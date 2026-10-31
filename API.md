@@ -167,3 +167,14 @@ callbacks or retries from duplicating business operations. Restart pauses active
 tasks. Schema11 adds exactly two tables. Full fields, states and errors:
 [AGENT-TASKS.md](AGENT-TASKS.md).
 
+
+
+## v0.14 two-group observations
+
+ChartCreate.kind adds grouped_points with existing x/y fields: exact group x,
+distinct numeric y, null bins/analysis_id. Artifact series remains x/y/rows;
+summary adds ordered groups(label,count) and three disjoint missing counts.
+Exactly two complete groups, label<=200Unicode characters without C0/C1 controls.
+Preview, explicit confirmation, hashes, lifecycle and old request fingerprints
+retain their semantics. Invalid groups/labels return invalid_grouped_points_data.
+No schema change. Full contract: [GROUPED-OBSERVATIONS.md](GROUPED-OBSERVATIONS.md).

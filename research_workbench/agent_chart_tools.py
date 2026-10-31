@@ -27,7 +27,7 @@ class ChartChangeArguments(ChartReadArguments):
 
 CHART_DEFINITIONS=[
     ('read_chart','读取已保存图表','Read verified chart metadata/summary/provenance of the explicitly shared dataset; never full raw series. Cite persistent chart reference.',ChartReadArguments,'read'),
-    ('preview_chart','预览绘图方案','Compute a read-only preview summary of registered chart kind and fields on explicitly shared dataset. Does not save. analysis_counts requires successful analysis_id only; histogram needs x and optional bins; scatter needs distinct x/y. No code/URLs/layout.',ChartArguments,'read'),
+    ('preview_chart','预览绘图方案','Compute a read-only preview summary of registered chart kind and fields on explicitly shared dataset. Does not save. analysis_counts requires successful analysis_id only; histogram needs numeric x and optional bins; scatter needs numeric x/y; grouped_points needs group x, numeric y, exactly two complete groups and no bins/analysis_id. No code/URLs/layout.',ChartArguments,'read'),
     ('propose_chart','建议保存图表','Propose concrete validated registered chart and fields for explicit user approval. Same arguments as preview_chart. Never claim saved before confirmation.',ChartArguments,'write'),
     ('propose_chart_delete','建议删除图表','Propose recoverable chart deletion using actual revision; explicitly shared dataset required.',ChartChangeArguments,'write'),
     ('propose_chart_restore','建议恢复图表','Propose restoring a deleted chart using actual revision; explicitly shared dataset required.',ChartChangeArguments,'write'),

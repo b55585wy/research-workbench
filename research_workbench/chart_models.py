@@ -3,7 +3,7 @@ from uuid import UUID
 from pydantic import BaseModel,ConfigDict,Field,field_validator,model_validator
 from .models import VersionedMutation
 
-ChartKind=Literal['analysis_counts','histogram','scatter']
+ChartKind=Literal['analysis_counts','histogram','scatter','grouped_points']
 
 
 class ChartCreate(BaseModel):
@@ -35,7 +35,7 @@ class ChartCreate(BaseModel):
             if self.x is None or self.y is not None or self.analysis_id is not None:raise ValueError('Histogram requires one numeric column')
             if self.bins is None:self.bins=20
         elif self.x is None or self.y is None or self.x==self.y or self.bins is not None or self.analysis_id is not None:
-            raise ValueError('Scatter requires distinct numeric columns')
+            raise ValueError('Point charts require distinct x/y columns without bins or analysis_id')
         return self
 
 

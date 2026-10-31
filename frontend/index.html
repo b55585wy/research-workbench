@@ -306,6 +306,7 @@
         <summary>实验图表</summary>
         <div class="charts-body">
           <p class="charts-help">从已保存数据或分析结果生成可追溯图表。先预览，再明确保存；图表仅描述数据。</p>
+          <p id="chart-draft-label" class="chart-draft-label">绘图草稿</p>
           <label class="chart-field" for="chart-dataset"><span class="chart-field-label">数据</span>
             <select id="chart-dataset" disabled></select>
           </label>
@@ -317,6 +318,7 @@
               <option value="analysis_counts">分析有效值 / 缺失值计数</option>
               <option value="histogram" selected>直方图</option>
               <option value="scatter">散点图</option>
+              <option value="grouped_points">两组观测点</option>
             </select>
           </label>
           <label class="chart-field" for="chart-title"><span class="chart-field-label">图表标题</span>
@@ -338,6 +340,7 @@
           </div>
           <div id="chart-status" class="chart-status" role="status" aria-live="polite"></div>
           <section class="chart-view" aria-label="图表预览">
+            <p id="chart-view-context" role="status" aria-live="polite" aria-atomic="true" hidden></p>
             <div id="chart-plot"></div>
             <div class="chart-view-actions">
               <button id="chart-png" class="button button-quiet" type="button" disabled>下载 PNG</button>

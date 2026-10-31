@@ -41,6 +41,9 @@ const messages = {
     clearChartContext: "清除图表上下文",
     chartDataset: "图表数据",
     chartKind: "图表类型",
+    grouped_points: "两组观测点",
+    chartGroupColumn: "分组列",
+    chartOutcome: "数值结果列",
     chartFields: "图表字段",
     chartBins: "分组数",
     chartRevision: "图表修订号",
@@ -236,6 +239,9 @@ const messages = {
     clearChartContext: "Clear chart context",
     chartDataset: "Chart data",
     chartKind: "Chart type",
+    grouped_points: "Two-group observations",
+    chartGroupColumn: "Grouping column",
+    chartOutcome: "Numeric outcome column",
     chartFields: "Chart fields",
     chartBins: "Bins",
     chartRevision: "Chart revision",
@@ -936,9 +942,14 @@ export function createAssistant(adapter) {
       }
       if (isChart) {
         if (payload.dataset_id) appendProposalField(details, t("chartDataset"), payload.dataset_name || payload.dataset_id);
-        if (payload.kind) appendProposalField(details, t("chartKind"), payload.kind);
-        const fields = [payload.x, payload.y].filter(Boolean);
-        if (fields.length) appendProposalField(details, t("chartFields"), fields.join(", "));
+        if (payload.kind) appendProposalField(details, t("chartKind"), t(payload.kind));
+        if (payload.kind === "grouped_points") {
+          appendProposalField(details, t("chartGroupColumn"), payload.x || "—");
+          appendProposalField(details, t("chartOutcome"), payload.y || "—");
+        } else {
+          const fields = [payload.x, payload.y].filter(Boolean);
+          if (fields.length) appendProposalField(details, t("chartFields"), fields.join(", "));
+        }
         if (payload.bins !== null && payload.bins !== undefined) appendProposalField(details, t("chartBins"), payload.bins);
         if (payload.expected_revision !== undefined) appendProposalField(details, t("chartRevision"), payload.expected_revision);
         if (payload.data_sha256) appendProposalField(details, t("chartDataHash"), payload.data_sha256);

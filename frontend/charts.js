@@ -13,6 +13,16 @@ const messages = {
     analysis_counts: "分析有效值 / 缺失值计数",
     histogram: "直方图",
     scatter: "散点图",
+    grouped_points: "两组观测点",
+    groupColumn: "分组标签（X）",
+    outcomeColumn: "观测数值（Y）",
+    chooseGroupedFields: "请选择不同的分组列和数值观测列。",
+    invalid_grouped_points_data: "需要恰好两组完整观测，且分组标签有效。",
+    groups: "分组计数",
+    missingGroupOnly: "仅分组缺失",
+    missingValueOnly: "仅观测值缺失",
+    missingBoth: "分组和观测值均缺失",
+    groupOverlap: "相同观测点可能重叠；图表数据与计数仍保留每一条原始记录。",
     title: "图表标题",
     titlePlaceholder: "输入图表标题",
     x: "X 列",
@@ -90,7 +100,11 @@ const messages = {
     proposalPreviewFailed: "预览失败，请重试；尚未写入。",
     openChart: "打开已保存图表",
     chartRevision: "修订号",
-    chartDataHash: "图表数据 SHA-256"
+    chartDataHash: "图表数据 SHA-256",
+    draftLabel: "绘图草稿",
+    assistantPreviewContext: "助手提案预览 · {kind}",
+    draftPreviewContext: "草稿预览 · {kind}",
+    savedChartContext: "已保存图表 · {kind}"
   },
   en: {
     panel: "Experiment charts",
@@ -102,6 +116,16 @@ const messages = {
     analysis_counts: "Analysis valid / missing counts",
     histogram: "Histogram",
     scatter: "Scatter plot",
+    grouped_points: "Two-group observations",
+    groupColumn: "Group label (X)",
+    outcomeColumn: "Observed numeric value (Y)",
+    chooseGroupedFields: "Choose distinct grouping and numeric outcome columns.",
+    invalid_grouped_points_data: "Exactly two complete groups with valid labels are required.",
+    groups: "Group counts",
+    missingGroupOnly: "Group only missing",
+    missingValueOnly: "Observed value only missing",
+    missingBoth: "Group and observed value missing",
+    groupOverlap: "Identical points may overlap; the chart data and counts retain every original observation.",
     title: "Chart title",
     titlePlaceholder: "Enter a chart title",
     x: "X column",
@@ -179,7 +203,11 @@ const messages = {
     proposalPreviewFailed: "Preview failed. Retry; nothing was written.",
     openChart: "Open saved chart",
     chartRevision: "Revision",
-    chartDataHash: "Chart data SHA-256"
+    chartDataHash: "Chart data SHA-256",
+    draftLabel: "Chart draft",
+    assistantPreviewContext: "Assistant proposal preview · {kind}",
+    draftPreviewContext: "Draft preview · {kind}",
+    savedChartContext: "Saved chart · {kind}"
   }
 };
 
@@ -216,6 +244,30 @@ function figureFor(artifact, labels = {}) {
       layout: { ...base, bargap: 0, xaxis: { title: { text: escapePlotlyText(spec.x) }, automargin: true }, yaxis: { title: { text: escapePlotlyText(labels.rows || "Rows") }, rangemode: "tozero" } }
     };
   }
+  if (artifact.kind === "grouped_points") {
+    return {
+      traces: [{
+        type: "scatter",
+        mode: "markers",
+        x: artifact.series.x.map(escapePlotlyText),
+        y: artifact.series.y,
+        text: artifact.series.rows.map((row) => `Row ${row}`),
+        marker: { color: "#1677b8", size: 7, opacity: 0.72 },
+        hovertemplate: "%{x}, %{y}<br>%{text}<extra></extra>"
+      }],
+      layout: {
+        ...base,
+        xaxis: {
+          type: "category",
+          categoryorder: "array",
+          categoryarray: artifact.summary.groups.map((group) => escapePlotlyText(group.label)),
+          title: { text: escapePlotlyText(spec.x) },
+          automargin: true
+        },
+        yaxis: { title: { text: escapePlotlyText(spec.y) }, automargin: true }
+      }
+    };
+  }
   return {
     traces: [{
       type: "scatter",
@@ -238,8 +290,43 @@ function stringArray(value) {
   return Array.isArray(value) && value.every((item) => typeof item === "string");
 }
 
+function exactKeys(value, keys) {
+  return value && typeof value === "object" && !Array.isArray(value) && Object.keys(value).length === keys.length &&
+    keys.every((key) => Object.hasOwn(value, key));
+}
+
 function validSummary(summary) {
   return summary && isInteger(summary.row_count) && isInteger(summary.used_rows) && isInteger(summary.excluded_rows) && stringArray(summary.columns);
+}
+
+function validGroupLabel(label) {
+  return typeof label === "string" && Array.from(label).length >= 1 && Array.from(label).length <= 200 &&
+    label.trim().length > 0 && !/[\u0000-\u001f\u007f-\u009f]/.test(label);
+}
+
+function validGroupedPoints(artifact) {
+  const { summary, series, spec } = artifact;
+  if (artifact.kind !== "grouped_points" || artifact.analysis_id !== null || !spec || Array.isArray(spec) ||
+    spec.kind !== artifact.kind || spec.title !== artifact.title || spec.analysis_id !== null || spec.bins !== null ||
+    !exactKeys(summary, ["row_count", "columns", "groups", "missing_group_only", "missing_value_only", "missing_both", "used_rows", "excluded_rows"]) ||
+    !exactKeys(series, ["x", "y", "rows"]) || !validSummary(summary) || summary.row_count > 50000 ||
+    summary.columns.length !== 2 || summary.columns[0] !== spec.x || summary.columns[1] !== spec.y || spec.x === spec.y) return false;
+  const missing = [summary.missing_group_only, summary.missing_value_only, summary.missing_both];
+  if (!missing.every((value) => isInteger(value)) || summary.excluded_rows !== missing.reduce((total, value) => total + value, 0) ||
+    summary.row_count !== summary.used_rows + summary.excluded_rows) return false;
+  if (!Array.isArray(series.x) || !Array.isArray(series.y) || !Array.isArray(series.rows) || series.x.length < 2 || series.x.length > 50000 ||
+    series.y.length !== series.x.length || series.rows.length !== series.x.length || summary.used_rows !== series.x.length ||
+    !series.x.every(validGroupLabel) || !series.y.every(Number.isFinite) ||
+    !series.rows.every((row, index) => isInteger(row, 1) && row <= summary.row_count && (index === 0 || row > series.rows[index - 1]))) return false;
+  if (!Array.isArray(summary.groups) || summary.groups.length !== 2 || summary.groups.some((group) => !exactKeys(group, ["label", "count"]) ||
+    !validGroupLabel(group.label) || !isInteger(group.count, 1))) return false;
+  const firstSeen = [];
+  const counts = new Map();
+  for (const label of series.x) {
+    if (!counts.has(label)) firstSeen.push(label);
+    counts.set(label, (counts.get(label) || 0) + 1);
+  }
+  return firstSeen.length === 2 && summary.groups.every((group, index) => group.label === firstSeen[index] && group.count === counts.get(group.label));
 }
 
 function validSeries(artifact) {
@@ -262,6 +349,7 @@ function validSeries(artifact) {
       series.x.length <= 50000 && series.y.length === series.x.length && series.rows.length === series.x.length &&
       series.x.every(Number.isFinite) && series.y.every(Number.isFinite) && series.rows.every((value) => isInteger(value, 1));
   }
+  if (artifact.kind === "grouped_points") return validGroupedPoints(artifact);
   return false;
 }
 
@@ -380,6 +468,8 @@ export function createCharts(adapter) {
   const byId = (id) => document.getElementById(id);
   const elements = {
     panel: byId("charts-panel"),
+    draftLabel: byId("chart-draft-label"),
+    viewContext: byId("chart-view-context"),
     dataset: byId("chart-dataset"),
     analysis: byId("chart-analysis"),
     kind: byId("chart-kind"),
@@ -459,8 +549,19 @@ export function createCharts(adapter) {
     return entry?.jobs.find((job) => job.id === entry.draft?.analysisId && job.dataset_id === entry.draft.datasetId && job.status === "succeeded" && isDescriptiveJob(job)) || null;
   }
 
+  function allColumns(entry) {
+    return (selectedDataset(entry)?.columns || []).map((column) => column.name);
+  }
+
   function numericColumns(entry) {
     return (selectedDataset(entry)?.columns || []).filter((column) => column.numeric).map((column) => column.name);
+  }
+
+  function syncFields(entry, draft, reset = false) {
+    const numeric = numericColumns(entry);
+    const xColumns = draft.kind === "grouped_points" ? allColumns(entry) : numeric;
+    draft.x = !reset && xColumns.includes(draft.x) ? draft.x : xColumns[0] || "";
+    draft.y = !reset && numeric.includes(draft.y) && draft.y !== draft.x ? draft.y : numeric.find((name) => name !== draft.x) || "";
   }
 
   function ensureDraft(entry) {
@@ -496,9 +597,7 @@ export function createCharts(adapter) {
     if (draft.datasetId === datasetId && (!analysisId || draft.analysisId === analysisId)) return;
     invalidateDraft(draft, false);
     draft.datasetId = datasetId;
-    const numeric = numericColumns(entry);
-    draft.x = numeric.includes(draft.x) ? draft.x : numeric[0] || "";
-    draft.y = numeric.includes(draft.y) && draft.y !== draft.x ? draft.y : numeric.find((name) => name !== draft.x) || "";
+    syncFields(entry, draft);
     draft.analysisId = entry.jobs.find((job) => job.id === analysisId && job.dataset_id === datasetId && job.status === "succeeded" && isDescriptiveJob(job))?.id ||
       entry.jobs.find((job) => job.dataset_id === datasetId && job.status === "succeeded" && isDescriptiveJob(job))?.id || null;
     render();
@@ -530,6 +629,7 @@ export function createCharts(adapter) {
     if (draft.kind === "analysis_counts" && !selectedJob(entry)) throw new Error("chooseAnalysis");
     if (["histogram", "scatter"].includes(draft.kind) && !numericColumns(entry).includes(draft.x)) throw new Error("chooseFields");
     if (draft.kind === "scatter" && (!numericColumns(entry).includes(draft.y) || draft.x === draft.y)) throw new Error("chooseFields");
+    if (draft.kind === "grouped_points" && (!allColumns(entry).includes(draft.x) || !numericColumns(entry).includes(draft.y) || draft.x === draft.y)) throw new Error("chooseGroupedFields");
     if (draft.kind === "histogram" && (!Number.isInteger(draft.bins) || draft.bins < 2 || draft.bins > 50)) throw new Error("validation_error");
     return {
       request_id: draft.saveOperation?.body.request_id || draft.previewOperation?.body.request_id || crypto.randomUUID(),
@@ -538,8 +638,8 @@ export function createCharts(adapter) {
       kind: draft.kind,
       title,
       analysis_id: draft.kind === "analysis_counts" ? draft.analysisId : null,
-      x: ["histogram", "scatter"].includes(draft.kind) ? draft.x : null,
-      y: draft.kind === "scatter" ? draft.y : null,
+      x: ["histogram", "scatter", "grouped_points"].includes(draft.kind) ? draft.x : null,
+      y: ["scatter", "grouped_points"].includes(draft.kind) ? draft.y : null,
       bins: draft.kind === "histogram" ? draft.bins : null,
       recipe_sha256: recipe.recipe_sha256,
       renderer_sha256: capabilities.renderer.sha256
@@ -552,7 +652,7 @@ export function createCharts(adapter) {
         if (!body || body.arbitrary_code !== false || !Array.isArray(body.items) || body.limits?.data_bytes !== MAX_ARTIFACT_BYTES ||
           body.renderer?.id !== "plotly-strict" || body.renderer?.version !== "4.2.0" || body.renderer?.script_url !== RENDERER_URL ||
           !HEX_64.test(body.renderer?.sha256 || "") || !isInteger(body.renderer?.byte_size, 1) ||
-          !["analysis_counts", "histogram", "scatter"].every((kind) => body.items.some((item) => item.id === kind && HEX_64.test(item.recipe_sha256 || "")))) {
+          !["analysis_counts", "histogram", "scatter", "grouped_points"].every((kind) => body.items.some((item) => item.id === kind && HEX_64.test(item.recipe_sha256 || "")))) {
           throw new Error("invalidCapabilities");
         }
         return body;
@@ -604,10 +704,15 @@ export function createCharts(adapter) {
     fillSelect(elements.dataset, (entry?.datasets || []).map((dataset) => ({ value: dataset.id, label: dataset.original_filename })), draft?.datasetId, entry?.datasets.length ? null : t("noDataset"));
     const jobs = (entry?.jobs || []).filter((job) => job.dataset_id === draft?.datasetId && job.status === "succeeded" && isDescriptiveJob(job));
     fillSelect(elements.analysis, jobs.map((job) => ({ value: job.id, label: `${job.dataset_name} · ${job.engine} · ${String(job.created_at || "").slice(0, 19)}` })), draft?.analysisId, t("noAnalysis"));
-    fillSelect(elements.kind, ["analysis_counts", "histogram", "scatter"].map((kind) => ({ value: kind, label: t(kind) })), draft?.kind);
+    fillSelect(elements.kind, ["analysis_counts", "histogram", "scatter", "grouped_points"].map((kind) => ({ value: kind, label: t(kind) })), draft?.kind);
     const numeric = numericColumns(entry);
-    fillSelect(elements.x, numeric.map((name) => ({ value: name, label: name })), draft?.x);
+    const grouped = draft?.kind === "grouped_points";
+    fillSelect(elements.x, (grouped ? allColumns(entry) : numeric).map((name) => ({ value: name, label: name })), draft?.x);
     fillSelect(elements.y, numeric.map((name) => ({ value: name, label: name })), draft?.y);
+    const xLabel = document.querySelector('label[for="chart-x"] .chart-field-label');
+    const yLabel = document.querySelector('label[for="chart-y"] .chart-field-label');
+    if (xLabel) xLabel.textContent = t(grouped ? "groupColumn" : "x");
+    if (yLabel) yLabel.textContent = t(grouped ? "outcomeColumn" : "y");
     if (elements.title.value !== (draft?.title || "")) elements.title.value = draft?.title || "";
     elements.bins.value = String(draft?.bins || 20);
     for (const control of [elements.dataset, elements.analysis, elements.kind, elements.title, elements.x, elements.y, elements.bins]) control.disabled = locked;
@@ -615,7 +720,7 @@ export function createCharts(adapter) {
     elements.analysis.labels?.[0] && (elements.analysis.labels[0].hidden = elements.analysis.hidden);
     elements.x.hidden = draft?.kind === "analysis_counts";
     elements.x.labels?.[0] && (elements.x.labels[0].hidden = elements.x.hidden);
-    elements.y.hidden = draft?.kind !== "scatter";
+    elements.y.hidden = !["scatter", "grouped_points"].includes(draft?.kind);
     elements.y.labels?.[0] && (elements.y.labels[0].hidden = elements.y.hidden);
     elements.bins.hidden = draft?.kind !== "histogram";
     elements.bins.labels?.[0] && (elements.bins.labels[0].hidden = elements.bins.hidden);
@@ -673,11 +778,24 @@ export function createCharts(adapter) {
     for (const chart of deleted) elements.deletedList.append(renderChartItem(entry, chart));
   }
 
+  function renderViewContext(entry) {
+    const view = entry?.view;
+    if (!view?.artifact) {
+      elements.viewContext.hidden = true;
+      elements.viewContext.textContent = "";
+      return;
+    }
+    const key = view.kind === "saved" ? "savedChartContext" : view.origin === "assistant" ? "assistantPreviewContext" : "draftPreviewContext";
+    elements.viewContext.hidden = false;
+    elements.viewContext.textContent = t(key, { kind: t(view.artifact.kind) });
+  }
+
   function render() {
     const entry = currentEntry();
     renderForm(entry);
     renderStatus(entry);
     renderLists(entry);
+    renderViewContext(entry);
     elements.png.disabled = !entry?.view?.renderReady || entry.view.pending || !entry.view.host?.isConnected;
   }
 
@@ -695,8 +813,15 @@ export function createCharts(adapter) {
     appendField(summary, t("rows"), artifact.summary.row_count);
     appendField(summary, t("used"), artifact.summary.used_rows);
     appendField(summary, t("excluded"), artifact.summary.excluded_rows);
+    if (artifact.kind === "grouped_points") {
+      appendField(summary, t("groups"), artifact.summary.groups.map((group) => `${group.label}: ${group.count}`).join(" · "));
+      appendField(summary, t("missingGroupOnly"), artifact.summary.missing_group_only);
+      appendField(summary, t("missingValueOnly"), artifact.summary.missing_value_only);
+      appendField(summary, t("missingBoth"), artifact.summary.missing_both);
+    }
     appendField(summary, t("columns"), artifact.summary.columns.join(", "));
     elements.summary.append(summary);
+    if (artifact.kind === "grouped_points") elements.summary.append(make("p", "charts-help", t("groupOverlap")));
     elements.details.append(make("h3", "", t("details")), make("p", view.kind === "preview" ? "chart-badge chart-badge-preview" : "chart-badge", t(view.kind === "preview" ? "previewBadge" : "savedBadge")));
     const details = make("dl", "chart-details-list");
     appendField(details, t("source"), view.record?.dataset_name || selectedDataset(entryFor(artifact.document_id))?.original_filename || artifact.dataset_id);
@@ -848,7 +973,7 @@ export function createCharts(adapter) {
         !validateArtifact(response.data, { ...body, document_id: documentId })) throw new Error("invalidArtifact");
       operation.artifact = response.data;
       operation.descriptor = response.chart;
-      const view = { kind: "preview", artifact: response.data, record: response.chart, renderer: capabilities.renderer, pending: true, renderReady: false, host: null, operation };
+      const view = { kind: "preview", origin: "draft", artifact: response.data, record: response.chart, renderer: capabilities.renderer, pending: true, renderReady: false, host: null, operation };
       operation.view = view;
       entry.view = view;
       entry.activeChartId = null;
@@ -1156,7 +1281,7 @@ export function createCharts(adapter) {
       if (!response?.chart || !validateArtifact(response.data, { ...body, document_id: documentId }) ||
         body.recipe_sha256 !== capabilities.items.find((item) => item.id === body.kind)?.recipe_sha256 ||
         body.renderer_sha256 !== capabilities.renderer.sha256) throw new Error("invalidArtifact");
-      const view = { kind: "preview", artifact: response.data, record: response.chart, renderer: capabilities.renderer, pending: true, renderReady: false, host: null };
+      const view = { kind: "preview", origin: "assistant", artifact: response.data, record: response.chart, renderer: capabilities.renderer, pending: true, renderReady: false, host: null };
       entry.view = view;
       entry.activeChartId = null;
       elements.panel.open = true;
@@ -1195,6 +1320,7 @@ export function createCharts(adapter) {
     if (!draft || draft.pendingSave || draft.saveFailed) return;
     invalidateDraft(draft);
     draft.kind = elements.kind.value;
+    syncFields(entry, draft);
     if (draft.kind === "analysis_counts") {
       const job = entry.jobs.find((item) => item.dataset_id === draft.datasetId && item.status === "succeeded" && isDescriptiveJob(item));
       draft.analysisId = job?.id || null;
@@ -1207,9 +1333,7 @@ export function createCharts(adapter) {
     if (!draft || draft.pendingSave || draft.saveFailed) return;
     invalidateDraft(draft);
     draft.datasetId = elements.dataset.value || null;
-    const numeric = numericColumns(entry);
-    draft.x = numeric[0] || "";
-    draft.y = numeric[1] || "";
+    syncFields(entry, draft, true);
     draft.analysisId = entry.jobs.find((job) => job.dataset_id === draft.datasetId && job.status === "succeeded" && isDescriptiveJob(job))?.id || null;
     adapter.datasetContextChanged?.(currentId, draft.datasetId, draft.analysisId);
     render();
@@ -1244,6 +1368,7 @@ export function createCharts(adapter) {
       language = nextLanguage;
       elements.panel.querySelector("summary").textContent = t("panel");
       elements.panel.querySelector(".charts-help").textContent = t("help");
+      elements.draftLabel.textContent = t("draftLabel");
       for (const [id, key] of [["chart-dataset", "dataset"], ["chart-analysis", "analysis"], ["chart-kind", "kind"], ["chart-title", "title"], ["chart-x", "x"], ["chart-y", "y"], ["chart-bins", "bins"]]) {
         const label = document.querySelector(`label[for="${id}"] .chart-field-label`);
         if (label) label.textContent = t(key);

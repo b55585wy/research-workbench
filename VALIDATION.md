@@ -527,3 +527,29 @@ and all4material files survive unchanged. Activation separately checks ownership
 backup, unchanged model/runtime capabilities and tFUS/global-routing preservation.
 Intermediate failures remain in external evidence: transient provider errors,
 prose-only model plan, drawer overlap/shrinking, draft loss and harness corrections.
+
+
+## v0.14 two-group observations —2026-10-31
+
+grouped-observations-v1/pytest-result-02.json:753passed,0skipped. Old chart recipe
+hashes remain exact; no schema or vendor/runtime changes. New53cases cover exact
+raw categories/row identity/missing counts, limits, malformed child output,
+timeouts/permissions, atomic writes, lifecycle/export/restart and actual R Agent
+task continuation. New kind uses independent fixed source snapshots.
+
+Actual configured model: pilot-02 passes5UI outcome groups with9calls, one goal
+and3business approvals. R Welch OJ-minus-VC on fixed-dose20public observations;
+13fields match independent60digit mpmath formulas and directR references. Actual
+Plotly renders20points/2categories; source note remains unreviewed.32export files
+hash verified; originals exact. Server stopped before offline20point replay and
+14malformed-data rejection cases, with no HTTP requests or page script errors.
+
+grouped-ui-02 passes5native groups with zero model calls: numeric-looking category
+identity, duplicate observations, missing summary, exact lost-save replay,
+delete/restore/export, hostile literal labels and390px English blue/keyboard.
+Legacy chart restart/portable regression also passes; subsequent release receipts
+record remaining old workflows, service ownership/backup and live preservation.
+Public data are not the user's own experiment; design and unit limits remain in
+the report and source note. Failed harness attempts are retained externally.
+
+Final clarity review: grouped-ui-03 passes6groups, including an explicit scripted Agent proposal preview with a preserved manual histogram draft. Native actions make0model calls; the requested Agent scenario makes1. Current view labels distinguish assistant preview, manual preview and saved kinds.

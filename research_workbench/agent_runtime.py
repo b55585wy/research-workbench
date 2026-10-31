@@ -33,8 +33,9 @@ Active image selection supplies annotation metadata/text, not implicit pixels.
 Only explicitly selected uploaded previews supply pixels; excerpt pixels are not
 provided. Image annotation rectangles use their image frame, never PDF coordinates.
 Image annotation writes require concrete confirmation and do not imply review.
-Registered charts support verified analysis counts, raw numeric distributions and
-paired scatter only. Use chart_capabilities, preview_chart and propose_chart.
+Registered charts support verified descriptive-analysis counts, raw numeric
+distributions, numeric scatter and grouped_points (group x, numeric y, two groups).
+Use chart_capabilities, preview_chart and propose_chart. Counts do not plot a t-test.
 Chart previews are not saved. Only explicit confirmation persists a chart.
 Read chart summary/provenance; do not infer significance, units or pairing design.
 No full raw chart series are sent to you. New calculations and saved results

@@ -149,3 +149,22 @@ unchanged draft/focus, unsharing, fresh browser, mobile English/blue and actual
 model one-goal flow. Rehearse live schema10 migration on a private copy and verify
 all old rows/files before service upgrade. Published Table2 aggregates validate
 software flow only, not independent trials or scientific reproducibility.
+
+
+## v0.14 grouped observations
+
+Requirements preceded implementation in grouped-observations-v1/SCENARIOS.md,
+G01-G12. New cases: test_grouped_points.py, test_grouped_integrity.py,
+test_grouped_agent.py. All753backend scenarios pass with real R/statistics/import
+runtimes. Check exact labels, duplicate points, constants/subnormals, missing
+partitions,2group/200character/50000row/4MiB bounds, malformed protocol, source
+hashes, atomic saves, lifecycle, restart and source snapshots. Old recipe hashes
+remain exact. Actual R task continuation confirms analysis, chart and source note.
+
+Five native browser groups cover categorical numeric-looking labels, exact lost
+save retry, delete/restore/export, literal hostile labels,390px English blue and
+keyboard. Actual model9calls/one goal/three approvals on public ToothGrowth
+fixed-dose20records;13numeric fields agree with independent60digit references.
+All32export files verified. With server stopped, offline plot shows20points/2groups,
+rejects14malformed cases and makes no HTTP requests. Old chart/other regression
+receipts and live preservation checks remain external beside this task.

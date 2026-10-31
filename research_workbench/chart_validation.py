@@ -1,5 +1,6 @@
 """Validate the fixed child protocol and stored figure identities."""
 import math
+from .grouped_points_validation import validate as validate_grouped_points
 
 
 def integer(value,lower=0,upper=50000):return type(value) is int and lower<=value<=upper
@@ -21,6 +22,8 @@ def projection(value,kind,columns,row_count):
         assert all(len(series[k])==size for k in series)
         assert all(integer(n) for n in series['counts']) and sum(series['counts'])==used
         assert all(isinstance(s,str) and 1<=len(s)<=2000 for k in ('labels','lower','upper') for s in series[k])
+    elif kind=='grouped_points':
+        validate_grouped_points(value,row_count,columns)
     else:
         assert set(series)=={'x','y','rows'} and all(len(v)==used for v in series.values())
         assert all(type(v) in (int,float) and math.isfinite(v) for k in ('x','y') for v in series[k])

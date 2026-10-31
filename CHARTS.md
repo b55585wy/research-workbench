@@ -28,7 +28,7 @@ and chart_operations only, retaining all19 previous tables.20 charts/paper,
 
 GET `/api/v1/charts/capabilities` -> `{items:[{id,title,recipe_sha256}],renderer,
 limits:{data_bytes:4194304,charts_per_document:20,rows:50000},arbitrary_code:false}`.
-Kinds: analysis_counts, histogram, scatter. renderer is
+Kinds: analysis_counts, histogram, scatter, grouped_points (v0.14, see below). renderer is
 `{id:"plotly-strict",version:"4.2.0",sha256,byte_size,
 script_url:"/vendor/plotly/4.2.0/plotly-strict.min.js"}`.
 
@@ -133,3 +133,16 @@ getActiveChartId(documentId),getActiveChart(documentId),clearActiveChart(documen
 reload(documentId),openChart(documentId,id),previewProposal(documentId,proposal).
 Offline chart-export.js reads #chart-data application/json and uses window.Plotly;
 classic script with no module imports/fetch supports file://. root generates HTML.
+
+
+## v0.14: two-group observations
+
+grouped_points takes a literal group x and distinct numeric y, exactly two complete
+groups; bins/analysis_id are null. First-seen labels and original row indices are
+retained; duplicate points are not aggregated. series keeps x/y/rows. Summary adds
+groups(label,count) and missing_group_only/missing_value_only/missing_both.
+Limits include two groups and200Unicode characters per label without C0/C1 controls.
+Whitespace-only group/value cells are missing; all three counts sum to exclusions.
+Original Plotly strict4.2.0 renders a categorical axis, escaped literal labels and
+actual row hover. A separate grouped_points_probe.py keeps all old recipe hashes.
+schema11/24tables unchanged. See [GROUPED-OBSERVATIONS.md](GROUPED-OBSERVATIONS.md).

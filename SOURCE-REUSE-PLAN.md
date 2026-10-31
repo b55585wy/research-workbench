@@ -115,3 +115,14 @@ without a whole application or a rewritten statistical engine. haven/SPSS file
 import remains pending. Source/diagnostics/actual integration are documented in
 STATISTICAL-TESTS.md and STATISTICS-SOURCES.md; no full SPSS compatibility claim.
 
+
+
+## v0.14 grouped observation component reuse
+
+The unchanged pinned original Plotly strict4.2.0 now also renders categorical
+group/raw numeric observations through its existing scatter trace. Host adapters
+provide closed source-bound parameters and fixed point projection, not a new
+plot engine or RSpace business model. R stats::t.test and datasets::ToothGrowth
+are reused for an isolated public-data workflow verification; no new R package,
+inferential method or arbitrary-code runtime is added. The independent mpmath
+numeric reference is test-only and is not an application dependency.
