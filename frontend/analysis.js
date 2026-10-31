@@ -1819,6 +1819,9 @@ export function createAnalysis(adapter) {
       notebook.applyLanguage(nextLanguage);
       render();
     },
+    getSelectedDataset() {
+      return selectedDataset(currentEntry());
+    },
     getSelectedDatasetId() {
       return selectedDataset(currentEntry())?.id || null;
     },

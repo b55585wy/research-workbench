@@ -166,7 +166,12 @@ def create_app(data_root=None, validator=None, renderer=None, *, agent_provider=
     from .charts import Charts
     from .chart_api import router as chart_router
     charts=Charts(store,datasets,analysis)
+    from .research_records import ResearchRecords
+    from .record_api import router as record_router
+    records=ResearchRecords(store,datasets,analysis,charts)
     agent=ReadingAgent(store,images,provider,page_reader,analysis=analysis,image_annotations=image_annotations,charts=charts)
+
+    agent.workspace.records=records
 
     @asynccontextmanager
     async def lifespan(app):
@@ -188,6 +193,8 @@ def create_app(data_root=None, validator=None, renderer=None, *, agent_provider=
     app.include_router(selection_router)
     app.state.image_annotations=image_annotations
     app.state.charts=charts
+    app.state.records=records
+    app.include_router(record_router)
     app.include_router(chart_router)
     app.include_router(data_import_router)
     app.add_middleware(LocalBoundary)

@@ -119,6 +119,7 @@ const messages = {
     assistantAnswer: "助手",
     tools: "工具记录",
     sources: "来源",
+    reviewResearchRecord: "查看导出范围",
     proposals: "待确认操作",
     proposalStatus: "状态：{status}",
     pending: "待确认",
@@ -328,6 +329,7 @@ const messages = {
     assistantAnswer: "Assistant",
     tools: "Tool history",
     sources: "Sources",
+    reviewResearchRecord: "Review export scope",
     proposals: "Actions awaiting confirmation",
     proposalStatus: "Status: {status}",
     pending: "Pending",
@@ -713,9 +715,19 @@ export function createAssistant(adapter) {
       const button = document.createElement("button");
       button.type = "button";
       button.className = "assistant-source-button";
-      button.textContent = source.label || source.ref;
-      button.addEventListener("click", () => adapter.navigateSource(source));
+      const isResearchRecord = source.kind === "research_record";
+      button.textContent = isResearchRecord ? t("reviewResearchRecord") : source.label || source.ref;
+      button.addEventListener("click", () => {
+        if (isResearchRecord) adapter.reviewResearchRecord?.(source);
+        else adapter.navigateSource(source);
+      });
       item.append(button);
+      if (isResearchRecord && source.ref) {
+        const reference = document.createElement("p");
+        reference.className = "assistant-source-ref";
+        reference.textContent = t("sourceRef", { ref: source.ref });
+        item.append(reference);
+      }
       if (source.text) {
         const excerpt = document.createElement("p");
         excerpt.textContent = source.text;

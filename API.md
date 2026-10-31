@@ -198,3 +198,20 @@ file/analysis/chart endpoints consume selected tables. Schema12 adds only one
 table. Agent uses dataset_values, preview_dataset_selection, propose_dataset_selection;
 new child requires fresh explicit sharing, continuous tasks cannot retarget.
 See [behavior and integrity contract](DATASET-SELECTION.md).
+
+
+## v0.16 research record export
+
+Prefix `/api/v1/documents/{doc}/research-records`. GET `/options` requires dataset_id
+and dataset_sha256; returns succeeded same-source analyses, active charts, reading
+counts and128MiB expanded-byte limit. POST `/preview` accepts strict dataset_id,
+dataset_sha256, optional analysis_id/chart_id (null), include_reading (strict bool,
+defaulttrue). Returns saved:false, spec, scope summaries, preview_sha256 and frozen
+download_url. No ZIP or database write. GET `/download?token=...` revalidates scope,
+streams original component artifacts into one ZIP and checks final scope again.
+Token is canonical bounded version1 JSON/base64url, not authentication.409 drift,
+scope/result mismatch or corruption;413 expanded limit;429 busy;422 malformed;
+503 storage unavailable. Existing ExportResponse removes temporary ZIP even on
+disconnect. No schema change. Agent prepare_research_record requires explicit
+dataset sharing, returns summary and a research_record source for human review.
+Full scope, resource and offline behavior: [RESEARCH-RECORD.md](RESEARCH-RECORD.md).

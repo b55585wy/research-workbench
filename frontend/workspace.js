@@ -191,6 +191,7 @@ export function createWorkspace(adapter) {
 
   function reveal(nextMode, options = {}) {
     navigationGeneration += 1;
+    adapter.navigationChanged?.();
     const nextTool = options.tool === "charts" ? "charts" : options.tool === "analysis" ? "analysis" : tool;
     const changed = mode !== nextMode || tool !== nextTool;
     if (changed && initialized) rememberFocus();

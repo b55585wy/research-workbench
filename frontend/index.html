@@ -15,6 +15,7 @@
   <link rel="stylesheet" href="/statistics.css">
   <link rel="stylesheet" href="/analysis-notebook.css">
   <link rel="stylesheet" href="/charts.css">
+  <link rel="stylesheet" href="/research-record.css">
   <link rel="stylesheet" href="/assistant.css">
   <link rel="stylesheet" href="/task-client.css">
   <link rel="stylesheet" href="/rich-text.css">
@@ -159,9 +160,12 @@
           <h2 id="data-workspace-title">数据工作区</h2>
           <p id="data-workspace-help" class="data-workspace-help">数据、设置、结果和图表均属于当前文献。预览仅显示前 5 行，运行分析前仍需核对并明确确认。</p>
         </div>
-        <div id="data-tool-switch" class="data-tool-switch" aria-label="分析 / 图表">
-          <button id="data-tool-analysis" class="data-tool-button" type="button" aria-controls="analysis-panel" aria-pressed="true">分析</button>
-          <button id="data-tool-charts" class="data-tool-button" type="button" aria-controls="charts-panel" aria-pressed="false">图表</button>
+        <div class="data-workspace-actions">
+          <button id="research-record-open" class="button button-secondary" type="button" disabled>导出研究记录</button>
+          <div id="data-tool-switch" class="data-tool-switch" aria-label="分析 / 图表">
+            <button id="data-tool-analysis" class="data-tool-button" type="button" aria-controls="analysis-panel" aria-pressed="true">分析</button>
+            <button id="data-tool-charts" class="data-tool-button" type="button" aria-controls="charts-panel" aria-pressed="false">图表</button>
+          </div>
         </div>
       </header>
       <p id="data-prerequisite" class="data-prerequisite" role="status">请先从左侧选择或上传一篇文献，再导入与该文献关联的数据。</p>
@@ -487,6 +491,41 @@
       </form>
     </details>
   </aside>
+
+  <dialog id="research-record-dialog" class="research-record-dialog" aria-labelledby="research-record-title" aria-describedby="research-record-help research-record-status">
+    <div class="research-record-layout">
+      <header class="research-record-header">
+        <div>
+          <h2 id="research-record-title">导出研究记录</h2>
+          <p id="research-record-help" class="research-record-help">原始 PDF 和所选数据始终包含。可选择一项已完成的分析和一项已保存图表。</p>
+        </div>
+        <button id="research-record-close" class="button button-quiet" type="button" aria-label="关闭">×</button>
+      </header>
+      <div class="research-record-body">
+        <div class="research-record-fields">
+          <label class="research-record-field" for="research-record-analysis">
+            <span id="research-record-analysis-label">已完成的分析</span>
+            <select id="research-record-analysis" disabled></select>
+          </label>
+          <label class="research-record-field" for="research-record-chart">
+            <span id="research-record-chart-label">已保存图表</span>
+            <select id="research-record-chart" disabled></select>
+          </label>
+        </div>
+        <label class="research-record-reading" for="research-record-reading">
+          <input id="research-record-reading" type="checkbox" checked disabled>
+          <span id="research-record-reading-label">包含本篇全部有效笔记、摘录与图片标注</span>
+        </label>
+        <p id="research-record-reading-help" class="research-record-reading-help"></p>
+        <section id="research-record-summary" class="research-record-summary" aria-label="导出范围"></section>
+        <div id="research-record-status" class="research-record-status" role="status" aria-live="polite" aria-atomic="true"></div>
+      </div>
+      <footer class="research-record-footer">
+        <button id="research-record-preview" class="button button-secondary" type="button" disabled>预览导出范围</button>
+        <button id="research-record-download" class="button button-primary" type="button" disabled>下载研究记录</button>
+      </footer>
+    </div>
+  </dialog>
 
   <dialog id="rich-text-dialog" class="rich-text-dialog" aria-labelledby="rich-text-title" aria-describedby="rich-text-status">
     <header class="rich-text-dialog-header">

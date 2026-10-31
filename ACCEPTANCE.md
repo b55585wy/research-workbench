@@ -176,3 +176,16 @@ receipts and live preservation checks remain external beside this task.
 零命中阻止生成、预览漂移/原请求重试、事务和回执共同回滚、有界解析/配额、缓存
 恢复与损坏拒绝、schema11原24表保留、SPSS说明和祖先导出、Agent新表重新授权、
 连续任务不切源；另跑完整后端和旧界面回归。公开60→20行再接实际R/图表/笔记。
+
+
+## v0.16 unified research record
+
+Scenarios R01-R12 were enumerated in research-record-v1/SCENARIOS.md before edits.
+Require all8 optional scope combinations, strict IDs/hash/bool/token/path limits,
+same-source and analysis-linked chart checks, included/excluded reading drift,
+metadata/material mutation, final-snapshot race, byte-exact existing artifacts,
+manifest hashes, exact128MiB expanded boundary, concurrent slot/permission/
+disconnect cleanup and no DB writes. Agent gets summary only for explicitly shared
+data and a human review entry. Native retry/repreview/source races, stale Agent
+scope, mobile/keyboard/bilingual/default-blue, old workflows and public offline
+20-point replay are required. Schema12 and all25 original tables remain.

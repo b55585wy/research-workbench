@@ -8,6 +8,7 @@ import { createCharts } from "/charts.js";
 import { createWorkspace } from "/workspace.js";
 import { createAssistant } from "/assistant.js";
 import { createRichText, renderRichHtml } from "/rich-text.js";
+import { createResearchRecord } from "/research-record.js";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = "/vendor/pdfjs/build/pdf.worker.mjs";
 
@@ -179,6 +180,8 @@ const messages = {
     metadataLatestHeading: "最新保存内容",
     metadataLatestLoaded: "已显示最新保存内容；你的草稿仍保留在上方。",
     metadataValidation: "请填写标题；年份须为 1 至 9999 的整数或留空。",
+    research_record_source_mismatch: "请先返回该来源的文献和所选数据，再查看导出范围；当前工作区未切换。",
+    research_record_invalid_source: "这条导出范围来源不完整，无法打开。",
     untitled: "未命名文献"
   },
   en: {
@@ -341,6 +344,8 @@ const messages = {
     metadataLatestHeading: "Latest saved values",
     metadataLatestLoaded: "Latest saved values are shown below; your draft is still preserved above.",
     metadataValidation: "Enter a title. Year must be a whole number from 1 to 9999, or empty.",
+    research_record_source_mismatch: "Return to the source paper and selected data to review this export scope. The current workspace was not changed.",
+    research_record_invalid_source: "This export-scope source is incomplete and cannot be opened.",
     untitled: "Untitled paper"
   }
 };
@@ -474,6 +479,7 @@ let charts = null;
 let workspace = null;
 let assistant = null;
 let richText = null;
+let researchRecord = null;
 
 function readLanguage() {
   try {
@@ -566,6 +572,7 @@ function applyLanguage() {
   workspace?.applyLanguage(state.language);
   assistant?.applyLanguage(state.language);
   richText?.applyLanguage(state.language);
+  researchRecord?.applyLanguage(state.language);
 }
 
 class ApiError extends Error {
@@ -1446,6 +1453,7 @@ function showMissingDocument() {
 function cancelDocumentWork() {
   richText?.close({ restoreFocus: false });
   imageViewer?.close({ restoreFocus: false });
+  researchRecord?.documentChanged();
   state.loadSequence += 1;
   state.renderSequence += 1;
   state.loadController?.abort();
@@ -2878,7 +2886,8 @@ workspace = createWorkspace({
   toolVisible: (tool) => {
     if (tool === "charts") charts?.refreshLayout();
   },
-  chartsSelected: (documentId) => charts?.reload(documentId)
+  chartsSelected: (documentId) => charts?.reload(documentId),
+  navigationChanged: () => researchRecord?.navigationChanged()
 });
 
 richText = createRichText({
@@ -2934,7 +2943,10 @@ analysis = createAnalysis({
   onDatasetOpened: showDatasetInUrl,
   startImport: (file) => dataImports?.startImport(file),
   isImportPending: () => dataImports?.isImportPending() || false,
-  datasetContextChanged: (documentId, datasetId, analysisId) => charts?.syncDataset(documentId, datasetId, analysisId),
+  datasetContextChanged: (documentId, datasetId, analysisId) => {
+    researchRecord?.sourceChanged();
+    charts?.syncDataset(documentId, datasetId, analysisId);
+  },
   datasetSelectionChanged: (documentId, dataset) => datasetSelection?.sync(documentId, dataset),
   addAnalysisCitation,
   sourcesChanged: (documentId) => {
@@ -2981,6 +2993,16 @@ charts = createCharts({
   addChartCitation
 });
 
+researchRecord = createResearchRecord({
+  api,
+  checkedFetch,
+  getDocument: () => state.document,
+  getSelectedDataset: () => analysis.getSelectedDataset(),
+  getLanguage: () => state.language,
+  getNavigationGeneration: () => workspace.getNavigationGeneration(),
+  sourceMismatch: (key) => setStatus(key, "error")
+});
+
 $("charts-panel").addEventListener("toggle", (event) => {
   const documentId = state.document?.id;
   if (event.currentTarget.open && documentId) charts.reload(documentId);
@@ -3013,6 +3035,7 @@ assistant = createAssistant({
   clearActiveImage: (documentId) => imageViewer.clearActiveContext(documentId),
   openImageProposal,
   navigateSource: navigateAssistantSource,
+  reviewResearchRecord: (source) => researchRecord.reviewSource(source),
   refreshAfterAgent
 });
 

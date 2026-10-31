@@ -130,7 +130,9 @@ DEFINITIONS=[
 
 from .agent_selection_tools import SelectionTools,SELECTION_DEFINITIONS
 
-DEFINITIONS+=CHART_DEFINITIONS+STATISTICS_DEFINITIONS+SELECTION_DEFINITIONS
+from .agent_record_tools import RecordTools,RECORD_DEFINITIONS
+
+DEFINITIONS+=CHART_DEFINITIONS+STATISTICS_DEFINITIONS+SELECTION_DEFINITIONS+RECORD_DEFINITIONS
 
 
 def bounded(value,depth=0):
@@ -141,7 +143,7 @@ def bounded(value,depth=0):
     return value
 
 
-class ReadingTools(SelectionTools,StatisticsTools,ChartTools):
+class ReadingTools(RecordTools,SelectionTools,StatisticsTools,ChartTools):
     def __init__(self,workspace,agent_store,proposals,turn,sources):
         self.workspace,self.store,self.proposals=workspace,agent_store,proposals
         self.turn,self.sources=turn,sources
