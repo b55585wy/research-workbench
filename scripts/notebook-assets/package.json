@@ -1,0 +1,13 @@
+{
+  "name": "research-workbench-notebook-assets",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@jupyter-kit/core": "3.0.0",
+    "@jupyter-kit/theme-default": "3.0.0",
+    "esbuild": "0.28.2",
+    "@codemirror/language": "6.13.1",
+    "@codemirror/legacy-modes": "6.5.5",
+    "@codemirror/state": "6.7.6"
+  }
+}

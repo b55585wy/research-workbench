@@ -1,0 +1,253 @@
+.rich-text-draft-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.rich-text-draft-help {
+  margin: 6px 0 0;
+  color: var(--ui-text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+#note-text[readonly] {
+  background: var(--ui-surface-subtle);
+}
+
+.rich-text-dialog {
+  width: min(720px, calc(100vw - 32px));
+  max-width: 100%;
+  max-height: 92vh;
+  padding: 0;
+  overflow: auto;
+  border: 1px solid var(--ui-border);
+  border-radius: 6px;
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  box-shadow: 0 18px 60px rgb(0 0 0 / 22%);
+}
+
+.rich-text-dialog::backdrop {
+  background: rgb(15 23 42 / 45%);
+}
+
+.rich-text-dialog-header {
+  padding: 16px 18px 12px;
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.rich-text-dialog-header h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+#rich-text-editor {
+  display: flex;
+  min-height: 310px;
+  flex-direction: column;
+  background: var(--ui-input-bg);
+}
+
+#rich-text-editor .ql-toolbar {
+  flex: none;
+  padding: 10px 14px;
+  border: 0;
+  border-bottom: 1px solid var(--ui-border);
+  background: var(--ui-surface-subtle);
+}
+
+#rich-text-editor .ql-toolbar button,
+#rich-text-editor .ql-toolbar .ql-picker {
+  min-height: 32px;
+}
+
+#rich-text-editor .ql-toolbar button {
+  min-width: 32px;
+}
+
+#rich-text-editor .ql-container {
+  min-height: 0;
+  flex: 1;
+  border: 0;
+  color: var(--ui-text);
+  font: inherit;
+  font-size: 14px;
+}
+
+#rich-text-editor .ql-editor {
+  min-height: 250px;
+  max-height: 56vh;
+  padding: 16px 18px;
+  overflow-y: auto;
+  color: var(--ui-text);
+  line-height: 1.65;
+}
+
+#rich-text-editor .ql-editor.ql-blank::before {
+  color: var(--ui-text-muted);
+  font-style: normal;
+}
+
+#rich-text-editor .ql-snow .ql-stroke {
+  stroke: var(--ui-text-soft);
+}
+
+#rich-text-editor .ql-snow .ql-fill {
+  fill: var(--ui-text-soft);
+}
+
+#rich-text-editor .ql-snow .ql-picker {
+  color: var(--ui-text-soft);
+}
+
+#rich-text-editor .ql-tooltip::before {
+  content: "Visit URL:";
+}
+
+#rich-text-editor .ql-tooltip[data-mode="link"]::before {
+  content: "Enter link:";
+}
+
+#rich-text-editor .ql-tooltip a.ql-action::after {
+  content: "Edit";
+}
+
+#rich-text-editor .ql-tooltip.ql-editing a.ql-action::after {
+  content: "Save";
+}
+
+#rich-text-editor .ql-tooltip a.ql-remove::before {
+  content: "Remove";
+}
+
+.rich-text-dialog[data-language="zh"] #rich-text-editor .ql-tooltip::before {
+  content: "访问链接：";
+}
+
+.rich-text-dialog[data-language="zh"] #rich-text-editor .ql-tooltip[data-mode="link"]::before {
+  content: "输入链接：";
+}
+
+.rich-text-dialog[data-language="zh"] #rich-text-editor .ql-tooltip a.ql-action::after {
+  content: "编辑";
+}
+
+.rich-text-dialog[data-language="zh"] #rich-text-editor .ql-tooltip.ql-editing a.ql-action::after {
+  content: "保存";
+}
+
+.rich-text-dialog[data-language="zh"] #rich-text-editor .ql-tooltip a.ql-remove::before {
+  content: "移除";
+}
+
+#rich-text-status {
+  min-height: 40px;
+  margin: 0;
+  padding: 10px 18px;
+  border-top: 1px solid var(--ui-border);
+  color: var(--ui-text-muted);
+  font-size: 12px;
+  line-height: 20px;
+}
+
+#rich-text-status[data-kind="error"],
+.rich-text-format-error {
+  color: var(--ui-danger);
+}
+
+.rich-text-dialog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 0 18px 16px;
+}
+
+.note-rich-content {
+  margin: 0 0 12px;
+  overflow-wrap: anywhere;
+  line-height: 1.6;
+}
+
+.note-rich-content p {
+  margin: 0 0 8px;
+}
+
+.note-rich-content p:last-child,
+.note-rich-content ul:last-child,
+.note-rich-content ol:last-child {
+  margin-bottom: 0;
+}
+
+.note-rich-content h1,
+.note-rich-content h2 {
+  margin: 12px 0 7px;
+  line-height: 1.35;
+}
+
+.note-rich-content h1 {
+  font-size: 20px;
+}
+
+.note-rich-content h2 {
+  font-size: 17px;
+}
+
+.note-rich-content ul,
+.note-rich-content ol {
+  margin: 6px 0 10px;
+  padding-left: 26px;
+}
+
+.note-rich-content a {
+  color: var(--ui-primary);
+  overflow-wrap: anywhere;
+}
+
+.rich-text-plain-fallback {
+  white-space: pre-wrap;
+}
+
+.rich-text-format-error {
+  margin: 7px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.assistant-proposal-rich.note-rich-content {
+  margin: 0;
+}
+
+@media (max-width: 480px) {
+  .rich-text-dialog {
+    width: calc(100vw - 16px);
+    max-height: 96vh;
+  }
+
+  .rich-text-dialog-header {
+    padding: 13px 12px 10px;
+  }
+
+  #rich-text-editor {
+    min-height: 280px;
+  }
+
+  #rich-text-editor .ql-toolbar {
+    padding: 8px;
+  }
+
+  #rich-text-editor .ql-editor {
+    min-height: 220px;
+    padding: 13px 12px;
+  }
+
+  #rich-text-status {
+    padding-inline: 12px;
+  }
+
+  .rich-text-dialog-actions {
+    padding: 0 12px 12px;
+  }
+}

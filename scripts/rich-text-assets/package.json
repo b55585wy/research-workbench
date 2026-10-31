@@ -1,0 +1,11 @@
+{
+  "name": "research-workbench-rich-text-assets",
+  "private": true,
+  "version": "0.8.0",
+  "type": "module",
+  "dependencies": {
+    "quill": "2.0.3",
+    "dompurify": "3.4.17",
+    "esbuild": "0.28.2"
+  }
+}

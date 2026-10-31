@@ -1,0 +1,271 @@
+{
+  "reference": "mpmath1.3.0,50decimal digits; Student CDF via regularized incomplete beta, independent formulas",
+  "cases": [
+    {
+      "variant": "student",
+      "alternative": "two_sided",
+      "reverse": false,
+      "confidence": 0.95,
+      "expected": {
+        "statistic": -1.8973665961010275,
+        "df": 8.0,
+        "p_value": 0.09434977284243766,
+        "difference": -3.0,
+        "standard_error": 1.5811388300841898,
+        "ci": {
+          "lower": -6.64611268050602,
+          "upper": 0.6461126805060197,
+          "lower_unbounded": false,
+          "upper_unbounded": false
+        }
+      }
+    },
+    {
+      "variant": "student",
+      "alternative": "two_sided",
+      "reverse": true,
+      "confidence": 0.95,
+      "expected": {
+        "statistic": 1.8973665961010275,
+        "df": 8.0,
+        "p_value": 0.09434977284243766,
+        "difference": 3.0,
+        "standard_error": 1.5811388300841898,
+        "ci": {
+          "lower": -0.6461126805060197,
+          "upper": 6.64611268050602,
+          "lower_unbounded": false,
+          "upper_unbounded": false
+        }
+      }
+    },
+    {
+      "variant": "student",
+      "alternative": "less",
+      "reverse": false,
+      "confidence": 0.95,
+      "expected": {
+        "statistic": -1.8973665961010275,
+        "df": 8.0,
+        "p_value": 0.04717488642121883,
+        "difference": -3.0,
+        "standard_error": 1.5811388300841898,
+        "ci": {
+          "lower": null,
+          "upper": -0.0597963914530445,
+          "lower_unbounded": true,
+          "upper_unbounded": false
+        }
+      }
+    },
+    {
+      "variant": "student",
+      "alternative": "less",
+      "reverse": true,
+      "confidence": 0.95,
+      "expected": {
+        "statistic": 1.8973665961010275,
+        "df": 8.0,
+        "p_value": 0.9528251135787812,
+        "difference": 3.0,
+        "standard_error": 1.5811388300841898,
+        "ci": {
+          "lower": null,
+          "upper": 5.940203608546955,
+          "lower_unbounded": true,
+          "upper_unbounded": false
+        }
+      }
+    },
+    {
+      "variant": "student",
+      "alternative": "greater",
+      "reverse": false,
+      "confidence": 0.95,
+      "expected": {
+        "statistic": -1.8973665961010275,
+        "df": 8.0,
+        "p_value": 0.9528251135787812,
+        "difference": -3.0,
+        "standard_error": 1.5811388300841898,
+        "ci": {
+          "lower": -5.940203608546955,
+          "upper": null,
+          "lower_unbounded": false,
+          "upper_unbounded": true
+        }
+      }
+    },
+    {
+      "variant": "student",
+      "alternative": "greater",
+      "reverse": true,
+      "confidence": 0.95,
+      "expected": {
+        "statistic": 1.8973665961010275,
+        "df": 8.0,
+        "p_value": 0.04717488642121883,
+        "difference": 3.0,
+        "standard_error": 1.5811388300841898,
+        "ci": {
+          "lower": 0.0597963914530445,
+          "upper": null,
+          "lower_unbounded": false,
+          "upper_unbounded": true
+        }
+      }
+    },
+    {
+      "variant": "welch",
+      "alternative": "two_sided",
+      "reverse": false,
+      "confidence": 0.95,
+      "expected": {
+        "statistic": -1.8973665961010275,
+        "df": 5.882352941176471,
+        "p_value": 0.10753119493062724,
+        "difference": -3.0,
+        "standard_error": 1.5811388300841898,
+        "ci": {
+          "lower": -6.887741643736976,
+          "upper": 0.8877416437369763,
+          "lower_unbounded": false,
+          "upper_unbounded": false
+        }
+      }
+    },
+    {
+      "variant": "welch",
+      "alternative": "two_sided",
+      "reverse": true,
+      "confidence": 0.95,
+      "expected": {
+        "statistic": 1.8973665961010275,
+        "df": 5.882352941176471,
+        "p_value": 0.10753119493062724,
+        "difference": 3.0,
+        "standard_error": 1.5811388300841898,
+        "ci": {
+          "lower": -0.8877416437369763,
+          "upper": 6.887741643736976,
+          "lower_unbounded": false,
+          "upper_unbounded": false
+        }
+      }
+    },
+    {
+      "variant": "welch",
+      "alternative": "less",
+      "reverse": false,
+      "confidence": 0.95,
+      "expected": {
+        "statistic": -1.8973665961010275,
+        "df": 5.882352941176471,
+        "p_value": 0.05376559746531362,
+        "difference": -3.0,
+        "standard_error": 1.5811388300841898,
+        "ci": {
+          "lower": null,
+          "upper": 0.08347776764113808,
+          "lower_unbounded": true,
+          "upper_unbounded": false
+        }
+      }
+    },
+    {
+      "variant": "welch",
+      "alternative": "less",
+      "reverse": true,
+      "confidence": 0.95,
+      "expected": {
+        "statistic": 1.8973665961010275,
+        "df": 5.882352941176471,
+        "p_value": 0.9462344025346864,
+        "difference": 3.0,
+        "standard_error": 1.5811388300841898,
+        "ci": {
+          "lower": null,
+          "upper": 6.0834777676411385,
+          "lower_unbounded": true,
+          "upper_unbounded": false
+        }
+      }
+    },
+    {
+      "variant": "welch",
+      "alternative": "greater",
+      "reverse": false,
+      "confidence": 0.95,
+      "expected": {
+        "statistic": -1.8973665961010275,
+        "df": 5.882352941176471,
+        "p_value": 0.9462344025346864,
+        "difference": -3.0,
+        "standard_error": 1.5811388300841898,
+        "ci": {
+          "lower": -6.0834777676411385,
+          "upper": null,
+          "lower_unbounded": false,
+          "upper_unbounded": true
+        }
+      }
+    },
+    {
+      "variant": "welch",
+      "alternative": "greater",
+      "reverse": true,
+      "confidence": 0.95,
+      "expected": {
+        "statistic": 1.8973665961010275,
+        "df": 5.882352941176471,
+        "p_value": 0.05376559746531362,
+        "difference": 3.0,
+        "standard_error": 1.5811388300841898,
+        "ci": {
+          "lower": -0.08347776764113808,
+          "upper": null,
+          "lower_unbounded": false,
+          "upper_unbounded": true
+        }
+      }
+    },
+    {
+      "variant": "student",
+      "alternative": "two_sided",
+      "reverse": false,
+      "confidence": 0.9,
+      "expected": {
+        "statistic": -1.8973665961010275,
+        "df": 8.0,
+        "p_value": 0.09434977284243766,
+        "difference": -3.0,
+        "standard_error": 1.5811388300841898,
+        "ci": {
+          "lower": -5.940203608546955,
+          "upper": -0.0597963914530445,
+          "lower_unbounded": false,
+          "upper_unbounded": false
+        }
+      }
+    },
+    {
+      "variant": "welch",
+      "alternative": "two_sided",
+      "reverse": false,
+      "confidence": 0.9,
+      "expected": {
+        "statistic": -1.8973665961010275,
+        "df": 5.882352941176471,
+        "p_value": 0.10753119493062724,
+        "difference": -3.0,
+        "standard_error": 1.5811388300841898,
+        "ci": {
+          "lower": -6.0834777676411385,
+          "upper": 0.08347776764113808,
+          "lower_unbounded": false,
+          "upper_unbounded": false
+        }
+      }
+    }
+  ]
+}

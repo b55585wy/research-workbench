@@ -1,0 +1,386 @@
+.image-viewer-dialog {
+  width: min(1120px, calc(100vw - 32px));
+  max-width: none;
+  height: min(820px, calc(100vh - 32px));
+  max-height: none;
+  margin: auto;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: 6px;
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  box-shadow: 0 16px 48px rgb(0 0 0 / 24%);
+}
+
+.image-viewer-dialog::backdrop {
+  background: rgb(15 23 42 / 52%);
+}
+
+.image-viewer-layout {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.image-viewer-header {
+  flex: none;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px 10px 18px;
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.image-viewer-heading {
+  min-width: 0;
+}
+
+#image-viewer-title {
+  overflow-wrap: anywhere;
+  font-size: 17px;
+}
+
+#image-viewer-close {
+  flex: none;
+  width: 36px;
+  padding: 4px;
+  font-size: 22px;
+}
+
+.image-viewer-source {
+  margin-top: 4px;
+  color: var(--ui-text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.image-viewer-source-actions {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 12px;
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.image-viewer-source-actions .button,
+.image-viewer-original {
+  min-height: 32px;
+  padding: 5px 8px;
+  font-size: 12px;
+}
+
+.image-viewer-original {
+  display: inline-flex;
+  align-items: center;
+  color: var(--ui-agent-link, var(--ui-primary));
+}
+
+.image-viewer-status {
+  flex: none;
+  min-height: 34px;
+  padding: 8px 18px;
+  border-bottom: 1px solid var(--ui-border);
+  color: var(--ui-text-soft);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.image-viewer-status[data-kind="error"] {
+  background: var(--ui-danger-bg);
+  color: var(--ui-danger);
+}
+
+.image-viewer-status[data-kind="success"] {
+  background: var(--ui-success-bg);
+  color: var(--ui-success);
+}
+
+.image-viewer-toolbar {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--ui-border);
+  background: var(--ui-surface-subtle);
+}
+
+.image-viewer-toolbar .button {
+  min-height: 34px;
+  padding: 5px 10px;
+}
+
+.image-viewer-toolbar .button-icon {
+  width: 34px;
+  padding: 3px;
+  font-size: 18px;
+}
+
+#image-viewer-pan[aria-pressed="true"],
+#image-annotation-new[aria-pressed="true"] {
+  border-color: var(--ui-focus);
+  background: var(--ui-selected);
+}
+
+#image-viewer-retry {
+  margin-left: auto;
+}
+
+.image-viewer-main {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(250px, 310px);
+}
+
+.image-viewer-stage-wrap {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  padding: 14px;
+  background: var(--ui-bg);
+}
+
+.image-viewer-stage {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 320px;
+  overflow: hidden;
+  border: 1px solid var(--ui-border-strong);
+  background: #20252b;
+}
+
+.image-viewer-stage-host {
+  position: absolute;
+  inset: 0;
+}
+
+.image-viewer-stage-host .openseadragon-container,
+.image-viewer-stage-host .openseadragon-canvas {
+  outline: none;
+}
+
+.image-viewer-stage-host .a9s-annotationlayer:focus-visible {
+  outline: 2px solid var(--ui-focus);
+  outline-offset: -2px;
+}
+
+.image-annotation-preview {
+  position: absolute;
+  top: 24px;
+  left: 24px;
+  z-index: 20;
+  max-width: calc(100% - 48px);
+  padding: 6px 9px;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: 3px;
+  background: var(--ui-surface);
+  color: var(--ui-text-soft);
+  font-size: 12px;
+  line-height: 1.5;
+  pointer-events: none;
+}
+
+.image-viewer-sidebar {
+  min-width: 0;
+  min-height: 0;
+  padding: 12px;
+  overflow-y: auto;
+  border-left: 1px solid var(--ui-border);
+}
+
+.image-annotation-editor {
+  margin-bottom: 14px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.image-annotation-editor label {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--ui-text-soft);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+#image-annotation-text {
+  display: block;
+  width: 100%;
+  min-height: 110px;
+  padding: 9px;
+  resize: vertical;
+  border: 1px solid var(--ui-input-border);
+  border-radius: 3px;
+  background: var(--ui-input-bg);
+  color: var(--ui-text);
+  line-height: 1.5;
+}
+
+#image-annotation-text:read-only {
+  background: var(--ui-surface-subtle);
+}
+
+.image-annotation-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 5px;
+  margin-top: 7px;
+}
+
+#image-annotation-list-heading {
+  margin-bottom: 6px;
+}
+
+.image-annotation-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.image-annotation-item {
+  padding: 9px 0;
+  border-top: 1px solid var(--ui-border);
+}
+
+.image-annotation-open {
+  display: block;
+  width: 100%;
+  padding: 2px 0;
+  border: 0;
+  background: transparent;
+  color: var(--ui-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.image-annotation-open:hover {
+  color: var(--ui-primary);
+}
+
+.image-annotation-text-preview {
+  display: block;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.image-annotation-item[data-draft="true"] .image-annotation-open::after {
+  content: " ·";
+  color: var(--ui-primary);
+}
+
+.image-annotation-item-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin-top: 5px;
+}
+
+.image-annotation-item-actions .button {
+  min-height: 31px;
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
+.image-annotation-item-actions [data-action="delete-image-annotation"] {
+  color: var(--ui-danger);
+}
+
+.image-annotation-empty {
+  padding: 10px 0;
+  color: var(--ui-text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.image-annotation-deleted {
+  margin-top: 12px;
+  border-top: 1px solid var(--ui-border);
+}
+
+.image-annotation-deleted summary {
+  min-height: 40px;
+  padding: 10px 0;
+  color: var(--ui-text-soft);
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.image-annotation-deleted > p {
+  margin-bottom: 8px;
+  color: var(--ui-text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+@media (max-width: 700px) {
+  .image-viewer-dialog {
+    width: 100vw;
+    height: 100vh;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .image-viewer-header {
+    padding-inline: 12px 8px;
+  }
+
+  .image-viewer-main {
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+  }
+
+  .image-viewer-stage-wrap {
+    flex: none;
+    height: min(56vh, 460px);
+    min-height: 300px;
+    padding: 8px;
+  }
+
+  .image-viewer-stage {
+    min-height: 284px;
+  }
+
+  .image-viewer-sidebar {
+    flex: none;
+    overflow: visible;
+    border-top: 1px solid var(--ui-border);
+    border-left: 0;
+  }
+
+  .image-viewer-toolbar {
+    padding-inline: 8px;
+  }
+
+  .image-viewer-toolbar .button {
+    min-height: 38px;
+  }
+
+  .image-viewer-source-actions {
+    padding-inline: 8px;
+  }
+
+  .image-viewer-status {
+    padding-inline: 12px;
+  }
+}
+
+@media (max-width: 390px) {
+  #image-viewer-fit {
+    padding-inline: 7px;
+  }
+
+  #image-annotation-new {
+    flex: 1 1 150px;
+  }
+}

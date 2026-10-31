@@ -1,0 +1,394 @@
+.analysis-panel {
+  border-bottom: 1px solid var(--ui-border);
+  background: var(--ui-surface);
+}
+
+.analysis-panel > summary {
+  min-height: 44px;
+  padding: 12px 16px;
+  color: var(--ui-text-soft);
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.analysis-body {
+  padding: 0 16px 16px;
+}
+
+.analysis-help,
+.analysis-sample-note,
+.analysis-muted {
+  color: var(--ui-text-muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.analysis-help {
+  margin-bottom: 12px;
+}
+
+.analysis-upload-row,
+.analysis-confirmation-actions,
+.analysis-job-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.analysis-label {
+  display: block;
+  margin-top: 12px;
+  color: var(--ui-text-soft);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+#dataset-select,
+#analysis-engine {
+  display: block;
+  width: 100%;
+  min-height: 38px;
+  margin-top: 5px;
+  padding: 7px 28px 7px 9px;
+  border: 1px solid var(--ui-input-border);
+  border-radius: 3px;
+  background: var(--ui-input-bg);
+  color: var(--ui-text);
+}
+
+.analysis-preview {
+  min-width: 0;
+  margin-top: 10px;
+}
+
+.analysis-dimensions {
+  margin-bottom: 6px;
+  color: var(--ui-text-soft);
+  font-size: 12px;
+}
+
+.analysis-table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--ui-border);
+  background: var(--ui-surface);
+  overscroll-behavior-inline: contain;
+}
+
+.analysis-table {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: collapse;
+  color: var(--ui-text);
+  font-size: 11px;
+  line-height: 1.45;
+  text-align: left;
+}
+
+.analysis-table th,
+.analysis-table td {
+  max-width: 240px;
+  padding: 6px 8px;
+  border-right: 1px solid var(--ui-border);
+  border-bottom: 1px solid var(--ui-border);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  vertical-align: top;
+}
+
+.analysis-table thead th {
+  background: var(--ui-surface-muted);
+  color: var(--ui-text-soft);
+  font-weight: 650;
+}
+
+.analysis-table tr:last-child > * {
+  border-bottom: 0;
+}
+
+.analysis-table tr > *:last-child {
+  border-right: 0;
+}
+
+.analysis-sample-note {
+  margin-top: 6px;
+}
+
+.analysis-columns-fieldset {
+  min-width: 0;
+  margin: 12px 0 0;
+  padding: 8px 10px;
+  border: 1px solid var(--ui-border);
+  border-radius: 3px;
+}
+
+.analysis-columns-fieldset legend {
+  padding: 0 4px;
+  color: var(--ui-text-soft);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.analysis-columns {
+  display: grid;
+  gap: 4px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.analysis-column,
+.analysis-share {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  min-height: 34px;
+  padding: 6px 2px;
+  color: var(--ui-text-soft);
+  font-size: 12px;
+  line-height: 1.5;
+  cursor: pointer;
+}
+
+.analysis-column input,
+.analysis-share input {
+  flex: none;
+  width: 17px;
+  height: 17px;
+  margin: 1px 0 0;
+}
+
+.analysis-column span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.analysis-share {
+  margin-top: 9px;
+}
+
+.analysis-runtime {
+  margin: 8px 0;
+  color: var(--ui-text-muted);
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.analysis-runtime[data-kind="error"],
+.analysis-status[data-kind="error"],
+.analysis-error {
+  color: var(--ui-danger);
+}
+
+.analysis-runtime p + p {
+  margin-top: 3px;
+}
+
+#analysis-prepare {
+  width: 100%;
+  margin-top: 4px;
+}
+
+.analysis-confirmation {
+  margin-top: 12px;
+  padding: 10px;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: 4px;
+  background: var(--ui-surface-subtle);
+}
+
+.analysis-confirmation-list {
+  display: grid;
+  grid-template-columns: minmax(72px, auto) minmax(0, 1fr);
+  gap: 5px 9px;
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.analysis-confirmation-list dt {
+  color: var(--ui-text-muted);
+}
+
+.analysis-confirmation-list dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.analysis-code,
+.analysis-log-text {
+  max-height: 300px;
+  margin: 10px 0 0;
+  padding: 9px;
+  overflow: auto;
+  border: 1px solid var(--ui-border);
+  border-radius: 3px;
+  background: var(--ui-agent-pre-bg, var(--ui-surface-muted));
+  color: var(--ui-agent-code-text, var(--ui-text));
+  font: 11px/1.55 ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  overflow-wrap: normal;
+  white-space: pre;
+  tab-size: 4;
+}
+
+.analysis-confirmation-actions {
+  justify-content: flex-end;
+  margin-top: 9px;
+}
+
+.analysis-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-height: 24px;
+  padding: 5px 0;
+  color: var(--ui-text-soft);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.analysis-status[data-kind="success"] {
+  color: var(--ui-success);
+}
+
+.analyses-list {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.analysis-job {
+  padding: 8px 0;
+  border-top: 1px solid var(--ui-border);
+}
+
+.analysis-job-actions .button {
+  min-width: 0;
+  padding: 5px 7px;
+  overflow-wrap: anywhere;
+  text-align: left;
+  font-size: 11px;
+}
+
+.analysis-job-status {
+  color: var(--ui-text-muted);
+  font-size: 11px;
+}
+
+.analysis-job[data-status="failed"] .analysis-job-status,
+.analysis-job[data-status="interrupted"] .analysis-job-status {
+  color: var(--ui-danger);
+}
+
+.analysis-job[data-status="succeeded"] .analysis-job-status {
+  color: var(--ui-success);
+}
+
+.analysis-result {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--ui-border-strong);
+}
+
+.analysis-result h3 {
+  overflow-wrap: anywhere;
+}
+
+.analysis-job-result-status,
+.analysis-result-note {
+  margin-top: 5px;
+  color: var(--ui-text-muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.analysis-result-note {
+  margin: 8px 0;
+}
+
+.analysis-result-table {
+  font-size: 10px;
+}
+
+.analysis-error {
+  margin-top: 7px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.analysis-chart {
+  margin-top: 14px;
+}
+
+.analysis-chart h4 {
+  margin: 0 0 7px;
+  font-size: 12px;
+}
+
+.analysis-chart-row {
+  display: grid;
+  grid-template-columns: minmax(50px, 0.8fr) minmax(60px, 1.4fr) auto;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  font-size: 11px;
+}
+
+.analysis-chart-label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.analysis-chart-track {
+  height: 10px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--ui-surface-muted);
+}
+
+.analysis-chart-bar {
+  height: 100%;
+  background: var(--ui-focus);
+}
+
+.analysis-chart-value {
+  color: var(--ui-text-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+.analysis-log {
+  margin-top: 10px;
+  border-top: 1px solid var(--ui-border);
+}
+
+.analysis-log > summary {
+  padding: 10px 0 4px;
+  color: var(--ui-text-soft);
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+@media (max-width: 480px) {
+  .analysis-body,
+  .analysis-panel > summary {
+    padding-inline: 12px;
+  }
+
+  .analysis-confirmation-list {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
+
+  .analysis-confirmation-list dd {
+    margin-bottom: 6px;
+  }
+
+  .analysis-job-actions {
+    align-items: flex-start;
+  }
+}

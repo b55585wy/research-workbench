@@ -1,0 +1,249 @@
+.charts-panel {
+  border-bottom: 1px solid var(--ui-border);
+  background: var(--ui-surface);
+}
+
+.charts-panel > summary {
+  min-height: 44px;
+  padding: 12px 16px;
+  color: var(--ui-text-soft);
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.charts-body {
+  min-width: 0;
+  padding: 0 16px 16px;
+}
+
+.charts-help,
+.chart-item-source,
+.chart-empty {
+  color: var(--ui-text-muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.charts-help {
+  margin-bottom: 12px;
+}
+
+.chart-field {
+  display: block;
+  margin-top: 10px;
+  color: var(--ui-text-soft);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.chart-field[hidden] {
+  display: none;
+}
+
+.chart-field select,
+.chart-field input {
+  display: block;
+  width: 100%;
+  min-height: 38px;
+  margin-top: 5px;
+  padding: 7px 9px;
+  border: 1px solid var(--ui-input-border);
+  border-radius: 3px;
+  background: var(--ui-input-bg);
+  color: var(--ui-text);
+  font-weight: 400;
+}
+
+.chart-draft-actions,
+.chart-item-actions,
+.chart-view-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.chart-draft-actions {
+  margin-top: 12px;
+}
+
+.chart-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-height: 24px;
+  padding: 5px 0;
+  color: var(--ui-text-soft);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.chart-status[data-kind="error"],
+.chart-item-error {
+  color: var(--ui-danger);
+}
+
+.chart-status[data-kind="success"] {
+  color: var(--ui-success);
+}
+
+.chart-view {
+  min-width: 0;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--ui-border-strong);
+}
+
+#chart-plot {
+  width: 100%;
+  min-height: 300px;
+  overflow: hidden;
+  background: #fff;
+}
+
+#chart-plot:empty {
+  min-height: 0;
+}
+
+.chart-view-actions {
+  justify-content: flex-end;
+  margin-top: 6px;
+}
+
+#chart-summary h3,
+#chart-details h3 {
+  margin: 12px 0 6px;
+  font-size: 12px;
+}
+
+.chart-summary-list,
+.chart-details-list {
+  display: grid;
+  grid-template-columns: minmax(82px, auto) minmax(0, 1fr);
+  gap: 5px 9px;
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.chart-summary-list dt,
+.chart-details-list dt {
+  color: var(--ui-text-muted);
+}
+
+.chart-summary-list dd,
+.chart-details-list dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.chart-badge {
+  display: inline-block;
+  margin: 0 0 8px;
+  padding: 3px 6px;
+  border: 1px solid var(--ui-border);
+  border-radius: 3px;
+  color: var(--ui-text-soft);
+  font-size: 11px;
+}
+
+.chart-badge-preview {
+  border-color: var(--ui-focus);
+}
+
+.charts-list-heading {
+  margin: 16px 0 4px;
+  font-size: 12px;
+}
+
+.charts-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chart-item {
+  min-width: 0;
+  padding: 9px 0;
+  border-top: 1px solid var(--ui-border);
+}
+
+.chart-item-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.chart-item-heading [data-action="open-chart"] {
+  min-width: 0;
+  padding: 3px 0;
+  overflow-wrap: anywhere;
+  text-align: left;
+}
+
+.chart-item-kind {
+  flex: none;
+  color: var(--ui-text-muted);
+  font-size: 10px;
+}
+
+.chart-item-source {
+  margin: 3px 0 6px;
+  overflow-wrap: anywhere;
+}
+
+.chart-item-actions .button {
+  min-width: 0;
+  padding: 5px 6px;
+  font-size: 11px;
+}
+
+.chart-item-error {
+  margin: 6px 0 0;
+  font-size: 11px;
+}
+
+.charts-deleted {
+  margin-top: 10px;
+  border-top: 1px solid var(--ui-border);
+}
+
+.charts-deleted > summary {
+  padding: 10px 0 4px;
+  color: var(--ui-text-soft);
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+@media (max-width: 480px) {
+  .charts-body,
+  .charts-panel > summary {
+    padding-inline: 12px;
+  }
+
+  #chart-plot {
+    min-height: 260px;
+  }
+
+  .chart-summary-list,
+  .chart-details-list {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
+
+  .chart-summary-list dd,
+  .chart-details-list dd {
+    margin-bottom: 6px;
+  }
+
+  .chart-draft-actions .button {
+    flex: 1 1 auto;
+  }
+}

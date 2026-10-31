@@ -1,0 +1,8 @@
+[
+  {
+    "package": "stats",
+    "version": "4.6.2",
+    "source": "Bundled with existing R4.6.2",
+    "license": "Part of R; GNU GPL version 2 or 3"
+  }
+]
