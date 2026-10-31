@@ -177,41 +177,6 @@ html[data-theme="doraemon-blue"] .app-header::after {
   pointer-events: none;
 }
 
-html[data-theme="doraemon-blue"] .brand {
-  color: var(--doraemon-blue-ink);
-}
-
-html[data-theme="doraemon-blue"] .brand-mark {
-  position: relative;
-  border: 2px solid var(--doraemon-blue-deep);
-  border-radius: 50%;
-  background: var(--doraemon-blue);
-  color: #fff;
-  box-shadow: inset 0 0 0 2px rgb(255 255 255 / 45%);
-}
-
-html[data-theme="doraemon-blue"] .brand-mark::after,
-html[data-theme="doraemon-blue"] .empty-state::after,
-html[data-theme="doraemon-blue"] .reader-empty::after {
-  content: "";
-  position: absolute;
-  z-index: 2;
-  border: 1.5px solid var(--doraemon-blue-deep);
-  border-radius: 50%;
-  background:
-    linear-gradient(var(--doraemon-blue-deep), var(--doraemon-blue-deep)) center 42% / 70% 1px no-repeat,
-    radial-gradient(circle at 50% 72%, var(--doraemon-blue-deep) 0 1.5px, transparent 1.8px),
-    var(--doraemon-bell);
-  pointer-events: none;
-}
-
-html[data-theme="doraemon-blue"] .brand-mark::after {
-  right: -4px;
-  bottom: -3px;
-  width: 13px;
-  height: 13px;
-}
-
 html[data-theme="doraemon-blue"] :where(
   .button,
   .excerpt-download,
@@ -303,29 +268,7 @@ html[data-theme="doraemon-blue"] :where(
   .notes-panel > .panel-heading,
   .reader-heading-row
 ) {
-  position: relative;
   background: linear-gradient(180deg, #fff 0%, #f4fbfe 100%);
-}
-
-html[data-theme="doraemon-blue"] :where(
-  .documents-panel > .panel-heading,
-  .notes-panel > .panel-heading,
-  .reader-heading-row
-)::after {
-  content: "";
-  position: absolute;
-  z-index: 2;
-  bottom: -10px;
-  left: 50%;
-  width: 68px;
-  height: 19px;
-  border: 2px solid var(--doraemon-pocket-line);
-  border-top: 0;
-  border-radius: 0 0 40px 40px;
-  background: linear-gradient(180deg, #fff 20%, var(--doraemon-pocket) 100%);
-  box-shadow: inset 0 -3px 0 rgb(7 155 218 / 8%);
-  transform: translateX(-50%);
-  pointer-events: none;
 }
 
 html[data-theme="doraemon-blue"] :where(
@@ -382,68 +325,23 @@ html[data-theme="doraemon-blue"] .page-surface {
 
 html[data-theme="doraemon-blue"] .empty-state,
 html[data-theme="doraemon-blue"] .reader-empty {
-  position: relative;
   border: 2px solid var(--doraemon-pocket-line);
   background: #fff;
   color: var(--ui-text-soft);
   box-shadow: inset 0 -7px 0 var(--doraemon-pocket), 0 10px 24px rgb(18 60 82 / 8%);
 }
 
-html[data-theme="doraemon-blue"] .empty-state::before,
-html[data-theme="doraemon-blue"] .reader-empty::before {
-  content: "";
-  position: absolute;
-  left: 50%;
-  border: 2px solid var(--doraemon-blue);
-  border-top: 0;
-  background: linear-gradient(180deg, #fff 0%, var(--doraemon-pocket) 100%);
-  box-shadow: inset 0 -5px 0 rgb(7 155 218 / 8%);
-  transform: translateX(-50%);
-  pointer-events: none;
-}
-
 html[data-theme="doraemon-blue"] .empty-state {
   margin: 16px 12px;
-  padding: 58px 16px 22px;
-  border-radius: 18px 18px 30px 30px;
+  padding: 24px 16px;
+  border-radius: 18px;
   text-align: center;
-}
-
-html[data-theme="doraemon-blue"] .empty-state::before {
-  top: 13px;
-  width: 76px;
-  height: 34px;
-  border-radius: 0 0 42px 42px;
-}
-
-html[data-theme="doraemon-blue"] .empty-state::after {
-  top: 26px;
-  left: calc(50% - 8px);
-  width: 16px;
-  height: 16px;
 }
 
 html[data-theme="doraemon-blue"] .reader-empty {
   max-width: 340px;
-  padding: 108px 28px 36px;
-  border-radius: 30px 30px 68px 68px;
-}
-
-html[data-theme="doraemon-blue"] .reader-empty::before {
-  top: 24px;
-  width: 148px;
-  height: 66px;
-  border-width: 3px;
-  border-top: 0;
-  border-radius: 0 0 80px 80px;
-}
-
-html[data-theme="doraemon-blue"] .reader-empty::after {
-  top: 50px;
-  left: calc(50% - 12px);
-  width: 24px;
-  height: 24px;
-  border-width: 2px;
+  padding: 48px 28px 36px;
+  border-radius: 24px;
 }
 
 html[data-theme="doraemon-blue"] :where(
@@ -627,8 +525,8 @@ html[data-theme="doraemon-blue"] .image-annotation-preview {
 
   html[data-theme="doraemon-blue"] .reader-empty {
     max-width: calc(100% - 8px);
-    padding: 100px 18px 30px;
-    border-radius: 24px 24px 52px 52px;
+    padding: 48px 18px 30px;
+    border-radius: 24px;
   }
 
   html[data-theme="doraemon-blue"] .assistant-panel {

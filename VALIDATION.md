@@ -421,3 +421,14 @@ E:/research-workbench-pilot-20261030/theme-v1/. Original live data/files and tFU
 HEAD/index/global routing are checked around deployment. No backend unit tests
 were added or repeated for this reversible styling change.
 
+# Theme refinement: remove arcs and restore logo
+
+The follow-up user correction removes heading/empty-state pocket arcs and logo
+bell/shape overrides. The original square outlined SN mark comes from base CSS.
+Focused browser checks cover populated desktop Chinese, 390px mobile English,
+empty-library states, original logo geometry, absent decorative pseudo-elements,
+theme reload persistence and switching back to neutral. Actual PDF pixels render
+after viewport resizing, with no page errors, external requests or data writes.
+The tested candidate and live stylesheet hashes must match before Git save.
+Evidence is in E:/research-workbench-pilot-20261030/theme-v2/.
+
