@@ -132,3 +132,20 @@ analysis sources without implicit Agent sharing. Test old links, browser history
 keyboard, 390/1060/1500px and bilingual neutral/blue. Background completion must
 not move the active task. Use synthetic workspaces; verify unchanged live data,
 backend/vendor/runtime/schema, tFUS source/index and global routing before release.
+
+## v0.13 task continuation
+
+Requirements were enumerated before implementation in agent-task-v1/SCENARIOS.md,
+T01-T12. Backend scenarios live in test_agent_tasks.py, test_agent_task_control.py,
+test_agent_task_recovery.py and test_agent_task_integrity.py; helpers in task_support.py.
+Require real successful analysis output before chart continuation, then concrete
+chart confirmation before a note with both actual record links. No write before
+confirmation; exact retries, concurrent starts, stop/confirm races, stale callbacks,
+source/output/image drift, restart, failed analysis retry and eight-turn/five-task
+bounds preserve prior work. Old request hashes and all original22 tables must survive.
+
+Exercise actual Chrome controls, lost stop receipts, restored frozen proposals,
+unchanged draft/focus, unsharing, fresh browser, mobile English/blue and actual
+model one-goal flow. Rehearse live schema10 migration on a private copy and verify
+all old rows/files before service upgrade. Published Table2 aggregates validate
+software flow only, not independent trials or scientific reproducibility.

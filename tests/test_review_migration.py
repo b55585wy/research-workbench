@@ -20,7 +20,7 @@ def test_legacy_notes_are_preserved_and_never_inferred_as_reviewed(tmp_path,vers
     store=Store(tmp_path)
     with store.connection() as db:
         assert tuple(db.execute('SELECT * FROM notes').fetchone())==original
-        assert db.execute('PRAGMA user_version').fetchone()[0]==10
+        assert db.execute('PRAGMA user_version').fetchone()[0]==11
     metadata=store.library.get(identifier)
     assert metadata['title']=='Legacy' and metadata['authors']==metadata['doi']==''
     assert metadata['year'] is None and metadata['revision']==1

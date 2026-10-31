@@ -47,6 +47,7 @@ def test_previous_frozen_submission_hash_still_retries(tmp_path,version):
         response=c.post(f"/api/v1/documents/{doc['id']}/agent/turns",json=value);assert response.status_code==202
         previous=AgentSubmission.model_validate(value).model_dump(mode='json');previous['context'].pop('active_analysis_id');previous['context'].pop('active_image',None);previous['context'].pop('active_chart_id',None)
         if version==5:previous['context'].pop('dataset_id')
+        previous.pop('continue_task',None)
         fingerprint=digest({'document_id':doc['id'],'payload':previous})
         with app.state.store.connection() as db:db.execute('UPDATE agent_turns SET request_hash=? WHERE id=?',(fingerprint,value['request_id']))
         again=c.post(f"/api/v1/documents/{doc['id']}/agent/turns",json=value)

@@ -23,6 +23,7 @@ def digest(value):
 
 def submission_hash(document_id,payload):
     value=payload.model_dump(mode='json')
+    if not value.get('continue_task'):value.pop('continue_task',None)
     for key in ('dataset_id','active_analysis_id','active_image','active_chart_id'):
         if value['context'].get(key) is None:value['context'].pop(key,None)
     return digest({'document_id':document_id,'payload':value})
@@ -69,35 +70,41 @@ class AgentStore:
                       error=json.loads(row['error_json']) if row['error_json'] else None)
         return result
 
-    def submit(self,document_id,payload,context):
+    def submit(self,document_id,payload,context,connection=None):
+        if connection is None:
+            with self.store.connection() as owned:
+                owned.execute('BEGIN IMMEDIATE')
+                return self.submit(document_id,payload,context,owned)
+        if not connection.in_transaction:raise ValueError('A transaction is required')
         request_id=str(payload.request_id)
         fingerprint=submission_hash(document_id,payload)
-        with self.store.connection() as connection:
-            connection.execute('BEGIN IMMEDIATE')
-            previous=connection.execute('SELECT * FROM agent_turns WHERE id=?',(request_id,)).fetchone()
-            if previous is not None:
-                if previous['request_hash']!=fingerprint:raise WorkspaceError('idempotency_conflict','这次助手请求与已有记录冲突。',409)
-                return self.read(connection,document_id,request_id)
-            conversation_id=str(payload.conversation_id) if payload.conversation_id else str(uuid4())
-            if payload.conversation_id:
-                self.conversation(connection,document_id,conversation_id)
-            else:
-                timestamp=now()
-                connection.execute('INSERT INTO agent_conversations VALUES (?,?,?,?,?)',(
-                    conversation_id,document_id,(payload.message or '图片阅读')[:80],timestamp,timestamp))
-            if connection.execute("SELECT 1 FROM agent_turns WHERE conversation_id=? AND status IN ('queued','running','waiting_confirmation')",(conversation_id,)).fetchone():
-                raise WorkspaceError('agent_busy','这段对话还有未完成请求，请先完成或取消。',409)
-            if connection.execute("SELECT COUNT(*) FROM agent_turns WHERE status IN ('queued','running')").fetchone()[0]>=10:
-                raise WorkspaceError('agent_busy','助手请求较多，请稍后重试。',429)
-            timestamp=now()
-            connection.execute('''INSERT INTO agent_turns
-                (id,document_id,conversation_id,request_hash,message,context_json,status,created_at,updated_at)
-                VALUES (?,?,?,?,?,?,'queued',?,?)''',(
-                request_id,document_id,conversation_id,fingerprint,payload.message,canonical(context),timestamp,timestamp))
-            connection.execute('UPDATE agent_conversations SET updated_at=? WHERE id=?',(timestamp,conversation_id))
+        previous=connection.execute('SELECT * FROM agent_turns WHERE id=?',(request_id,)).fetchone()
+        if previous is not None:
+            if previous['request_hash']!=fingerprint:raise WorkspaceError('idempotency_conflict','这次助手请求与已有记录冲突。',409)
             return self.read(connection,document_id,request_id)
+        conversation_id=str(payload.conversation_id) if payload.conversation_id else str(uuid4())
+        if payload.conversation_id:
+            self.conversation(connection,document_id,conversation_id)
+        else:
+            timestamp=now()
+            connection.execute('INSERT INTO agent_conversations VALUES (?,?,?,?,?)',(
+                conversation_id,document_id,(payload.message or '图片阅读')[:80],timestamp,timestamp))
+        task=connection.execute("SELECT id FROM agent_tasks WHERE conversation_id=? AND status IN ('running','waiting_confirmation','waiting_analysis')",(conversation_id,)).fetchone()
+        if task and task['id']!=context.get('task_id'):
+            raise WorkspaceError('agent_task_busy','本对话还有接续任务，请先停止接续或打开新对话。',409)
+        if connection.execute("SELECT 1 FROM agent_turns WHERE conversation_id=? AND status IN ('queued','running','waiting_confirmation')",(conversation_id,)).fetchone():
+            raise WorkspaceError('agent_busy','这段对话还有未完成请求，请先完成或取消。',409)
+        if connection.execute("SELECT COUNT(*) FROM agent_turns WHERE status IN ('queued','running')").fetchone()[0]>=10:
+            raise WorkspaceError('agent_busy','助手请求较多，请稍后重试。',429)
+        timestamp=now()
+        connection.execute('''INSERT INTO agent_turns
+            (id,document_id,conversation_id,request_hash,message,context_json,status,created_at,updated_at)
+            VALUES (?,?,?,?,?,?,'queued',?,?)''',(
+            request_id,document_id,conversation_id,fingerprint,payload.message,canonical(context),timestamp,timestamp))
+        connection.execute('UPDATE agent_conversations SET updated_at=? WHERE id=?',(timestamp,conversation_id))
+        return self.read(connection,document_id,request_id)
 
-    def update(self,document_id,identifier,**changes):
+    def update(self,document_id,identifier,expected_turn=None,**changes):
         allowed={'status','answer','context','sources','error'}
         if set(changes)-allowed:raise ValueError('Unknown turn field')
         fields={({'context':'context_json','sources':'sources_json','error':'error_json'}.get(k,k)):
@@ -107,6 +114,11 @@ class AgentStore:
             connection.execute('BEGIN IMMEDIATE')
             current=self.read(connection,document_id,identifier)
             if current['status'] in TERMINAL:return current
+            if expected_turn and expected_turn['context'].get('task_id'):
+                context=expected_turn['context']
+                task=connection.execute('SELECT * FROM agent_tasks WHERE id=?',(context['task_id'],)).fetchone()
+                if not task or task['status']!='running' or task['current_turn_id']!=identifier or task['generation']!=context.get('task_generation'):
+                    return current
             connection.execute('UPDATE agent_turns SET '+','.join(k+'=?' for k in fields)+' WHERE id=?',(*fields.values(),identifier))
             return self.read(connection,document_id,identifier)
 

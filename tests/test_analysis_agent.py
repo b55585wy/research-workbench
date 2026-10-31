@@ -97,6 +97,7 @@ def test_legacy_v05_request_hash_retries_after_schema_upgrade(tmp_path):
         value={'request_id':str(uuid4()),'conversation_id':None,'message':'Legacy pending send','context':{'page':1}}
         response=c.post(f"/api/v1/documents/{doc['id']}/agent/turns",json=value);assert response.status_code==202,response.text
         legacy=AgentSubmission.model_validate(value).model_dump(mode='json');legacy['context'].pop('dataset_id');legacy['context'].pop('active_analysis_id');legacy['context'].pop('active_image',None);legacy['context'].pop('active_chart_id',None)
+        legacy.pop('continue_task',None)
         old=digest({'document_id':doc['id'],'payload':legacy})
         with app.state.store.connection() as db:db.execute('UPDATE agent_turns SET request_hash=? WHERE id=?',(old,value['request_id']))
         again=c.post(f"/api/v1/documents/{doc['id']}/agent/turns",json=value)

@@ -163,7 +163,7 @@ class ReadingTools(StatisticsTools,ChartTools):
             result=getattr(self,'tool_'+name)(data,call_id)
         except ValidationError:
             raise WorkspaceError('agent_invalid_tool_input','功能参数或引用格式不正确。',422) from None
-        self.store.update(self.document_id,self.turn['id'],sources=self.sources.items)
+        self.store.update(self.document_id,self.turn['id'],expected_turn=self.turn,sources=self.sources.items)
         self.store.event(self.turn['id'],'tool',definition[1],summary='已完成资料读取。' if definition[4]=='read' else '建议已生成，等待确认。')
         return bounded(result)
 

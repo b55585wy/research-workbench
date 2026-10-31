@@ -52,6 +52,7 @@ class AgentSubmission(BaseModel):
     conversation_id: UUID | None=None
     message: str=Field(default='',max_length=8000)
     context: ReadingContext
+    continue_task: bool=Field(default=False,strict=True)
 
     @field_validator('message')
     @classmethod
@@ -71,6 +72,24 @@ class ProposalConfirmation(BaseModel):
     model_config=ConfigDict(extra='forbid')
     approved: bool=Field(strict=True)
     proposal_sha256: str=Field(pattern='^[a-f0-9]{64}$')
+
+
+class TaskControl(BaseModel):
+    model_config=ConfigDict(extra='forbid')
+    request_id: UUID
+    expected_generation: int=Field(strict=True,ge=0)
+    action: Literal['stop','resume']
+    context: ReadingContext | None=None
+    message: str=Field(default='',max_length=8000)
+    reason: Literal['user','sharing_changed']='user'
+
+    @model_validator(mode='after')
+    def action_fields(self):
+        if '\x00' in self.message:raise ValueError('Invalid message')
+        self.message=self.message.strip()
+        if self.action=='resume' and self.context is None:raise ValueError('Fresh context required')
+        if self.action=='stop' and (self.context is not None or self.message):raise ValueError('Stop has no new input')
+        return self
 
 
 class ModelSettings(BaseModel):

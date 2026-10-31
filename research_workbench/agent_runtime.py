@@ -7,6 +7,7 @@ from .agent_context import ReadingWorkspace,Sources
 from .agent_proposals import Proposals
 from .agent_store import AgentStore,canonical,digest,TERMINAL,submission_hash
 from .agent_tools import ReadingTools,bounded
+from .agent_tasks import AgentTasks
 from .models import WorkspaceError
 
 SYSTEM='''You are the reading assistant in the user's local research workbench.
@@ -56,6 +57,8 @@ class ReadingAgent:
         self.proposals=Proposals(store,self.store,images,analysis)
         self.proposals.image_annotations=image_annotations
         self.proposals.charts=charts
+        self.tasks=AgentTasks(self.workspace,self.store)
+        self.proposals.task_guard=self.tasks.guard_proposal
         self.max_steps=max_steps
         self.stop=threading.Event()
         self.wake=threading.Event()
@@ -63,6 +66,7 @@ class ReadingAgent:
 
     def start(self):
         self.store.recover()
+        self.tasks.recover()
         self.stop.clear()
         self.thread=threading.Thread(target=self.loop,name='research-reading-agent',daemon=True)
         self.thread.start()
@@ -86,7 +90,7 @@ class ReadingAgent:
         if payload.context.image_ids and not status.get('image_input'):
             raise WorkspaceError('agent_vision_disabled','当前模型未启用图片输入。图片已保留，可调整连接或取消图片选择后发送文字。',409)
         context=self.workspace.capture(document_id,payload.context)
-        turn=self.store.submit(document_id,payload,context)
+        turn=self.tasks.start(document_id,payload,context) if payload.continue_task else self.store.submit(document_id,payload,context)
         self.wake.set()
         return turn
 
@@ -95,11 +99,14 @@ class ReadingAgent:
         if 'conflict' in result:raise result['conflict']
         if self.workspace.analysis and any(p['kind'] in ('run_analysis','run_t_test') and p['status']=='applied' for p in result.get('proposals',[])):
             self.workspace.analysis.notify()
+        self.wake.set()
         return result
 
     def loop(self):
         while not self.stop.is_set():
-            try:turn=self.store.next_turn()
+            try:
+                self.tasks.tick()
+                turn=self.store.next_turn()
             except (OSError,sqlite3.Error):
                 self.stop.wait(.5)
                 continue
@@ -110,13 +117,15 @@ class ReadingAgent:
             except Exception:self.fail(turn,WorkspaceError('agent_execution_error','助手执行遇到错误，请检查已有记录后重试。',503))
 
     def fail(self,turn,error):
-        self.store.update(turn['document_id'],turn['id'],status='failed',error={'code':error.code,'message':error.message})
+        self.store.update(turn['document_id'],turn['id'],expected_turn=turn,status='failed',error={'code':error.code,'message':error.message})
 
     def active(self,turn):
-        return not self.stop.is_set() and self.store.get(turn['document_id'],turn['id'])['status'] not in TERMINAL
+        return not self.stop.is_set() and self.store.get(turn['document_id'],turn['id'])['status'] not in TERMINAL and self.tasks.active(turn)
 
     def initial_messages(self,turn,sources):
         messages=[{'role':'system','content':SYSTEM}]
+        task_instructions=self.tasks.instructions(turn)
+        if task_instructions:messages.append({'role':'system','content':task_instructions})
         history=self.store.history(turn['document_id'],turn['conversation_id'])['turns'][-8:]
         for old in history:
             if old['id']==turn['id']:continue
@@ -141,10 +150,11 @@ class ReadingAgent:
         for image in context['images']:
             content.append({'type':'image_url','image_url':{'url':self.workspace.pixels(turn['document_id'],image)}})
         messages.append({'role':'user','content':content})
-        self.store.update(turn['document_id'],turn['id'],sources=sources.items)
+        self.store.update(turn['document_id'],turn['id'],expected_turn=turn,sources=sources.items)
         return messages
 
     def execute(self,turn):
+        if not self.active(turn):return
         sources=Sources(turn['document_id'],turn['context'])
         messages=self.initial_messages(turn,sources)
         tools=ReadingTools(self.workspace,self.store,self.proposals,turn,sources)
@@ -155,7 +165,7 @@ class ReadingAgent:
             self.prune(messages)
             if turn['context']['images'] and not self.provider.status().get('image_input'):
                 raise WorkspaceError('agent_vision_disabled','当前模型图片能力已关闭，请检查连接后重新发送。',409)
-            response=self.provider.complete(messages,tools.functions())
+            response=self.provider.complete(messages,self.tasks.functions(turn,tools.functions()))
             if not self.active(turn):return
             calls=response.get('tool_calls') or []
             if not calls:
@@ -165,13 +175,14 @@ class ReadingAgent:
             message={k:response[k] for k in ('role','content','tool_calls') if k in response}
             message['role']='assistant';messages.append(message)
             completion=self.execute_calls(turn,tools,messages,calls,seen)
+            if not self.active(turn):return
             current=self.store.get(turn['document_id'],turn['id'])
             if current['proposals']:
-                self.store.update(turn['document_id'],turn['id'],status='waiting_confirmation',
+                self.store.update(turn['document_id'],turn['id'],expected_turn=turn,status='waiting_confirmation',
                     answer=response.get('content') or '已生成待确认建议，请核对正文、出处和图片后决定是否保存。')
                 return
             if completion is not None:
-                self.store.update(turn['document_id'],turn['id'],status='completed',answer=completion)
+                self.store.update(turn['document_id'],turn['id'],expected_turn=turn,status='completed',answer=completion)
                 return
         raise WorkspaceError('agent_step_limit','本次助手已达到执行上限，已有记录保留。请缩小任务后重试。',409)
 
@@ -187,6 +198,7 @@ class ReadingAgent:
             try:
                 arguments=json.loads(function.get('arguments','{}'),parse_constant=lambda value:(_ for _ in ()).throw(ValueError()))
                 if not isinstance(arguments,dict):raise ValueError()
+                self.tasks.check_tool(turn,function.get('name'))
                 result=tools.execute(function.get('name'),arguments,identifier)
                 if result.get('complete'):completion=result['summary']
             except (ValueError,TypeError,AttributeError):
@@ -201,7 +213,7 @@ class ReadingAgent:
         text=response.get('content')
         if response.get('finish_reason')!='stop' or not isinstance(text,str) or not text.strip():
             raise WorkspaceError('agent_provider_response','模型没有给出有效的完成回答。',502)
-        return self.store.update(turn['document_id'],turn['id'],status='completed',answer=text[:12000])
+        return self.store.update(turn['document_id'],turn['id'],expected_turn=turn,status='completed',answer=text[:12000])
 
     @staticmethod
     def prune(messages):

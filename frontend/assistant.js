@@ -1,4 +1,5 @@
 import { renderRichHtml } from "/rich-text.js";
+import { createTaskClient } from "/task-client.js";
 
 const ACTIVE_STATES = new Set(["queued", "running"]);
 const TERMINAL_STATES = new Set(["waiting_confirmation", "completed", "failed", "cancelled", "interrupted"]);
@@ -174,6 +175,15 @@ const messages = {
     agent_not_configured: "尚未配置模型。请先在“本地模型设置”中保存连接。",
     agent_vision_disabled: "当前模型未确认支持图片。请移除图片或调整模型设置；消息草稿已保留。",
     agent_busy: "此对话已有正在处理的任务，请等待或停止后再发送。",
+    agent_task_dataset_required: "连续任务需要先明确共享所选数据。",
+    agent_task_busy: "此对话已有连续任务。请停止接续，或开始新对话。",
+    agent_task_scope_changed: "文献或来源范围已变化，未继续任务。",
+    agent_task_paused: "任务已暂停，请明确继续后再操作。",
+    agent_task_stage: "当前步骤不能执行此操作。",
+    agent_task_sources_required: "请重新共享原始数据和原任务所选图片后再继续。",
+    agent_task_limit: "连续任务已达到自动接续上限，请查看当前进度。",
+    agent_task_control_conflict: "任务状态已变化，请读取最新状态后再操作。",
+    agent_task_invalid_state: "当前任务状态不能执行此操作。",
     idempotency_conflict: "请求标识发生冲突，原请求未被改写。",
     revision_conflict: "目标已在其他地方更新。原提案仍保留，请查看后重新提出操作。",
     source_changed: "来源已变化，未执行写入。原提案仍保留。",
@@ -360,6 +370,15 @@ const messages = {
     agent_not_configured: "No model is configured. Save a connection under “Local model settings” first.",
     agent_vision_disabled: "This model has not confirmed image support. Remove the images or change settings; your draft is retained.",
     agent_busy: "This conversation already has an active task. Wait or stop it before sending.",
+    agent_task_dataset_required: "Share the selected data explicitly before starting a continuation task.",
+    agent_task_busy: "This conversation has a continuation task. Stop it or start a new conversation.",
+    agent_task_scope_changed: "The paper or source scope changed, so the task was not continued.",
+    agent_task_paused: "The task is paused. Continue it explicitly before taking this action.",
+    agent_task_stage: "This action is not available at the current step.",
+    agent_task_sources_required: "Share the original data and task-selected images again before continuing.",
+    agent_task_limit: "The continuation limit was reached. Review the current progress.",
+    agent_task_control_conflict: "The task state changed. Load the latest state before taking another action.",
+    agent_task_invalid_state: "This action is unavailable in the current task state.",
     idempotency_conflict: "The request ID conflicted; the original request was not changed.",
     revision_conflict: "The target changed elsewhere. The original proposal is retained; review it and request a new action.",
     source_changed: "The source changed, so no write occurred. The original proposal is retained.",
@@ -420,6 +439,28 @@ export function createAssistant(adapter) {
     for (const [name, value] of Object.entries(values)) text = text.replaceAll(`{${name}}`, String(value));
     return text;
   }
+
+  const tasks = createTaskClient({
+    api: adapter.api,
+    getDocument: adapter.getDocument,
+    getLanguage: () => language,
+    getConversationId: (paperId) => entryFor(paperId).conversationId,
+    getSharedDatasetId: adapter.getSharedDatasetId,
+    getChatImages: adapter.getChatImages,
+    getDraft: (paperId) => entryFor(paperId).draft,
+    clearDraft: (paperId, expectedDraft) => {
+      const entry = entryFor(paperId);
+      if (entry.draft === expectedDraft) entry.draft = "";
+    },
+    refreshConversation: async (paperId, conversationId) => {
+      const entry = entryFor(paperId);
+      if (entry.conversationId === conversationId) await loadConversation(paperId, entry, conversationId, { taskRefresh: true });
+    },
+    openAnalysisJob: adapter.openAnalysisJob,
+    openChart: adapter.openChart,
+    navigateSource: adapter.navigateSource,
+    render: () => render()
+  });
 
   function entryFor(documentId) {
     if (!papers.has(documentId)) {
@@ -1094,12 +1135,14 @@ export function createAssistant(adapter) {
     renderSources(turn);
     if (paper && entry) renderProposals(paper, entry, turn);
     else elements.proposals.replaceChildren();
+    tasks.render();
     renderStatus(paper, entry);
     if (entry && elements.message.value !== entry.draft) elements.message.value = entry.draft;
     elements.message.disabled = !paper || Boolean(entry?.pendingSend?.pending);
     const active = entry ? activeTurn(entry) : null;
     const sending = Boolean(entry?.pendingSend?.pending);
-    elements.send.disabled = !paper || sending || Boolean(active) || Boolean(entry?.pendingDecision) || (!entry?.draft.trim() && !adapter.getChatImages(paper?.id).length && !entry?.pendingSend);
+    const taskBusy = Boolean(paper && entry && tasks.isBusy(paper.id, entry.conversationId));
+    elements.send.disabled = !paper || sending || Boolean(active) || taskBusy || Boolean(entry?.pendingDecision) || (!entry?.draft.trim() && !adapter.getChatImages(paper?.id).length && !entry?.pendingSend);
     elements.send.textContent = t(entry?.pendingSend ? "retry" : "send");
     elements.cancel.hidden = !active;
     elements.cancel.disabled = !active || Boolean(entry?.cancelling);
@@ -1150,7 +1193,7 @@ export function createAssistant(adapter) {
     poll();
   }
 
-  async function loadConversation(paperId, entry, conversationId) {
+  async function loadConversation(paperId, entry, conversationId, options = {}) {
     stopPolling(entry);
     const sequence = ++entry.loadSequence;
     entry.loadController?.abort();
@@ -1166,6 +1209,7 @@ export function createAssistant(adapter) {
       entry.loaded = true;
       entry.conversationId = conversationId;
       entry.fresh = false;
+      if (!options.taskRefresh) tasks.conversationChanged(paperId, conversationId);
       const active = activeTurn(entry);
       if (active) startPolling(paperId, entry, active.id);
     } catch (error) {
@@ -1195,6 +1239,11 @@ export function createAssistant(adapter) {
 
   async function send(paperId, entry) {
     if (entry.pendingSend?.pending || activeTurn(entry)) return;
+    if (!entry.pendingSend && tasks.isBusy(paperId, entry.conversationId)) {
+      entry.status = { key: "agent_task_busy", kind: "error" };
+      render();
+      return;
+    }
     if (!entry.pendingSend) {
       const context = adapter.getContext();
       const imageIds = adapter.getChatImages(paperId).map((image) => image.id);
@@ -1233,6 +1282,7 @@ export function createAssistant(adapter) {
           }
         }
       };
+      if (tasks.continueTaskRequested(paperId)) entry.pendingSend.payload.continue_task = true;
     }
     const operation = entry.pendingSend;
     operation.pending = true;
@@ -1247,6 +1297,7 @@ export function createAssistant(adapter) {
       if (entry.pendingSend === operation) entry.pendingSend = null;
       if (entry.draft === operation.payload.message) entry.draft = "";
       upsertTurn(entry, turn);
+      tasks.acceptTurn(paperId, turn.conversation_id, turn);
       entry.status = null;
       if (isCurrent(paperId, entry)) render();
       loadConversations(paperId, entry, false);
@@ -1429,6 +1480,7 @@ export function createAssistant(adapter) {
     entry.fresh = true;
     entry.pendingSend = null;
     entry.status = null;
+    tasks.conversationChanged(paper.id, null);
     render();
     elements.message.focus();
   });
@@ -1438,6 +1490,7 @@ export function createAssistant(adapter) {
     entry.conversationId = elements.history.value;
     entry.turns = [];
     entry.pendingSend = null;
+    tasks.conversationChanged(paper.id, entry.conversationId);
     loadConversation(paper.id, entry, entry.conversationId);
   });
   elements.message.addEventListener("input", () => {
@@ -1476,14 +1529,19 @@ export function createAssistant(adapter) {
       elements.settingsForm.querySelector('label[for="assistant-provider-model"]').textContent = t("providerModel");
       elements.settingsForm.querySelector('label[for="assistant-provider-key"]').textContent = t("providerKey");
       elements.settingsForm.querySelector(".assistant-vision-option span").textContent = t("providerImages");
+      tasks.applyLanguage(nextLanguage);
       render();
     },
     documentChanged() {
       const { paper, entry } = current();
       if (paper && !entry.loaded && !entry.loading && !entry.conversations.length) loadConversations(paper.id, entry, true);
+      tasks.documentChanged();
       render();
     },
-    contextChanged: render,
+    contextChanged() {
+      tasks.contextChanged();
+      render();
+    },
     refreshConversations(documentId) {
       const entry = entryFor(documentId);
       return loadConversations(documentId, entry, false);

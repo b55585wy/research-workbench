@@ -3,7 +3,7 @@ from uuid import UUID
 from fastapi import APIRouter,File,Form,Request,UploadFile
 from fastapi.responses import FileResponse,JSONResponse
 
-from .agent_models import AgentSubmission,ImageNoteCreate,ModelSettings,ProposalConfirmation
+from .agent_models import AgentSubmission,ImageNoteCreate,ModelSettings,ProposalConfirmation,TaskControl
 
 router=APIRouter(prefix='/api/v1')
 
@@ -66,6 +66,23 @@ def conversation(document_id:UUID,conversation_id:UUID,request:Request):
 @router.post('/documents/{document_id}/agent/turns',status_code=202)
 def submit(document_id:UUID,payload:AgentSubmission,request:Request):
     return request.app.state.agent.submit(str(document_id),payload)
+
+
+@router.get('/documents/{document_id}/agent/tasks')
+def tasks(document_id:UUID,request:Request,conversation_id:UUID|None=None):
+    return {'items':request.app.state.agent.tasks.list(str(document_id),str(conversation_id) if conversation_id else None)}
+
+
+@router.get('/documents/{document_id}/agent/tasks/{task_id}')
+def task(document_id:UUID,task_id:UUID,request:Request):
+    return request.app.state.agent.tasks.get(str(document_id),str(task_id))
+
+
+@router.post('/documents/{document_id}/agent/tasks/{task_id}/control')
+def control_task(document_id:UUID,task_id:UUID,payload:TaskControl,request:Request):
+    result=request.app.state.agent.tasks.control(str(document_id),str(task_id),payload)
+    request.app.state.agent.wake.set()
+    return result
 
 
 @router.get('/documents/{document_id}/agent/turns/{turn_id}')

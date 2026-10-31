@@ -293,6 +293,39 @@ CREATE TABLE IF NOT EXISTS data_imports (
 );
 CREATE INDEX IF NOT EXISTS data_imports_document ON data_imports(document_id,created_at);
 PRAGMA user_version=10;
+CREATE TABLE IF NOT EXISTS agent_tasks (
+ id TEXT PRIMARY KEY REFERENCES agent_turns(id),
+ document_id TEXT NOT NULL REFERENCES documents(id),
+ conversation_id TEXT NOT NULL REFERENCES agent_conversations(id),
+ goal TEXT NOT NULL CHECK(length(trim(goal)) BETWEEN 1 AND 8000),
+ dataset_id TEXT NOT NULL REFERENCES datasets(id),
+ dataset_sha256 TEXT NOT NULL CHECK(length(dataset_sha256)=64),
+ dataset_name TEXT NOT NULL,
+ scope_hash TEXT NOT NULL CHECK(length(scope_hash)=64),
+ reading_json TEXT NOT NULL CHECK(json_valid(reading_json)),
+ phase TEXT NOT NULL CHECK(phase IN ('analysis','chart','note')),
+ status TEXT NOT NULL CHECK(status IN ('running','waiting_confirmation','waiting_analysis','needs_input','failed','paused','completed')),
+ revision INTEGER NOT NULL CHECK(revision>=1),
+ generation INTEGER NOT NULL CHECK(generation>=0),
+ current_turn_id TEXT NOT NULL REFERENCES agent_turns(id),
+ turn_ids_json TEXT NOT NULL CHECK(json_valid(turn_ids_json) AND json_array_length(turn_ids_json) BETWEEN 1 AND 8),
+ analysis_id TEXT REFERENCES analysis_jobs(id),
+ chart_id TEXT REFERENCES charts(id),
+ note_id TEXT REFERENCES notes(id),
+ error_json TEXT CHECK(error_json IS NULL OR json_valid(error_json)),
+ created_at TEXT NOT NULL,updated_at TEXT NOT NULL,
+ CHECK(status!='completed' OR (analysis_id IS NOT NULL AND chart_id IS NOT NULL AND note_id IS NOT NULL))
+);
+CREATE INDEX IF NOT EXISTS agent_tasks_document ON agent_tasks(document_id,updated_at);
+CREATE UNIQUE INDEX IF NOT EXISTS agent_tasks_active_conversation ON agent_tasks(conversation_id) WHERE status!='completed';
+CREATE TABLE IF NOT EXISTS agent_task_operations (
+ request_id TEXT PRIMARY KEY,
+ task_id TEXT NOT NULL REFERENCES agent_tasks(id),
+ payload_hash TEXT NOT NULL CHECK(length(payload_hash)=64),
+ result_json TEXT NOT NULL CHECK(json_valid(result_json)),
+ created_at TEXT NOT NULL
+);
+PRAGMA user_version=11;
 COMMIT;
 '''
 
@@ -320,7 +353,7 @@ class Store:
         self.exports.mkdir(exist_ok=True)
         self.database = self.root / 'workspace.sqlite3'
         with self.connection() as connection:
-            if connection.execute('PRAGMA user_version').fetchone()[0] > 10:
+            if connection.execute('PRAGMA user_version').fetchone()[0] > 11:
                 raise RuntimeError('Database requires a newer application')
             connection.executescript(SCHEMA)
         self.lifecycle = NoteLifecycle(self)

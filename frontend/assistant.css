@@ -18,7 +18,9 @@
   display: flex;
   flex-direction: column;
   width: min(420px, calc(100vw - 32px));
+  height: calc(100vh - 32px);
   max-height: min(760px, calc(100vh - 32px));
+  overflow: hidden;
   border: 1px solid var(--ui-border-strong);
   border-radius: 6px;
   background: var(--ui-surface);
@@ -93,11 +95,15 @@
   overflow-wrap: anywhere;
 }
 
-.assistant-messages {
-  flex: 1 1 220px;
-  min-height: 120px;
-  padding: 12px;
+.assistant-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.assistant-messages {
+  padding: 12px;
 }
 
 .assistant-empty {
@@ -178,9 +184,6 @@
 }
 
 .assistant-results {
-  flex: 0 1 auto;
-  max-height: 300px;
-  overflow-y: auto;
   border-top: 1px solid var(--ui-border);
 }
 
@@ -470,14 +473,11 @@
     right: 0;
     bottom: 0;
     width: 100vw;
+    height: 92vh;
     max-height: 92vh;
     border-right: 0;
     border-bottom: 0;
     border-left: 0;
     border-radius: 6px 6px 0 0;
-  }
-
-  .assistant-results {
-    max-height: 240px;
   }
 }

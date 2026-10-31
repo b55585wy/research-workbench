@@ -1,0 +1,124 @@
+.assistant-task {
+  padding: 0 12px;
+  border-bottom: 1px solid var(--ui-border);
+  background: var(--ui-surface-subtle);
+}
+
+.assistant-task[hidden] {
+  display: none;
+}
+
+.assistant-task-card {
+  padding: 10px 0;
+}
+
+.assistant-task-card h3 {
+  margin: 0;
+  font-size: 13px;
+}
+
+.assistant-task-status {
+  margin-top: 5px;
+  color: var(--ui-text-soft);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.assistant-task-details {
+  display: grid;
+  grid-template-columns: minmax(72px, auto) minmax(0, 1fr);
+  gap: 4px 9px;
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.assistant-task-details dt {
+  color: var(--ui-text-muted);
+}
+
+.assistant-task-details dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.assistant-task-details dd:first-of-type {
+  max-height: 4.5em;
+  overflow-y: auto;
+}
+
+.assistant-task-plan {
+  display: grid;
+  gap: 4px;
+  margin: 9px 0 0;
+  padding: 0;
+  color: var(--ui-text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+  list-style: none;
+}
+
+.assistant-task-plan li {
+  padding-left: 9px;
+  border-left: 3px solid var(--ui-border);
+}
+
+.assistant-task-plan li[data-state="current"] {
+  border-left-color: var(--ui-primary);
+  color: var(--ui-text);
+  font-weight: 650;
+}
+
+.assistant-task-plan li[data-state="done"] {
+  border-left-color: var(--ui-success);
+  color: var(--ui-text-soft);
+}
+
+.assistant-task-links,
+.assistant-task-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  margin-top: 8px;
+}
+
+.assistant-task-actions {
+  gap: 6px;
+}
+
+.assistant-task-help {
+  margin-top: 7px;
+  color: var(--ui-text-muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.assistant-task-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  min-height: 36px;
+  margin-top: 8px;
+  color: var(--ui-text-soft);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.assistant-task-option input {
+  flex: none;
+  margin-top: 2px;
+}
+
+.assistant-task-option input:disabled + span {
+  color: var(--ui-text-muted);
+}
+
+.assistant-task-option-help {
+  margin: 3px 0 0 23px;
+  color: var(--ui-text-muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+

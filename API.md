@@ -156,3 +156,14 @@ Notebook/export work with both methods. Agent tools: analysis_methods,
 read_t_test_groups,preview_t_test,propose_t_test,propose_analysis_cancel; writes
 require explicit proposal confirmation. See STATISTICAL-TESTS.md.
 
+## v0.13 opt-in task continuation
+
+AgentSubmission adds strict boolean continue_task (default false, excluded from
+legacy false fingerprints). Document-scoped Agent tasks list/read/control endpoints
+persist a bounded analysis -> chart -> source-note checkpoint. Every write still
+uses the existing concrete proposal confirmation. Stop/resume controls use frozen
+UUID receipts and expected_generation; stage/revision/source guards prevent late
+callbacks or retries from duplicating business operations. Restart pauses active
+tasks. Schema11 adds exactly two tables. Full fields, states and errors:
+[AGENT-TASKS.md](AGENT-TASKS.md).
+

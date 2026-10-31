@@ -15,6 +15,7 @@
   <link rel="stylesheet" href="/analysis-notebook.css">
   <link rel="stylesheet" href="/charts.css">
   <link rel="stylesheet" href="/assistant.css">
+  <link rel="stylesheet" href="/task-client.css">
   <link rel="stylesheet" href="/rich-text.css">
   <link rel="stylesheet" href="/doraemon-theme.css">
 </head>
@@ -406,14 +407,24 @@
       <select id="assistant-history" aria-label="对话记录"></select>
       <button id="assistant-new" class="button button-quiet" type="button">新对话</button>
     </div>
-    <div id="assistant-context" class="assistant-context" aria-live="polite"></div>
-    <div id="assistant-messages" class="assistant-messages" aria-live="polite"></div>
-    <section class="assistant-results" aria-label="助手结果">
-      <div id="assistant-sources" class="assistant-sources"></div>
-      <div id="assistant-proposals" class="assistant-proposals"></div>
-    </section>
-    <div id="assistant-status" class="assistant-status" role="status" aria-live="polite"></div>
+    <div id="assistant-scroll" class="assistant-scroll" tabindex="0">
+      <div id="assistant-context" class="assistant-context" aria-live="polite"></div>
+      <section id="assistant-task" class="assistant-task" aria-label="连续任务" hidden>
+        <div id="assistant-task-card" class="assistant-task-card"></div>
+      </section>
+      <div id="assistant-messages" class="assistant-messages" aria-live="polite"></div>
+      <section class="assistant-results" aria-label="助手结果">
+        <div id="assistant-sources" class="assistant-sources"></div>
+        <div id="assistant-proposals" class="assistant-proposals"></div>
+      </section>
+      <div id="assistant-status" class="assistant-status" role="status" aria-live="polite"></div>
+    </div>
     <form id="assistant-form" class="assistant-form">
+      <label class="assistant-task-option" for="assistant-continue-task">
+        <input id="assistant-continue-task" type="checkbox" aria-describedby="assistant-continue-task-help" disabled>
+        <span>连续完成分析、图表和笔记</span>
+      </label>
+      <p id="assistant-continue-task-help" class="assistant-task-option-help">默认关闭。开启后仍须逐一确认每次分析、图表和笔记写入。</p>
       <label class="sr-only" for="assistant-message">给研究助手的消息</label>
       <textarea id="assistant-message" rows="4" maxlength="8000" placeholder="询问当前页面或已选图片…"></textarea>
       <div class="assistant-send-row">

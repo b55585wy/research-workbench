@@ -497,3 +497,33 @@ pilot-01 ended after a harness-only unsupported origin-field assertion; the
 actual initial job succeeded. The corrected full pilot passed without product
 code changes. Original live data and tFUS preservation are checked separately.
 See REAL-DATA-PILOT.md and examples/published-table2 for reproducible inputs.
+
+## v0.13 opt-in task continuation — 2026-10-31
+
+agent-task-v1/pytest-full-03.log: 700 passed, no skips, with installed isolated
+R/statistics/SPSS-reader runtimes. Requirement scenarios T01-T12 precede changes.
+New task tests cover three confirmed receipts, actual successful worker output,
+stage/scope guards, source/output/image integrity, exact retries, concurrent starts,
+atomic controls, stop/confirm races, stale callbacks, fresh-process recovery and
+five-task/eight-turn bounds. Old schema/hash fixtures and all legacy cases pass.
+
+task-ui-04 passes7 real Chrome groups with deterministic model and actual app,
+DB/worker/Plotly: long-goal natural card height, lost stop response/exact retry,
+frozen-proposal resume and draft preservation, independent successful analysis
+reuse, sharing revoke/resume, fresh browser reshare and original note, 390px
+English blue keyboard stop with late response blocked. No page script errors.
+Legacy workspace16groups, SPSS-import11groups, reader restart, analysis/Notebook/
+export restart and final-layout chart regressions also pass in owned instances.
+
+Actual configured model: pilot-04 completes one goal with3 write confirmations,
+7 model calls and26 verified export files; offline plot contains5points without
+server/network. Final-layout pilot-05 loses model connectivity after successful
+analysis; pilot-06 explicitly resumes that checkpoint, reuses the single analysis,
+then completes chart/note/exports. No new goal or duplicate analysis is submitted.
+These use published aggregate Table2 values, not raw experimental observations.
+
+Migration rehearsal: schema10->11 adds exactly2tables; every original22table row
+and all4material files survive unchanged. Activation separately checks ownership,
+backup, unchanged model/runtime capabilities and tFUS/global-routing preservation.
+Intermediate failures remain in external evidence: transient provider errors,
+prose-only model plan, drawer overlap/shrinking, draft loss and harness corrections.

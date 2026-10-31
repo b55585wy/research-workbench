@@ -29,6 +29,8 @@ class Proposals:
             if previous is not None:
                 if previous['sha256']!=fingerprint:raise WorkspaceError('idempotency_conflict','功能调用编号发生冲突。',409)
                 return self.agent_store.proposal_record(previous)
+            guard=getattr(self,'task_guard',None)
+            if guard:guard(connection,{**current,'context':turn['context']},kind,payload)
             connection.execute('INSERT INTO agent_proposals VALUES (?,?,?,?,?,?,\'pending\',NULL,NULL,?)',(
                 identifier,turn['id'],kind,title,canonical(payload),fingerprint,now()))
         return {'proposal_id':identifier,'status':'pending','saved':False,'message':'已生成待确认建议，尚未保存。'}
@@ -42,6 +44,8 @@ class Proposals:
             self.check_decision(turn,row,payload)
             if row['status'] in ('applied','rejected'):
                 return turn
+            guard=getattr(self,'task_guard',None)
+            if payload.approved and guard:guard(connection,turn,row['kind'],json.loads(row['payload_json']),confirming=True)
             error=self.decide(connection,document_id,row,payload.approved)
             if error is not None:return error
             remaining=connection.execute("SELECT COUNT(*) FROM agent_proposals WHERE turn_id=? AND status IN ('pending','conflict')",(turn_id,)).fetchone()[0]
