@@ -121,3 +121,14 @@ Repeat all previous217 browser groups and actual new UI/Agent/portable export;
 use synthetic materials only. Statistical applicability is not established by
 these software tests. Components and rejected jmv evidence: STATISTICAL-TESTS.md.
 
+
+## Task-oriented workspace acceptance
+
+See WORKSPACE-WORKFLOW.md and external workspace-v1/SCENARIOS.md (W01-W10).
+Verify central analysis width, real previews/results/Plotly, one four-format chooser,
+contextual review/defer/confirm, exact uncertain retries and cross-paper responses.
+Keep drafts/page/zoom and frozen operations across task switches. Align chart and
+analysis sources without implicit Agent sharing. Test old links, browser history,
+keyboard, 390/1060/1500px and bilingual neutral/blue. Background completion must
+not move the active task. Use synthetic workspaces; verify unchanged live data,
+backend/vendor/runtime/schema, tFUS source/index and global routing before release.

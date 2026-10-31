@@ -5,11 +5,11 @@ const ACTIVE_JOBS = new Set(["queued", "running"]);
 const messages = {
   zh: {
     panel: "数据与分析",
-    help: "上传 CSV 或 TSV，选择描述统计或独立样本 t 检验，并核对固定分析代码。结果不构成科学结论。",
-    upload: "上传 CSV/TSV",
+    help: "导入 CSV、TSV、SAV 或 ZSAV，选择描述统计或独立样本 t 检验，并核对固定分析代码。结果不构成科学结论。",
+    upload: "导入数据",
     selectDataset: "选择数据",
     noDataset: "尚未选择数据",
-    noDatasets: "请先上传 CSV 或 TSV 数据。",
+    noDatasets: "请先导入 CSV、TSV、SAV 或 ZSAV 数据。",
     columns: "分析数值列",
     share: "向助手提供此数据的预览",
     engine: "分析语言",
@@ -37,7 +37,7 @@ const messages = {
     uploading: "正在上传… {progress}%",
     uploaded: "数据已上传。",
     uploadRetry: "上传结果不确定。已保留原文件和请求标识，可按原请求重试。",
-    invalidDatasetType: "请选择 CSV 或 TSV 文件。",
+    invalidDatasetType: "请选择 CSV、TSV、SAV 或 ZSAV 文件。",
     dataset_too_large: "数据文件不能超过 5 MiB。",
     preparing: "正在读取固定代码…",
     prepareFailed: "无法读取固定代码，请重试。",
@@ -144,11 +144,11 @@ const messages = {
   },
   en: {
     panel: "Data & analysis",
-    help: "Upload CSV or TSV, choose descriptive statistics or an independent-samples t-test, and review the fixed code. Results are not scientific conclusions.",
-    upload: "Upload CSV/TSV",
+    help: "Import CSV, TSV, SAV, or ZSAV, choose descriptive statistics or an independent-samples t-test, and review the fixed code. Results are not scientific conclusions.",
+    upload: "Import data",
     selectDataset: "Choose data",
     noDataset: "No data selected",
-    noDatasets: "Upload CSV or TSV data first.",
+    noDatasets: "Import CSV, TSV, SAV, or ZSAV data first.",
     columns: "Numeric columns to analyze",
     share: "Provide a preview of this data to the assistant",
     engine: "Analysis language",
@@ -176,7 +176,7 @@ const messages = {
     uploading: "Uploading… {progress}%",
     uploaded: "Data uploaded.",
     uploadRetry: "The upload outcome is uncertain. The original file and request ID are retained for an exact retry.",
-    invalidDatasetType: "Choose a CSV or TSV file.",
+    invalidDatasetType: "Choose a CSV, TSV, SAV, or ZSAV file.",
     dataset_too_large: "The data file must be no larger than 5 MiB.",
     preparing: "Loading fixed code…",
     prepareFailed: "The fixed code could not be loaded. Try again.",
@@ -340,7 +340,7 @@ export function createAnalysis(adapter) {
   }
 
   function errorText(error, fallback = "request_failed") {
-    const code = typeof error === "string" ? error : error?.code;
+    const code = typeof error === "string" ? error : error?.code || error?.key;
     if (code && (Object.hasOwn(messages[language], code) || Object.hasOwn(messages.en, code))) return t(code);
     return t(fallback);
   }
@@ -366,6 +366,7 @@ export function createAnalysis(adapter) {
         upload: null,
         status: null,
         selectedJobId: null,
+        jobRequestSequence: 0,
         cancelling: new Set(),
         exporting: new Set(),
         loadSequence: 0,
@@ -505,7 +506,7 @@ export function createAnalysis(adapter) {
   function renderUpload(entry) {
     elements.uploadStatus.replaceChildren();
     const upload = entry?.upload;
-    elements.uploadButton.disabled = !entry || Boolean(upload?.pending);
+    elements.uploadButton.disabled = !entry || Boolean(upload?.pending) || Boolean(adapter.isImportPending?.());
     elements.uploadButton.textContent = t("upload");
     if (!upload?.status) return;
     const status = upload.status;
@@ -1184,6 +1185,9 @@ export function createAnalysis(adapter) {
     const confirmation = entry.confirmation;
     if (!confirmation || confirmation.pending || confirmation.method === "ttest_independent" && !confirmation.preview) return;
     const documentId = confirmation.documentId;
+    const navigationGeneration = adapter.getNavigationGeneration?.();
+    const requestSequence = ++entry.jobRequestSequence;
+    entry.datasetRequestSequence += 1;
     const isTTest = confirmation.method === "ttest_independent";
     if (!confirmation.requestId) confirmation.requestId = crypto.randomUUID();
     const body = isTTest ? confirmation.body : {
@@ -1210,15 +1214,19 @@ export function createAnalysis(adapter) {
       entry.jobVersion += 1;
       entry.jobs = [job, ...entry.jobs.filter((item) => item.id !== job.id)];
       entry.jobDetails.set(job.id, job);
-      if (entry.selectedJobId !== job.id) notebook.close({ restoreFocus: false });
-      entry.selectedJobId = job.id;
-      adapter.contextChanged?.();
-      entry.confirmation = null;
-      entry.status = {
-        key: job.status === "queued" ? "queuedReceipt" : job.status,
-        kind: job.status === "succeeded" ? "success" : ["failed", "cancelled", "interrupted"].includes(job.status) ? "error" : "info"
-      };
-      adapter.onJobOpened?.(documentId, job.id);
+      if (entry.confirmation === confirmation) entry.confirmation = null;
+      if (requestSequence === entry.jobRequestSequence && navigationGeneration === adapter.getNavigationGeneration?.()) {
+        if (entry.selectedJobId !== job.id) notebook.close({ restoreFocus: false });
+        entry.selectedJobId = job.id;
+        adapter.contextChanged?.();
+        entry.status = {
+          key: job.status === "queued" ? "queuedReceipt" : job.status,
+          kind: job.status === "succeeded" ? "success" : ["failed", "cancelled", "interrupted"].includes(job.status) ? "error" : "info"
+        };
+        adapter.onJobOpened?.(documentId, job.id);
+      } else if (entry.status?.key === "runningRequest") {
+        entry.status = null;
+      }
       if (job.status === "succeeded") adapter.sourcesChanged?.(documentId);
       schedulePolling(entry);
     } catch (error) {
@@ -1336,78 +1344,103 @@ export function createAnalysis(adapter) {
     if (entry === currentEntry() && entry.selectedJobId === job.id) renderResult(entry);
   }
 
-  async function openJob(jobId) {
+  function selectDataset(entry, dataset, options = {}) {
+    if (!entry || !dataset) return;
+    const changed = entry.selectedDatasetId !== dataset.id;
+    entry.datasetRequestSequence += 1;
+    entry.jobRequestSequence += 1;
+    entry.selectedDatasetId = dataset.id;
+    if (changed || options.resetColumns) {
+      entry.selectedColumns = new Set((dataset.columns || []).filter((column) => column.numeric).map((column) => column.name));
+    }
+    if (changed) entry.shared = false;
+    if (!options.preserveConfirmation) invalidateConfirmation(entry);
+    adapter.contextChanged?.();
+    const documentId = options.documentId || (entry === currentEntry() ? currentId : null);
+    if (documentId) adapter.datasetContextChanged?.(documentId, dataset.id, options.analysisId || null);
+  }
+
+  async function openJob(jobId, options = {}) {
     const entry = currentEntry();
     if (!entry) return;
     const documentId = currentId;
+    const navigationGeneration = adapter.getNavigationGeneration?.();
+    const requestSequence = ++entry.jobRequestSequence;
+    entry.datasetRequestSequence += 1;
+    const isCurrent = () => entry === currentEntry() && requestSequence === entry.jobRequestSequence && entry.selectedJobId === jobId && navigationGeneration === adapter.getNavigationGeneration?.();
     elements.panel.open = true;
     if (entry.selectedJobId !== jobId) notebook.close({ restoreFocus: false });
     entry.selectedJobId = jobId;
     adapter.contextChanged?.();
-    adapter.onJobOpened?.(documentId, jobId);
+    if (!options.preserveUrl) adapter.onJobOpened?.(documentId, jobId);
     render();
     let job = jobFor(entry, jobId);
     if (job && ACTIVE_JOBS.has(job.status)) entry.logs.delete(job.id);
     if (!job) {
       try {
         job = await adapter.api(`/api/v1/documents/${encodeURIComponent(documentId)}/analyses/${encodeURIComponent(jobId)}`);
-        if (entry !== currentEntry()) return;
+        if (!isCurrent()) return;
         entry.jobVersion += 1;
         entry.jobs = [job, ...entry.jobs.filter((item) => item.id !== job.id)];
         entry.jobDetails.set(job.id, job);
       } catch (error) {
-        entry.status = { key: error.code || "not_found", kind: "error" };
+        if (isCurrent()) entry.status = { key: error.code || "not_found", kind: "error" };
       }
     }
-    if (entry === currentEntry()) {
+    if (isCurrent()) {
+      let dataset = entry.datasets.find((item) => item.id === job?.dataset_id);
+      if (job?.dataset_id && !dataset) {
+        try {
+          dataset = await adapter.api(`/api/v1/documents/${encodeURIComponent(documentId)}/datasets/${encodeURIComponent(job.dataset_id)}`);
+          if (!isCurrent()) return;
+          entry.datasets = [dataset, ...entry.datasets.filter((item) => item.id !== dataset.id)];
+        } catch {
+          dataset = null;
+        }
+      }
+      if (!isCurrent()) return;
+      if (dataset) selectDataset(entry, dataset, { preserveConfirmation: true, analysisId: job.id });
       adapter.contextChanged?.();
       render();
       schedulePolling(entry);
       if (elements.log.open && entry.selectedJobId === jobId) loadLog(entry, jobFor(entry, jobId));
-      elements.result.scrollIntoView({ block: "nearest" });
+      if (!options.preserveFocus) elements.result.scrollIntoView({ block: "nearest" });
     }
   }
 
-  async function openDataset(datasetId) {
+  async function openDataset(datasetId, options = {}) {
     const entry = currentEntry();
     if (!entry || !datasetId) return;
     const documentId = currentId;
+    const navigationGeneration = adapter.getNavigationGeneration?.();
     const requestSequence = ++entry.datasetRequestSequence;
+    entry.jobRequestSequence += 1;
+    const isCurrent = () => entry === currentEntry() && requestSequence === entry.datasetRequestSequence && navigationGeneration === adapter.getNavigationGeneration?.();
     elements.panel.open = true;
     let dataset = entry.datasets.find((item) => item.id === datasetId);
     if (!dataset) {
       try {
         dataset = await adapter.api(`/api/v1/documents/${encodeURIComponent(documentId)}/datasets/${encodeURIComponent(datasetId)}`);
-        if (entry !== currentEntry() || requestSequence !== entry.datasetRequestSequence) return;
+        if (!isCurrent()) return;
         entry.datasets = [dataset, ...entry.datasets.filter((item) => item.id !== dataset.id)];
       } catch (error) {
-        if (requestSequence === entry.datasetRequestSequence) entry.status = { key: error.code || "not_found", kind: "error" };
+        if (isCurrent()) entry.status = { key: error.code || "not_found", kind: "error" };
       }
     }
-    if (dataset && entry === currentEntry() && requestSequence === entry.datasetRequestSequence) {
-      entry.selectedDatasetId = dataset.id;
-      entry.selectedColumns = new Set((dataset.columns || []).filter((column) => column.numeric).map((column) => column.name));
-      entry.shared = false;
-      invalidateConfirmation(entry);
-      adapter.contextChanged?.();
+    if (dataset && isCurrent()) {
+      selectDataset(entry, dataset, { resetColumns: true, preserveConfirmation: options.preserveConfirmation });
+      if (!options.preserveUrl) adapter.onDatasetOpened?.(documentId, dataset.id);
       render();
-      elements.datasetSelect.focus();
+      if (!options.preserveFocus) elements.datasetSelect.focus();
     }
   }
 
-  function openImportedDataset(documentId, dataset) {
+  function openImportedDataset(documentId, dataset, options = {}) {
     if (!documentId || !dataset?.id) return;
     const entry = entryFor(documentId);
     entry.datasets = [dataset, ...entry.datasets.filter((item) => item.id !== dataset.id)];
-    entry.datasetRequestSequence += 1;
-    entry.selectedDatasetId = dataset.id;
-    entry.selectedColumns = new Set((dataset.columns || []).filter((column) => column.numeric).map((column) => column.name));
-    entry.shared = false;
-    invalidateConfirmation(entry);
-    if (entry === currentEntry()) {
-      adapter.contextChanged?.();
-      render();
-    }
+    if (options.select !== false) selectDataset(entry, dataset, { resetColumns: true, documentId });
+    if (entry === currentEntry()) render();
   }
 
   function uploadDataset(entry) {
@@ -1451,6 +1484,7 @@ export function createAnalysis(adapter) {
           entry.upload = null;
           invalidateConfirmation(entry);
           adapter.contextChanged?.();
+          adapter.datasetContextChanged?.(documentId, body.id);
           adapter.sourcesChanged?.(documentId);
           if (entry === currentEntry()) render();
         }
@@ -1514,13 +1548,14 @@ export function createAnalysis(adapter) {
           ...entry.datasets.filter((dataset) => !fetchedIds.has(dataset.id))
         ];
       }
-      if (!entry.datasets.some((dataset) => dataset.id === entry.selectedDatasetId)) {
+      if (datasetRequestSequence === entry.datasetRequestSequence && !entry.datasets.some((dataset) => dataset.id === entry.selectedDatasetId)) {
         entry.datasetRequestSequence += 1;
         entry.selectedDatasetId = entry.datasets[0]?.id || null;
         entry.selectedColumns = new Set((entry.datasets[0]?.columns || []).filter((column) => column.numeric).map((column) => column.name));
         entry.shared = false;
         invalidateConfirmation(entry);
         adapter.contextChanged?.();
+        adapter.datasetContextChanged?.(documentId, entry.selectedDatasetId);
       }
     }
     if (jobs.status === "fulfilled") {
@@ -1547,6 +1582,7 @@ export function createAnalysis(adapter) {
       : null;
     entry.loadController = null;
     render();
+    if (elements.panel.open) discoverMethods(entry);
     schedulePolling(entry);
   }
 
@@ -1621,6 +1657,10 @@ export function createAnalysis(adapter) {
     const file = elements.uploadInput.files?.[0];
     elements.uploadInput.value = "";
     if (!entry || !file) return;
+    if (/\.(sav|zsav)$/i.test(file.name)) {
+      adapter.startImport?.(file);
+      return;
+    }
     const validExtension = /\.(csv|tsv)$/i.test(file.name);
     if (!validExtension) {
       entry.upload = { file, requestId: crypto.randomUUID(), pending: false, status: { key: "invalidDatasetType", kind: "error" } };
@@ -1642,11 +1682,13 @@ export function createAnalysis(adapter) {
     const entry = currentEntry();
     if (!entry) return;
     entry.datasetRequestSequence += 1;
+    entry.jobRequestSequence += 1;
     entry.selectedDatasetId = elements.datasetSelect.value || null;
     entry.selectedColumns = new Set((selectedDataset(entry)?.columns || []).filter((column) => column.numeric).map((column) => column.name));
     entry.shared = false;
     invalidateConfirmation(entry);
     adapter.contextChanged?.();
+    adapter.datasetContextChanged?.(currentId, entry.selectedDatasetId);
     render();
   });
   elements.share.addEventListener("change", () => {
@@ -1713,6 +1755,12 @@ export function createAnalysis(adapter) {
       notebook.applyLanguage(nextLanguage);
       render();
     },
+    getSelectedDatasetId() {
+      return selectedDataset(currentEntry())?.id || null;
+    },
+    refreshUpload() {
+      renderUpload(currentEntry());
+    },
     getSharedDatasetId() {
       const entry = currentEntry();
       return entry?.shared && selectedDataset(entry) ? entry.selectedDatasetId : null;
@@ -1726,6 +1774,9 @@ export function createAnalysis(adapter) {
     reload,
     openJob,
     openDataset,
+    alignDataset(datasetId) {
+      return openDataset(datasetId, { preserveConfirmation: true, preserveFocus: true, preserveUrl: true });
+    },
     openImportedDataset,
     getRecipe
   };

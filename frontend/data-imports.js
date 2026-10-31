@@ -23,6 +23,8 @@ const messages = {
     policy: "固定转换：编码保持为编码，不用值标签替换；系统缺失和声明的用户缺失在分析预览中为空；文本保留；日期和时间使用 ISO 文本。不会自动推断研究角色。",
     acknowledge: "我已核对字段含义、分组编码和缺失规则。",
     confirm: "确认并加入数据",
+    defer: "稍后核对 / 返回",
+    reviewSelected: "查看核对",
     confirming: "正在确认…",
     retryConfirm: "按原核对结果重试确认",
     name: "字段名",
@@ -103,6 +105,8 @@ const messages = {
     policy: "Fixed conversion: codes remain codes and are not replaced by value labels; system and declared user missing values become empty analysis cells; text is preserved; dates and times use ISO text. No research roles are inferred automatically.",
     acknowledge: "I have checked the field meanings, group codes, and missing-value rules.",
     confirm: "Confirm and add to data",
+    defer: "Review later / Back",
+    reviewSelected: "Review selected import",
     confirming: "Confirming…",
     retryConfirm: "Retry the same reviewed confirmation",
     name: "Name",
@@ -169,8 +173,6 @@ export function createDataImports(adapter) {
     section: byId("data-imports"),
     heading: byId("data-imports-heading"),
     help: byId("data-imports-help"),
-    uploadButton: byId("spss-upload-button"),
-    uploadInput: byId("spss-upload-input"),
     selectLabel: byId("spss-import-select-label"),
     select: byId("spss-import-select"),
     status: byId("spss-import-status"),
@@ -187,8 +189,13 @@ export function createDataImports(adapter) {
     sampleNote: byId("spss-import-sample-note"),
     ackLabel: byId("spss-import-ack-label"),
     ack: byId("spss-import-ack"),
-    confirm: byId("spss-import-confirm")
+    confirm: byId("spss-import-confirm"),
+    defer: byId("spss-import-defer")
   };
+  elements.open = make("button", "button button-quiet");
+  elements.open.id = "spss-import-open";
+  elements.open.type = "button";
+  elements.select.after(elements.open);
   const papers = new Map();
   let language = adapter.getLanguage();
   let currentId = null;
@@ -225,6 +232,7 @@ export function createDataImports(adapter) {
         acknowledged: false,
         upload: null,
         confirmation: null,
+        reviewOpen: false,
         status: null,
         loadSequence: 0,
         detailSequence: 0,
@@ -360,7 +368,7 @@ export function createDataImports(adapter) {
 
   function renderReview(entry) {
     const item = selectedImport(entry);
-    elements.review.hidden = !item;
+    elements.review.hidden = !item || !entry?.reviewOpen;
     elements.review.setAttribute("aria-label", t("review"));
     if (!item) {
       elements.summary.replaceChildren();
@@ -402,12 +410,11 @@ export function createDataImports(adapter) {
     elements.confirm.textContent = t(confirmation?.pending ? "confirming" : confirmation?.uncertain ? "retryConfirm" : "confirm");
   }
 
-  function render() {
+  function render(revealReview = false) {
     const entry = currentEntry();
-    const uploadPending = Boolean(entry?.upload?.pending);
-    elements.uploadButton.disabled = !entry || availability?.available !== true || availabilityPending || uploadPending;
-    elements.uploadInput.disabled = elements.uploadButton.disabled;
-    elements.uploadButton.textContent = t(uploadPending ? "uploading" : "upload");
+    elements.section.hidden = !entry?.items.length && !entry?.upload && !entry?.status && !entry?.reviewOpen;
+    elements.defer.textContent = t("defer");
+    elements.defer.disabled = Boolean(entry?.confirmation);
     elements.selectLabel.textContent = t("imports");
     elements.select.replaceChildren();
     if (!entry?.items.length) {
@@ -424,8 +431,13 @@ export function createDataImports(adapter) {
       elements.select.value = entry.selectedImportId || "";
     }
     elements.select.disabled = !entry?.items.length || Boolean(entry.confirmation);
+    elements.open.hidden = !selectedImport(entry);
+    elements.open.disabled = !selectedImport(entry) || Boolean(entry.confirmation);
+    elements.open.textContent = t("reviewSelected");
     renderReview(entry);
     renderStatus();
+    adapter.reviewVisibilityChanged?.(currentId, Boolean(entry?.reviewOpen && selectedImport(entry)), revealReview);
+    adapter.importStateChanged?.();
   }
 
   async function loadAvailability() {
@@ -525,6 +537,7 @@ export function createDataImports(adapter) {
   async function uploadImport(entry, upload) {
     if (!entry || entry.upload !== upload || upload.pending) return;
     upload.pending = true;
+    upload.navigationGeneration = adapter.getNavigationGeneration?.();
     entry.status = { key: "uploading", kind: "info" };
     if (entry === currentEntry()) render();
     const form = new FormData();
@@ -539,6 +552,7 @@ export function createDataImports(adapter) {
       entry.loadSequence += 1;
       upsert(entry, item);
       entry.selectedImportId = item.id;
+      entry.reviewOpen = upload.navigationGeneration === adapter.getNavigationGeneration?.();
       entry.acknowledged = false;
       entry.upload = null;
       entry.status = { key: "imported", kind: "success" };
@@ -579,6 +593,7 @@ export function createDataImports(adapter) {
     entry.acknowledged = true;
     confirmation.pending = true;
     confirmation.uncertain = false;
+    confirmation.navigationGeneration = adapter.getNavigationGeneration?.();
     entry.status = { key: "confirming", kind: "info" };
     render();
     try {
@@ -598,9 +613,10 @@ export function createDataImports(adapter) {
         current.dataset_id = dataset.id;
       }
       entry.confirmation = null;
+      entry.reviewOpen = false;
       entry.acknowledged = false;
       entry.status = { key: "confirmedReceipt", kind: "success" };
-      adapter.datasetConfirmed?.(entry.documentId, dataset);
+      adapter.datasetConfirmed?.(entry.documentId, dataset, confirmation.navigationGeneration);
     } catch (error) {
       if (entry.confirmation !== confirmation) return;
       confirmation.pending = false;
@@ -617,34 +633,53 @@ export function createDataImports(adapter) {
     }
   }
 
-  elements.uploadButton.addEventListener("click", () => elements.uploadInput.click());
-  elements.uploadInput.addEventListener("change", () => {
+  function startImport(file) {
     const entry = currentEntry();
-    const file = elements.uploadInput.files?.[0];
-    elements.uploadInput.value = "";
-    if (!entry || !file || availability?.available !== true) return;
+    if (!entry || !file || entry.upload?.pending) return false;
     const upload = { file, requestId: crypto.randomUUID(), pending: false };
     entry.upload = upload;
+    entry.reviewOpen = false;
     if (!/\.(sav|zsav)$/i.test(file.name)) {
       entry.status = { key: "invalidType", kind: "error" };
       render();
-      return;
+      return false;
     }
     if (file.size > MAX_FILE_BYTES) {
       entry.status = { key: "spss_too_large", kind: "error" };
       render();
-      return;
+      return false;
+    }
+    if (availability?.available !== true) {
+      entry.status = { key: "unavailable", kind: "error", retry: loadAvailability };
+      render();
+      return false;
     }
     uploadImport(entry, upload);
-  });
+    return true;
+  }
+
   elements.select.addEventListener("change", () => {
     const entry = currentEntry();
     if (!entry || entry.confirmation) return;
     entry.selectedImportId = elements.select.value || null;
+    entry.reviewOpen = Boolean(entry.selectedImportId);
     entry.acknowledged = false;
     entry.status = null;
-    render();
+    render(true);
     loadDetail(entry, entry.selectedImportId);
+  });
+  elements.open.addEventListener("click", () => {
+    const entry = currentEntry();
+    if (!entry || entry.confirmation || !selectedImport(entry)) return;
+    entry.reviewOpen = true;
+    render(true);
+    loadDetail(entry, entry.selectedImportId);
+  });
+  elements.defer.addEventListener("click", () => {
+    const entry = currentEntry();
+    if (!entry || entry.confirmation) return;
+    entry.reviewOpen = false;
+    render();
   });
   elements.ack.addEventListener("change", () => {
     const entry = currentEntry();
@@ -667,6 +702,10 @@ export function createDataImports(adapter) {
       elements.section.setAttribute("aria-label", t("heading"));
       render();
     },
-    reload
+    reload,
+    startImport,
+    isImportPending() {
+      return Boolean(currentEntry()?.upload?.pending);
+    }
   };
 }

@@ -458,3 +458,24 @@ Evidence and requirement scenarios are in E:/research-workbench-pilot-20261030/r
 Activation checks the preserved live rows/files, actual reader/analysis status,
 model configuration and protected tFUS/global-routing boundaries again.
 
+
+## v0.12 task workspaces — 2026-10-31
+
+The final frontend fingerprint passed16 actual-browser workflow groups and11
+unified-import groups, plus the existing reader, analysis and chart regressions.
+Evidence: E:/research-workbench-pilot-20261030/workspace-v1/accepted.json.
+
+Checks include central analysis layout; preserved PDF page/zoom/source drafts;
+CSV/TSV and reviewed SAV/ZSAV; exact committed-but-lost retries; real Python/R
+results; normalized SAV missing-value statistics; saved Plotly/source notes;
+rapid back/forward and delayed read/write receipts; explicit Agent sharing;
+Chinese/English, neutral/blue, keyboard and390/1060/1500px operation.
+Background metadata refresh and programmatic source alignment are distinguished
+from explicit navigation. Existing imports have a keyboard-accessible review action.
+
+All writes used isolated synthetic workspaces, and owned helpers/listeners were
+closed. Real user materials were accessed read-only for preservation checks.
+Backend, API, schema, vendor and runtime were unchanged; the previously accepted
+661 backend scenarios were not rerun for this frontend-only slice. No new method,
+arbitrary script execution, authentication or shared workspace was introduced.
+Deployment preservation and local Git receipts live beside the acceptance record.

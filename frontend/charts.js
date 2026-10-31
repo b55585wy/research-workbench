@@ -465,7 +465,8 @@ export function createCharts(adapter) {
 
   function ensureDraft(entry) {
     if (!entry.draft) {
-      const dataset = entry.datasets[0] || null;
+      const selectedId = adapter.getSelectedDatasetId?.();
+      const dataset = entry.datasets.find((item) => item.id === selectedId) || entry.datasets[0] || null;
       const numeric = (dataset?.columns || []).filter((column) => column.numeric).map((column) => column.name);
       entry.draft = {
         datasetId: dataset?.id || null,
@@ -487,14 +488,31 @@ export function createCharts(adapter) {
     return entry.draft;
   }
 
-  function invalidateDraft(draft) {
+  function syncDataset(documentId, datasetId, analysisId = null) {
+    if (currentId !== documentId || !datasetId) return;
+    const entry = currentEntry();
+    const draft = ensureDraft(entry);
+    if (draft.pendingPreview || draft.pendingSave || draft.saveFailed) return;
+    if (draft.datasetId === datasetId && (!analysisId || draft.analysisId === analysisId)) return;
+    invalidateDraft(draft, false);
+    draft.datasetId = datasetId;
+    const numeric = numericColumns(entry);
+    draft.x = numeric.includes(draft.x) ? draft.x : numeric[0] || "";
+    draft.y = numeric.includes(draft.y) && draft.y !== draft.x ? draft.y : numeric.find((name) => name !== draft.x) || "";
+    draft.analysisId = entry.jobs.find((job) => job.id === analysisId && job.dataset_id === datasetId && job.status === "succeeded" && isDescriptiveJob(job))?.id ||
+      entry.jobs.find((job) => job.dataset_id === datasetId && job.status === "succeeded" && isDescriptiveJob(job))?.id || null;
+    render();
+  }
+
+  function invalidateDraft(draft, invalidateOpen = true) {
+    const entry = currentEntry();
+    if (invalidateOpen && entry?.draft === draft) entry.openSequence += 1;
     draft.version += 1;
     draft.previewOperation?.controller?.abort();
     draft.previewOperation = null;
     if (!draft.pendingSave) draft.saveOperation = null;
     draft.saveFailed = false;
     draft.status = null;
-    const entry = currentEntry();
     if (entry?.draft === draft && entry.view?.kind === "preview") {
       entry.view = null;
       purgePlot();
@@ -725,9 +743,18 @@ export function createCharts(adapter) {
     renderArtifactDetails(view);
     entry.status = { key: "rendering", kind: "info" };
     render();
+    const deferHiddenRender = () => {
+      view.pending = false;
+      view.renderReady = false;
+      entry.status = null;
+      render();
+      return false;
+    };
+    if (!host.clientWidth) return deferHiddenRender();
     try {
       const Plotly = await loadRenderer(view.renderer);
       if (!isCurrentRender()) return false;
+      if (!host.clientWidth) return deferHiddenRender();
       const figure = figureFor(view.artifact, { valid: language === "zh" ? "非缺失" : "Valid", missing: language === "zh" ? "缺失" : "Missing", rows: t("rows") });
       await Plotly.react(host, figure.traces, figure.layout, {
         responsive: true,
@@ -742,7 +769,7 @@ export function createCharts(adapter) {
         return false;
       }
       resizeObserver = new ResizeObserver(() => {
-        if (isCurrentRender()) Plotly.Plots.resize(host);
+        if (isCurrentRender() && host.clientWidth) Plotly.Plots.resize(host);
       });
       resizeObserver.observe(host);
       view.pending = false;
@@ -769,22 +796,40 @@ export function createCharts(adapter) {
     const documentId = entry === currentEntry() ? currentId : null;
     if (!documentId) return;
     const version = draft.version;
-    entry.openSequence += 1;
+    const navigationGeneration = adapter.getNavigationGeneration?.();
+    const sequence = ++entry.openSequence;
+    const isCurrent = () => entry.draft === draft && draft.version === version && currentId === documentId && sequence === entry.openSequence && navigationGeneration === adapter.getNavigationGeneration?.();
     let body;
     let capabilities;
-    draft.status = { key: "previewing", kind: "info" };
+    const previewStatus = { key: "previewing", kind: "info" };
+    const clearStatus = () => {
+      if (draft.status === previewStatus) draft.status = null;
+    };
+    draft.status = previewStatus;
     render();
     try {
       capabilities = await getCapabilities();
-      if (entry.draft !== draft || draft.version !== version || currentId !== documentId) return;
+      if (!isCurrent()) {
+        clearStatus();
+        if (entry === currentEntry()) render();
+        return;
+      }
       body = draftBody(entry, capabilities);
     } catch (error) {
-      if (entry.draft !== draft || draft.version !== version) return;
+      if (!isCurrent()) {
+        clearStatus();
+        if (entry === currentEntry()) render();
+        return;
+      }
       draft.status = errorStatus(error, "previewFailed");
       if (entry === currentEntry()) render();
       return;
     }
     const operation = { body, version, controller: new AbortController(), artifact: null, descriptor: null, renderer: capabilities.renderer, view: null, renderReady: false };
+    const clearAbandoned = () => {
+      if (draft.previewOperation === operation) draft.previewOperation = null;
+      clearStatus();
+    };
     draft.previewOperation = operation;
     draft.saveOperation = null;
     draft.pendingPreview = true;
@@ -795,7 +840,10 @@ export function createCharts(adapter) {
         body: JSON.stringify(body),
         signal: operation.controller.signal
       });
-      if (entry.draft !== draft || draft.previewOperation !== operation || draft.version !== version || currentId !== documentId) return;
+      if (!isCurrent() || draft.previewOperation !== operation) {
+        clearAbandoned();
+        return;
+      }
       if (!response?.chart || response.chart.id !== body.request_id || response.chart.origin !== "preview" || response.chart.revision !== 0 ||
         !validateArtifact(response.data, { ...body, document_id: documentId })) throw new Error("invalidArtifact");
       operation.artifact = response.data;
@@ -808,7 +856,10 @@ export function createCharts(adapter) {
       draft.status = null;
       await displayArtifact(entry, view);
     } catch (error) {
-      if (error?.name === "AbortError" || draft.previewOperation !== operation) return;
+      if (error?.name === "AbortError" || draft.previewOperation !== operation || !isCurrent()) {
+        clearAbandoned();
+        return;
+      }
       draft.previewOperation = null;
       draft.status = errorStatus(error, "previewFailed");
     } finally {
@@ -826,6 +877,9 @@ export function createCharts(adapter) {
     const operation = draft.saveOperation;
     const documentId = entry === currentEntry() ? currentId : null;
     if (!documentId) return;
+    const navigationGeneration = adapter.getNavigationGeneration?.();
+    const sequence = entry.openSequence;
+    const view = previewOperation.view;
     draft.pendingSave = true;
     draft.saveFailed = false;
     draft.status = { key: "saving", kind: "info" };
@@ -841,19 +895,21 @@ export function createCharts(adapter) {
       if (!chart || chart.id !== operation.body.request_id || chart.document_id !== documentId || chart.deleted_at ||
         !validateArtifact(previewOperation.artifact, chart)) throw new Error("request_failed");
       entry.charts = [chart, ...entry.charts.filter((item) => item.id !== chart.id)];
-      entry.activeChartId = chart.id;
-      const view = previewOperation.view;
-      view.kind = "saved";
-      view.record = chart;
-      view.renderer = previewOperation.renderer;
-      entry.view = view;
-      entry.status = { key: "saved", kind: "success" };
-      entry.draft = null;
-      adapter.contextChanged?.();
-      adapter.chartOpened?.(documentId, chart.id);
-      if (entry === currentEntry()) {
+      if (currentId === documentId && entry.view === view && entry.draft === draft && draft.saveOperation === operation && sequence === entry.openSequence && navigationGeneration === adapter.getNavigationGeneration?.()) {
+        entry.activeChartId = chart.id;
+        view.kind = "saved";
+        view.record = chart;
+        view.renderer = previewOperation.renderer;
+        entry.view = view;
+        entry.status = { key: "saved", kind: "success" };
+        entry.draft = null;
+        adapter.contextChanged?.();
+        adapter.chartOpened?.(documentId, chart.id);
         renderArtifactDetails(entry.view);
         render();
+      } else {
+        draft.status = { key: "saved", kind: "success" };
+        if (sequence === entry.openSequence && entry.status?.key === "saving") entry.status = null;
       }
     } catch (error) {
       draft.pendingSave = false;
@@ -869,6 +925,7 @@ export function createCharts(adapter) {
   function cancelDraft(entry) {
     const draft = entry?.draft;
     if (!draft || draft.pendingSave) return;
+    entry.openSequence += 1;
     draft.previewOperation?.controller?.abort();
     entry.draft = null;
     ensureDraft(entry);
@@ -893,7 +950,7 @@ export function createCharts(adapter) {
       renderArtifactDetails(null);
       return;
     }
-    entry.openSequence += 1;
+    if (previous !== currentId) entry.openSequence += 1;
     entry.loadController?.abort();
     const controller = new AbortController();
     entry.loadController = controller;
@@ -922,33 +979,37 @@ export function createCharts(adapter) {
     return entry.ready;
   }
 
-  async function openChart(documentId, chartId) {
+  async function openChart(documentId, chartId, options = {}) {
     if (!documentId || !chartId || currentId !== documentId) return;
     const entry = entryFor(documentId);
+    const navigationGeneration = adapter.getNavigationGeneration?.();
     const sequence = ++entry.openSequence;
+    const isCurrent = () => currentId === documentId && sequence === entry.openSequence && navigationGeneration === adapter.getNavigationGeneration?.();
     await entry.ready;
-    if (currentId !== documentId || sequence !== entry.openSequence) return;
+    if (!isCurrent()) return;
     let chart = entry.charts.find((item) => item.id === chartId);
     try {
       if (!chart) chart = await adapter.api(`/api/v1/documents/${encodeURIComponent(documentId)}/charts/${encodeURIComponent(chartId)}`);
-      if (currentId !== documentId || sequence !== entry.openSequence) return;
+      if (!isCurrent()) return;
       if (chart.document_id !== documentId || chart.deleted_at) throw new Error("chart_deleted");
       const response = await adapter.checkedFetch(`/api/v1/documents/${encodeURIComponent(documentId)}/charts/${encodeURIComponent(chartId)}/data`);
       const artifact = await readBoundedJson(response, chart);
-      if (currentId !== documentId || sequence !== entry.openSequence) return;
+      if (!isCurrent()) return;
       if (!validateArtifact(artifact, chart)) throw new Error("invalidArtifact");
       entry.charts = [chart, ...entry.charts.filter((item) => item.id !== chart.id)];
       entry.activeChartId = chart.id;
       const view = { kind: "saved", artifact, record: chart, renderer: chart.renderer, pending: true, renderReady: false, host: null };
       entry.view = view;
       entry.status = null;
+      syncDataset(documentId, chart.dataset_id, chart.analysis_id);
+      adapter.datasetContextChanged?.(documentId, chart.dataset_id, chart.analysis_id);
       adapter.contextChanged?.();
-      adapter.chartOpened?.(documentId, chart.id);
+      if (!options.preserveUrl) adapter.chartOpened?.(documentId, chart.id);
       elements.panel.open = true;
       render();
       await displayArtifact(entry, view);
     } catch (error) {
-      if (currentId !== documentId || sequence !== entry.openSequence) return;
+      if (!isCurrent()) return;
       entry.status = errorStatus(error, "loadFailed", () => openChart(documentId, chartId));
       render();
     }
@@ -956,6 +1017,7 @@ export function createCharts(adapter) {
 
   function cloneChart(entry, chart) {
     if (!entry || chart.deleted_at) return;
+    entry.openSequence += 1;
     invalidateDraft(ensureDraft(entry));
     entry.draft = {
       datasetId: chart.dataset_id,
@@ -1078,16 +1140,19 @@ export function createCharts(adapter) {
     const key = proposal.sha256 || proposal.id;
     if (proposal.kind !== "create_chart" || !key || entry.proposalPreviews.get(key)?.pending) return false;
     const state = { pending: true, ready: false };
+    const navigationGeneration = adapter.getNavigationGeneration?.();
+    const sequence = ++entry.openSequence;
+    const isCurrent = () => currentId === documentId && entry.proposalPreviews.get(key) === state && sequence === entry.openSequence && navigationGeneration === adapter.getNavigationGeneration?.();
     entry.proposalPreviews.set(key, state);
     try {
       const capabilities = await getCapabilities();
-      if (currentId !== documentId || entry.proposalPreviews.get(key) !== state) return false;
+      if (!isCurrent()) return false;
       const response = await adapter.api(`/api/v1/documents/${encodeURIComponent(documentId)}/charts/preview`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body)
       });
-      if (currentId !== documentId || entry.proposalPreviews.get(key) !== state) return false;
+      if (!isCurrent()) return false;
       if (!response?.chart || !validateArtifact(response.data, { ...body, document_id: documentId }) ||
         body.recipe_sha256 !== capabilities.items.find((item) => item.id === body.kind)?.recipe_sha256 ||
         body.renderer_sha256 !== capabilities.renderer.sha256) throw new Error("invalidArtifact");
@@ -1095,6 +1160,7 @@ export function createCharts(adapter) {
       entry.view = view;
       entry.activeChartId = null;
       elements.panel.open = true;
+      adapter.chartPreviewed?.(documentId);
       adapter.contextChanged?.();
       state.ready = await displayArtifact(entry, view);
       return state.ready;
@@ -1145,6 +1211,7 @@ export function createCharts(adapter) {
     draft.x = numeric[0] || "";
     draft.y = numeric[1] || "";
     draft.analysisId = entry.jobs.find((job) => job.dataset_id === draft.datasetId && job.status === "succeeded" && isDescriptiveJob(job))?.id || null;
+    adapter.datasetContextChanged?.(currentId, draft.datasetId, draft.analysisId);
     render();
   });
   elements.analysis.addEventListener("change", () => {
@@ -1201,6 +1268,17 @@ export function createCharts(adapter) {
       const entry = entryFor(documentId);
       entry.activeChartId = null;
       adapter.contextChanged?.();
+    },
+    syncDataset,
+    refreshLayout() {
+      const entry = currentEntry();
+      const view = entry?.view;
+      if (!entry || !view?.artifact || view.pending) return;
+      if (!view.renderReady || !view.host?.isConnected) {
+        displayArtifact(entry, view);
+      } else if (view.host.clientWidth && window.Plotly) {
+        window.Plotly.Plots.resize(view.host);
+      }
     },
     reload,
     openChart,

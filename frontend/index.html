@@ -7,6 +7,7 @@
   <title>文献与笔记 · Synrise Neuro</title>
   <link rel="stylesheet" href="/theme-tokens.css">
   <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/workspace.css">
   <link rel="stylesheet" href="/image-library.css">
   <link rel="stylesheet" href="/analysis.css">
   <link rel="stylesheet" href="/data-imports.css">
@@ -39,6 +40,14 @@
     <span id="status-text"></span>
     <button id="status-retry" class="status-retry" type="button" hidden data-i18n="retry">重试</button>
   </div>
+
+  <nav class="workspace-modebar" aria-label="工作区">
+    <div id="workspace-mode-controls" class="workspace-mode-controls" aria-label="阅读 / 数据分析">
+      <button id="workspace-mode-reading" class="workspace-mode-button" type="button" aria-pressed="true">阅读</button>
+      <button id="workspace-mode-data" class="workspace-mode-button" type="button" aria-pressed="false">数据分析</button>
+    </div>
+    <button id="workspace-notes-toggle" class="button button-quiet" type="button" aria-controls="notes-panel" aria-pressed="true">隐藏笔记</button>
+  </nav>
 
   <main class="workspace">
     <aside class="documents-panel" aria-labelledby="documents-heading">
@@ -142,7 +151,21 @@
       </div>
     </section>
 
-    <aside class="notes-panel" aria-labelledby="notes-heading">
+    <section id="data-workspace" class="data-workspace" aria-labelledby="data-workspace-title" hidden>
+      <header class="data-workspace-header">
+        <div>
+          <h2 id="data-workspace-title">数据工作区</h2>
+          <p id="data-workspace-help" class="data-workspace-help">数据、设置、结果和图表均属于当前文献。预览仅显示前 5 行，运行分析前仍需核对并明确确认。</p>
+        </div>
+        <div id="data-tool-switch" class="data-tool-switch" aria-label="分析 / 图表">
+          <button id="data-tool-analysis" class="data-tool-button" type="button" aria-controls="analysis-panel" aria-pressed="true">分析</button>
+          <button id="data-tool-charts" class="data-tool-button" type="button" aria-controls="charts-panel" aria-pressed="false">图表</button>
+        </div>
+      </header>
+      <p id="data-prerequisite" class="data-prerequisite" role="status">请先从左侧选择或上传一篇文献，再导入与该文献关联的数据。</p>
+    </section>
+
+    <aside id="notes-panel" class="notes-panel" aria-labelledby="notes-heading">
       <div class="panel-heading notes-heading">
         <h2 id="notes-heading" data-i18n="notes">笔记</h2>
       </div>
@@ -163,22 +186,18 @@
       <details id="analysis-panel" class="analysis-panel">
         <summary>数据与分析</summary>
         <div class="analysis-body">
-          <p class="analysis-help">上传 CSV 或 TSV，选择描述统计或独立样本 t 检验，并核对固定分析代码。结果不构成科学结论。</p>
+          <p class="analysis-help">导入 CSV、TSV、SAV 或 ZSAV，选择描述统计或独立样本 t 检验，并核对固定分析代码。结果不构成科学结论。</p>
           <div class="analysis-upload-row">
-            <button id="dataset-upload-button" class="button button-secondary" type="button" disabled>上传 CSV/TSV</button>
-            <input id="dataset-upload-input" type="file" accept="text/csv,text/tab-separated-values,.csv,.tsv" hidden>
+            <button id="dataset-upload-button" class="button button-primary" type="button" disabled>导入数据</button>
+            <input id="dataset-upload-input" type="file" accept="text/csv,text/tab-separated-values,.csv,.tsv,.sav,.zsav" hidden>
           </div>
           <div id="dataset-upload-status" class="analysis-status" role="status" aria-live="polite"></div>
           <label class="analysis-label" for="dataset-select">选择数据</label>
           <select id="dataset-select" disabled></select>
           <div id="dataset-preview" class="analysis-preview"></div>
           <section id="data-imports" class="data-imports" aria-labelledby="data-imports-heading">
-            <h3 id="data-imports-heading">SPSS 导入</h3>
-            <p id="data-imports-help" class="data-imports-help">保留原始文件，核对字段和缺失处理后再确认。</p>
-            <div class="analysis-upload-row">
-              <button id="spss-upload-button" class="button button-secondary" type="button" disabled>Import SPSS</button>
-              <input id="spss-upload-input" type="file" accept=".sav,.zsav" hidden disabled>
-            </div>
+            <h3 id="data-imports-heading">数据导入记录</h3>
+            <p id="data-imports-help" class="data-imports-help">SAV/ZSAV 原始文件和核对记录保留在此处。打开记录不会更改当前数据或运行设置。</p>
             <div id="spss-import-status" class="analysis-status data-imports-status" role="status" aria-live="polite"></div>
             <label id="spss-import-select-label" class="analysis-label" for="spss-import-select">导入记录</label>
             <select id="spss-import-select" disabled></select>
@@ -203,7 +222,10 @@
                 <input id="spss-import-ack" type="checkbox" disabled>
                 <span>我已核对字段含义、分组编码和缺失规则。</span>
               </label>
-              <button id="spss-import-confirm" class="button button-primary" type="button" disabled>确认并加入数据</button>
+              <div class="data-import-review-actions">
+                <button id="spss-import-defer" class="button button-secondary" type="button">稍后核对 / 返回</button>
+                <button id="spss-import-confirm" class="button button-primary" type="button" disabled>确认并加入数据</button>
+              </div>
             </section>
           </section>
           <label id="analysis-method-label" class="analysis-label" for="analysis-method">分析方法</label>

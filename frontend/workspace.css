@@ -1,0 +1,324 @@
+.workspace-modebar {
+  min-height: 54px;
+  padding: 8px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--ui-border);
+  background: var(--ui-surface);
+}
+
+.workspace-mode-controls,
+.data-tool-switch {
+  display: inline-flex;
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid var(--ui-border);
+  border-radius: 5px;
+  background: var(--ui-surface-subtle);
+}
+
+.workspace-mode-button,
+.data-tool-button {
+  min-height: 34px;
+  padding: 6px 14px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--ui-text-soft);
+  cursor: pointer;
+}
+
+.workspace-mode-button[aria-pressed="true"],
+.data-tool-button[aria-pressed="true"] {
+  border-color: var(--ui-control-border);
+  background: var(--ui-surface);
+  color: var(--ui-primary);
+  box-shadow: 0 1px 2px var(--ui-shadow, transparent);
+}
+
+.workspace[data-workspace-mode="data"] {
+  grid-template-columns: minmax(200px, 240px) minmax(0, 1fr);
+}
+
+.workspace[data-workspace-mode="data"][data-notes-visible="true"] {
+  grid-template-columns: minmax(200px, 240px) minmax(0, 1fr) minmax(280px, 340px);
+}
+
+.data-workspace {
+  min-width: 0;
+  padding: 20px 24px 32px;
+  background: var(--ui-bg);
+}
+
+.data-workspace-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.data-workspace-header h2 {
+  font-size: 18px;
+}
+
+.data-workspace-help {
+  max-width: 760px;
+  margin-top: 5px;
+  color: var(--ui-text-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.data-prerequisite {
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border-left: 3px solid var(--ui-focus);
+  background: var(--ui-info-bg);
+  color: var(--ui-text-soft);
+  line-height: 1.6;
+}
+
+.data-workspace > .analysis-panel,
+.data-workspace > .charts-panel {
+  border: 0;
+  background: transparent;
+}
+
+.data-workspace .analysis-panel > summary,
+.data-workspace .charts-panel > summary {
+  display: none;
+}
+
+.data-workspace .analysis-body,
+.data-workspace .charts-body {
+  padding: 0;
+}
+
+.analysis-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.85fr) minmax(360px, 1.35fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.analysis-overview {
+  grid-column: 1 / -1;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--ui-border);
+  border-radius: 5px;
+  background: var(--ui-surface);
+}
+
+.analysis-overview .analysis-upload-row {
+  margin-bottom: 4px;
+}
+
+.analysis-overview #dataset-preview {
+  max-height: 390px;
+  overflow: auto;
+}
+
+.analysis-settings,
+.analysis-results,
+.charts-builder,
+.charts-output {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--ui-border);
+  border-radius: 5px;
+  background: var(--ui-surface);
+}
+
+.analysis-settings .analysis-label:first-child,
+.charts-builder .chart-field:first-child {
+  margin-top: 0;
+}
+
+.analysis-results:empty {
+  display: none;
+}
+
+.analysis-results .analyses-list {
+  margin-top: 0;
+}
+
+.charts-layout {
+  display: grid;
+  grid-template-columns: minmax(250px, 340px) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.charts-output .chart-view {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.charts-output #chart-plot {
+  min-height: 420px;
+}
+
+.data-imports {
+  margin: 0 0 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--ui-border);
+  border-radius: 5px;
+  background: var(--ui-surface);
+}
+
+.data-import-history {
+  margin-top: 8px;
+  border-top: 1px solid var(--ui-border);
+}
+
+.data-import-history > summary {
+  min-height: 38px;
+  padding: 10px 0 4px;
+  color: var(--ui-text-soft);
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.data-import-history #spss-import-select {
+  margin-bottom: 4px;
+}
+
+.data-imports-review {
+  margin-top: 0;
+  padding: 16px;
+  background: var(--ui-surface);
+}
+
+.data-imports-review[data-status="pending"] {
+  border-color: var(--ui-focus);
+}
+
+.data-imports-review .data-imports-table-scroll {
+  max-height: 440px;
+}
+
+.data-import-review-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.data-import-review-actions #spss-import-confirm {
+  width: auto;
+  margin-top: 0;
+}
+
+.data-imports[data-review-open="true"] {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.data-imports[data-review-open="true"] > h3,
+.data-imports[data-review-open="true"] > .data-imports-help,
+.data-imports[data-review-open="true"] > .data-import-history,
+.data-imports[data-review-open="true"] > .data-imports-status:empty {
+  display: none;
+}
+
+.data-imports[data-review-open="false"] #spss-import-review {
+  display: none;
+}
+
+@media (max-width: 1120px) {
+  .workspace[data-workspace-mode="data"],
+  .workspace[data-workspace-mode="data"][data-notes-visible="true"] {
+    grid-template-columns: 200px minmax(0, 1fr);
+  }
+
+  .workspace[data-workspace-mode="data"][data-notes-visible="true"] .notes-panel {
+    grid-column: 2;
+    border-top: 1px solid var(--ui-border);
+    border-left: 0;
+  }
+
+  .analysis-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .analysis-overview {
+    grid-column: auto;
+  }
+
+  .charts-layout {
+    grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 820px) {
+  .workspace-modebar {
+    padding-inline: 16px;
+  }
+
+  .data-workspace {
+    padding: 16px;
+  }
+
+  .data-workspace-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .data-tool-switch {
+    align-self: flex-start;
+  }
+
+  .charts-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .workspace-modebar {
+    padding: 8px 12px;
+    gap: 8px;
+  }
+
+  .workspace-mode-button,
+  .data-tool-button {
+    padding-inline: 10px;
+  }
+
+  #workspace-notes-toggle {
+    padding-inline: 8px;
+  }
+
+  .data-workspace {
+    padding: 12px;
+  }
+
+  .analysis-overview,
+  .analysis-settings,
+  .analysis-results,
+  .charts-builder,
+  .charts-output,
+  .data-imports-review {
+    padding: 12px;
+  }
+
+  .charts-output #chart-plot {
+    min-height: 280px;
+  }
+
+  .data-import-review-actions {
+    align-items: stretch;
+    flex-direction: column-reverse;
+  }
+
+  .data-import-review-actions .button {
+    width: 100%;
+  }
+}

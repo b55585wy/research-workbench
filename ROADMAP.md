@@ -61,3 +61,9 @@ v0.11：首个独立样本 t 检验，直接复用 jmv 的实际计算层 R stat
 jmv 隔离安装后发生退出崩溃，未部署；不声称移植了 jmv 或拥有 SPSS 引擎。
 下一步再验证 haven 的文件标签/缺失语义，以及有真实需求的后续统计方法。
 依据见 [STATISTICAL-TESTS.md](STATISTICAL-TESTS.md) 和 [STATISTICS-SOURCES.md](STATISTICS-SOURCES.md)。
+
+## v0.12 交互改进：任务工作区
+
+将阅读、数据分析作为两个主任务，分析设置和结果进入中央；图表与所选数据关联，
+笔记按需展开。统一数据导入并保留 SPSS 核对、失败原请求重试和全部运行确认。
+接口、运行环境、数据库及 tFUS 边界保持现有约束。见 [WORKSPACE-WORKFLOW.md](WORKSPACE-WORKFLOW.md)。

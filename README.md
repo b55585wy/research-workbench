@@ -168,3 +168,9 @@ PDF 检查使用独立子进程及超时/并发限制，这不等于安全沙箱
 原 tFUS 开发顺序、队列、科学规则与访问边界保持独立。
 
 文献与搜索接口见 [LIBRARY-AND-SEARCH.md](LIBRARY-AND-SEARCH.md)。后续自定义分析、在线资料与引用、按需下载和空间控制计划见 [ROADMAP.md](ROADMAP.md)。
+
+## 阅读与分析工作区
+
+顶部“阅读 / 数据分析”切换当前任务。分析时数据预览、方法设置、结果和图表占据中央，
+笔记与助手按需展开；统一入口接受 CSV、TSV、SAV、ZSAV，后两种格式仍需核对确认。
+切换视图不执行分析，也不自动向助手提供数据。流程与边界见 [WORKSPACE-WORKFLOW.md](WORKSPACE-WORKFLOW.md)。

@@ -4,6 +4,7 @@ import { createImageViewer } from "/image-viewer.js";
 import { createAnalysis } from "/analysis.js";
 import { createDataImports } from "/data-imports.js";
 import { createCharts } from "/charts.js";
+import { createWorkspace } from "/workspace.js";
 import { createAssistant } from "/assistant.js";
 import { createRichText, renderRichHtml } from "/rich-text.js";
 
@@ -468,6 +469,7 @@ let imageViewer = null;
 let analysis = null;
 let dataImports = null;
 let charts = null;
+let workspace = null;
 let assistant = null;
 let richText = null;
 
@@ -558,6 +560,7 @@ function applyLanguage() {
   analysis?.applyLanguage(state.language);
   dataImports?.applyLanguage(state.language);
   charts?.applyLanguage(state.language);
+  workspace?.applyLanguage(state.language);
   assistant?.applyLanguage(state.language);
   richText?.applyLanguage(state.language);
 }
@@ -598,14 +601,19 @@ async function api(path, options = {}) {
   }
 }
 
-function updateUrl(documentId, noteId = null, replace = false) {
+function updateUrl(documentId, noteId = null, replace = false, mode = "reading", tool = "analysis") {
+  workspace?.reveal(mode, { tool, showNotes: Boolean(noteId) });
   const url = new URL(window.location.href);
   if (documentId) url.searchParams.set("document", documentId);
   else url.searchParams.delete("document");
   if (noteId) url.searchParams.set("note", noteId);
   else url.searchParams.delete("note");
+  url.searchParams.set("workspace", mode);
+  if (mode === "data") url.searchParams.set("tool", tool);
+  else url.searchParams.delete("tool");
   for (const key of ["analysis", "dataset", "chart", "image_kind", "image_source", "image_annotation"]) url.searchParams.delete(key);
-  window.history[replace ? "replaceState" : "pushState"]({}, "", url);
+  const method = replace || url.href === window.location.href ? "replaceState" : "pushState";
+  window.history[method]({}, "", url);
 }
 
 function readImageLink(params) {
@@ -623,10 +631,13 @@ function readImageLink(params) {
 
 function showImageInUrl(documentId, context) {
   if (state.document?.id !== documentId || !context) return;
+  workspace?.reveal("reading", { showNotes: true });
   const url = new URL(window.location.href);
   url.searchParams.set("document", documentId);
   url.searchParams.set("image_kind", context.source_kind);
   url.searchParams.set("image_source", context.source_id);
+  url.searchParams.set("workspace", "reading");
+  url.searchParams.delete("tool");
   if (context.annotation_id) url.searchParams.set("image_annotation", context.annotation_id);
   else url.searchParams.delete("image_annotation");
   for (const key of ["note", "analysis", "dataset", "chart"]) url.searchParams.delete(key);
@@ -1375,10 +1386,20 @@ async function loadDocuments() {
     const requestedAnalysis = params.get("analysis");
     const requestedDataset = params.get("dataset");
     const requestedChart = params.get("chart");
+    const requestedMode = workspace?.modeForParams(params) || "reading";
     const imageLink = readImageLink(params);
     if (requestedDocument) {
       if (state.documents.some((document) => document.id === requestedDocument)) {
-        await openDocument(requestedDocument, { noteId: requestedNote, analysisId: requestedAnalysis, datasetId: requestedDataset, chartId: requestedChart, imageLink: imageLink || null, replaceUrl: true });
+        await openDocument(requestedDocument, {
+          noteId: requestedMode === "reading" ? requestedNote : null,
+          analysisId: requestedMode === "data" ? requestedAnalysis : null,
+          datasetId: requestedMode === "data" ? requestedDataset : null,
+          chartId: requestedMode === "data" ? requestedChart : null,
+          imageLink: requestedMode === "reading" ? imageLink || null : null,
+          workspace: requestedMode,
+          tool: requestedChart ? "charts" : params.get("tool"),
+          replaceUrl: true
+        });
       } else {
         showMissingDocument();
       }
@@ -1415,6 +1436,7 @@ function showMissingDocument() {
   dataImports?.reload(null);
   charts?.reload(null);
   assistant?.documentChanged(null);
+  workspace?.documentChanged();
   setStatus("missingDocument", "error");
 }
 
@@ -1452,12 +1474,15 @@ async function openDocument(documentId, options = {}) {
     showMissingDocument();
     return;
   }
+  const mode = options.workspace || (options.noteId || options.imageLink ? "reading" : options.analysisId || options.datasetId || options.chartId ? "data" : workspace?.getMode() || "reading");
+  const tool = options.chartId || options.tool === "charts" ? "charts" : "analysis";
+  workspace?.reveal(mode, { tool, showNotes: Boolean(options.noteId || options.imageLink) });
   if (state.document?.id === documentId && state.pdf && !options.force) {
     if (options.imageLink) await openImageViewer(documentId, options.imageLink.kind, options.imageLink.sourceId, { annotationId: options.imageLink.annotationId });
-    else if (options.noteId) openNote(options.noteId);
-    if (options.datasetId) analysis?.openDataset(options.datasetId);
-    if (options.analysisId) analysis?.openJob(options.analysisId);
-    if (options.chartId) charts?.openChart(documentId, options.chartId);
+    else if (options.noteId) openNote(options.noteId, { preserveUrl: options.preserveUrl });
+    if (options.datasetId) analysis?.openDataset(options.datasetId, { preserveUrl: options.preserveUrl });
+    if (options.analysisId) analysis?.openJob(options.analysisId, { preserveUrl: options.preserveUrl });
+    if (options.chartId) charts?.openChart(documentId, options.chartId, { preserveUrl: options.preserveUrl });
     return;
   }
 
@@ -1478,7 +1503,7 @@ async function openDocument(documentId, options = {}) {
   state.effectiveScale = 1;
   elements.pageSurface.hidden = true;
   elements.readerEmpty.hidden = false;
-  updateUrl(documentId, options.noteId || null, Boolean(options.replaceUrl));
+  if (!options.preserveUrl) updateUrl(documentId, options.noteId || null, Boolean(options.replaceUrl), mode, tool);
   renderDocuments();
   renderDocumentDetails();
   renderMetadata();
@@ -1488,9 +1513,9 @@ async function openDocument(documentId, options = {}) {
   analysis?.reload(documentId);
   dataImports?.reload(documentId);
   charts?.reload(documentId);
-  if (options.datasetId) analysis?.openDataset(options.datasetId);
-  if (options.analysisId) analysis?.openJob(options.analysisId);
-  if (options.chartId) charts?.openChart(documentId, options.chartId);
+  if (options.datasetId) analysis?.openDataset(options.datasetId, { preserveUrl: options.preserveUrl });
+  if (options.analysisId) analysis?.openJob(options.analysisId, { preserveUrl: options.preserveUrl });
+  if (options.chartId) charts?.openChart(documentId, options.chartId, { preserveUrl: options.preserveUrl });
   assistant?.documentChanged(document);
   setStatus("loadingDocument");
 
@@ -1523,7 +1548,7 @@ async function openDocument(documentId, options = {}) {
     } else if (noteStateFor(options.noteId)?.deleted_at) {
       deletedLink = true;
       elements.deletedNotes.open = true;
-    } else if (notesResult.status === "fulfilled" && noteStatesResult.status === "fulfilled") {
+    } else if (!options.preserveUrl && notesResult.status === "fulfilled" && noteStatesResult.status === "fulfilled") {
       updateUrl(documentId, null, true);
     }
   }
@@ -1648,12 +1673,12 @@ async function renderCurrentPage(sequence) {
   const pdf = state.pdf;
   const document = state.document;
   const pageNumber = state.page;
-  if (!pdf || !document || sequence !== state.renderSequence) return;
+  if (!pdf || !document || sequence !== state.renderSequence || !elements.readerStage.clientWidth) return;
 
   clearHighlights();
   try {
     const page = await pdf.getPage(pageNumber);
-    if (sequence !== state.renderSequence || state.pdf !== pdf || state.document?.id !== document.id) return;
+    if (sequence !== state.renderSequence || state.pdf !== pdf || state.document?.id !== document.id || !elements.readerStage.clientWidth) return;
 
     const baseViewport = page.getViewport({ scale: 1 });
     const stageStyle = getComputedStyle(elements.readerStage);
@@ -1727,7 +1752,7 @@ function drawHighlight() {
   return highlight;
 }
 
-function openNote(noteId) {
+function openNote(noteId, options = {}) {
   if (!state.document) {
     setStatus("unknownNote", "error");
     return;
@@ -1739,7 +1764,7 @@ function openNote(noteId) {
       state.highlightRevealId = null;
       clearHighlights();
       elements.deletedNotes.open = true;
-      updateUrl(state.document.id, note.id);
+      if (!options.preserveUrl) updateUrl(state.document.id, note.id);
       setStatus("deletedNoteRecovery", "error");
     } else {
       setStatus("unknownNote", "error");
@@ -1748,7 +1773,7 @@ function openNote(noteId) {
   }
   state.highlight = note;
   state.highlightRevealId = note.id;
-  updateUrl(state.document.id, note.id);
+  if (!options.preserveUrl) updateUrl(state.document.id, note.id);
   goToPage(note.page, { preserveHighlight: true });
 }
 
@@ -2516,7 +2541,10 @@ window.addEventListener("popstate", () => {
   const analysisId = params.get("analysis");
   const datasetId = params.get("dataset");
   const chartId = params.get("chart");
+  const mode = workspace?.modeForParams(params) || "reading";
+  const tool = chartId || params.get("tool") === "charts" ? "charts" : "analysis";
   const imageLink = readImageLink(params);
+  workspace?.reveal(mode, { tool, showNotes: mode === "reading" && Boolean(noteId || imageLink), focus: false });
   if (!documentId) {
     captureCurrentDraft();
     captureCurrentMetadataDraft();
@@ -2537,27 +2565,38 @@ window.addEventListener("popstate", () => {
     dataImports?.reload(null);
     charts?.reload(null);
     assistant?.documentChanged(null);
+    workspace?.documentChanged();
     if (imageLink === false) setStatus("invalidImageLink", "error");
     return;
   }
   if (imageLink === false) setStatus("invalidImageLink", "error");
   if (state.document?.id === documentId) {
-    if (imageLink) openImageViewer(documentId, imageLink.kind, imageLink.sourceId, { annotationId: imageLink.annotationId });
+    if (mode === "reading" && imageLink) openImageViewer(documentId, imageLink.kind, imageLink.sourceId, { annotationId: imageLink.annotationId });
     else {
       imageViewer?.close({ restoreFocus: false });
-      if (noteId) openNote(noteId);
+      if (mode === "reading" && noteId) openNote(noteId, { preserveUrl: true });
     }
-    if (datasetId) analysis?.openDataset(datasetId);
-    if (analysisId) analysis?.openJob(analysisId);
-    if (chartId) charts?.openChart(documentId, chartId);
+    if (mode === "data" && datasetId) analysis?.openDataset(datasetId, { preserveUrl: true, preserveFocus: true });
+    if (mode === "data" && analysisId) analysis?.openJob(analysisId, { preserveUrl: true, preserveFocus: true });
+    if (mode === "data" && chartId) charts?.openChart(documentId, chartId, { preserveUrl: true });
   } else {
-    openDocument(documentId, { noteId, analysisId, datasetId, chartId, imageLink: imageLink || null, replaceUrl: true });
+    openDocument(documentId, {
+      noteId: mode === "reading" ? noteId : null,
+      analysisId: mode === "data" ? analysisId : null,
+      datasetId: mode === "data" ? datasetId : null,
+      chartId: mode === "data" ? chartId : null,
+      imageLink: mode === "reading" ? imageLink || null : null,
+      workspace: mode,
+      tool,
+      preserveUrl: true
+    });
   }
 });
 
 const resizeObserver = new ResizeObserver(() => {
   if (state.resizeFrame) cancelAnimationFrame(state.resizeFrame);
   state.resizeFrame = requestAnimationFrame(() => {
+    if (!elements.readerStage.clientWidth) return;
     if (state.zoomMode === "fit" && state.pdf) requestRender();
     else drawHighlight();
   });
@@ -2584,13 +2623,15 @@ async function navigateAssistantSource(source) {
   if (source.kind === "dataset_sample") {
     if (!source.dataset_id) return;
     if (state.document?.id !== source.document_id) await openDocument(source.document_id, { datasetId: source.dataset_id });
-    else analysis?.openDataset(source.dataset_id);
+    else {
+      workspace?.reveal("data", { tool: "analysis" });
+      await analysis?.openDataset(source.dataset_id);
+    }
     return;
   }
   if (source.kind === "analysis_result") {
     if (!source.analysis_id) return;
-    if (state.document?.id !== source.document_id) await openDocument(source.document_id, { analysisId: source.analysis_id });
-    else analysis?.openJob(source.analysis_id);
+    await openAnalysisJob(source.document_id, source.analysis_id);
     return;
   }
   if (source.kind === "chart_result") {
@@ -2656,36 +2697,58 @@ async function refreshAfterAgent(documentId) {
   await assistant?.refreshConversations(documentId);
 }
 
-function showAnalysisInUrl(documentId, analysisId) {
-  if (state.document?.id !== documentId) return;
+function showDatasetInUrl(documentId, datasetId) {
+  if (state.document?.id !== documentId || workspace?.getMode() !== "data" || workspace?.getTool() !== "analysis") return;
   const url = new URL(window.location.href);
+  const replace = url.searchParams.get("document") === documentId && url.searchParams.get("dataset") === datasetId;
+  url.searchParams.set("document", documentId);
+  url.searchParams.set("dataset", datasetId);
+  url.searchParams.set("workspace", "data");
+  url.searchParams.set("tool", "analysis");
+  for (const key of ["note", "analysis", "chart", "image_kind", "image_source", "image_annotation"]) url.searchParams.delete(key);
+  window.history[replace ? "replaceState" : "pushState"]({}, "", url);
+}
+
+function showAnalysisInUrl(documentId, analysisId) {
+  if (state.document?.id !== documentId || workspace?.getMode() !== "data" || workspace?.getTool() !== "analysis") return;
+  const url = new URL(window.location.href);
+  const replace = url.searchParams.get("document") === documentId && url.searchParams.get("analysis") === analysisId;
   url.searchParams.set("document", documentId);
   url.searchParams.set("analysis", analysisId);
-  url.searchParams.delete("dataset");
-  url.searchParams.delete("note");
-  url.searchParams.delete("chart");
-  window.history.pushState({}, "", url);
+  url.searchParams.set("workspace", "data");
+  url.searchParams.set("tool", "analysis");
+  for (const key of ["dataset", "note", "chart", "image_kind", "image_source", "image_annotation"]) url.searchParams.delete(key);
+  window.history[replace ? "replaceState" : "pushState"]({}, "", url);
 }
 
 async function openAnalysisJob(documentId, analysisId) {
   if (!analysisId) return;
   if (state.document?.id !== documentId) await openDocument(documentId, { analysisId });
-  else analysis?.openJob(analysisId);
+  else {
+    workspace?.reveal("data", { tool: "analysis" });
+    await analysis?.openJob(analysisId);
+  }
 }
 
 function showChartInUrl(documentId, chartId) {
-  if (state.document?.id !== documentId) return;
+  if (state.document?.id !== documentId || workspace?.getMode() !== "data" || workspace?.getTool() !== "charts") return;
   const url = new URL(window.location.href);
+  const replace = url.searchParams.get("document") === documentId && url.searchParams.get("chart") === chartId;
   url.searchParams.set("document", documentId);
   url.searchParams.set("chart", chartId);
+  url.searchParams.set("workspace", "data");
+  url.searchParams.set("tool", "charts");
   for (const key of ["note", "analysis", "dataset", "image_kind", "image_source", "image_annotation"]) url.searchParams.delete(key);
-  window.history.pushState({}, "", url);
+  window.history[replace ? "replaceState" : "pushState"]({}, "", url);
 }
 
 async function openChart(documentId, chartId) {
   if (!chartId) return;
   if (state.document?.id !== documentId) await openDocument(documentId, { chartId });
-  else await charts?.openChart(documentId, chartId);
+  else {
+    workspace?.reveal("data", { tool: "charts" });
+    await charts?.openChart(documentId, chartId);
+  }
 }
 
 async function addAnalysisCitation(documentId, job) {
@@ -2695,6 +2758,8 @@ async function addAnalysisCitation(documentId, job) {
   const url = new URL(window.location.origin + "/");
   url.searchParams.set("document", documentId);
   url.searchParams.set("analysis", job.id);
+  url.searchParams.set("workspace", "data");
+  url.searchParams.set("tool", "analysis");
   const method = job.method === "ttest_independent" ? "Independent-samples t-test" : "Descriptive analysis";
   const citation = `Analysis: ${method} · ${job.dataset_name}\n${url.pathname}${url.search}`;
   if (draft.text.includes(`analysis=${job.id}`)) return true;
@@ -2711,6 +2776,7 @@ async function addAnalysisCitation(documentId, job) {
     draft.richContent.ops = ops;
   }
   invalidateRequestId(draft);
+  workspace?.showNotes();
   renderDraft();
   elements.noteText.focus();
   return true;
@@ -2723,6 +2789,8 @@ async function addChartCitation(documentId, chart) {
   const url = new URL(window.location.origin + "/");
   url.searchParams.set("document", documentId);
   url.searchParams.set("chart", chart.id);
+  url.searchParams.set("workspace", "data");
+  url.searchParams.set("tool", "charts");
   const citation = `Chart: ${chart.title}\n${url.pathname}${url.search}`;
   if (draft.text.includes(`chart=${chart.id}`)) return true;
   const separator = draft.text ? (draft.text.endsWith("\n") ? "\n" : "\n\n") : "";
@@ -2738,6 +2806,7 @@ async function addChartCitation(documentId, chart) {
     draft.richContent.ops = ops;
   }
   invalidateRequestId(draft);
+  workspace?.showNotes();
   renderDraft();
   elements.noteText.focus();
   return true;
@@ -2797,6 +2866,18 @@ function convertRichDraftToPlain() {
   elements.noteText.focus();
 }
 
+workspace = createWorkspace({
+  getDocument: () => state.document,
+  getLanguage: () => state.language,
+  readingVisible: () => {
+    if (state.pdf) requestRender();
+  },
+  toolVisible: (tool) => {
+    if (tool === "charts") charts?.refreshLayout();
+  },
+  chartsSelected: (documentId) => charts?.reload(documentId)
+});
+
 richText = createRichText({
   getLanguage: () => state.language,
   getScope: currentRichTextScope,
@@ -2844,8 +2925,13 @@ analysis = createAnalysis({
   checkedFetch,
   getDocument: () => state.document,
   getLanguage: () => state.language,
+  getNavigationGeneration: () => workspace.getNavigationGeneration(),
   contextChanged: () => assistant?.contextChanged(),
   onJobOpened: showAnalysisInUrl,
+  onDatasetOpened: showDatasetInUrl,
+  startImport: (file) => dataImports?.startImport(file),
+  isImportPending: () => dataImports?.isImportPending() || false,
+  datasetContextChanged: (documentId, datasetId, analysisId) => charts?.syncDataset(documentId, datasetId, analysisId),
   addAnalysisCitation,
   sourcesChanged: (documentId) => {
     if (state.document?.id === documentId) charts?.reload(documentId);
@@ -2856,8 +2942,11 @@ dataImports = createDataImports({
   api,
   checkedFetch,
   getLanguage: () => state.language,
-  datasetConfirmed: (documentId, dataset) => {
-    analysis.openImportedDataset(documentId, dataset);
+  getNavigationGeneration: () => workspace.getNavigationGeneration(),
+  reviewVisibilityChanged: (documentId, open, reveal) => workspace.setImportReview(documentId, open, reveal),
+  importStateChanged: () => analysis.refreshUpload(),
+  datasetConfirmed: (documentId, dataset, navigationGeneration) => {
+    analysis.openImportedDataset(documentId, dataset, { select: navigationGeneration === workspace.getNavigationGeneration() });
     if (state.document?.id === documentId) charts?.reload(documentId);
   }
 });
@@ -2867,7 +2956,12 @@ charts = createCharts({
   checkedFetch,
   getDocument: () => state.document,
   getLanguage: () => state.language,
+  getNavigationGeneration: () => workspace.getNavigationGeneration(),
+  getSelectedDatasetId: () => analysis.getSelectedDatasetId(),
   getSharedDatasetId: () => analysis.getSharedDatasetId(),
+  datasetContextChanged: (documentId, datasetId) => {
+    if (state.document?.id === documentId && datasetId) analysis.alignDataset(datasetId);
+  },
   contextChanged: () => assistant?.contextChanged(),
   chartOpened: showChartInUrl,
   addChartCitation
@@ -2890,7 +2984,10 @@ assistant = createAssistant({
   getAnalysisRecipe: (engine, method) => analysis.getRecipe(engine, method),
   openAnalysisJob,
   openChart,
-  previewChartProposal: (documentId, proposal) => charts.previewProposal(documentId, proposal),
+  previewChartProposal: (documentId, proposal) => {
+    if (state.document?.id === documentId) workspace.reveal("data", { tool: "charts" });
+    return charts.previewProposal(documentId, proposal);
+  },
   getChatImages: (documentId) => documentId ? imageLibrary.getChatImages(documentId) : [],
   getImages: (documentId, imageIds) => documentId ? imageLibrary.getImages(documentId, imageIds) : [],
   getActiveImage: (documentId) => imageViewer.getActiveImage(documentId),
