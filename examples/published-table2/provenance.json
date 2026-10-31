@@ -1,0 +1,21 @@
+{
+  "title": "Reconfigurable phase-only acoustic holography with surrogate model based on soft-GAN",
+  "doi": "10.1016/j.apacoust.2025.110625",
+  "publisher_url": "https://www.sciencedirect.com/science/article/abs/pii/S0003682X25000970",
+  "source_pdf_sha256": "2f169085a4e5739bac99053bed7b029e417d987f10cbd1b90f3e8765c4f1abbe",
+  "table": 2,
+  "page": 8,
+  "availability_page": 9,
+  "unit": "ms",
+  "observation_unit": "algorithm; author-reported mean runtime",
+  "data_level": "published aggregate, not raw trials",
+  "row_count": 5,
+  "extraction": "literal transcription, checked against local PDF text and rendered page",
+  "raw_data_availability": "available on request; no raw dataset downloaded",
+  "csv_sha256": "2300416cba3e2ff10699dc0247b588d1ec4c5789ce272c790675205e9ad3a1a7",
+  "limitations": [
+    "No trial-level observations or sample counts",
+    "No inferential test or controlled hardware rerun",
+    "No assumption of participant pairing or sampling independence"
+  ]
+}

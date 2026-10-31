@@ -1,0 +1,6 @@
+method,cpu_ms,gpu_ms
+IASA,8231,2435
+Diff-PAT,8142,682
+MoCo,483,287
+USDL,363,217
+Our Method,206,138

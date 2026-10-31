@@ -479,3 +479,21 @@ Backend, API, schema, vendor and runtime were unchanged; the previously accepted
 661 backend scenarios were not rerun for this frontend-only slice. No new method,
 arbitrary script execution, authentication or shared workspace was introduced.
 Deployment preservation and local Git receipts live beside the acceptance record.
+
+## Real material / actual model pilot — 2026-10-31
+
+real-analysis-v1/pilot-02 passed5 UI outcome groups (P01-P08) using the actual
+configured provider, not a scripted model: sourcePDF/Table2CSV, explicit sharing,
+installed fixed analysis with confirmation, independent numeric oracle, actual
+saved scatter, confirmed source note and exact export/source bytes.7 model rounds.
+Python means3485/751.8ms, median483/287ms, sampleSD4293.101850643658/
+963.9547188535362 agree with a separate50-digit Decimal calculation. Five points,
+zero exclusions; note remains unreviewed.26 exported files verified. Offline
+chart opens with app stopped, no HTTP requests. Closed owned listener verified.
+
+Data are author-reported algorithm mean runtimes, not raw trials. No inferential
+test, clinical claim, original raw-data download or new arbitrary-code tool.
+pilot-01 ended after a harness-only unsupported origin-field assertion; the
+actual initial job succeeded. The corrected full pilot passed without product
+code changes. Original live data and tFUS preservation are checked separately.
+See REAL-DATA-PILOT.md and examples/published-table2 for reproducible inputs.
