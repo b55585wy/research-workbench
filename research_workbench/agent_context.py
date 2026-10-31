@@ -71,7 +71,7 @@ class ReadingWorkspace:
             if context.dataset_id:
                 if self.analysis is None:raise WorkspaceError('agent_tool_unavailable','数据读取服务尚未安装。',409)
                 row=self.analysis.datasets.row(connection,identifier,str(context.dataset_id))
-                self.analysis.datasets.checked(row);dataset=self.analysis.datasets.record(row)
+                self.analysis.datasets.checked(row);dataset=self.analysis.datasets.for_agent(self.analysis.datasets.record(row))
             if context.active_analysis_id:
                 if self.analysis is None:raise WorkspaceError('agent_tool_unavailable','分析服务尚未安装。',409)
                 row=self.analysis.row(connection,identifier,str(context.active_analysis_id))

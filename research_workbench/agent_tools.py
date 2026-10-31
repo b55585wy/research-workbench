@@ -221,6 +221,7 @@ class ReadingTools(StatisticsTools,ChartTools):
 
     def tool_read_dataset(self,data,call_id):
         value=self.selected_dataset(data.dataset_id)
+        value=self.workspace.analysis.datasets.for_agent(value)
         return {**value,'source_ref':self.sources.dataset(value)['ref'],'notice':'Only preview rows; full statistics require actual completed analysis.'}
 
     def tool_propose_analysis(self,data,call_id):

@@ -2,7 +2,7 @@
 
 产品整体方向与近期迭代见 [PRODUCT-PLAN.md](PRODUCT-PLAN.md)，版本交付见 [ROADMAP.md](ROADMAP.md)。
 
-当前版本 v0.11.0：PDF 阅读、出处笔记、图片标注、Python/R 分析、Notebook 与研究助手，新增独立样本 t 检验、完整案例预览、Agent 统计提案与可追溯结果。
+当前版本 v0.12.0：PDF 阅读、出处笔记、图片标注、Python/R 分析、Notebook 与研究助手；新增 SPSS 文件导入，核对标签和缺失规则后生成分析表，保留原文件与转换记录。
 PDF.js 嵌入我们的页面，FastAPI/SQLite 保存资料与笔记，PDFium 在独立子进程中生成区域图片。
 没有部署 eLabFTW、RSpace 或 JupyterLab，也不依赖 tFUS 数据库和运行进程。
 
@@ -34,7 +34,7 @@ Notebook 资源准备另需 Node.js/npm；构建从锁文件取得上游组件�
 阅读区展开“书目信息”可编辑标题、作者、年份和 DOI，支持保存、取消与冲突提示。作者和 DOI 为手动文本，年份可留空；这些信息不会自动联网验证。未保存的书目信息需先保存或取消再导出。书目、笔记和原文文件分别保存，改书目不改 PDF。
 
 顶部主题选择提供默认与“哆啦A梦蓝”。后者用蓝白圆润控件统一资料区、工具和弹窗，
-保留原有 Logo，按反馈移除了口袋弧线和 Logo 铃铛。选择保存在当前浏览器；原文、图片、
+品牌保留“Synrise Neuro”文字，按反馈移除了左侧图标和口袋弧线。选择保存在当前浏览器；原文、图片、
 科学图表和笔记内容保持完整，默认中性主题仍可切换。
 
 ## 图片查看与标注
@@ -53,7 +53,7 @@ PDF 摘录像素本轮不发送。助手的标注建议可预览，逐项确认�
 独立样本 t 检验在“数据与分析”的方法选择中使用：明确一个数值结果列、两组顺序、
 Student/Welch、方向、置信水平及独立样本声明，预览后确认运行。计算直接复用现有
 R stats::t.test，保存原始结果、参数与版本，支持 Notebook、引用和导出。
-这是首个统计方法；没有 SPSS 引擎或 .sav 导入。jmv 在隔离验证中异常退出，未部署。
+这是首个统计方法；SPSS .sav/.zsav 文件导入已支持，但没有 SPSS 引擎或语法执行器。jmv 在隔离验证中异常退出，未部署。
 启动时需显式添加 --rscript 和 --statistics-root；详见 [STATISTICAL-TESTS.md](STATISTICAL-TESTS.md)。
 
 在“实验图表”选择已上传数据，可绘制单列分布、双列成对散点，或从成功的
@@ -106,6 +106,20 @@ W10-A 的 Actor/账号基础源码已完成部分验收但尚未部署、全入�
 导出会附带有效笔记关联的上传原图、预览和来源标记；不附带未关联图片、已删除笔记或助手聊天记录。
 
 ## 数据与 Python/R 分析
+
+“导入 SPSS”支持 `.sav/.zsav`：保留原文件，展示变量/值标签、测量级别、格式和缺失规则，
+核对后再确认生成分析表。编码不换成标签；系统与声明的用户缺失转成空值，日期使用可表示的 ISO 文本。
+确认不会自动运行分析或向 Agent 共享数据。分析导出同时保留原文件、字段字典和转换记录。
+限制与接口见 [DATA-IMPORTS.md](DATA-IMPORTS.md)。CSV/TSV 原有上传流程保持可用。
+
+SPSS 读取部件采用独立环境；Windows/Python 3.12 的锁定安装命令如下（目标目录须为新目录）：
+
+```powershell
+python scripts/prepare_import_runtime.py --root E:\research-workbench-runtime\research-import-v1
+python -m research_workbench --port 3150 --import-root E:\research-workbench-runtime\research-import-v1
+```
+
+也可通过 `RESEARCH_IMPORT_ROOT` 指定该运行目录。未配置时仅 SPSS 导入不可用，不影响原有阅读和表格分析。
 
 展开右侧“数据与分析”，上传 UTF-8 CSV/TSV，查看预览并选择数值列及 Python 或 R；点击“查看并准备运行”，核对数据、参数和完整代码，再确认运行。支持非缺失数、缺失数、均值、中位数、样本标准差、最小值和最大值；单个有效值的标准差为空。只有空单元格视为缺失，`NA` 等字符串不会被悄悄转成缺失值。所选列的所有非空内容必须是有限数值。
 

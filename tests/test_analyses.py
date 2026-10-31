@@ -161,6 +161,6 @@ def test_schema_five_preserves_all_fourteen_tables(tmp_path):
         before={t:db.execute(f'SELECT * FROM {t} ORDER BY 1').fetchall() for t in tables};assert len(tables)==14
     Store(tmp_path)
     with sqlite3.connect(tmp_path/'workspace.sqlite3') as db:
-        assert db.execute('PRAGMA user_version').fetchone()[0]==9
+        assert db.execute('PRAGMA user_version').fetchone()[0]==10
         assert all(db.execute(f'SELECT * FROM {t} ORDER BY 1').fetchall()==value for t,value in before.items())
         assert db.execute('SELECT COUNT(*) FROM analysis_jobs').fetchone()[0]==0

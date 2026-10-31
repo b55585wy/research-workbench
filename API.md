@@ -1,4 +1,6 @@
-# Reader and source-linked notes: v0.1 contract preserved in v0.8
+# Reader and source-linked notes: original contract preserved through v0.12
+
+Reviewed .sav/.zsav imports and additive schema10 are documented in [DATA-IMPORTS.md](DATA-IMPORTS.md).
 
 This slice is a single-user local application. The default listener is 127.0.0.1;
 no account/shared-space or remote-access readiness is claimed. Data lives under
@@ -9,7 +11,7 @@ RESEARCH_WORKBENCH_DATA, default ./data. No tFUS imports or database access.
 All endpoints are same-origin. Errors: {"detail":{"code":"...","message":"..."}}.
 UUIDs are canonical UUID strings. Times are UTC ISO 8601. JSON is UTF-8.
 
-- GET /api/v1/health -> {"status":"ok","version":"0.8.0"}.
+- GET /api/v1/health -> {"status":"ok","version":"0.12.0"}.
 - GET /api/v1/documents/{doc}/analyses/{id}/notebook -> verified deterministic
   application/x-ipynb+json, attachment, no-store, <=1MiB. Only succeeded jobs;
   incomplete ->409 analysis_not_complete, output drift ->409

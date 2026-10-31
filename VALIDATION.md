@@ -432,3 +432,29 @@ after viewport resizing, with no page errors, external requests or data writes.
 The tested candidate and live stylesheet hashes must match before Git save.
 Evidence is in E:/research-workbench-pilot-20261030/theme-v2/.
 
+# v0.12 reviewed SPSS import
+
+The full backend suite passes 659 cases. Two additional real concurrency/quota
+boundary cases pass: a third parser is rejected, and the 100MiB combined import
+quota accepts its exact boundary and rejects overflow. Existing reader and
+analysis browser regressions pass, including restart/offline export behavior.
+Nine new actual-browser groups pass: SAV/ZSAV, literal labels, raw/analysis
+preview, acknowledgment, no automatic Agent sharing, exact upload/confirmation
+retries after committed-but-lost responses, paper switches, refresh recovery,
+unavailable reader, keyboard operation, both themes and 390px English layout.
+All test materials are labelled synthetic; no actual model or research-data
+validity is inferred. The text-only brand and preserved PDF rendering are checked.
+
+Actual Python/R summaries match known counts/means; imported independent t-test
+counts, statistic and degrees of freedom match an independent formula. Exports
+include exact original bytes, table, dictionary, provenance and manifest hashes.
+Native crash, timeout, 512MiB Windows child memory limit, storage failure, scope,
+source/dictionary drift, explicit sharing and persistent state are exercised.
+The locked reader installer succeeds in a fresh environment and refuses to
+overwrite an existing runtime. A private live-data migration rehearsal verifies
+all 21 old tables/material files while adding only the empty data_imports table.
+
+Evidence and requirement scenarios are in E:/research-workbench-pilot-20261030/reader-v12/.
+Activation checks the preserved live rows/files, actual reader/analysis status,
+model configuration and protected tFUS/global-routing boundaries again.
+

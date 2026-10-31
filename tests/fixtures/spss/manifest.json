@@ -1,0 +1,19 @@
+{
+  "generator": {
+    "pyreadstat": "1.3.7",
+    "polars": "2.1.0"
+  },
+  "synthetic": true,
+  "files": {
+    "cell-2048.sav": "25231ac7a7124f33b7d00c699eb7237dc9dd275d5d1a7f657b2625cebd9b69c1",
+    "cell-2049.sav": "4fb23e55adf75ffe461a83fbada3beb33b92dad9e712a879ab7f7b6034226321",
+    "columns-50.sav": "74b19f37714742a83968c8401efdc4364bb93310519c876ab1459debb0f233c0",
+    "columns-51.sav": "af2cf16175c4fa37fda34b25df74c6525f74e6a3a682230409778918e12eef7f",
+    "expanded.zsav": "8cab5288352e8bf408df59caacac2ed1a4a555994c5882c7abca03275dea2162",
+    "metadata.sav": "d7f70fd3b00dbb8e9b69a03bfe817f0c98ab8a3361cf8500878e40c658bd8d0e",
+    "rows-50000.sav": "0dd22eb332dec990725afcd803b4c876104841a0e856daef0f75045e3bd93923",
+    "rows-50001.sav": "33e96d2d3ff253301d601de90a023374e9740b43685da745d8fd155063c88ab2",
+    "synthetic.sav": "d334449360352cba069e3b64296d4d06c57f210672e46c2c8711c3052cf0ad6c",
+    "synthetic.zsav": "ca9d26740525f4e20153ca9d0db6baffe1313813d727a4f7caefc138262517cf"
+  }
+}

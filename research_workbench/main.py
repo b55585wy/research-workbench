@@ -144,12 +144,16 @@ def copy_upload(upload, output):
 
 def create_app(data_root=None, validator=None, renderer=None, *, agent_provider=None, agent_config=None,
                page_reader=None, agent_autostart=True, analysis_rscript=None, analysis_autostart=True,
-               statistics_root=None):
+               statistics_root=None,import_root=None):
     store = Store(data_root or os.environ.get('RESEARCH_WORKBENCH_DATA', ROOT / 'data'))
     validator = validator or PdfValidator()
     images=ImageLibrary(store)
     provider=agent_provider or ModelConnection(store.root,agent_config or os.environ.get('RESEARCH_AGENT_CONFIG'))
     datasets=Datasets(store)
+    from .data_imports import DataImports
+    from .data_import_api import router as data_import_router
+    data_imports=DataImports(store,datasets,import_root)
+    datasets.imports=data_imports
     analysis=Analyses(store,datasets,RuntimeCatalog(analysis_rscript or os.environ.get('RESEARCH_RSCRIPT'),statistics_root))
     supervisor=AnalysisSupervisor(analysis) if analysis_autostart else None
     from .image_annotations import ImageAnnotations
@@ -175,9 +179,11 @@ def create_app(data_root=None, validator=None, renderer=None, *, agent_provider=
     app.state.excerpts = Excerpts(store, renderer)
     app.state.images,app.state.agent=images,agent
     app.state.datasets,app.state.analysis=datasets,analysis
+    app.state.data_imports=data_imports
     app.state.image_annotations=image_annotations
     app.state.charts=charts
     app.include_router(chart_router)
+    app.include_router(data_import_router)
     app.add_middleware(LocalBoundary)
     install_image_annotation_routes(app,image_annotations)
 

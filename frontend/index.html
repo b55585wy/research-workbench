@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="/styles.css">
   <link rel="stylesheet" href="/image-library.css">
   <link rel="stylesheet" href="/analysis.css">
+  <link rel="stylesheet" href="/data-imports.css">
   <link rel="stylesheet" href="/statistics.css">
   <link rel="stylesheet" href="/analysis-notebook.css">
   <link rel="stylesheet" href="/charts.css">
@@ -19,7 +20,6 @@
 <body>
   <header class="app-header">
     <div class="brand" aria-label="Synrise Neuro">
-      <span class="brand-mark" aria-hidden="true">SN</span>
       <span>Synrise Neuro</span>
     </div>
     <h1 data-i18n="pageTitle">文献与笔记</h1>
@@ -172,6 +172,40 @@
           <label class="analysis-label" for="dataset-select">选择数据</label>
           <select id="dataset-select" disabled></select>
           <div id="dataset-preview" class="analysis-preview"></div>
+          <section id="data-imports" class="data-imports" aria-labelledby="data-imports-heading">
+            <h3 id="data-imports-heading">SPSS 导入</h3>
+            <p id="data-imports-help" class="data-imports-help">保留原始文件，核对字段和缺失处理后再确认。</p>
+            <div class="analysis-upload-row">
+              <button id="spss-upload-button" class="button button-secondary" type="button" disabled>Import SPSS</button>
+              <input id="spss-upload-input" type="file" accept=".sav,.zsav" hidden disabled>
+            </div>
+            <div id="spss-import-status" class="analysis-status data-imports-status" role="status" aria-live="polite"></div>
+            <label id="spss-import-select-label" class="analysis-label" for="spss-import-select">导入记录</label>
+            <select id="spss-import-select" disabled></select>
+            <section id="spss-import-review" class="data-imports-review" aria-label="SPSS 导入核对" hidden>
+              <dl id="spss-import-summary" class="data-imports-summary"></dl>
+              <a id="spss-import-original" class="button button-quiet" href="#" download hidden>下载原始文件</a>
+              <p id="spss-import-policy" class="data-imports-policy"></p>
+              <details id="spss-import-dictionary">
+                <summary>字段字典</summary>
+                <div id="spss-import-dictionary-content" class="data-imports-table-scroll" tabindex="0"></div>
+              </details>
+              <details id="spss-import-raw" open>
+                <summary>原始预览</summary>
+                <div id="spss-import-raw-content" class="data-imports-table-scroll" tabindex="0"></div>
+              </details>
+              <details id="spss-import-analysis" open>
+                <summary>分析预览</summary>
+                <div id="spss-import-analysis-content" class="data-imports-table-scroll" tabindex="0"></div>
+              </details>
+              <p id="spss-import-sample-note" class="data-imports-sample-note" hidden></p>
+              <label id="spss-import-ack-label" class="data-imports-ack" for="spss-import-ack">
+                <input id="spss-import-ack" type="checkbox" disabled>
+                <span>我已核对字段含义、分组编码和缺失规则。</span>
+              </label>
+              <button id="spss-import-confirm" class="button button-primary" type="button" disabled>确认并加入数据</button>
+            </section>
+          </section>
           <label id="analysis-method-label" class="analysis-label" for="analysis-method">分析方法</label>
           <select id="analysis-method" disabled>
             <option value="describe">描述统计</option>

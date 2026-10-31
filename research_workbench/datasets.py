@@ -31,6 +31,22 @@ class Datasets:
         return value
 
     @staticmethod
+    def for_agent(value):
+        if 'data_dictionary' not in value:return value
+        result={key:item for key,item in value.items() if key!='data_dictionary'}
+        summary=[]
+        for field in value['data_dictionary']:
+            item={key:field[key] for key in ('name','source_type','measure','format','system_missing','user_missing','blank_missing','nonmissing')}
+            item['label']=field['label'][:160]
+            item['value_labels']=[{'value':label['value'],'label':label['label'][:80]} for label in field['value_labels'][:3]]
+            item['missing_ranges']=field['missing_ranges']
+            if len(json.dumps(summary+[item],ensure_ascii=True).encode())>16384:break
+            summary.append(item)
+        result['data_dictionary_summary']=summary
+        result['data_dictionary_truncated']=len(summary)<len(value['data_dictionary']) or any(len(field['value_labels'])>3 or len(field['label'])>160 or any(len(label['label'])>80 for label in field['value_labels']) for field in value['data_dictionary'])
+        return result
+
+    @staticmethod
     def row(connection,document_id,identifier):
         value=connection.execute('SELECT * FROM datasets WHERE id=? AND document_id=?',(identifier,document_id)).fetchone()
         if value is None:raise WorkspaceError('not_found','找不到这份表格数据。',404)
@@ -47,7 +63,10 @@ class Datasets:
     def checked(self,row):
         path=self.root/(row['storage_key']+'.data')
         try:
-            if path.stat().st_size==row['byte_size'] and hashlib.sha256(path.read_bytes()).hexdigest()==row['sha256']:return path
+            if path.stat().st_size==row['byte_size'] and hashlib.sha256(path.read_bytes()).hexdigest()==row['sha256']:
+                profile=json.loads(row['profile_json'])
+                if profile.get('import_provenance'):self.imports.check_dataset(row,profile)
+                return path
         except FileNotFoundError:pass
         raise WorkspaceError('dataset_changed','数据文件缺失或已改变，请重新上传。',409)
 

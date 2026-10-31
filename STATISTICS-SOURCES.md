@@ -1,5 +1,9 @@
 # SPSS 类统计能力：部件来源审查
 
+v0.12 文件导入采用独立 pyreadstat 1.3.7/ReadStat 部件，保留变量/值标签、缺失规则和原文件，
+核对后生成分析表。其 Python 接口能直接在独立进程中提供所需的字典和数据，不需要完整统计应用。
+haven 继续作为 R 文件库备选；本轮没有接入它。安装与接口见 [DATA-IMPORTS.md](DATA-IMPORTS.md)。
+
 2026-10-31。更新：jmv 已在隔离目录安装并验证，但当前环境退出崩溃，未部署。
 v0.11 首个独立样本 t 检验直接复用其实际计算层 R stats::t.test；依据和运行证据见
 [STATISTICAL-TESTS.md](STATISTICAL-TESTS.md)。haven文件适配、JASP与PSPP尚未接入。

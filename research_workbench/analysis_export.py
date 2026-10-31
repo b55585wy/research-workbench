@@ -17,6 +17,8 @@ def build_analysis_export(service,document_id,identifier):
     files['source'+extension]=service.datasets.path(document_id,job['dataset_id']).read_bytes()
     if hashlib.sha256(files['source'+extension]).hexdigest()!=job['dataset_sha256']:
         raise WorkspaceError('dataset_changed','原始数据文件已改变。',409)
+    if dataset.get('import_provenance'):
+        files.update(service.datasets.imports.export_files(document_id,dataset['import_provenance']['import_id'],dataset))
     files['analysis.ipynb']=serialize(notebook_from_snapshot(job,files))
     rows=[]
     for item in job['result']['stats']:

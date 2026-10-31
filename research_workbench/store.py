@@ -275,6 +275,24 @@ CREATE TABLE IF NOT EXISTS chart_operations (
  result_revision INTEGER NOT NULL CHECK(result_revision>=1),created_at TEXT NOT NULL
 );
 PRAGMA user_version=9;
+CREATE TABLE IF NOT EXISTS data_imports (
+ id TEXT PRIMARY KEY,
+ document_id TEXT NOT NULL REFERENCES documents(id),
+ storage_key TEXT NOT NULL UNIQUE,
+ original_filename TEXT NOT NULL,
+ sha256 TEXT NOT NULL CHECK(length(sha256)=64),
+ byte_size INTEGER NOT NULL CHECK(byte_size BETWEEN 1 AND 5242880),
+ normalized_sha256 TEXT NOT NULL CHECK(length(normalized_sha256)=64),
+ normalized_size INTEGER NOT NULL CHECK(normalized_size BETWEEN 1 AND 5242880),
+ review_sha256 TEXT NOT NULL CHECK(length(review_sha256)=64),
+ review_json TEXT NOT NULL CHECK(json_valid(review_json)),
+ profile_json TEXT NOT NULL CHECK(json_valid(profile_json)),
+ dataset_id TEXT UNIQUE,
+ created_at TEXT NOT NULL,
+ FOREIGN KEY(dataset_id,document_id) REFERENCES datasets(id,document_id)
+);
+CREATE INDEX IF NOT EXISTS data_imports_document ON data_imports(document_id,created_at);
+PRAGMA user_version=10;
 COMMIT;
 '''
 
@@ -302,7 +320,7 @@ class Store:
         self.exports.mkdir(exist_ok=True)
         self.database = self.root / 'workspace.sqlite3'
         with self.connection() as connection:
-            if connection.execute('PRAGMA user_version').fetchone()[0] > 9:
+            if connection.execute('PRAGMA user_version').fetchone()[0] > 10:
                 raise RuntimeError('Database requires a newer application')
             connection.executescript(SCHEMA)
         self.lifecycle = NoteLifecycle(self)

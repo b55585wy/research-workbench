@@ -82,6 +82,19 @@ is-reference/locate-character are compiler-only dependencies with MIT declared
 in metadata but no standalone upstream license file. Their README/metadata and
 an explicit omission notice are retained; their compiler code is not shipped in
 the runtime. Source provenance and hashes live in upstream-source/source.json.
+# v0.12 SPSS file component
+
+pyreadstat1.3.7 is Apache-2.0 and bundles MIT-licensed ReadStat. Its original
+combined notice is retained in scripts/import-runtime/licenses/pyreadstat-1.3.7/.
+The isolated reader also pins numpy2.5.4 and narwhals2.28.0; their full upstream
+license directories and package metadata are retained alongside it, including
+NumPy's bundled compiled-component notices. Preserve these notices and the
+runtime wheel metadata when distributing the file-reader component.
+scripts/import-runtime/requirements.lock.txt records the verified Windows/cp312
+wheel hashes; scripts/prepare_import_runtime.py installs it in a separate venv.
+No application venv, global R installation or complete statistical application
+is replaced. Source: https://github.com/Roche/pyreadstat .
+
 # v0.11 R stats computation
 
 The independent-samples t-test directly calls the existing R4.6.2 stats::t.test

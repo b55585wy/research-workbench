@@ -17,9 +17,9 @@ CSV='value,second,label\n1,10,a\n2,,b\n3,30,c\n'.encode()
 
 
 @contextmanager
-def workspace(root,model=None,worker=False,agent=False,rscript=R_PATH):
+def workspace(root,model=None,worker=False,agent=False,rscript=R_PATH,import_root=None,statistics_root=None):
     model=model or ScriptedModel()
-    app=create_app(root,agent_provider=model,agent_autostart=agent,analysis_autostart=worker,analysis_rscript=rscript)
+    app=create_app(root,agent_provider=model,agent_autostart=agent,analysis_autostart=worker,analysis_rscript=rscript,import_root=import_root,statistics_root=statistics_root)
     with TestClient(app,base_url='http://127.0.0.1',client=('127.0.0.1',48000)) as client:
         response=client.post('/api/v1/documents',files={'file':('synthetic.pdf',text_pdf(),'application/pdf')})
         assert response.status_code==201,response.text

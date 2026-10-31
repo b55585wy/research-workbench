@@ -2,6 +2,7 @@ import * as pdfjsLib from "/vendor/pdfjs/build/pdf.mjs";
 import { createImageLibrary } from "/image-library.js";
 import { createImageViewer } from "/image-viewer.js";
 import { createAnalysis } from "/analysis.js";
+import { createDataImports } from "/data-imports.js";
 import { createCharts } from "/charts.js";
 import { createAssistant } from "/assistant.js";
 import { createRichText, renderRichHtml } from "/rich-text.js";
@@ -465,6 +466,7 @@ const state = {
 let imageLibrary = null;
 let imageViewer = null;
 let analysis = null;
+let dataImports = null;
 let charts = null;
 let assistant = null;
 let richText = null;
@@ -554,6 +556,7 @@ function applyLanguage() {
   imageLibrary?.applyLanguage(state.language);
   imageViewer?.applyLanguage(state.language);
   analysis?.applyLanguage(state.language);
+  dataImports?.applyLanguage(state.language);
   charts?.applyLanguage(state.language);
   assistant?.applyLanguage(state.language);
   richText?.applyLanguage(state.language);
@@ -1409,6 +1412,7 @@ function showMissingDocument() {
   renderNotes();
   imageLibrary?.documentChanged(null);
   analysis?.reload(null);
+  dataImports?.reload(null);
   charts?.reload(null);
   assistant?.documentChanged(null);
   setStatus("missingDocument", "error");
@@ -1482,6 +1486,7 @@ async function openDocument(documentId, options = {}) {
   renderNotes();
   imageLibrary?.documentChanged(document);
   analysis?.reload(documentId);
+  dataImports?.reload(documentId);
   charts?.reload(documentId);
   if (options.datasetId) analysis?.openDataset(options.datasetId);
   if (options.analysisId) analysis?.openJob(options.analysisId);
@@ -2529,6 +2534,7 @@ window.addEventListener("popstate", () => {
     renderNotes();
     imageLibrary?.documentChanged(null);
     analysis?.reload(null);
+    dataImports?.reload(null);
     charts?.reload(null);
     assistant?.documentChanged(null);
     if (imageLink === false) setStatus("invalidImageLink", "error");
@@ -2842,6 +2848,16 @@ analysis = createAnalysis({
   onJobOpened: showAnalysisInUrl,
   addAnalysisCitation,
   sourcesChanged: (documentId) => {
+    if (state.document?.id === documentId) charts?.reload(documentId);
+  }
+});
+
+dataImports = createDataImports({
+  api,
+  checkedFetch,
+  getLanguage: () => state.language,
+  datasetConfirmed: (documentId, dataset) => {
+    analysis.openImportedDataset(documentId, dataset);
     if (state.document?.id === documentId) charts?.reload(documentId);
   }
 });

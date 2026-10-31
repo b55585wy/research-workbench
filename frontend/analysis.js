@@ -1395,6 +1395,21 @@ export function createAnalysis(adapter) {
     }
   }
 
+  function openImportedDataset(documentId, dataset) {
+    if (!documentId || !dataset?.id) return;
+    const entry = entryFor(documentId);
+    entry.datasets = [dataset, ...entry.datasets.filter((item) => item.id !== dataset.id)];
+    entry.datasetRequestSequence += 1;
+    entry.selectedDatasetId = dataset.id;
+    entry.selectedColumns = new Set((dataset.columns || []).filter((column) => column.numeric).map((column) => column.name));
+    entry.shared = false;
+    invalidateConfirmation(entry);
+    if (entry === currentEntry()) {
+      adapter.contextChanged?.();
+      render();
+    }
+  }
+
   function uploadDataset(entry) {
     const upload = entry?.upload;
     const documentId = currentId;
@@ -1472,6 +1487,7 @@ export function createAnalysis(adapter) {
     stopPolling(entry);
     const sequence = ++entry.loadSequence;
     const jobVersion = entry.jobVersion;
+    const datasetRequestSequence = entry.datasetRequestSequence;
     entry.loadController?.abort();
     const controller = new AbortController();
     entry.loadController = controller;
@@ -1487,7 +1503,17 @@ export function createAnalysis(adapter) {
     if (runtime.status === "fulfilled") entry.runtime = runtime.value;
     else entry.runtime = null;
     if (datasets.status === "fulfilled") {
-      entry.datasets = Array.isArray(datasets.value.items) ? datasets.value.items : [];
+      const fetched = Array.isArray(datasets.value.items) ? datasets.value.items : [];
+      if (datasetRequestSequence === entry.datasetRequestSequence) {
+        entry.datasets = fetched;
+      } else {
+        const current = new Map(entry.datasets.map((dataset) => [dataset.id, dataset]));
+        const fetchedIds = new Set(fetched.map((dataset) => dataset.id));
+        entry.datasets = [
+          ...fetched.map((dataset) => current.get(dataset.id) || dataset),
+          ...entry.datasets.filter((dataset) => !fetchedIds.has(dataset.id))
+        ];
+      }
       if (!entry.datasets.some((dataset) => dataset.id === entry.selectedDatasetId)) {
         entry.datasetRequestSequence += 1;
         entry.selectedDatasetId = entry.datasets[0]?.id || null;
@@ -1700,6 +1726,7 @@ export function createAnalysis(adapter) {
     reload,
     openJob,
     openDataset,
+    openImportedDataset,
     getRecipe
   };
 }
