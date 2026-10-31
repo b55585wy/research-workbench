@@ -553,3 +553,19 @@ Public data are not the user's own experiment; design and unit limits remain in
 the report and source note. Failed harness attempts are retained externally.
 
 Final clarity review: grouped-ui-03 passes6groups, including an explicit scripted Agent proposal preview with a preserved manual histogram draft. Native actions make0model calls; the requested Agent scenario makes1. Current view labels distinguish assistant preview, manual preview and saved kinds.
+
+
+## v0.15 数据筛选
+
+新增需求用例覆盖 CSV/TSV 精确字符串/空值/Unicode/最大单元格、分页、50k行、
+转义膨胀、并发重试、预览漂移、完整事务回滚、损坏/缓存/祖先校验、SPSS来源、
+迁移与分析/图表导出。实际浏览器和配置模型从公开ToothGrowth全部60行筛选20行，
+显式重新共享后执行原R检验→图表→笔记链路；数值核对上一轮独立参考。
+软件输出不构成研究设计、单位或临床有效性证明。见[本轮契约](DATASET-SELECTION.md)。
+
+
+最终验收：813项后端用例全部通过、零跳过；新增界面6组、旧工作区16组、
+SPSS导入11组、连续任务7组通过。配置模型12次调用、4次明确确认，完成公开
+60→20行及实际R/图表/笔记闭环。36个导出文件逐项校验，关闭服务后离线
+20观测点仍可交互，14类损坏输入被拒绝。实际Python/R子进程与SPSS来源另有
+回归用例，避免仅在主进程中验收。全部试验使用隔离资料目录。

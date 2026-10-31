@@ -178,3 +178,23 @@ Exactly two complete groups, label<=200Unicode characters without C0/C1 controls
 Preview, explicit confirmation, hashes, lifecycle and old request fingerprints
 retain their semantics. Invalid groups/labels return invalid_grouped_points_data.
 No schema change. Full contract: [GROUPED-OBSERVATIONS.md](GROUPED-OBSERVATIONS.md).
+
+
+## v0.15 Dataset selections
+
+GET `/api/v1/dataset-selections/capabilities` returns fixed recipe SHA and limits.
+POST `/api/v1/documents/{doc}/dataset-selections/values` accepts dataset_id, dataset_sha256,
+column, optional query/offset/limit (50 max). Read-only raw value counts, paginated.
+POST same prefix `/preview` accepts dataset_id, dataset_sha256, column, exact string
+value, optional name and recipe_sha256. Returns saved:false, source, condition,
+counts, sample (5 rows/200 chars per cell), columns, recipe, result/source_rows and
+preview SHA-256. Zero hits allowed in preview only.
+POST prefix accepts the same fields plus request_id and preview_sha256;201 new,200
+exact replay. Returns normal dataset record with selection_provenance.409 drift,
+quota or conflicting retry;422 invalid/empty;429 busy;503 storage unavailable.
+GET `/documents/{doc}/datasets/{id}/selection` returns verified lineage steps,
+immediate-parent 1-based source_rows and calculation_sources. Existing dataset
+file/analysis/chart endpoints consume selected tables. Schema12 adds only one
+table. Agent uses dataset_values, preview_dataset_selection, propose_dataset_selection;
+new child requires fresh explicit sharing, continuous tasks cannot retarget.
+See [behavior and integrity contract](DATASET-SELECTION.md).

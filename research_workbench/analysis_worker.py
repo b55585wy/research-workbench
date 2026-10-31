@@ -154,7 +154,12 @@ def main():
     parser=argparse.ArgumentParser();parser.add_argument('--data',type=Path,required=True);parser.add_argument('--rscript',type=Path);parser.add_argument('--token',type=UUID,required=True)
     parser.add_argument('--statistics-root',type=Path)
     args=parser.parse_args();job_handle=own_process_tree()
-    store=Store(args.data);datasets=Datasets(store);service=Analyses(store,datasets,RuntimeCatalog(args.rscript,args.statistics_root))
+    store=Store(args.data);datasets=Datasets(store)
+    from .data_imports import DataImports
+    from .dataset_selections import DatasetSelections
+    datasets.imports=DataImports(store,datasets)
+    datasets.selections=DatasetSelections(store,datasets)
+    service=Analyses(store,datasets,RuntimeCatalog(args.rscript,args.statistics_root))
     stop=threading.Event()
     def parent_closed():
         try:os.read(sys.stdin.fileno(),1)

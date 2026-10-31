@@ -140,7 +140,16 @@ const messages = {
     missingCompleteCases: "缺失处理：仅使用结果和分组均完整的行",
     ttest_preview_required: "必须先成功预览当前完整请求。",
     ttest_groups_invalid: "请从实际标签中选择两个不同的分组。",
-    library_unavailable: "r-stats 库当前不可用。"
+    library_unavailable: "r-stats 库当前不可用。",
+    selectionProvenance: "筛选来源",
+    selectionParent: "父数据",
+    selectionRule: "精确规则",
+    selectionCounts: "匹配 / 源数据行数",
+    selectionRecipeHash: "筛选配方 SHA-256",
+    selectionSourceRowsHash: "源行映射 SHA-256",
+    selectionParentLink: "打开父数据",
+    selectionRowsLink: "查看逐行来源映射",
+    selectionDictionaryNote: "原始 SPSS 字典和缺失值规则保留在父数据中；派生表的缺失值数量会重新计算。"
   },
   en: {
     panel: "Data & analysis",
@@ -279,7 +288,16 @@ const messages = {
     missingCompleteCases: "Missing data: only rows with both outcome and group present are used",
     ttest_preview_required: "The exact current request must be previewed successfully first.",
     ttest_groups_invalid: "Choose two different groups from the actual labels.",
-    library_unavailable: "The r-stats library is currently unavailable."
+    library_unavailable: "The r-stats library is currently unavailable.",
+    selectionProvenance: "Selection provenance",
+    selectionParent: "Parent data",
+    selectionRule: "Exact rule",
+    selectionCounts: "Matched / source rows",
+    selectionRecipeHash: "Selection recipe SHA-256",
+    selectionSourceRowsHash: "Source-row mapping SHA-256",
+    selectionParentLink: "Open parent data",
+    selectionRowsLink: "View row-level source mapping",
+    selectionDictionaryNote: "The parent data retains the original SPSS dictionary and missing-value rules; missing-value counts are recalculated for the derived table."
   }
 };
 
@@ -558,6 +576,46 @@ export function createAnalysis(adapter) {
     table.append(thead, tbody);
     scroll.append(table);
     elements.preview.append(scroll, make("p", "analysis-sample-note", t("sampleTruncated")));
+    const provenance = renderSelectionProvenance(dataset);
+    if (provenance) elements.preview.append(provenance);
+  }
+
+  function renderSelectionProvenance(dataset) {
+    const provenance = dataset.selection_provenance;
+    if (!provenance) return null;
+    const section = make("section", "dataset-selection-provenance");
+    section.id = "dataset-selection-provenance";
+    section.append(make("h3", "", t("selectionProvenance")));
+    const details = make("dl");
+    appendField(details, t("selectionParent"), `${provenance.parent_name || provenance.parent_dataset_id || "—"}\n${provenance.parent_sha256 || "—"}`);
+    appendField(details, t("selectionRule"), `${provenance.condition?.column || "—"} = ${JSON.stringify(provenance.condition?.value ?? "")}`);
+    appendField(details, t("selectionCounts"), `${provenance.counts?.matched ?? "—"} / ${provenance.counts?.total ?? "—"}`);
+    appendField(details, t("selectionRecipeHash"), provenance.recipe_sha256 || "—");
+    appendField(details, t("selectionSourceRowsHash"), provenance.source_rows_sha256 || "—");
+    section.append(details);
+    const links = make("div", "dataset-selection-provenance-links");
+    if (provenance.parent_url) {
+      const parent = make("a", "", t("selectionParentLink"));
+      parent.id = "dataset-selection-parent-link";
+      parent.href = provenance.parent_url;
+      parent.addEventListener("click", (event) => {
+        if (!provenance.parent_dataset_id) return;
+        event.preventDefault();
+        openDataset(provenance.parent_dataset_id);
+      });
+      links.append(parent);
+    }
+    if (provenance.rows_url) {
+      const rows = make("a", "", t("selectionRowsLink"));
+      rows.id = "dataset-selection-rows-link";
+      rows.href = provenance.rows_url;
+      rows.target = "_blank";
+      rows.rel = "noopener";
+      links.append(rows);
+    }
+    section.append(links);
+    if (provenance.original_dictionary_available) section.append(make("p", "dataset-selection-provenance-note", t("selectionDictionaryNote")));
+    return section;
   }
 
   function renderColumns(entry) {
@@ -965,6 +1023,7 @@ export function createAnalysis(adapter) {
     renderStatus();
     renderJobs(entry);
     renderResult(entry);
+    adapter.datasetSelectionChanged?.(currentId, dataset || null);
   }
 
   function invalidateConfirmation(entry) {
@@ -1438,8 +1497,13 @@ export function createAnalysis(adapter) {
   function openImportedDataset(documentId, dataset, options = {}) {
     if (!documentId || !dataset?.id) return;
     const entry = entryFor(documentId);
+    entry.datasetRequestSequence += 1;
     entry.datasets = [dataset, ...entry.datasets.filter((item) => item.id !== dataset.id)];
-    if (options.select !== false) selectDataset(entry, dataset, { resetColumns: true, documentId });
+    if (options.select !== false) {
+      selectDataset(entry, dataset, { resetColumns: true, documentId });
+      entry.shared = false;
+      adapter.contextChanged?.();
+    }
     if (entry === currentEntry()) render();
   }
 

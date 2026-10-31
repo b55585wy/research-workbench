@@ -44,6 +44,7 @@ def build_chart_export(service,document_id,identifier):
             writer=ArchiveWriter(archive);writer.text('chart.json',data);writer.text('specification.json',canonical(chart['spec']).encode())
             writer.text('provenance.json',canonical(provenance).encode());writer.text('chart.html',markup(chart,data))
             writer.file('source'+suffix,source,dataset['sha256'],dataset['byte_size'])
+            for name,raw in service.datasets.selections.export_files(document_id,dataset['id']).items():writer.text(name,raw)
             writer.file('plotly-strict.min.js',service.asset_root/'plotly-strict.min.js',service.renderer['sha256'],service.renderer['byte_size'])
             writer.text('LICENSE',(service.asset_root/'LICENSE').read_bytes())
             writer.text('renderer-manifest.json',(service.asset_root/'manifest.json').read_bytes())

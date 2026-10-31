@@ -81,7 +81,8 @@ export function createWorkspace(adapter) {
     byId("dataset-upload-status"),
     analysisBody.querySelector('label[for="dataset-select"]'),
     byId("dataset-select"),
-    byId("dataset-preview")
+    byId("dataset-preview"),
+    byId("dataset-selection")
   ]);
   moveMany(analysisSettings, [
     byId("analysis-method-label"),

@@ -97,6 +97,17 @@ const messages = {
     analysisId: "分析任务 ID",
     analysisStatus: "任务状态",
     analysisLibrary: "计算库",
+    selectionParent: "筛选父数据",
+    selectionRule: "精确筛选规则",
+    selectionName: "结果名称",
+    selectionDefaultName: "（默认名称）",
+    selectionCounts: "匹配 / 排除 / 总行数",
+    selectionRecipe: "固定筛选配方",
+    selectionSourceRowsHash: "源行映射 SHA-256",
+    selectionPreviewHash: "预览 SHA-256",
+    selectionCreated: "筛选分析表已生成，尚未自动共享给助手。",
+    selectionOpen: "打开筛选分析表",
+    selectionChildLoadFailed: "分析表已保存，但读取完整记录失败；不会重复确认提案。",
     variant_welch: "Welch（不假定等方差）",
     variant_student: "Student（假定等方差）",
     alternative_two_sided: "双侧（两组不相等）",
@@ -295,6 +306,17 @@ const messages = {
     analysisId: "Analysis task ID",
     analysisStatus: "Task status",
     analysisLibrary: "Computation library",
+    selectionParent: "Selection parent data",
+    selectionRule: "Exact filter rule",
+    selectionName: "Result name",
+    selectionDefaultName: "(default name)",
+    selectionCounts: "Matched / excluded / total rows",
+    selectionRecipe: "Fixed selection recipe",
+    selectionSourceRowsHash: "Source-row mapping SHA-256",
+    selectionPreviewHash: "Preview SHA-256",
+    selectionCreated: "The filtered analysis table was generated and has not been shared with the assistant automatically.",
+    selectionOpen: "Open filtered analysis table",
+    selectionChildLoadFailed: "The table was saved, but its full record could not be loaded; the proposal will not be confirmed again.",
     variant_welch: "Welch (equal variances not assumed)",
     variant_student: "Student (equal variances assumed)",
     alternative_two_sided: "Two-sided (groups differ)",
@@ -901,6 +923,7 @@ export function createAssistant(adapter) {
       const payload = proposal.payload && typeof proposal.payload === "object" ? proposal.payload : {};
       const isAnalysis = ["run_analysis", "run_t_test"].includes(proposal.kind);
       const isCancelAnalysis = proposal.kind === "cancel_analysis";
+      const isDatasetSelection = proposal.kind === "create_dataset_selection";
       const isCreateChart = proposal.kind === "create_chart";
       const isChart = ["create_chart", "delete_chart", "restore_chart"].includes(proposal.kind);
       const chartPreviewKey = proposal.sha256 || proposal.id;
@@ -954,6 +977,16 @@ export function createAssistant(adapter) {
         if (payload.expected_revision !== undefined) appendProposalField(details, t("chartRevision"), payload.expected_revision);
         if (payload.data_sha256) appendProposalField(details, t("chartDataHash"), payload.data_sha256);
       }
+      if (isDatasetSelection) {
+        appendProposalField(details, t("selectionParent"), `${payload.source_name || payload.dataset_id || "—"}\n${payload.dataset_sha256 || "—"}`);
+        appendProposalField(details, t("selectionRule"), `${payload.column || "—"} = ${JSON.stringify(payload.value ?? "")}`);
+        appendProposalField(details, t("selectionName"), payload.name || t("selectionDefaultName"));
+        appendProposalField(details, t("selectionCounts"), `${payload.counts?.matched ?? "—"} / ${payload.counts?.excluded ?? "—"} / ${payload.counts?.total ?? "—"}`);
+        appendProposalField(details, t("selectionRecipe"), `${payload.recipe?.id || "—"} · v${payload.recipe?.version || "—"}`);
+        appendProposalField(details, t("analysisRecipeHash"), payload.recipe?.sha256 || payload.recipe_sha256 || "—");
+        appendProposalField(details, t("selectionSourceRowsHash"), payload.source_rows_sha256 || "—");
+        appendProposalField(details, t("selectionPreviewHash"), payload.preview_sha256 || "—");
+      }
       if (isCancelAnalysis) {
         appendProposalField(details, t("analysisId"), payload.analysis_id || "—");
         appendProposalField(details, t("analysisDataset"), payload.dataset_name || payload.dataset_id || "—");
@@ -990,8 +1023,8 @@ export function createAssistant(adapter) {
         view.textContent = t("viewImageRegion");
         view.addEventListener("click", () => adapter.openImageProposal(paper.id, proposal));
         card.append(view);
-      } else if (isAnalysis && payload.dataset_id) {
-        appendSourceButton(card, { document_id: paper.id, kind: "dataset_sample", dataset_id: payload.dataset_id }, t("analysisDataset"));
+      } else if ((isAnalysis || isDatasetSelection) && payload.dataset_id) {
+        appendSourceButton(card, { document_id: paper.id, kind: "dataset_sample", dataset_id: payload.dataset_id }, t(isDatasetSelection ? "selectionParent" : "analysisDataset"));
       } else if (isCancelAnalysis && payload.analysis_id) {
         appendSourceButton(card, { document_id: paper.id, kind: "analysis_result", analysis_id: payload.analysis_id }, t("analysisOpen"));
       } else if (payload.note_id) {
@@ -1039,7 +1072,7 @@ export function createAssistant(adapter) {
           delete: "receiptDeleted",
           restore: "receiptRestored"
         }[proposal.result.outcome] || "receiptSaved";
-        receipt.textContent = isAnalysis ? t("analysisQueued") : isCancelAnalysis ? t("analysisCancelled") : t(outcome);
+        receipt.textContent = isAnalysis ? t("analysisQueued") : isCancelAnalysis ? t("analysisCancelled") : isDatasetSelection ? t("selectionCreated") : t(outcome);
         card.append(receiptLabel, receipt);
         if ((isAnalysis || isCancelAnalysis) && proposal.result.analysis_id) {
           const open = document.createElement("button");
@@ -1049,6 +1082,12 @@ export function createAssistant(adapter) {
           open.textContent = t("analysisOpen");
           open.addEventListener("click", () => adapter.openAnalysisJob?.(proposal.result.document_id || paper.id, proposal.result.analysis_id));
           card.append(open);
+        } else if (isDatasetSelection && proposal.result.dataset_id) {
+          appendSourceButton(card, {
+            document_id: proposal.result.document_id || paper.id,
+            kind: "dataset_sample",
+            dataset_id: proposal.result.dataset_id
+          }, t("selectionOpen"));
         } else if (isChart && (proposal.result.chart_id || payload.chart_id || proposal.result.id)) {
           appendSourceButton(card, {
             document_id: proposal.result.document_id || paper.id,
@@ -1358,6 +1397,24 @@ export function createAssistant(adapter) {
     if (isCurrent(paperId, entry)) render();
   }
 
+  async function acceptDatasetSelectionResult(paperId, entry, proposal, result) {
+    if (!result?.dataset_id) return;
+    try {
+      const url = result.url || `/api/v1/documents/${encodeURIComponent(paperId)}/datasets/${encodeURIComponent(result.dataset_id)}`;
+      const dataset = await adapter.api(url);
+      const select = adapter.getDocument()?.id === paperId && adapter.getSelectedDatasetId?.() === proposal.payload?.dataset_id;
+      adapter.acceptDatasetSelection?.(paperId, dataset, { select });
+      entry.status = { key: "selectionCreated", kind: "success" };
+    } catch (error) {
+      entry.status = {
+        key: "selectionChildLoadFailed",
+        kind: "error",
+        retry: () => acceptDatasetSelectionResult(paperId, entry, proposal, result)
+      };
+    }
+    if (isCurrent(paperId, entry)) render();
+  }
+
   async function decideProposal(paperId, entry, turnId, proposal, approved) {
     const turn = entry.turns.find((item) => item.id === turnId);
     const allowed = turn?.status === "waiting_confirmation" && (proposal.status === "pending" || proposal.status === "conflict" && !approved);
@@ -1374,7 +1431,7 @@ export function createAssistant(adapter) {
         body: JSON.stringify({ approved, proposal_sha256: proposal.sha256 })
       });
       upsertTurn(entry, updated);
-      entry.status = { key: approved ? ["run_analysis", "run_t_test"].includes(proposal.kind) ? "analysisQueued" : proposal.kind === "cancel_analysis" ? "analysisCancelled" : "confirmed" : "rejectedDone", kind: "success" };
+      entry.status = { key: approved ? ["run_analysis", "run_t_test"].includes(proposal.kind) ? "analysisQueued" : proposal.kind === "cancel_analysis" ? "analysisCancelled" : proposal.kind === "create_dataset_selection" ? "selectionCreated" : "confirmed" : "rejectedDone", kind: "success" };
       if (approved) {
         await adapter.refreshAfterAgent(paperId, proposal.kind);
         const result = updated.proposals?.find((item) => item.id === proposal.id)?.result;
@@ -1382,10 +1439,11 @@ export function createAssistant(adapter) {
         if (["run_analysis", "run_t_test", "cancel_analysis"].includes(proposal.kind) && analysisId && adapter.getDocument()?.id === paperId) await adapter.openAnalysisJob?.(paperId, analysisId);
         const chartId = result?.chart_id || proposal.payload?.chart_id || result?.id;
         if (["create_chart", "restore_chart"].includes(proposal.kind) && chartId && adapter.getDocument()?.id === paperId) await adapter.openChart?.(paperId, chartId);
+        if (proposal.kind === "create_dataset_selection") await acceptDatasetSelectionResult(paperId, entry, proposal, result);
       }
     } catch (error) {
       let retry = () => decideProposal(paperId, entry, turnId, proposal, approved);
-      if (approved && ["revision_conflict", "source_changed", "note_deleted", "dataset_changed", "recipe_changed", "engine_unavailable", "analysis_busy", "analysis_quota"].includes(error.code)) {
+      if (approved && ["revision_conflict", "source_changed", "note_deleted", "dataset_changed", "recipe_changed", "preview_changed", "selection_preview_changed", "selection_source_changed", "engine_unavailable", "analysis_busy", "analysis_quota"].includes(error.code)) {
         try {
           const updated = await adapter.api(`/api/v1/documents/${encodeURIComponent(paperId)}/agent/turns/${encodeURIComponent(turnId)}`);
           upsertTurn(entry, updated);

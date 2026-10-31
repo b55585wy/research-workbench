@@ -154,6 +154,10 @@ def create_app(data_root=None, validator=None, renderer=None, *, agent_provider=
     from .data_import_api import router as data_import_router
     data_imports=DataImports(store,datasets,import_root)
     datasets.imports=data_imports
+    from .dataset_selections import DatasetSelections
+    from .selection_api import router as selection_router
+    selections=DatasetSelections(store,datasets)
+    datasets.selections=selections
     analysis=Analyses(store,datasets,RuntimeCatalog(analysis_rscript or os.environ.get('RESEARCH_RSCRIPT'),statistics_root))
     supervisor=AnalysisSupervisor(analysis) if analysis_autostart else None
     from .image_annotations import ImageAnnotations
@@ -180,6 +184,8 @@ def create_app(data_root=None, validator=None, renderer=None, *, agent_provider=
     app.state.images,app.state.agent=images,agent
     app.state.datasets,app.state.analysis=datasets,analysis
     app.state.data_imports=data_imports
+    app.state.selections=selections
+    app.include_router(selection_router)
     app.state.image_annotations=image_annotations
     app.state.charts=charts
     app.include_router(chart_router)

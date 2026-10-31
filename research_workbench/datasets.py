@@ -60,7 +60,11 @@ class Datasets:
     def get(self,document_id,identifier):
         with self.store.connection() as connection:return self.record(self.row(connection,document_id,identifier))
 
-    def checked(self,row):
+    def checked(self,row,seen=None):
+        selections=getattr(self,'selections',None)
+        if selections is not None:
+            derived=selections.check_dataset(row,seen)
+            if derived is not None:return derived
         path=self.root/(row['storage_key']+'.data')
         try:
             if path.stat().st_size==row['byte_size'] and hashlib.sha256(path.read_bytes()).hexdigest()==row['sha256']:

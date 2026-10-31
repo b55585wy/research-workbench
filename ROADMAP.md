@@ -89,3 +89,11 @@ jmv 隔离安装后发生退出崩溃，未部署；不声称移植了 jmv 或�
 用R公开ToothGrowth固定剂量数据完成实际R检验→分组图→来源笔记的逐项确认验收，
 与独立数值参考比对。它不替代用户真实数据及设计确认。
 详见 [GROUPED-OBSERVATIONS.md](GROUPED-OBSERVATIONS.md)。
+
+
+## v0.15 可追溯数据筛选
+
+当前表内选择一列和一个原始值，预览数量后确认生成独立分析表，保留原表、
+源行顺序、逐行来源和固定代码。分析/绘图导出携带完整来源链；Agent新表重新
+授权，连续任务固定源。schema12仅新增一表，旧流程与tFUS边界保持原约束。
+验收说明见[DATASET-SELECTION.md](DATASET-SELECTION.md)。

@@ -96,6 +96,15 @@ class Proposals:
             raise WorkspaceError('source_changed','原论文发生变化，请重新读取。',409)
         verify_source(self.store,document)
         request_id=str(uuid5(NAMESPACE_URL,'research-agent-proposal:'+proposal_id))
+        if kind=='create_dataset_selection':
+            from .selection_models import SelectionCreate
+            if self.analysis is None:raise WorkspaceError('agent_tool_unavailable','分析服务尚未安装。',409)
+            if data.get('request_id')!=request_id:raise WorkspaceError('agent_proposal_changed','筛选请求编号与建议不一致。',409)
+            fields={k:data[k] for k in SelectionCreate.model_fields if k!='request_id' and k in data}
+            child,_=self.analysis.datasets.selections.create_in(connection,document_id,SelectionCreate(request_id=request_id,**fields))
+            return {'dataset_id':child['id'],'parent_dataset_id':str(fields['dataset_id']),'name':child['original_filename'],
+                    'sha256':child['sha256'],'row_count':child['row_count'],
+                    'url':f"/api/v1/documents/{document_id}/datasets/{child['id']}"}
         if kind in ('create_chart','delete_chart','restore_chart'):
             service=getattr(self,'charts',None)
             if service is None:raise WorkspaceError('agent_tool_unavailable','绘图工具尚未安装。',409)

@@ -2,6 +2,7 @@ import * as pdfjsLib from "/vendor/pdfjs/build/pdf.mjs";
 import { createImageLibrary } from "/image-library.js";
 import { createImageViewer } from "/image-viewer.js";
 import { createAnalysis } from "/analysis.js";
+import { createDatasetSelection } from "/dataset-selection.js";
 import { createDataImports } from "/data-imports.js";
 import { createCharts } from "/charts.js";
 import { createWorkspace } from "/workspace.js";
@@ -467,6 +468,7 @@ const state = {
 let imageLibrary = null;
 let imageViewer = null;
 let analysis = null;
+let datasetSelection = null;
 let dataImports = null;
 let charts = null;
 let workspace = null;
@@ -558,6 +560,7 @@ function applyLanguage() {
   imageLibrary?.applyLanguage(state.language);
   imageViewer?.applyLanguage(state.language);
   analysis?.applyLanguage(state.language);
+  datasetSelection?.applyLanguage(state.language);
   dataImports?.applyLanguage(state.language);
   charts?.applyLanguage(state.language);
   workspace?.applyLanguage(state.language);
@@ -2932,8 +2935,19 @@ analysis = createAnalysis({
   startImport: (file) => dataImports?.startImport(file),
   isImportPending: () => dataImports?.isImportPending() || false,
   datasetContextChanged: (documentId, datasetId, analysisId) => charts?.syncDataset(documentId, datasetId, analysisId),
+  datasetSelectionChanged: (documentId, dataset) => datasetSelection?.sync(documentId, dataset),
   addAnalysisCitation,
   sourcesChanged: (documentId) => {
+    if (state.document?.id === documentId) charts?.reload(documentId);
+  }
+});
+
+datasetSelection = createDatasetSelection({
+  api,
+  checkedFetch,
+  getLanguage: () => state.language,
+  acceptDataset: (documentId, dataset, options) => {
+    analysis.openImportedDataset(documentId, dataset, options);
     if (state.document?.id === documentId) charts?.reload(documentId);
   }
 });
@@ -2978,6 +2992,11 @@ assistant = createAssistant({
   getLanguage: () => state.language,
   getContext: assistantContext,
   getSharedDatasetId: () => analysis.getSharedDatasetId(),
+  getSelectedDatasetId: () => analysis.getSelectedDatasetId(),
+  acceptDatasetSelection: (documentId, dataset, options) => {
+    analysis.openImportedDataset(documentId, dataset, options);
+    if (state.document?.id === documentId) charts?.reload(documentId);
+  },
   getActiveAnalysisId: () => analysis.getActiveAnalysisId(),
   getActiveChart: (documentId) => charts.getActiveChart(documentId),
   clearActiveChart: (documentId) => charts.clearActiveChart(documentId),

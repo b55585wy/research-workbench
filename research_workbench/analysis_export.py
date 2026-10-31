@@ -19,6 +19,9 @@ def build_analysis_export(service,document_id,identifier):
         raise WorkspaceError('dataset_changed','原始数据文件已改变。',409)
     if dataset.get('import_provenance'):
         files.update(service.datasets.imports.export_files(document_id,dataset['import_provenance']['import_id'],dataset))
+    files.update(service.datasets.selections.export_files(document_id,job['dataset_id']))
+    if sum(len(data) for data in files.values())>128*1024*1024:
+        raise WorkspaceError('export_too_large','导出资料超过128 MiB。',413)
     files['analysis.ipynb']=serialize(notebook_from_snapshot(job,files))
     rows=[]
     for item in job['result']['stats']:

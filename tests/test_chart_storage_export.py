@@ -26,8 +26,8 @@ def test_schema8_preserves_all_nineteen_tables_rows_and_columns(tmp_path):
         before={t:(db.execute(f'PRAGMA table_info({t})').fetchall(),db.execute(f'SELECT * FROM {t} ORDER BY 1').fetchall()) for t in tables}
     Store(tmp_path)
     with sqlite3.connect(dbpath) as db:
-        assert db.execute('PRAGMA user_version').fetchone()[0]==11
-        assert len(db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").fetchall())==24
+        assert db.execute('PRAGMA user_version').fetchone()[0]==12
+        assert len(db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").fetchall())==25
         for t,old in before.items():assert (db.execute(f'PRAGMA table_info({t})').fetchall(),db.execute(f'SELECT * FROM {t} ORDER BY 1').fetchall())==old
         assert db.execute('SELECT COUNT(*) FROM charts').fetchone()[0]==db.execute('SELECT COUNT(*) FROM chart_operations').fetchone()[0]==0
 

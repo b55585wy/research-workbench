@@ -325,7 +325,23 @@ CREATE TABLE IF NOT EXISTS agent_task_operations (
  result_json TEXT NOT NULL CHECK(json_valid(result_json)),
  created_at TEXT NOT NULL
 );
-PRAGMA user_version=11;
+CREATE TABLE IF NOT EXISTS dataset_selections (
+    dataset_id TEXT PRIMARY KEY REFERENCES datasets(id),
+    document_id TEXT NOT NULL REFERENCES documents(id),
+    parent_dataset_id TEXT NOT NULL REFERENCES datasets(id) CHECK(parent_dataset_id != dataset_id),
+    request_hash TEXT NOT NULL CHECK(length(request_hash)=64),
+    spec_json TEXT NOT NULL CHECK(json_valid(spec_json)),
+    preview_json TEXT NOT NULL CHECK(json_valid(preview_json)),
+    source_rows_json TEXT NOT NULL CHECK(json_valid(source_rows_json) AND json_type(source_rows_json)='array' AND json_array_length(source_rows_json) BETWEEN 1 AND 50000),
+    sources_json TEXT NOT NULL CHECK(json_valid(sources_json)),
+    data_bytes BLOB NOT NULL CHECK(typeof(data_bytes)='blob' AND length(data_bytes) BETWEEN 1 AND 5242880),
+    created_at TEXT NOT NULL
+);
+CREATE TRIGGER IF NOT EXISTS dataset_selection_scope BEFORE INSERT ON dataset_selections
+WHEN NOT EXISTS(SELECT 1 FROM datasets c JOIN datasets p ON p.id=NEW.parent_dataset_id
+    WHERE c.id=NEW.dataset_id AND c.document_id=NEW.document_id AND p.document_id=NEW.document_id)
+BEGIN SELECT RAISE(ABORT,'selection scope mismatch'); END;
+PRAGMA user_version=12;
 COMMIT;
 '''
 
@@ -353,7 +369,7 @@ class Store:
         self.exports.mkdir(exist_ok=True)
         self.database = self.root / 'workspace.sqlite3'
         with self.connection() as connection:
-            if connection.execute('PRAGMA user_version').fetchone()[0] > 11:
+            if connection.execute('PRAGMA user_version').fetchone()[0] > 12:
                 raise RuntimeError('Database requires a newer application')
             connection.executescript(SCHEMA)
         self.lifecycle = NoteLifecycle(self)

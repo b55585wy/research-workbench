@@ -168,3 +168,11 @@ fixed-dose20records;13numeric fields agree with independent60digit references.
 All32export files verified. With server stopped, offline plot shows20points/2groups,
 rejects14malformed cases and makes no HTTP requests. Old chart/other regression
 receipts and live preservation checks remain external beside this task.
+
+
+## v0.15 精确筛选验收
+
+按[筛选契约](DATASET-SELECTION.md)验证：原表不变、原字符串精确匹配、源行顺序、
+零命中阻止生成、预览漂移/原请求重试、事务和回执共同回滚、有界解析/配额、缓存
+恢复与损坏拒绝、schema11原24表保留、SPSS说明和祖先导出、Agent新表重新授权、
+连续任务不切源；另跑完整后端和旧界面回归。公开60→20行再接实际R/图表/笔记。

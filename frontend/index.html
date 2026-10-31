@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="/workspace.css">
   <link rel="stylesheet" href="/image-library.css">
   <link rel="stylesheet" href="/analysis.css">
+  <link rel="stylesheet" href="/dataset-selection.css">
   <link rel="stylesheet" href="/data-imports.css">
   <link rel="stylesheet" href="/statistics.css">
   <link rel="stylesheet" href="/analysis-notebook.css">
@@ -196,6 +197,38 @@
           <label class="analysis-label" for="dataset-select">选择数据</label>
           <select id="dataset-select" disabled></select>
           <div id="dataset-preview" class="analysis-preview"></div>
+          <details id="dataset-selection" class="dataset-selection">
+            <summary id="dataset-selection-toggle">筛选数据</summary>
+            <form id="dataset-selection-form" class="dataset-selection-form">
+              <p id="dataset-selection-help" class="dataset-selection-help">按某一列的原始文本精确筛选，不 trim、不进行数值转换。源数据保持不变；SPSS 规范化字段字典仍随源数据保存。</p>
+              <label class="analysis-label" for="dataset-selection-column">筛选列</label>
+              <select id="dataset-selection-column" disabled></select>
+              <label class="analysis-label" for="dataset-selection-search">搜索可选值（仅用于查找）</label>
+              <div class="dataset-selection-search-row">
+                <input id="dataset-selection-search" type="search" autocomplete="off" disabled>
+                <button id="dataset-selection-values-search" class="button button-secondary" type="button" disabled>查找值</button>
+              </div>
+              <label class="analysis-label" for="dataset-selection-value">精确匹配值</label>
+              <select id="dataset-selection-value" disabled></select>
+              <div class="dataset-selection-value-actions">
+                <button id="dataset-selection-values-previous" class="button button-quiet" type="button" disabled>上一批</button>
+                <button id="dataset-selection-values-next" class="button button-quiet" type="button" disabled>下一批</button>
+              </div>
+              <div id="dataset-selection-values-status" class="dataset-selection-values-status" role="status" aria-live="polite"></div>
+              <label class="analysis-label" for="dataset-selection-name">结果名称（可选）</label>
+              <input id="dataset-selection-name" type="text" autocomplete="off" disabled>
+              <output id="dataset-selection-rule" class="dataset-selection-rule"></output>
+              <dl id="dataset-selection-counts" class="dataset-selection-counts"></dl>
+              <div id="dataset-selection-preview" class="dataset-selection-preview"></div>
+              <p id="dataset-selection-recipe" class="dataset-selection-recipe"></p>
+              <div id="dataset-selection-status" class="analysis-status" role="status" aria-live="polite"></div>
+              <div class="dataset-selection-actions">
+                <button id="dataset-selection-edit" class="button button-quiet" type="button" hidden>返回编辑</button>
+                <button id="dataset-selection-preview-button" class="button button-secondary" type="submit" disabled>预览筛选结果</button>
+                <button id="dataset-selection-create" class="button button-primary" type="button" disabled>生成分析表</button>
+              </div>
+            </form>
+          </details>
           <section id="data-imports" class="data-imports" aria-labelledby="data-imports-heading">
             <h3 id="data-imports-heading">数据导入记录</h3>
             <p id="data-imports-help" class="data-imports-help">SAV/ZSAV 原始文件和核对记录保留在此处。打开记录不会更改当前数据或运行设置。</p>
