@@ -55,9 +55,10 @@ class ReadingWorkspace:
 
     def capture(self,identifier,context):
         with self.store.connection() as connection:
-            connection.execute('BEGIN')
+            if not connection.in_transaction:connection.execute('BEGIN')
             document=read_metadata(connection,identifier)
-            if context.page>document['page_count']:
+            if document.get('kind')=='study' and (context.page is not None or context.rect is not None):raise WorkspaceError('invalid_page','研究上下文不使用PDF页码。',422)
+            if document.get('kind')!='study' and (context.page is None or context.page>document['page_count']):
                 raise WorkspaceError('invalid_page','当前页码超出论文范围。')
             active_note=None
             if context.active_note_id:
@@ -111,6 +112,7 @@ class ReadingWorkspace:
 
     def page(self,document_id,number):
         document=self.store.get_document(document_id)
+        if document.get('kind')=='study':raise WorkspaceError('source_has_no_pdf','研究上下文没有PDF页面。',409)
         if type(number) is not int or not 1<=number<=document['page_count']:
             raise WorkspaceError('invalid_page','页码超出论文范围。')
         source=verify_source(self.store,document)
@@ -138,6 +140,9 @@ class Sources:
         self.items.append(item)
         return item
 
+    def study(self,value):
+        return self.add('study_context',value['title'],page=None,rect=None,scope_sha256=value['scope_sha256'],question=value['question'],url=f"/?study={self.document_id}")
+
     def page(self,value):
         page=value['page']
         label=f'Page {page}' if self.context['language']=='en' else f'第 {page} 页'
@@ -158,10 +163,11 @@ class Sources:
             image_id=value['id'],url=value['preview_url'],source_sha256=self.context['document']['sha256'])
 
     def note(self,value):
-        return self.add('note',f"第 {value['page']} 页笔记",document_id=value['document_id'],page=value['page'],
+        return self.add('note',f"第 {value['page']} 页笔记" if value['page'] else '研究笔记',document_id=value['document_id'],page=value['page'],
             rect=value['rect'],note_id=value['id'],revision=value['revision'],text=value['text'][:4000],
             truncated=len(value['text'])>4000,url=f"/?document={value['document_id']}&note={value['id']}",
-            source_sha256=self.context['document']['sha256'] if value['document_id']==self.document_id else None)
+            source_sha256=self.context['document']['sha256'] if value['document_id']==self.document_id else None,
+            **({'source':value['source']} if 'source' in value else {}))
 
     def image_annotation(self,value,source):
         return self.add('image_annotation','图片标注 · '+source['label'],source_kind=value['source_kind'],source_id=value['source_id'],
@@ -185,7 +191,8 @@ class Sources:
 
     def get(self,ref):
         result=next((r for r in self.items if r['ref']==ref),None)
-        if result is None or result['document_id']!=self.document_id or not result.get('page'):
+        study_source=self.context['document'].get('kind')=='study' and result and result['kind'] in ('study_context','dataset_sample','analysis_result','chart_result','note')
+        if result is None or result['document_id']!=self.document_id or (not result.get('page') and not study_source):
             raise WorkspaceError('agent_source_required','请先读取当前论文中的实际出处，再提出笔记。',409)
         return result
 

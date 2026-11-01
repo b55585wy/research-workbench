@@ -178,7 +178,7 @@ class ImageLibrary:
             return self.create_note_in(connection,identifier,payload)
 
     def create_note_in(self,connection,identifier,payload):
-        data=payload.model_dump(mode='json');data['image_ids']=sorted(data['image_ids'])
+        data=payload.model_dump(mode='json',exclude={'source'} if payload.source is None else set());data['image_ids']=sorted(data['image_ids'])
         if data.get('rich_content') is None:data.pop('rich_content',None)
         digest=hashlib.sha256(json.dumps({'document_id':identifier,'data':data},sort_keys=True,ensure_ascii=False).encode()).hexdigest()
         identifier_note=str(payload.request_id)

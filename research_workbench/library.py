@@ -13,6 +13,8 @@ DOCUMENT_QUERY = '''SELECT d.id,m.title,d.original_filename,d.page_count,d.byte_
 
 
 def base_document(metadata):
+    metadata=dict(metadata)
+    if metadata.get('kind')=='study':return dict(metadata)
     return {key: metadata[key] for key in DOCUMENT_FIELDS}
 
 
@@ -20,6 +22,9 @@ def read_metadata(connection, identifier):
     row = connection.execute(DOCUMENT_QUERY + ' WHERE d.id=?', (identifier,)).fetchone()
     if row is None:
         raise WorkspaceError('not_found', '找不到这篇文献。', 404)
+    if row['page_count'] is None:
+        from .studies import owner
+        return owner(connection,dict(row))
     return dict(row)
 
 
@@ -51,6 +56,7 @@ class Library:
         fingerprint = hashlib.sha256(json.dumps({'document_id':identifier,'data':data},
             ensure_ascii=False,sort_keys=True).encode()).hexdigest()
         current = read_metadata(connection, identifier)
+        if current.get('kind')=='study':raise WorkspaceError('study_metadata','首版研究描述在创建时确认。',409)
         receipt = connection.execute('SELECT * FROM document_operations WHERE request_id=?',
                                      (str(payload.request_id),)).fetchone()
         if receipt is not None:
@@ -84,11 +90,11 @@ class Library:
         folded = query.casefold()
         with self.store.connection() as connection:
             connection.execute('BEGIN')
-            documents = connection.execute(DOCUMENT_QUERY + ' ORDER BY d.created_at DESC,d.id DESC')
+            documents = connection.execute(DOCUMENT_QUERY + ' WHERE d.page_count IS NOT NULL ORDER BY d.created_at DESC,d.id DESC')
             result['documents'] = self.find_documents(documents,folded,limit)
             sql = STATE_QUERY.replace('SELECT n.id','SELECT m.title AS document_title,n.id',1)
             sql += ''' JOIN document_metadata m ON m.document_id=n.document_id
-                WHERE s.deleted_at IS NULL ORDER BY n.created_at DESC,n.id DESC'''
+                WHERE s.deleted_at IS NULL AND n.page IS NOT NULL ORDER BY n.created_at DESC,n.id DESC'''
             for row in connection.execute(sql):
                 if folded in row['text'].casefold():
                     result['notes'].append(state_record(row))

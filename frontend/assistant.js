@@ -27,6 +27,9 @@ const messages = {
     cancelled: "已停止",
     interrupted: "服务重启后已中断；不会自动重试或写入。",
     contextPaper: "文献：{title}",
+    contextStudy: "研究：{title}",
+    studySource: "研究笔记来源",
+    sourceHash: "来源 SHA-256",
     contextPage: "第 {page} 页",
     contextRegion: "选定区域",
     contextWhole: "整页上下文",
@@ -237,6 +240,9 @@ const messages = {
     cancelled: "Stopped",
     interrupted: "Interrupted by a service restart; no automatic retry or write will occur.",
     contextPaper: "Paper: {title}",
+    contextStudy: "Research: {title}",
+    studySource: "Study note source",
+    sourceHash: "Source SHA-256",
     contextPage: "Page {page}",
     contextRegion: "Selected region",
     contextWhole: "Whole-page context",
@@ -561,7 +567,9 @@ export function createAssistant(adapter) {
     }
     const context = adapter.getContext();
     const images = adapter.getChatImages(paper.id);
-    const badges = [
+    const badges = paper.kind === "study" ? [
+      t("contextStudy", { title: paper.title || paper.name || t("untitled") })
+    ] : [
       t("contextPaper", { title: paper.title || paper.original_filename || t("untitled") }),
       t("contextPage", { page: context.page }),
       t(context.rect ? "contextRegion" : "contextWhole")
@@ -956,7 +964,7 @@ export function createAssistant(adapter) {
       details.className = "assistant-proposal-details";
       appendProposalField(details, t("paper"), paper.title || paper.original_filename || t("untitled"));
       if (Number.isInteger(payload.page)) appendProposalField(details, t("page"), t("pageValue", { page: payload.page }));
-      if (Object.hasOwn(payload, "rect")) appendProposalField(details, t(isImageAnnotation ? "imageRegion" : "selection"), t(payload.rect ? "selectedRegion" : "wholePage"));
+      if (paper.kind !== "study" && Object.hasOwn(payload, "rect")) appendProposalField(details, t(isImageAnnotation ? "imageRegion" : "selection"), t(payload.rect ? "selectedRegion" : "wholePage"));
       const source = turn.sources?.find((item) => payload.source_ref
         ? item.ref === payload.source_ref
         : isImageAnnotation
@@ -964,6 +972,10 @@ export function createAssistant(adapter) {
           : payload.note_id && item.note_id === payload.note_id);
       const sourceRef = payload.source_ref || source?.ref;
       if (sourceRef) appendProposalField(details, t("sourceRef", { ref: sourceRef }), source?.label || t("viewSource"));
+      if (payload.source?.kind && payload.source?.id) {
+        appendProposalField(details, t("studySource"), `${payload.source.kind} · ${payload.source.id}`);
+        appendProposalField(details, t("sourceHash"), payload.source.sha256 || "—");
+      }
       if (isImageAnnotation) appendProposalField(details, t("imageSource"), source?.label || payload.source_label || payload.source_id || "—");
       if (typeof payload.text === "string") {
         const noteBody = appendProposalField(details, t("noteBody"), payload.text, "assistant-proposal-text");
@@ -1043,6 +1055,8 @@ export function createAssistant(adapter) {
         appendSourceButton(card, { ...source, document_id: paper.id, note_id: payload.note_id }, t("viewTarget"));
       } else if (payload.source_ref || source) {
         appendSourceButton(card, { ...source, document_id: paper.id, page: payload.page || source?.page, rect: Object.hasOwn(payload, "rect") ? payload.rect : source?.rect }, t("viewSource"));
+      } else if (payload.source?.kind) {
+        appendSourceButton(card, { document_id: paper.id, source: payload.source }, t("viewSource"));
       }
       if (isCreateChart && proposal.status === "pending") {
         const previewButton = document.createElement("button");
@@ -1118,8 +1132,9 @@ export function createAssistant(adapter) {
           appendSourceButton(card, {
             document_id: proposal.result.document_id || paper.id,
             note_id: proposal.result.note_id || null,
-            page: proposal.result.note_id ? null : 1,
-            rect: null
+            page: paper.kind === "study" || proposal.result.note_id ? null : 1,
+            rect: null,
+            ...(paper.kind === "study" && payload.source ? { source: payload.source } : {})
           }, t("openSource"));
         }
       }

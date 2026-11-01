@@ -15,10 +15,18 @@ class WorkspaceError(Exception):
         self.code, self.message, self.status = code, message, status
 
 
+class SourceAnchor(BaseModel):
+    model_config=ConfigDict(extra='forbid')
+    kind: Literal['study','dataset','analysis','chart']
+    id: UUID
+    sha256: str=Field(pattern=r'^[0-9a-f]{64}$')
+
+
 class NoteCreate(BaseModel):
     model_config = ConfigDict(extra='forbid')
     request_id: UUID
-    page: int = Field(strict=True, ge=1, le=MAX_PAGES)
+    page: int | None = Field(..., strict=True, ge=1, le=MAX_PAGES)
+    source: SourceAnchor | None = None
     rect: tuple[float, float, float, float] | None = None
     text: str = Field(min_length=1, max_length=10_000)
     rich_content: dict | None = None

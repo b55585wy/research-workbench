@@ -215,3 +215,11 @@ scope/result mismatch or corruption;413 expanded limit;429 busy;422 malformed;
 disconnect. No schema change. Agent prepare_research_record requires explicit
 dataset sharing, returns summary and a research_record source for human review.
 Full scope, resource and offline behavior: [RESEARCH-RECORD.md](RESEARCH-RECORD.md).
+
+## v0.17 data-first study
+
+Explicit paperless owners use POST/GET /api/v1/studies; papers have separate,
+hash-bound association endpoints. Existing owned data/result/note routes accept
+study IDs without creating a PDF. Null-page notes require typed source anchors;
+PDF APIs retain their old shapes and reject study page/file operations.
+Contract, limits and schema13 migration: [DATA-FIRST-STUDY.md](DATA-FIRST-STUDY.md).

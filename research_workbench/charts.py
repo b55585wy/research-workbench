@@ -10,7 +10,7 @@ import threading
 from uuid import UUID
 from .agent_store import canonical,digest,now
 from .analysis_recipes import clean_environment
-from .excerpts import verify_source
+from .studies import verify_owner as verify_source
 from .image_sources import checked_bytes
 from .library import read_metadata
 from .models import WorkspaceError

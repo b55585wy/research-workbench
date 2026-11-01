@@ -586,3 +586,14 @@ SPSS导入11组、连续任务7组通过。配置模型12次调用、4次明确�
 图表字节保持一致；停止服务后20点图可离线交互，14类损坏输入被拒绝。
 另验收同方法重复运行的时间区分、Agent旧范围漂移和切换来源后拒绝自动跳转。
 全部试验在隔离目录完成，正式资料和tFUS边界另做发布前后校验。
+
+## v0.17 data-first research
+
+Requirement scenarios cover no-PDF ownership, exact retry, typed notes, owner/hash
+isolation, optional paper links, existing compute/import/selection paths, explicit
+Agent confirmation and portable records. Migration12→13 preserves original25
+tables and bytes, with only declared PDF-field/page nullability changes.
+Store regression covers nested write rollback, thread-local isolation and a
+waiting writer without nested-reader deadlock. Native browser and actual model
+acceptance use isolated data; no public sample is inserted into the live library.
+This is software validation, not validation of an experimental design or inference.

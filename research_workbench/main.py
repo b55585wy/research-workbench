@@ -171,6 +171,11 @@ def create_app(data_root=None, validator=None, renderer=None, *, agent_provider=
     records=ResearchRecords(store,datasets,analysis,charts)
     agent=ReadingAgent(store,images,provider,page_reader,analysis=analysis,image_annotations=image_annotations,charts=charts)
 
+    from .studies import Studies
+    from .study_notes import StudyNotes
+    from .study_api import router as study_router
+    studies=Studies(store)
+    store.study_notes=StudyNotes(store,datasets,analysis,charts)
     agent.workspace.records=records
 
     @asynccontextmanager
@@ -194,6 +199,8 @@ def create_app(data_root=None, validator=None, renderer=None, *, agent_provider=
     app.state.image_annotations=image_annotations
     app.state.charts=charts
     app.state.records=records
+    app.state.studies=studies
+    app.include_router(study_router)
     app.include_router(record_router)
     app.include_router(chart_router)
     app.include_router(data_import_router)
@@ -252,6 +259,7 @@ def create_app(data_root=None, validator=None, renderer=None, *, agent_provider=
     @app.get('/api/v1/documents/{identifier}/file')
     def document_file(identifier: UUID):
         record = store.get_document(str(identifier))
+        if record.get('kind')=='study':raise WorkspaceError('source_has_no_pdf','研究没有占位PDF，请打开实际关联文献。',409)
         path = store.files / f'{identifier}.pdf'
         if not path.is_file():
             raise WorkspaceError('file_missing', '原文件暂时无法打开，请检查资料存储。', 409)

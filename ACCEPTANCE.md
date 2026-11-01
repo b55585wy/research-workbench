@@ -189,3 +189,14 @@ disconnect cleanup and no DB writes. Agent gets summary only for explicitly shar
 data and a human review entry. Native retry/repreview/source races, stale Agent
 scope, mobile/keyboard/bilingual/default-blue, old workflows and public offline
 20-point replay are required. Schema12 and all25 original tables remain.
+
+## v0.17 data-first study acceptance
+
+Create/retry/reopen without a PDF; actual Python/R, reviewed SPSS imports,
+selection ancestry, grouped chart and typed source notes; explicit Agent sharing
+and each write confirmation; PDF-free export and later real-paper association.
+Verify cross-owner/hash/page errors, atomic receipts, migration rollback, all25
+old table values, original files and conditional nullability constraints.
+Concurrent writer plus nested reads must complete; outer failures roll back all
+nested writes. Native mobile/zh-en, actual provider and old PDF paths are required.
+Details: [DATA-FIRST-STUDY.md](DATA-FIRST-STUDY.md).

@@ -9,6 +9,7 @@ import { createWorkspace } from "/workspace.js";
 import { createAssistant } from "/assistant.js";
 import { createRichText, renderRichHtml } from "/rich-text.js";
 import { createResearchRecord } from "/research-record.js";
+import { createStudy } from "/study.js";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = "/vendor/pdfjs/build/pdf.worker.mjs";
 
@@ -425,6 +426,7 @@ const state = {
   language: readLanguage(),
   theme: readTheme(),
   documents: [],
+  studies: [],
   document: null,
   pdf: null,
   pdfTask: null,
@@ -480,6 +482,11 @@ let workspace = null;
 let assistant = null;
 let richText = null;
 let researchRecord = null;
+let study = null;
+
+function isStudy(document = state.document) {
+  return document?.kind === "study";
+}
 
 function readLanguage() {
   try {
@@ -573,6 +580,7 @@ function applyLanguage() {
   assistant?.applyLanguage(state.language);
   richText?.applyLanguage(state.language);
   researchRecord?.applyLanguage(state.language);
+  study?.applyLanguage(state.language);
 }
 
 class ApiError extends Error {
@@ -611,11 +619,20 @@ async function api(path, options = {}) {
   }
 }
 
+function setOwnerInUrl(url, documentId, studyOwner = isStudy()) {
+  if (documentId) {
+    url.searchParams.set(studyOwner ? "study" : "document", documentId);
+    url.searchParams.delete(studyOwner ? "document" : "study");
+  } else {
+    url.searchParams.delete("document");
+    url.searchParams.delete("study");
+  }
+}
+
 function updateUrl(documentId, noteId = null, replace = false, mode = "reading", tool = "analysis") {
   workspace?.reveal(mode, { tool, showNotes: Boolean(noteId) });
   const url = new URL(window.location.href);
-  if (documentId) url.searchParams.set("document", documentId);
-  else url.searchParams.delete("document");
+  setOwnerInUrl(url, documentId);
   if (noteId) url.searchParams.set("note", noteId);
   else url.searchParams.delete("note");
   url.searchParams.set("workspace", mode);
@@ -643,7 +660,7 @@ function showImageInUrl(documentId, context) {
   if (state.document?.id !== documentId || !context) return;
   workspace?.reveal("reading", { showNotes: true });
   const url = new URL(window.location.href);
-  url.searchParams.set("document", documentId);
+  setOwnerInUrl(url, documentId);
   url.searchParams.set("image_kind", context.source_kind);
   url.searchParams.set("image_source", context.source_id);
   url.searchParams.set("workspace", "reading");
@@ -686,6 +703,10 @@ function ensureDraft(documentId) {
 
 function captureCurrentDraft() {
   if (!state.document) return;
+  if (isStudy()) {
+    study?.captureCurrentDraft();
+    return;
+  }
   const editDraft = state.editDrafts.get(state.document.id);
   if (editDraft) {
     if (!state.pendingMutations.has(mutationKey(state.document.id, editDraft.noteId))) {
@@ -1133,7 +1154,7 @@ function mutationKey(documentId, noteId) {
 function renderDocumentDetails() {
   const document = state.document;
   elements.documentTitle.textContent = document ? document.title || document.original_filename || t("untitled") : "";
-  elements.pageCount.textContent = document ? t("pageOf", { count: document.page_count }) : "";
+  elements.pageCount.textContent = document && !isStudy(document) ? t("pageOf", { count: document.page_count }) : "";
   elements.readerEmpty.hidden = Boolean(document);
   if (!document) elements.pageSurface.hidden = true;
   const hasPdf = Boolean(state.pdf && document);
@@ -1151,12 +1172,16 @@ function renderDocumentDetails() {
   elements.sample.disabled = state.pendingUpload;
   elements.uploadButton.disabled = state.pendingUpload;
   elements.uploadInput.disabled = state.pendingUpload;
-  elements.exportReadingRecord.disabled = !document || richText?.isOpen() || state.pendingSaves > 0 || state.pendingExcerpts.size > 0 || state.pendingExports.size > 0 || state.pendingMutations.size > 0 || state.pendingMetadata.size > 0 || state.editDrafts.has(document.id) || Boolean(document && ensureMetadata(document.id).draft);
+  elements.exportReadingRecord.disabled = !document || isStudy(document) || richText?.isOpen() || state.pendingSaves > 0 || state.pendingExcerpts.size > 0 || state.pendingExports.size > 0 || state.pendingMutations.size > 0 || state.pendingMetadata.size > 0 || state.editDrafts.has(document.id) || Boolean(document && !isStudy(document) && ensureMetadata(document.id).draft);
   elements.exportReadingRecord.textContent = t(state.pendingExports.size > 0 ? "exporting" : "exportReadingRecord");
   assistant?.contextChanged();
 }
 
 function renderDraft() {
+  if (isStudy()) {
+    study?.renderDocument();
+    return;
+  }
   if (!state.document) {
     elements.noteForm.dataset.mode = "create";
     elements.editModeLabel.hidden = true;
@@ -1254,6 +1279,10 @@ function appendRichNoteBody(item, note, noteState) {
 }
 
 function renderNotes() {
+  if (isStudy()) {
+    study?.renderNotes();
+    return;
+  }
   elements.notesList.replaceChildren();
   const document = state.document;
   const hasDocument = Boolean(document);
@@ -1387,34 +1416,37 @@ function renderDeletedNotes() {
 async function loadDocuments() {
   setStatus("loadingDocuments");
   try {
-    const body = await api("/api/v1/documents");
+    const [body, studyBody] = await Promise.all([api("/api/v1/documents"), api("/api/v1/studies")]);
     state.documents = Array.isArray(body.items) ? body.items : [];
+    state.studies = Array.isArray(studyBody.items) ? studyBody.items : [];
+    study?.setStudies(state.studies);
     renderDocuments();
     const params = new URLSearchParams(window.location.search);
-    const requestedDocument = params.get("document");
+    const requestedStudy = params.get("study");
+    const requestedDocument = requestedStudy || params.get("document");
     const requestedNote = params.get("note");
     const requestedAnalysis = params.get("analysis");
     const requestedDataset = params.get("dataset");
     const requestedChart = params.get("chart");
-    const requestedMode = workspace?.modeForParams(params) || "reading";
-    const imageLink = readImageLink(params);
+    const hasExplicitMode = params.has("workspace") || ["note", "analysis", "dataset", "chart", "image_source"].some((key) => params.has(key));
+    const requestedMode = requestedStudy && !hasExplicitMode ? "data" : workspace?.modeForParams(params) || "reading";
+    const imageLink = requestedStudy ? null : readImageLink(params);
     if (requestedDocument) {
-      if (state.documents.some((document) => document.id === requestedDocument)) {
-        await openDocument(requestedDocument, {
-          noteId: requestedMode === "reading" ? requestedNote : null,
-          analysisId: requestedMode === "data" ? requestedAnalysis : null,
-          datasetId: requestedMode === "data" ? requestedDataset : null,
-          chartId: requestedMode === "data" ? requestedChart : null,
-          imageLink: requestedMode === "reading" ? imageLink || null : null,
-          workspace: requestedMode,
-          tool: requestedChart ? "charts" : params.get("tool"),
-          replaceUrl: true
-        });
-      } else {
-        showMissingDocument();
-      }
+      await openDocument(requestedDocument, {
+        ownerKind: requestedStudy ? "study" : "paper",
+        noteId: requestedMode === "reading" ? requestedNote : null,
+        analysisId: requestedMode === "data" ? requestedAnalysis : null,
+        datasetId: requestedMode === "data" ? requestedDataset : null,
+        chartId: requestedMode === "data" ? requestedChart : null,
+        imageLink: requestedMode === "reading" ? imageLink || null : null,
+        workspace: requestedMode,
+        tool: requestedChart ? "charts" : params.get("tool"),
+        replaceUrl: true
+      });
     } else if (state.documents.length) {
       await openDocument(state.documents[0].id, { replaceUrl: true });
+    } else if (state.studies.length) {
+      await openDocument(state.studies[0].id, { ownerKind: "study", workspace: "data", replaceUrl: true });
     } else {
       clearStatus();
     }
@@ -1436,6 +1468,7 @@ function showMissingDocument() {
   state.highlight = null;
   elements.pageSurface.hidden = true;
   elements.readerEmpty.hidden = false;
+  study?.documentChanged(null);
   renderDocuments();
   renderDocumentDetails();
   renderMetadata();
@@ -1480,16 +1513,39 @@ function cancelDocumentWork() {
 }
 
 async function openDocument(documentId, options = {}) {
-  const document = state.documents.find((item) => item.id === documentId);
+  let document = state.documents.find((item) => item.id === documentId) || state.studies.find((item) => item.id === documentId);
   if (!document) {
-    showMissingDocument();
-    return;
+    const resolveSequence = ++state.loadSequence;
+    state.loadController?.abort();
+    let resolveError = null;
+    try {
+      document = await api(`/api/v1/documents/${encodeURIComponent(documentId)}`);
+    } catch (error) {
+      resolveError = error;
+      document = null;
+    }
+    if (resolveSequence !== state.loadSequence) return;
+    if (!document && resolveError?.code !== "not_found") {
+      setStatus(resolveError?.code || "documentOpenFailed", "error", {}, () => openDocument(documentId, options));
+      return;
+    }
+    if (!document) {
+      showMissingDocument();
+      return;
+    }
+    if (isStudy(document)) {
+      state.studies = [document, ...state.studies.filter((item) => item.id !== document.id)];
+      study?.setStudies(state.studies);
+    } else {
+      state.documents = [document, ...state.documents.filter((item) => item.id !== document.id)];
+    }
   }
-  const mode = options.workspace || (options.noteId || options.imageLink ? "reading" : options.analysisId || options.datasetId || options.chartId ? "data" : workspace?.getMode() || "reading");
+  const studyOwner = isStudy(document);
+  const mode = options.workspace || (options.noteId || options.imageLink ? "reading" : options.analysisId || options.datasetId || options.chartId ? "data" : studyOwner ? "data" : workspace?.getMode() || "reading");
   const tool = options.chartId || options.tool === "charts" ? "charts" : "analysis";
   workspace?.reveal(mode, { tool, showNotes: Boolean(options.noteId || options.imageLink) });
-  if (state.document?.id === documentId && state.pdf && !options.force) {
-    if (options.imageLink) await openImageViewer(documentId, options.imageLink.kind, options.imageLink.sourceId, { annotationId: options.imageLink.annotationId });
+  if (state.document?.id === documentId && (studyOwner ? state.noteStatesLoaded : state.pdf) && !options.force) {
+    if (options.imageLink && !studyOwner) await openImageViewer(documentId, options.imageLink.kind, options.imageLink.sourceId, { annotationId: options.imageLink.annotationId });
     else if (options.noteId) openNote(options.noteId, { preserveUrl: options.preserveUrl });
     if (options.datasetId) analysis?.openDataset(options.datasetId, { preserveUrl: options.preserveUrl });
     if (options.analysisId) analysis?.openJob(options.analysisId, { preserveUrl: options.preserveUrl });
@@ -1514,13 +1570,14 @@ async function openDocument(documentId, options = {}) {
   state.effectiveScale = 1;
   elements.pageSurface.hidden = true;
   elements.readerEmpty.hidden = false;
+  study?.documentChanged(document);
   if (!options.preserveUrl) updateUrl(documentId, options.noteId || null, Boolean(options.replaceUrl), mode, tool);
   renderDocuments();
   renderDocumentDetails();
   renderMetadata();
   renderDraft();
   renderNotes();
-  imageLibrary?.documentChanged(document);
+  imageLibrary?.documentChanged(studyOwner ? null : document);
   analysis?.reload(documentId);
   dataImports?.reload(documentId);
   charts?.reload(documentId);
@@ -1528,13 +1585,14 @@ async function openDocument(documentId, options = {}) {
   if (options.analysisId) analysis?.openJob(options.analysisId, { preserveUrl: options.preserveUrl });
   if (options.chartId) charts?.openChart(documentId, options.chartId, { preserveUrl: options.preserveUrl });
   assistant?.documentChanged(document);
+  workspace?.documentChanged();
   setStatus("loadingDocument");
 
-  const pdfPromise = loadPdf(document, sequence, controller.signal);
+  const pdfPromise = studyOwner ? Promise.resolve(null) : loadPdf(document, sequence, controller.signal);
   const notesPromise = loadNotes(document, sequence, controller.signal);
   const noteStatesPromise = loadNoteStates(document, sequence, controller.signal);
-  const excerptsPromise = loadExcerpts(document, sequence, controller.signal);
-  const metadataPromise = loadMetadata(document, sequence, controller.signal);
+  const excerptsPromise = studyOwner ? Promise.resolve(null) : loadExcerpts(document, sequence, controller.signal);
+  const metadataPromise = studyOwner ? Promise.resolve(null) : loadMetadata(document, sequence, controller.signal);
   const [pdfResult, notesResult, noteStatesResult, excerptsResult] = await Promise.allSettled([pdfPromise, notesPromise, noteStatesPromise, excerptsPromise, metadataPromise]);
   if (sequence !== state.loadSequence || state.document?.id !== documentId) return;
 
@@ -1550,7 +1608,9 @@ async function openDocument(documentId, options = {}) {
 
   state.pdf = pdfResult.value;
   let deletedLink = false;
-  if (options.noteId) {
+  if (options.noteId && studyOwner) {
+    study?.openNote(options.noteId);
+  } else if (options.noteId) {
     const note = state.notes.find((item) => item.id === options.noteId);
     if (note) {
       state.highlight = note;
@@ -1566,8 +1626,8 @@ async function openDocument(documentId, options = {}) {
   elements.readerEmpty.hidden = true;
   renderDocumentDetails();
   renderDraft();
-  await requestRender();
-  if (sequence === state.loadSequence && options.imageLink) {
+  if (!studyOwner) await requestRender();
+  if (!studyOwner && sequence === state.loadSequence && options.imageLink) {
     await openImageViewer(documentId, options.imageLink.kind, options.imageLink.sourceId, { annotationId: options.imageLink.annotationId });
   }
 
@@ -1589,7 +1649,7 @@ async function openDocument(documentId, options = {}) {
         setStatus(error.code || "noteStatesLoadFailed", "error");
       }
     });
-  } else if (sequence === state.loadSequence && excerptsResult.status === "rejected" && excerptsResult.reason?.name !== "AbortError") {
+  } else if (!studyOwner && sequence === state.loadSequence && excerptsResult.status === "rejected" && excerptsResult.reason?.name !== "AbortError") {
     setStatus(excerptsResult.reason?.code || "excerptsLoadFailed", "error", {}, async () => {
       if (state.document?.id !== document.id) {
         await openDocument(document.id, { force: true });
@@ -1764,6 +1824,10 @@ function drawHighlight() {
 }
 
 function openNote(noteId, options = {}) {
+  if (isStudy()) {
+    study?.openNote(noteId);
+    return;
+  }
   if (!state.document) {
     setStatus("unknownNote", "error");
     return;
@@ -2254,7 +2318,7 @@ async function createExcerpt(document, note) {
 }
 
 async function exportReadingRecord(document) {
-  if (!document || richText?.isOpen() || state.pendingExports.size > 0 || state.pendingSaves > 0 || state.pendingExcerpts.size > 0 || state.pendingMutations.size > 0 || state.pendingMetadata.size > 0 || state.editDrafts.has(document.id) || ensureMetadata(document.id).draft) return;
+  if (!document || isStudy(document) || richText?.isOpen() || state.pendingExports.size > 0 || state.pendingSaves > 0 || state.pendingExcerpts.size > 0 || state.pendingMutations.size > 0 || state.pendingMetadata.size > 0 || state.editDrafts.has(document.id) || ensureMetadata(document.id).draft) return;
   state.pendingExports.add(document.id);
   renderDocumentDetails();
   setStatus("exporting");
@@ -2547,14 +2611,16 @@ document.addEventListener("keydown", (event) => {
 
 window.addEventListener("popstate", () => {
   const params = new URLSearchParams(window.location.search);
-  const documentId = params.get("document");
+  const studyId = params.get("study");
+  const documentId = studyId || params.get("document");
   const noteId = params.get("note");
   const analysisId = params.get("analysis");
   const datasetId = params.get("dataset");
   const chartId = params.get("chart");
-  const mode = workspace?.modeForParams(params) || "reading";
+  const hasExplicitMode = params.has("workspace") || ["note", "analysis", "dataset", "chart", "image_source"].some((key) => params.has(key));
+  const mode = studyId && !hasExplicitMode ? "data" : workspace?.modeForParams(params) || "reading";
   const tool = chartId || params.get("tool") === "charts" ? "charts" : "analysis";
-  const imageLink = readImageLink(params);
+  const imageLink = studyId ? null : readImageLink(params);
   workspace?.reveal(mode, { tool, showNotes: mode === "reading" && Boolean(noteId || imageLink), focus: false });
   if (!documentId) {
     captureCurrentDraft();
@@ -2566,6 +2632,7 @@ window.addEventListener("popstate", () => {
     state.noteStatesLoaded = false;
     state.excerpts = [];
     state.highlight = null;
+    study?.documentChanged(null);
     renderDocuments();
     renderDocumentDetails();
     renderMetadata();
@@ -2592,6 +2659,7 @@ window.addEventListener("popstate", () => {
     if (mode === "data" && chartId) charts?.openChart(documentId, chartId, { preserveUrl: true });
   } else {
     openDocument(documentId, {
+      ownerKind: studyId ? "study" : "paper",
       noteId: mode === "reading" ? noteId : null,
       analysisId: mode === "data" ? analysisId : null,
       datasetId: mode === "data" ? datasetId : null,
@@ -2615,10 +2683,12 @@ const resizeObserver = new ResizeObserver(() => {
 resizeObserver.observe(elements.readerStage);
 
 function assistantContext() {
-  const context = { page: state.page, rect: null, activeNoteId: null, activeImage: null, dataset_id: analysis?.getSharedDatasetId() || null, activeAnalysisId: analysis?.getActiveAnalysisId() || null, activeChartId: null };
+  const studyOwner = isStudy();
+  const context = { page: studyOwner ? null : state.page, rect: null, activeNoteId: null, activeImage: null, dataset_id: analysis?.getSharedDatasetId() || null, activeAnalysisId: analysis?.getActiveAnalysisId() || null, activeChartId: null };
   if (!state.document) return context;
-  context.activeImage = imageViewer?.getActiveContext(state.document.id) || null;
+  if (!studyOwner) context.activeImage = imageViewer?.getActiveContext(state.document.id) || null;
   context.activeChartId = charts?.getActiveChartId(state.document.id) || null;
+  if (studyOwner) return context;
   if (state.highlight?.document_id === state.document.id && state.highlight.page === state.page) {
     context.rect = state.highlight.rect ? [...state.highlight.rect] : null;
     context.activeNoteId = state.notes.some((note) => note.id === state.highlight.id) ? state.highlight.id : null;
@@ -2631,6 +2701,21 @@ function assistantContext() {
 
 async function navigateAssistantSource(source) {
   if (!source?.document_id) return;
+  const attached = source.source;
+  if (attached?.kind === "study") {
+    await openDocument(source.document_id, { ownerKind: "study", workspace: "reading" });
+    return;
+  }
+  if (attached?.kind === "dataset") source = { ...source, kind: "dataset_sample", dataset_id: attached.id };
+  else if (attached?.kind === "analysis") source = { ...source, kind: "analysis_result", analysis_id: attached.id };
+  else if (attached?.kind === "chart") source = { ...source, kind: "chart_result", chart_id: attached.id };
+  if (source.kind === "study_context") {
+    await openDocument(source.document_id, { ownerKind: "study", workspace: "reading" });
+    return;
+  }
+  if (source.kind === "data") source = { ...source, kind: "dataset_sample", dataset_id: source.dataset_id || source.id };
+  if (source.kind === "analysis") source = { ...source, kind: "analysis_result", analysis_id: source.analysis_id || source.id };
+  if (source.kind === "chart") source = { ...source, kind: "chart_result", chart_id: source.chart_id || source.id };
   if (source.kind === "dataset_sample") {
     if (!source.dataset_id) return;
     if (state.document?.id !== source.document_id) await openDocument(source.document_id, { datasetId: source.dataset_id });
@@ -2690,16 +2775,15 @@ async function openImageProposal(documentId, proposal) {
 }
 
 async function refreshAfterAgent(documentId) {
-  const tasks = [imageLibrary?.reload(documentId), imageViewer?.refreshIfCurrent(documentId), state.document?.id === documentId ? analysis?.reload(documentId) : null, state.document?.id === documentId ? charts?.reload(documentId) : null];
+  const studyOwner = state.document?.id === documentId && isStudy();
+  const tasks = studyOwner ? [] : [imageLibrary?.reload(documentId), imageViewer?.refreshIfCurrent(documentId)];
+  tasks.push(state.document?.id === documentId ? analysis?.reload(documentId) : null, state.document?.id === documentId ? charts?.reload(documentId) : null);
   if (state.document?.id === documentId) {
     const document = state.document;
     const sequence = state.loadSequence;
     const signal = state.loadController?.signal;
-    tasks.push(
-      loadNoteStates(document, sequence, signal),
-      loadExcerpts(document, sequence, signal),
-      loadMetadata(document, sequence, signal)
-    );
+    tasks.push(loadNoteStates(document, sequence, signal));
+    if (!studyOwner) tasks.push(loadExcerpts(document, sequence, signal), loadMetadata(document, sequence, signal));
   }
   const results = await Promise.allSettled(tasks.filter(Boolean));
   if (state.document?.id === documentId && results.some((result) => result.status === "rejected")) {
@@ -2711,8 +2795,8 @@ async function refreshAfterAgent(documentId) {
 function showDatasetInUrl(documentId, datasetId) {
   if (state.document?.id !== documentId || workspace?.getMode() !== "data" || workspace?.getTool() !== "analysis") return;
   const url = new URL(window.location.href);
-  const replace = url.searchParams.get("document") === documentId && url.searchParams.get("dataset") === datasetId;
-  url.searchParams.set("document", documentId);
+  const replace = url.searchParams.get(isStudy() ? "study" : "document") === documentId && url.searchParams.get("dataset") === datasetId;
+  setOwnerInUrl(url, documentId);
   url.searchParams.set("dataset", datasetId);
   url.searchParams.set("workspace", "data");
   url.searchParams.set("tool", "analysis");
@@ -2723,8 +2807,8 @@ function showDatasetInUrl(documentId, datasetId) {
 function showAnalysisInUrl(documentId, analysisId) {
   if (state.document?.id !== documentId || workspace?.getMode() !== "data" || workspace?.getTool() !== "analysis") return;
   const url = new URL(window.location.href);
-  const replace = url.searchParams.get("document") === documentId && url.searchParams.get("analysis") === analysisId;
-  url.searchParams.set("document", documentId);
+  const replace = url.searchParams.get(isStudy() ? "study" : "document") === documentId && url.searchParams.get("analysis") === analysisId;
+  setOwnerInUrl(url, documentId);
   url.searchParams.set("analysis", analysisId);
   url.searchParams.set("workspace", "data");
   url.searchParams.set("tool", "analysis");
@@ -2744,8 +2828,8 @@ async function openAnalysisJob(documentId, analysisId) {
 function showChartInUrl(documentId, chartId) {
   if (state.document?.id !== documentId || workspace?.getMode() !== "data" || workspace?.getTool() !== "charts") return;
   const url = new URL(window.location.href);
-  const replace = url.searchParams.get("document") === documentId && url.searchParams.get("chart") === chartId;
-  url.searchParams.set("document", documentId);
+  const replace = url.searchParams.get(isStudy() ? "study" : "document") === documentId && url.searchParams.get("chart") === chartId;
+  setOwnerInUrl(url, documentId);
   url.searchParams.set("chart", chartId);
   url.searchParams.set("workspace", "data");
   url.searchParams.set("tool", "charts");
@@ -2765,14 +2849,18 @@ async function openChart(documentId, chartId) {
 async function addAnalysisCitation(documentId, job) {
   if (state.document?.id !== documentId) await openDocument(documentId);
   if (state.document?.id !== documentId || state.pendingSaves > 0 || state.pendingMutations.size > 0 || state.editDrafts.has(documentId)) return false;
-  const draft = ensureDraft(documentId);
   const url = new URL(window.location.origin + "/");
-  url.searchParams.set("document", documentId);
+  setOwnerInUrl(url, documentId);
   url.searchParams.set("analysis", job.id);
   url.searchParams.set("workspace", "data");
   url.searchParams.set("tool", "analysis");
   const method = job.method === "ttest_independent" ? "Independent-samples t-test" : "Descriptive analysis";
   const citation = `Analysis: ${method} · ${job.dataset_name}\n${url.pathname}${url.search}`;
+  if (isStudy()) {
+    workspace?.showNotes();
+    return study?.addCitation("analysis", job, citation) || false;
+  }
+  const draft = ensureDraft(documentId);
   if (draft.text.includes(`analysis=${job.id}`)) return true;
   const separator = draft.text ? (draft.text.endsWith("\n") ? "\n" : "\n\n") : "";
   draft.text += `${separator}${citation}`;
@@ -2796,13 +2884,17 @@ async function addAnalysisCitation(documentId, job) {
 async function addChartCitation(documentId, chart) {
   if (state.document?.id !== documentId) await openDocument(documentId);
   if (state.document?.id !== documentId || state.pendingSaves > 0 || state.pendingMutations.size > 0 || state.editDrafts.has(documentId)) return false;
-  const draft = ensureDraft(documentId);
   const url = new URL(window.location.origin + "/");
-  url.searchParams.set("document", documentId);
+  setOwnerInUrl(url, documentId);
   url.searchParams.set("chart", chart.id);
   url.searchParams.set("workspace", "data");
   url.searchParams.set("tool", "charts");
   const citation = `Chart: ${chart.title}\n${url.pathname}${url.search}`;
+  if (isStudy()) {
+    workspace?.showNotes();
+    return study?.addCitation("chart", chart, citation) || false;
+  }
+  const draft = ensureDraft(documentId);
   if (draft.text.includes(`chart=${chart.id}`)) return true;
   const separator = draft.text ? (draft.text.endsWith("\n") ? "\n" : "\n\n") : "";
   draft.text += `${separator}${citation}`;
@@ -2946,6 +3038,7 @@ analysis = createAnalysis({
   datasetContextChanged: (documentId, datasetId, analysisId) => {
     researchRecord?.sourceChanged();
     charts?.syncDataset(documentId, datasetId, analysisId);
+    if (state.document?.id === documentId && isStudy()) study?.sourceContextChanged();
   },
   datasetSelectionChanged: (documentId, dataset) => datasetSelection?.sync(documentId, dataset),
   addAnalysisCitation,
@@ -3001,6 +3094,47 @@ researchRecord = createResearchRecord({
   getLanguage: () => state.language,
   getNavigationGeneration: () => workspace.getNavigationGeneration(),
   sourceMismatch: (key) => setStatus(key, "error")
+});
+
+study = createStudy({
+  api,
+  getDocument: () => state.document,
+  getDocuments: () => state.documents,
+  getLanguage: () => state.language,
+  getNavigationGeneration: () => workspace.getNavigationGeneration(),
+  getSelectedDataset: () => analysis.getSelectedDataset(),
+  getNotes: () => state.notes,
+  getNoteStates: () => state.noteStates,
+  openDocument,
+  openStudySource: (documentId, source) => navigateAssistantSource({ document_id: documentId, source }),
+  async refreshNotes(owner) {
+    if (state.document?.id !== owner.id) return;
+    await loadNoteStates(owner, state.loadSequence, state.loadController?.signal);
+  },
+  studyCreated(owner) {
+    state.studies = [owner, ...state.studies.filter((item) => item.id !== owner.id)];
+  },
+  noteCreated(owner, note) {
+    if (state.document?.id !== owner.id) return;
+    state.notes = [note, ...state.notes.filter((item) => item.id !== note.id)];
+    const noteState = {
+      ...note,
+      revision: note.revision || 1,
+      review_status: note.review_status || "unreviewed",
+      reviewed_at: note.reviewed_at || null,
+      review_provenance: note.review_provenance || null,
+      updated_at: note.updated_at || note.created_at,
+      deleted_at: note.deleted_at || null
+    };
+    state.noteStates = [noteState, ...state.noteStates.filter((item) => item.id !== note.id)];
+  },
+  noteStateChanged(owner, savedState) {
+    if (state.document?.id !== owner.id) return;
+    state.noteStates = [savedState, ...state.noteStates.filter((item) => item.id !== savedState.id)];
+    state.notes = savedState.deleted_at
+      ? state.notes.filter((item) => item.id !== savedState.id)
+      : [{ ...savedState }, ...state.notes.filter((item) => item.id !== savedState.id)];
+  }
 });
 
 $("charts-panel").addEventListener("toggle", (event) => {

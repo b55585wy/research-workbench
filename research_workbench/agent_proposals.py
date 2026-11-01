@@ -3,7 +3,7 @@ from uuid import UUID,uuid4,uuid5,NAMESPACE_URL
 
 from .agent_models import ImageNoteCreate
 from .agent_store import canonical,digest,now,TERMINAL
-from .excerpts import verify_source
+from .studies import verify_owner as verify_source
 from .library import read_metadata
 from .models import DocumentUpdate,NoteCreate,NoteUpdate,NoteMutation,WorkspaceError
 from .note_lifecycle import read_state
@@ -132,6 +132,7 @@ class Proposals:
             return {'analysis_id':row['id'],'status':row['status'],'url':f"/?document={document_id}&analysis={row['id']}"}
         if kind=='create_note':
             fields={key:data[key] for key in ('page','rect','text')}
+            if 'source' in data:fields['source']=data['source']
             if 'rich_content' in data:fields['rich_content']=data['rich_content']
             if data.get('image_ids'):
                 for image in data['image_ids']:self.images.path(document_id,image)

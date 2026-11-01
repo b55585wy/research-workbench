@@ -20,7 +20,7 @@ class ImageNoteCreate(NoteCreate):
 
 class ReadingContext(BaseModel):
     model_config=ConfigDict(extra='forbid')
-    page: int=Field(strict=True,ge=1,le=200)
+    page: int | None=Field(...,strict=True,ge=1,le=200)
     rect: tuple[float,float,float,float] | None=None
     active_note_id: UUID | None=None
     image_ids: list[UUID]=Field(default_factory=list,max_length=4)

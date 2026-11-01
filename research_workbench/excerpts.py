@@ -24,6 +24,7 @@ def file_digest(path):
 
 
 def verify_source(store, document):
+    if document.get('kind')=='study':raise WorkspaceError('source_has_no_pdf','这项研究尚无原始PDF，请打开关联文献阅读。',409)
     path = store.files / f"{document['id']}.pdf"
     if not path.is_file():
         raise WorkspaceError('file_missing', '原 PDF 缺失，无法摘录或导出。', 409)

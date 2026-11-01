@@ -275,6 +275,9 @@ class ReadingTools(RecordTools,SelectionTools,StatisticsTools,ChartTools):
         if source.get('image_id') and source['image_id'] not in images:images.append(source['image_id'])
         payload={**self.base_proposal(),'page':source['page'],'rect':source.get('rect'),
                  'text':text,'image_ids':images,'source_ref':data.source_ref}
+        if self.turn['context']['document'].get('kind')=='study':
+            from .study_notes import anchor_from_source
+            payload['source']=anchor_from_source(source,self.document_id)
         if checked.rich_content is not None:
             payload.update(rich_content=checked.rich_content,rich_html=render_html(checked.rich_content))
         return self.proposals.add(self.turn,'create_note','保存带出处的笔记',payload,call_id)

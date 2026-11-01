@@ -37,12 +37,15 @@ def build_chart_export(service,document_id,identifier):
     dataset=service.datasets.get(document_id,chart['dataset_id']);source=service.datasets.path(document_id,dataset['id'])
     suffix='.tsv' if dataset['original_filename'].lower().endswith('.tsv') else '.csv'
     provenance={k:v for k,v in chart.items() if k not in ('data_url','viewer_url','export_url')}
+    owner=service.store.get_document(document_id)
+    if owner.get('kind')=='study':provenance.update(source_kind='study',scope_sha256=owner['scope_sha256'])
     pending=None
     try:
         with tempfile.NamedTemporaryFile(dir=service.store.exports,suffix='.zip',delete=False) as temporary:pending=Path(temporary.name)
         with zipfile.ZipFile(pending,'w',compression=zipfile.ZIP_DEFLATED) as archive:
             writer=ArchiveWriter(archive);writer.text('chart.json',data);writer.text('specification.json',canonical(chart['spec']).encode())
             writer.text('provenance.json',canonical(provenance).encode());writer.text('chart.html',markup(chart,data))
+            if owner.get('kind')=='study':writer.text('study.json',canonical(owner).encode())
             writer.file('source'+suffix,source,dataset['sha256'],dataset['byte_size'])
             for name,raw in service.datasets.selections.export_files(document_id,dataset['id']).items():writer.text(name,raw)
             writer.file('plotly-strict.min.js',service.asset_root/'plotly-strict.min.js',service.renderer['sha256'],service.renderer['byte_size'])

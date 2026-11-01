@@ -23,7 +23,7 @@ def test_schema_one_rows_survive_additive_migration(tmp_path):
     with sqlite3.connect(database) as connection:
         assert tuple(connection.execute('SELECT * FROM documents').fetchone()) == document
         assert tuple(connection.execute('SELECT * FROM notes').fetchone()) == note
-        assert connection.execute('PRAGMA user_version').fetchone()[0] == 12
+        assert connection.execute('PRAGMA user_version').fetchone()[0] == 13
     assert store.list_excerpts(document_id) == []
     assert store.get_note(document_id, note_id)['text'] == note[4]
     assert Store(root).list_notes(document_id) == store.list_notes(document_id)

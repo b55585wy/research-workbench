@@ -136,6 +136,7 @@ class ArchiveWriter:
 
 def build_export(store, identifier):
     document, notes, excerpts,annotation_groups = store.reading_snapshot(identifier,include_annotations=True)
+    if document.get('kind')=='study':return store.study_notes.export(identifier)
     source = verify_source(store, document)
     for record in excerpts:
         verify_excerpt_source(record, document)

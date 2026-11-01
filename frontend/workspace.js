@@ -9,7 +9,10 @@ const messages = {
     hideNotes: "隐藏笔记",
     dataTitle: "数据工作区",
     dataHelp: "数据、设置、结果和图表均属于当前文献。预览仅显示前 5 行，运行分析前仍需核对并明确确认。",
+    studyDataHelp: "数据、设置、结果和图表均属于当前研究。预览仅显示前 5 行，运行分析前仍需核对并明确确认。",
     prerequisite: "请先从左侧选择或上传一篇文献，再导入与该文献关联的数据。",
+    studyPrerequisite: "请先从左侧选择一项研究，再导入与该研究关联的数据。",
+    study: "研究",
     imports: "数据导入记录",
     importsHelp: "SAV/ZSAV 原始文件和核对记录保留在此处。打开记录不会更改当前数据或运行设置。"
   },
@@ -23,7 +26,10 @@ const messages = {
     hideNotes: "Hide notes",
     dataTitle: "Data workspace",
     dataHelp: "Data, settings, results, and charts belong to the current paper. Previews show only the first 5 rows; every analysis run still requires review and explicit confirmation.",
+    studyDataHelp: "Data, settings, results, and charts belong to the current research. Previews show only the first 5 rows; every analysis run still requires review and explicit confirmation.",
     prerequisite: "Choose or upload a paper on the left before importing data associated with that paper.",
+    studyPrerequisite: "Choose a research entry on the left before importing data associated with it.",
+    study: "Research",
     imports: "Data import history",
     importsHelp: "SAV/ZSAV originals and reviews remain available here. Opening a review does not change the current data or run settings."
   }
@@ -52,6 +58,7 @@ export function createWorkspace(adapter) {
   const modeData = byId("workspace-mode-data");
   const notesToggle = byId("workspace-notes-toggle");
   const dataWorkspace = byId("data-workspace");
+  const studyView = byId("study-view");
   const analysisTab = byId("data-tool-analysis");
   const chartsTab = byId("data-tool-charts");
   const prerequisite = byId("data-prerequisite");
@@ -134,6 +141,15 @@ export function createWorkspace(adapter) {
     return messages[language]?.[key] || messages.en[key] || key;
   }
 
+  function renderOwnerCopy() {
+    const owner = adapter.getDocument();
+    const studyOwner = owner?.kind === "study";
+    main.dataset.ownerKind = studyOwner ? "study" : owner ? "paper" : "none";
+    modeReading.textContent = t(studyOwner ? "study" : "reading");
+    byId("data-workspace-help").textContent = t(studyOwner ? "studyDataHelp" : "dataHelp");
+    prerequisite.textContent = t(studyOwner ? "studyPrerequisite" : "prerequisite");
+  }
+
   function modeForParams(search) {
     const explicit = search.get("workspace");
     if (explicit === "reading") return "reading";
@@ -147,7 +163,11 @@ export function createWorkspace(adapter) {
   }
 
   function render() {
+    renderOwnerCopy();
     const reviewVisible = mode === "data" && tool === "analysis" && importReviewOpen;
+    const studyHost = adapter.getDocument()?.kind === "study" && mode === "data" ? dataWorkspace : reader;
+    const studyAnchor = studyHost === dataWorkspace ? imports : byId("metadata-panel");
+    if (studyView.parentElement !== studyHost) studyHost.insertBefore(studyView, studyAnchor);
     main.dataset.workspaceMode = mode;
     main.dataset.notesVisible = String(notesVisible);
     dataWorkspace.dataset.tool = tool;
@@ -232,7 +252,7 @@ export function createWorkspace(adapter) {
     notesVisible = !notesVisible;
     notesVisibility[mode] = notesVisible;
     render();
-    if (notesVisible) byId("note-text").focus({ preventScroll: true });
+    if (notesVisible) byId(adapter.getDocument()?.kind === "study" ? "study-note-text" : "note-text").focus({ preventScroll: true });
     else notesToggle.focus({ preventScroll: true });
   });
 

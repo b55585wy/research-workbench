@@ -7,14 +7,16 @@ from .rich_content import validate_content,plaintext,add_to_state,canonical
 
 NOTE_FIELDS = ('id', 'document_id', 'page', 'rect', 'text', 'created_at')
 STATE_QUERY = '''SELECT n.id,n.document_id,n.page,n.rect,s.current_text AS text,
-    n.created_at,s.revision,s.review_status,s.reviewed_at,s.updated_at,s.deleted_at,r.current_json
+    n.created_at,s.revision,s.review_status,s.reviewed_at,s.updated_at,s.deleted_at,r.current_json,a.source_json
     FROM notes n JOIN note_states s ON s.note_id=n.id
-    LEFT JOIN note_rich_content r ON r.note_id=n.id'''
+    LEFT JOIN note_rich_content r ON r.note_id=n.id LEFT JOIN study_note_sources a ON a.note_id=n.id'''
 
 
 def state_record(row):
     result = dict(row)
     result['rect'] = json.loads(result['rect']) if result['rect'] else None
+    source=result.pop('source_json')
+    if source is not None:result['source']=json.loads(source)
     result['review_provenance'] = 'self_reported' if result['review_status'] == 'source_checked' else None
     content=result.pop('current_json')
     if content is not None:
@@ -28,7 +30,7 @@ def state_record(row):
 
 
 def base_note(state):
-    return {key: state[key] for key in NOTE_FIELDS}
+    return {**{key: state[key] for key in NOTE_FIELDS},**({'source':state['source']} if 'source' in state else {})}
 
 
 def read_state(connection, identifier, note_id):

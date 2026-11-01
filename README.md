@@ -2,7 +2,7 @@
 
 产品整体方向与近期迭代见 [PRODUCT-PLAN.md](PRODUCT-PLAN.md)，版本交付见 [ROADMAP.md](ROADMAP.md)。
 
-当前版本 v0.14.0：PDF 阅读、出处笔记、图片标注、Python/R 分析、Notebook、SPSS 文件导入与可停止恢复的连续研究任务；新增“两组观测点”，按确切组别展示每条有效观测，保留组内数量和缺失排除信息。
+当前版本 v0.17.0：可从研究问题和数据直接开始，无需先上传论文；支持来源笔记、Python/R 分析、图表、数据筛选及统一研究记录导出。原有 PDF 阅读、图片标注、Notebook、SPSS 文件导入和逐项确认的连续任务继续可用。使用与接口边界见 [从数据开始研究](DATA-FIRST-STUDY.md)。
 PDF.js 嵌入我们的页面，FastAPI/SQLite 保存资料与笔记，PDFium 在独立子进程中生成区域图片。
 没有部署 eLabFTW、RSpace 或 JupyterLab，也不依赖 tFUS 数据库和运行进程。
 

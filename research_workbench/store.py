@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 import json
 from pathlib import Path
 import sqlite3
+import threading
 
 from .models import WorkspaceError
 from .note_lifecycle import NoteLifecycle, base_note, read_state, read_states, ensure_active
@@ -12,30 +13,23 @@ from .rich_content import canonical
 SCHEMA = '''
 BEGIN IMMEDIATE;
 CREATE TABLE IF NOT EXISTS documents (
-    id TEXT PRIMARY KEY,
-    title TEXT NOT NULL CHECK(length(title) BETWEEN 1 AND 180),
-    original_filename TEXT NOT NULL,
-    page_count INTEGER NOT NULL CHECK(typeof(page_count)='integer' AND page_count BETWEEN 1 AND 200),
-    byte_size INTEGER NOT NULL CHECK(typeof(byte_size)='integer' AND byte_size BETWEEN 1 AND 20971520),
-    sha256 TEXT NOT NULL CHECK(length(sha256) = 64),
-    created_at TEXT NOT NULL
+ id TEXT PRIMARY KEY,title TEXT NOT NULL CHECK(length(title) BETWEEN 1 AND 180),
+ original_filename TEXT,page_count INTEGER,byte_size INTEGER,sha256 TEXT,created_at TEXT NOT NULL,
+ CHECK((original_filename IS NULL AND page_count IS NULL AND byte_size IS NULL AND sha256 IS NULL)
+ OR (original_filename IS NOT NULL AND typeof(page_count)='integer' AND page_count BETWEEN 1 AND 200
+ AND typeof(byte_size)='integer' AND byte_size BETWEEN 1 AND 20971520 AND sha256 IS NOT NULL AND length(sha256)=64))
 );
 CREATE TABLE IF NOT EXISTS notes (
-    id TEXT PRIMARY KEY,
-    document_id TEXT NOT NULL REFERENCES documents(id),
-    page INTEGER NOT NULL CHECK(typeof(page)='integer' AND page BETWEEN 1 AND 200),
-    rect TEXT CHECK(rect IS NULL OR CASE WHEN json_valid(rect) THEN (
-        json_type(rect)='array' AND json_array_length(rect)=4 AND
-        json_type(rect,'$[0]') IN ('integer','real') AND
-        json_type(rect,'$[1]') IN ('integer','real') AND
-        json_type(rect,'$[2]') IN ('integer','real') AND
-        json_type(rect,'$[3]') IN ('integer','real') AND
-        json_extract(rect,'$[0]') >= 0 AND json_extract(rect,'$[1]') >= 0 AND
-        json_extract(rect,'$[2]') <= 1 AND json_extract(rect,'$[3]') <= 1 AND
-        json_extract(rect,'$[0]') < json_extract(rect,'$[2]') AND
-        json_extract(rect,'$[1]') < json_extract(rect,'$[3]')) ELSE 0 END),
-    text TEXT NOT NULL CHECK(length(trim(text)) BETWEEN 1 AND 10000),
-    created_at TEXT NOT NULL
+ id TEXT PRIMARY KEY,document_id TEXT NOT NULL REFERENCES documents(id),
+ page INTEGER CHECK(page IS NULL OR (typeof(page)='integer' AND page BETWEEN 1 AND 200)),
+ rect TEXT,text TEXT NOT NULL CHECK(length(trim(text)) BETWEEN 1 AND 10000),created_at TEXT NOT NULL,
+ CHECK(rect IS NULL OR CASE WHEN json_valid(rect) THEN (
+ json_type(rect)='array' AND json_array_length(rect)=4 AND
+ json_type(rect,'$[0]') IN ('integer','real') AND json_type(rect,'$[1]') IN ('integer','real') AND
+ json_type(rect,'$[2]') IN ('integer','real') AND json_type(rect,'$[3]') IN ('integer','real') AND
+ json_extract(rect,'$[0]')>=0 AND json_extract(rect,'$[1]')>=0 AND
+ json_extract(rect,'$[2]')<=1 AND json_extract(rect,'$[3]')<=1 AND
+ json_extract(rect,'$[0]')<json_extract(rect,'$[2]') AND json_extract(rect,'$[1]')<json_extract(rect,'$[3]')) ELSE 0 END)
 );
 CREATE INDEX IF NOT EXISTS notes_document ON notes(document_id, created_at);
 CREATE TRIGGER IF NOT EXISTS note_page_bounds BEFORE INSERT ON notes
@@ -341,7 +335,28 @@ CREATE TRIGGER IF NOT EXISTS dataset_selection_scope BEFORE INSERT ON dataset_se
 WHEN NOT EXISTS(SELECT 1 FROM datasets c JOIN datasets p ON p.id=NEW.parent_dataset_id
     WHERE c.id=NEW.dataset_id AND c.document_id=NEW.document_id AND p.document_id=NEW.document_id)
 BEGIN SELECT RAISE(ABORT,'selection scope mismatch'); END;
-PRAGMA user_version=12;
+
+CREATE TABLE IF NOT EXISTS studies (
+ document_id TEXT PRIMARY KEY REFERENCES documents(id),question TEXT NOT NULL CHECK(length(trim(question)) BETWEEN 1 AND 4000),
+ request_hash TEXT NOT NULL CHECK(length(request_hash)=64),created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS study_note_sources (
+ note_id TEXT PRIMARY KEY REFERENCES notes(id),source_json TEXT NOT NULL CHECK(json_valid(source_json))
+);
+CREATE TABLE IF NOT EXISTS study_papers (
+ study_id TEXT NOT NULL REFERENCES studies(document_id),paper_id TEXT NOT NULL REFERENCES documents(id),
+ sha256 TEXT NOT NULL CHECK(length(sha256)=64),created_at TEXT NOT NULL,PRIMARY KEY(study_id,paper_id),CHECK(study_id!=paper_id)
+);
+CREATE TRIGGER IF NOT EXISTS note_owner_kind BEFORE INSERT ON notes
+WHEN (NEW.page IS NULL AND NOT EXISTS(SELECT 1 FROM studies WHERE document_id=NEW.document_id))
+ OR (NEW.page IS NOT NULL AND EXISTS(SELECT 1 FROM studies WHERE document_id=NEW.document_id))
+ OR (NEW.page IS NULL AND NEW.rect IS NOT NULL)
+BEGIN SELECT RAISE(ABORT,'note source kind mismatch'); END;
+CREATE TRIGGER IF NOT EXISTS study_note_source_owner BEFORE INSERT ON study_note_sources
+WHEN NOT EXISTS(SELECT 1 FROM notes n JOIN studies s ON s.document_id=n.document_id WHERE n.id=NEW.note_id AND n.page IS NULL)
+BEGIN SELECT RAISE(ABORT,'study note source mismatch'); END;
+PRAGMA user_version=13;
+
 COMMIT;
 '''
 
@@ -358,6 +373,7 @@ def note_record(row):
 
 class Store:
     def __init__(self, root):
+        self._connections = threading.local()
         self.root = Path(root).resolve()
         self.files = self.root / 'documents'
         self.incoming = self.root / 'incoming'
@@ -369,27 +385,34 @@ class Store:
         self.exports.mkdir(exist_ok=True)
         self.database = self.root / 'workspace.sqlite3'
         with self.connection() as connection:
-            if connection.execute('PRAGMA user_version').fetchone()[0] > 12:
+            if connection.execute('PRAGMA user_version').fetchone()[0] > 13:
                 raise RuntimeError('Database requires a newer application')
-            connection.executescript(SCHEMA)
+            from .study_migration import install
+            install(connection,SCHEMA)
         self.lifecycle = NoteLifecycle(self)
         self.library = Library(self)
 
     @contextmanager
     def connection(self):
+        current = getattr(self._connections, 'current', None)
+        if current is not None:
+            yield current
+            return
         connection = sqlite3.connect(self.database, timeout=10)
         connection.row_factory = sqlite3.Row
         connection.execute('PRAGMA foreign_keys=ON')
+        self._connections.current = connection
         try:
             with connection:
                 yield connection
         finally:
+            self._connections.current = None
             connection.close()
 
     def list_documents(self):
         with self.connection() as connection:
             return [base_document(row) for row in connection.execute(
-                DOCUMENT_QUERY + ' ORDER BY d.created_at DESC,d.id DESC')]
+                DOCUMENT_QUERY + ' WHERE d.page_count IS NOT NULL ORDER BY d.created_at DESC,d.id DESC')]
 
     def get_document(self, identifier):
         with self.connection() as connection:
@@ -419,6 +442,9 @@ class Store:
             return self.save_note_in(connection,identifier,payload)
 
     def save_note_in(self, connection, identifier, payload):
+        owner=read_metadata(connection,identifier)
+        if owner.get('kind')=='study':return self.study_notes.save_in(connection,identifier,payload)
+        if payload.page is None or payload.source is not None:raise WorkspaceError('invalid_page','文献笔记需要实际PDF页码。',422)
         rectangle = json.dumps(payload.rect) if payload.rect is not None else None
         note = dict(id=str(payload.request_id), document_id=identifier, page=payload.page,
                     rect=rectangle, text=payload.text, created_at=timestamp())

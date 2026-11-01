@@ -1,3 +1,4 @@
+from migration_support import table_info
 import importlib.util
 import json
 from pathlib import Path
@@ -20,12 +21,12 @@ def test_schema7_all_seventeen_original_tables_and_fields_are_preserved(tmp_path
         db.execute('INSERT INTO documents VALUES (?,?,?,?,?,?,?)',(doc,'Original','original.pdf',1,1,'a'*64,stamp))
         db.execute('INSERT INTO notes VALUES (?,?,?,?,?,?)',(note,doc,1,None,'Original plain note',stamp))
         tables=[r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")];assert len(tables)==17
-        before={t:(db.execute(f'PRAGMA table_info({t})').fetchall(),db.execute(f'SELECT * FROM {t} ORDER BY 1').fetchall()) for t in tables}
+        before={t:(table_info(db,t),db.execute(f'SELECT * FROM {t} ORDER BY 1').fetchall()) for t in tables}
     Store(tmp_path)
     with sqlite3.connect(database) as db:
-        assert db.execute('PRAGMA user_version').fetchone()[0]==12
-        assert len(db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").fetchall())==25
-        for t,(columns,rows) in before.items():assert (db.execute(f'PRAGMA table_info({t})').fetchall(),db.execute(f'SELECT * FROM {t} ORDER BY 1').fetchall())==(columns,rows)
+        assert db.execute('PRAGMA user_version').fetchone()[0]==13
+        assert len(db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").fetchall())==28
+        for t,(columns,rows) in before.items():assert (table_info(db,t),db.execute(f'SELECT * FROM {t} ORDER BY 1').fetchall())==(columns,rows)
         assert db.execute('SELECT COUNT(*) FROM image_annotations').fetchone()[0]==0
 
 

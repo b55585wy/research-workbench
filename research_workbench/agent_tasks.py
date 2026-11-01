@@ -5,7 +5,7 @@ from uuid import UUID,uuid5
 
 from .agent_models import AgentSubmission,ReadingContext
 from .agent_store import canonical,digest,now
-from .excerpts import verify_source
+from .studies import verify_owner as verify_source
 from .models import WorkspaceError
 
 ACTIVE=('running','waiting_confirmation','waiting_analysis')
@@ -142,7 +142,7 @@ class AgentTasks:
                 ') to create the concrete pending UI proposal. The user confirms that UI proposal; do NOT ask for preliminary '
                 'permission in prose or end with only a plan. A proposal call itself does NOT execute or save the business operation. '
                 'Do not repeat completed work or treat queued analysis as success. Read actual saved owned records before deriving a chart/note. '
-                'A result note must include BOTH persistent analysis and chart links. Never infer trial design or significance from labels. '
+                'A result note must include BOTH persistent analysis and chart links. For a study, propose_note source_ref MUST be an analysis_result or chart_result reference from those saved results. Never infer trial design or significance from labels. '
                 'If required information/capability is missing, explain and finish read-only; the task will wait for user input. '
                 'Do not say the whole goal is complete before all three server receipts. Original user goal: '+context['task_goal']+
                 ('\nAdditional user clarification: '+context['task_input'] if context.get('task_input') else ''))
@@ -190,6 +190,9 @@ class AgentTasks:
         chart_read=any(s['kind']=='chart_result' and s.get('chart_id')==chart_id and s['url'] in text for s in sources)
         if not (analysis_id and chart_id and analysis_id in text and chart_id in text and analysis_read and chart_read):
             raise WorkspaceError('agent_task_sources_required','先读取本任务已保存的分析与图表，并在笔记中保留两条真实记录链接。',409)
+        source=payload.get('source')
+        if source is not None and (source.get('kind'),source.get('id')) not in (('analysis',analysis_id),('chart',chart_id)):
+            raise WorkspaceError('agent_task_sources_required','结果笔记需引用本任务已保存的分析或图表来源。',409)
 
     def control(self,document_id,identifier,payload):
         fingerprint=digest({'document_id':document_id,'task_id':identifier,'payload':payload.model_dump(mode='json')})

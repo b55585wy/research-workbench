@@ -3,11 +3,13 @@ const messages = {
     open: "导出研究记录",
     title: "导出研究记录",
     help: "原始 PDF 和所选数据始终包含。可选择一项已完成的分析和一项已保存图表。",
+    studyHelp: "研究问题、所选数据和明确关联的论文将包含在导出包中。可选择一项已完成的分析和一项已保存图表。",
     close: "关闭",
     analysis: "已完成的分析",
     chart: "已保存图表",
     none: "不包含",
     reading: "包含本篇全部有效笔记、摘录与图片标注",
+    studyReading: "包含本研究全部有效笔记与图片",
     readingCounts: "笔记 {notes} 条 · 摘录 {excerpts} 条 · 图片标注 {annotations} 条",
     preview: "预览导出范围",
     retry: "重试",
@@ -23,6 +25,10 @@ const messages = {
     summary: "导出范围",
     summaryAria: "导出范围",
     document: "文献",
+    studyDocument: "研究",
+    question: "研究问题",
+    papers: "关联论文",
+    paperCount: "{count} 篇",
     dataset: "所选数据",
     rows: "数据行数",
     analysisValue: "分析",
@@ -30,6 +36,7 @@ const messages = {
     readingValue: "阅读记录",
     readingExcluded: "不包含",
     alwaysIncluded: "导出包包含原始PDF和所选数据；此处仅预览范围，不展示数据行或笔记正文。",
+    studyAlwaysIncluded: "导出包包含研究问题、所选数据和明确关联的论文；没有关联论文时不包含 PDF。此处仅预览范围，不展示数据行或笔记正文。",
     limit: "导出上限",
     limitValue: "{count} MiB",
     unavailable: "当前不可用",
@@ -66,11 +73,13 @@ const messages = {
     open: "Export research record",
     title: "Export research record",
     help: "The original PDF and selected data are always included. Optionally choose one completed analysis and one saved chart.",
+    studyHelp: "The research question, selected data, and explicitly associated papers are included. Optionally choose one completed analysis and one saved chart.",
     close: "Close",
     analysis: "Completed analysis",
     chart: "Saved chart",
     none: "None",
     reading: "Include all active notes, excerpts, and image annotations from this paper",
+    studyReading: "Include all active notes and images from this research",
     readingCounts: "{notes} notes · {excerpts} excerpts · {annotations} image annotations",
     preview: "Preview export scope",
     retry: "Retry",
@@ -86,6 +95,10 @@ const messages = {
     summary: "Export scope",
     summaryAria: "Export scope",
     document: "Paper",
+    studyDocument: "Research",
+    question: "Research question",
+    papers: "Associated papers",
+    paperCount: "{count} papers",
     dataset: "Selected data",
     rows: "Data rows",
     analysisValue: "Analysis",
@@ -93,6 +106,7 @@ const messages = {
     readingValue: "Reading record",
     readingExcluded: "Not included",
     alwaysIncluded: "The package includes the original PDF and selected data. This preview shows scope only, without data rows or note text.",
+    studyAlwaysIncluded: "The package includes the research question, selected data, and explicitly associated papers. With no associated papers, it contains no PDF. This preview shows scope only, without data rows or note text.",
     limit: "Export limit",
     limitValue: "{count} MiB",
     unavailable: "Currently unavailable",
@@ -278,16 +292,22 @@ export function createResearchRecord(adapter) {
     const analysisLabel = analysis?.method ? formatAnalysisLabel(analysis) : analysis?.id || t("none");
     const chartLabel = chart?.kind ? `${chart.title || chart.id} · ${kindName(chart.kind)}` : chart?.title || chart?.id || t("none");
     const maxBytes = Number(result.limits?.max_bytes || 0);
+    const studyOwner = scope.kind === "study" || result.document?.kind === "study";
     const heading = make("h3", "", t("summary"));
     const list = make("dl");
-    appendField(list, t("document"), result.document?.title || result.document?.id || "");
+    appendField(list, t(studyOwner ? "studyDocument" : "document"), result.document?.title || result.document?.name || result.document?.id || "");
+    if (studyOwner) {
+      appendField(list, t("question"), result.document?.question || "—");
+      const paperCount = Array.isArray(result.papers) ? result.papers.length : Number(result.papers || 0);
+      appendField(list, t("papers"), t("paperCount", { count: paperCount }));
+    }
     appendField(list, t("dataset"), result.dataset?.name || result.dataset?.id || scope.datasetId);
     appendField(list, t("rows"), result.dataset?.row_count ?? "—");
     appendField(list, t("analysisValue"), analysisLabel);
     appendField(list, t("chartValue"), chartLabel);
-    appendField(list, t("readingValue"), readingIncluded ? t("reading") : t("readingExcluded"));
+    appendField(list, t("readingValue"), readingIncluded ? t(studyOwner ? "studyReading" : "reading") : t("readingExcluded"));
     appendField(list, t("limit"), t("limitValue", { count: Math.floor(maxBytes / 1048576) }));
-    elements.summary.append(heading, list, make("p", "research-record-summary-note", t("alwaysIncluded")));
+    elements.summary.append(heading, list, make("p", "research-record-summary-note", t(studyOwner ? "studyAlwaysIncluded" : "alwaysIncluded")));
   }
 
   function renderStatus() {
@@ -325,6 +345,9 @@ export function createResearchRecord(adapter) {
   function render() {
     syncOpenState();
     const scope = active;
+    const studyOwner = scope?.kind === "study" || currentSource().document?.kind === "study";
+    byId("research-record-help").textContent = t(studyOwner ? "studyHelp" : "help");
+    byId("research-record-reading-label").textContent = t(studyOwner ? "studyReading" : "reading");
     const busy = Boolean(scope?.pending || scope?.downloadPending);
     elements.analysis.disabled = !scope?.options || busy;
     elements.chart.disabled = !scope?.options || busy;
@@ -384,6 +407,7 @@ export function createResearchRecord(adapter) {
     returnFocus = request?.returnFocus || window.document.activeElement;
     active = {
       documentId: document.id,
+      kind: document.kind === "study" ? "study" : "paper",
       datasetId: dataset.id,
       datasetSha256: dataset.sha256,
       navigationGeneration: adapter.getNavigationGeneration?.(),

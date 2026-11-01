@@ -15,6 +15,7 @@ from .agent_store import canonical
 from .analysis_export import build_analysis_export
 from .chart_export import build_chart_export
 from .excerpts import verify_source
+from .studies import verify_owner,Studies
 from .models import WorkspaceError
 from .reading_export import ArchiveWriter, build_export
 from .record_archive import copy_component
@@ -64,7 +65,7 @@ class ResearchRecords:
         return dataset
 
     def options(self, document_id, identifier, checksum):
-        document = self.store.get_document(document_id); verify_source(self.store, document)
+        document = self.store.get_document(document_id); verify_owner(self.store, document)
         data = self.dataset(document_id, identifier, checksum)
         jobs = [j for j in self.analysis.list(document_id) if j['dataset_id'] == data['id'] and j['dataset_sha256'] == checksum and j['status'] == 'succeeded']
         charts = [c for c in self.charts.list(document_id) if c['dataset_id'] == data['id'] and c['dataset_sha256'] == checksum and not c['deleted_at']]
@@ -87,7 +88,7 @@ class ResearchRecords:
         return {'id': data['id'], 'name': data['original_filename'], 'sha256': data['sha256'], 'row_count': data['row_count']}
 
     def snapshot(self, document_id, spec):
-        document = self.store.get_document(document_id); verify_source(self.store, document)
+        document = self.store.get_document(document_id); verify_owner(self.store, document)
         dataset = self.dataset(document_id, spec.dataset_id, spec.dataset_sha256)
         reading = self.store.reading_snapshot(document_id, include_annotations=True) if spec.include_reading else None
         job = self.analysis.result(document_id, str(spec.analysis_id)) if spec.analysis_id else None
@@ -100,6 +101,9 @@ class ResearchRecords:
             for item in job['outputs']: self.analysis.file(document_id, job['id'], item['name'])
         if chart and chart['deleted_at']: changed()
         snapshot = {'document': document, 'dataset': dataset, 'reading': reading, 'analysis': job, 'chart': chart}
+        papers=Studies(self.store).papers(document_id) if document.get('kind')=='study' else []
+        for paper in papers:verify_source(self.store,paper)
+        if document.get('kind')=='study':snapshot['papers']=papers
         checksum = digest({'format': 'research-record/v1', 'spec': spec.model_dump(mode='json'), 'snapshot': snapshot})
         public = {'saved': False, 'format': 'research-record/v1', 'spec': spec.model_dump(mode='json'),
                   'document': {k: document[k] for k in ('id', 'title', 'sha256')}, 'dataset': self.dataset_summary(dataset),
@@ -107,6 +111,9 @@ class ResearchRecords:
                   'chart': {k: chart[k] for k in ('id', 'title', 'kind', 'analysis_id')} if chart else None,
                   'reading': {'included': spec.include_reading, **(counts(reading) if reading else {'notes': 0, 'excerpts': 0, 'annotations': 0})},
                   'limits': {'max_bytes': MAX_BYTES}, 'preview_sha256': checksum}
+        if document.get('kind')=='study':
+            public['document'].update(kind='study',question=document['question'])
+            public['papers']=papers
         public['download_url'] = f'/api/v1/documents/{document_id}/research-records/download?token='+encode_token(document_id, spec, checksum)
         return public
 
@@ -129,9 +136,14 @@ class ResearchRecords:
             with tempfile.NamedTemporaryFile(dir=self.store.exports, suffix='.zip', delete=False) as stream: target = Path(stream.name)
             with zipfile.ZipFile(target, 'w', compression=zipfile.ZIP_DEFLATED) as archive:
                 writer = ArchiveWriter(archive)
+                study=preview['document'].get('kind')=='study'
+                if study:
+                    writer.text('study.json',canonical(self.store.get_document(document_id)).encode())
+                    for paper in preview['papers']:
+                        writer.file('papers/'+paper['id']+'/source.pdf',verify_source(self.store,paper),paper['sha256'],paper['byte_size'])
                 if spec.include_reading:
                     self.component(writer, components, 'reading', build_export, self.store, document_id)
-                else:
+                elif not study:
                     document = self.store.get_document(document_id)
                     writer.file('source.pdf', verify_source(self.store, document), document['sha256'], document['byte_size'])
                 self.data_files(writer, document_id, preview['dataset'])
@@ -175,6 +187,9 @@ class ResearchRecords:
         links = [('reading/source.pdf' if reading else 'source.pdf', '原论文 / Source PDF'),
                  ('data/source'+suffix, '所选数据 / Selected data'), ('record.json', '范围与来源 / Scope and provenance'),
                  ('manifest.json', '文件校验清单 / File checksums')]
+        if preview['document'].get('kind')=='study':
+            links[0]=('study.json','研究问题 / Research question')
+            links.extend(('papers/'+p['id']+'/source.pdf','关联论文 / Paper: '+escape(p['title'])) for p in preview['papers'])
         if reading: links.append(('reading/index.html', '有效笔记与图片标注 / Active notes and image annotations'))
         if preview['analysis']: links.append(('analysis/index.html', '已保存分析 / Saved analysis'))
         if preview['chart']: links.append(('chart/chart.html', '交互图表 / Interactive chart'))

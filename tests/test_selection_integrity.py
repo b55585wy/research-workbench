@@ -1,3 +1,4 @@
+from migration_support import table_info
 import hashlib
 import json
 from pathlib import Path
@@ -79,11 +80,11 @@ def test_schema11_migration_preserves_all24_tables_columns_rows_and_file(tmp_pat
         db.execute('INSERT INTO documents VALUES (?,?,?,?,?,?,?)',(doc,'Original','original.pdf',1,1,'a'*64,'2026-10-31'))
         db.execute('INSERT INTO notes VALUES (?,?,?,?,?,?)',(note,doc,1,None,'Preserve me','2026-10-31'))
         names=[r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")]
-        before={n:(db.execute(f'PRAGMA table_info({n})').fetchall(),db.execute(f'SELECT * FROM {n} ORDER BY 1').fetchall()) for n in names}
+        before={n:(table_info(db,n),db.execute(f'SELECT * FROM {n} ORDER BY 1').fetchall()) for n in names}
     files=tmp_path/'documents';files.mkdir();material=files/(doc+'.pdf');material.write_bytes(b'preserve exact bytes')
     Store(tmp_path)
     with sqlite3.connect(database) as db:
-        assert db.execute('PRAGMA user_version').fetchone()[0]==12 and len(names)==24
-        assert {r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")}-set(names)=={'dataset_selections'}
-        assert before=={n:(db.execute(f'PRAGMA table_info({n})').fetchall(),db.execute(f'SELECT * FROM {n} ORDER BY 1').fetchall()) for n in names}
+        assert db.execute('PRAGMA user_version').fetchone()[0]==13 and len(names)==24
+        assert {r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")}-set(names)=={'dataset_selections','studies','study_note_sources','study_papers'}
+        assert before=={n:(table_info(db,n),db.execute(f'SELECT * FROM {n} ORDER BY 1').fetchall()) for n in names}
     assert material.read_bytes()==b'preserve exact bytes'
