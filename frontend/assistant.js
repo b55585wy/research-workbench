@@ -116,6 +116,29 @@ const messages = {
     alternative_two_sided: "双侧（两组不相等）",
     alternative_greater: "第 1 组大于第 2 组",
     alternative_less: "第 1 组小于第 2 组",
+    analysisPaired: "配对 t 检验（r-stats）",
+    analysisPairedUnit: "唯一配对单位 ID 列",
+    analysisPairedFirst: "第 1 个数值列",
+    analysisPairedSecond: "第 2 个数值列",
+    analysisPairedDirection: "配对差值方向",
+    analysisPairedDeclaration: "配对设计声明",
+    analysisPairedConfirmed: "已确认按唯一、非空单位 ID 精确配对，并已核对配对设计。",
+    analysisCompletePairs: "仅使用两个数值和配对单位 ID 均完整的配对",
+    analysisPairedTotal: "总配对数",
+    analysisPairedUsed: "完整配对数",
+    analysisPairedExcluded: "排除配对数",
+    analysisPairedMissingFirst: "仅第 1 列缺失",
+    analysisPairedMissingSecond: "仅第 2 列缺失",
+    analysisPairedMissingBoth: "两列均缺失",
+    analysisPairedStats: "完整配对摘要",
+    analysisPairedDifferenceStats: "配对差值摘要（第 1 列 − 第 2 列）",
+    analysisPairedStatsBasis: "仅完整配对；n 为完整配对数，missing 为排除配对数。",
+    analysisCompletePairN: "完整配对",
+    analysisExcludedPairN: "排除配对",
+    analysisPairedIdentity: "配对标识：精确、唯一、非空",
+    paired_alternative_two_sided: "双侧（第 1 列与第 2 列的差值不为零）",
+    paired_alternative_greater: "第 1 列减去第 2 列大于零",
+    paired_alternative_less: "第 1 列减去第 2 列小于零",
     noDocument: "选择一篇文献后可向助手提问。",
     emptyChat: "发送一条消息开始。助手会保留来源、工具进度和待确认操作。",
     you: "你",
@@ -329,6 +352,29 @@ const messages = {
     alternative_two_sided: "Two-sided (groups differ)",
     alternative_greater: "Group 1 greater than group 2",
     alternative_less: "Group 1 less than group 2",
+    analysisPaired: "Paired t-test (r-stats)",
+    analysisPairedUnit: "Unique pairing unit ID column",
+    analysisPairedFirst: "First numeric column",
+    analysisPairedSecond: "Second numeric column",
+    analysisPairedDirection: "Paired difference direction",
+    analysisPairedDeclaration: "Paired-design declaration",
+    analysisPairedConfirmed: "Exact pairing by unique, nonempty unit IDs and the paired design are confirmed.",
+    analysisCompletePairs: "Only pairs with both numeric values and the pairing unit ID present are used",
+    analysisPairedTotal: "Total pairs",
+    analysisPairedUsed: "Complete pairs",
+    analysisPairedExcluded: "Excluded pairs",
+    analysisPairedMissingFirst: "First column only missing",
+    analysisPairedMissingSecond: "Second column only missing",
+    analysisPairedMissingBoth: "Both columns missing",
+    analysisPairedStats: "Complete-pair summaries",
+    analysisPairedDifferenceStats: "Paired-difference summary (first − second)",
+    analysisPairedStatsBasis: "Complete pairs only; n is used pairs and missing is excluded pairs.",
+    analysisCompletePairN: "Complete pairs",
+    analysisExcludedPairN: "Excluded pairs",
+    analysisPairedIdentity: "Pairing identity: exact, unique, nonempty",
+    paired_alternative_two_sided: "Two-sided (first minus second is nonzero)",
+    paired_alternative_greater: "First minus second is greater than zero",
+    paired_alternative_less: "First minus second is less than zero",
     noDocument: "Choose a paper before asking the assistant.",
     emptyChat: "Send a message to start. Sources, tool progress, and pending actions are retained.",
     you: "You",
@@ -814,7 +860,7 @@ export function createAssistant(adapter) {
 
   function analysisRecipe(payload) {
     const engine = payload.engine === "r" ? "r" : "python";
-    const method = payload.method === "ttest_independent" ? "ttest_independent" : "describe";
+    const method = ["ttest_independent", "ttest_paired"].includes(payload.method) ? payload.method : "describe";
     const key = `${engine}:${method}`;
     if (!analysisRecipes.has(key)) {
       const state = { status: "loading", recipe: null };
@@ -891,14 +937,83 @@ export function createAssistant(adapter) {
     return options.independent_samples_confirmed === true && groups.length === 2 && groups[0] !== groups[1] && Boolean(preview.counts);
   }
 
+  function appendPairedProposal(card, details, payload) {
+    const options = payload.paired || {};
+    const columns = Array.isArray(payload.columns) ? payload.columns : [];
+    const preview = payload.preview || {};
+    const pairing = preview.pairing || {};
+    appendProposalField(details, t("analysisMethod"), t("analysisPaired"));
+    appendProposalField(details, t("analysisPairedFirst"), columns[0] || "—");
+    appendProposalField(details, t("analysisPairedSecond"), columns[1] || "—");
+    appendProposalField(details, t("analysisPairedUnit"), options.unit_column || "—");
+    appendProposalField(details, t("analysisPairedDirection"), columns.length === 2 ? `${columns[0]} − ${columns[1]}` : "—");
+    appendProposalField(details, t("analysisAlternative"), t(`paired_alternative_${options.alternative || "two_sided"}`));
+    appendProposalField(details, t("analysisConfidence"), `${Number(options.confidence ?? 0.95) * 100}%`);
+    appendProposalField(details, t("analysisPairedDeclaration"), options.paired_samples_confirmed === true ? t("analysisPairedConfirmed") : "—");
+    appendProposalField(details, t("analysisMissing"), t("analysisCompletePairs"));
+    appendProposalField(details, t("analysisPairedIdentity"), pairing.identity || "exact_unique_nonempty");
+    if (payload.library) appendProposalField(details, t("analysisLibrary"), `${payload.library.id || "r-stats"} ${payload.library.version || ""} · ${payload.library.sha256 || "—"}`);
+    const counts = preview.counts || {};
+    for (const [field, key] of [["total", "analysisPairedTotal"], ["used", "analysisPairedUsed"], ["excluded", "analysisPairedExcluded"], ["missing_first_only", "analysisPairedMissingFirst"], ["missing_second_only", "analysisPairedMissingSecond"], ["missing_both", "analysisPairedMissingBoth"]]) {
+      appendProposalField(details, `${t("analysisCounts")} · ${t(key)}`, counts[field] ?? "—");
+    }
+    if (Array.isArray(preview.stats)) {
+      const label = document.createElement("strong");
+      label.textContent = t("analysisPairedStats");
+      const basis = document.createElement("p");
+      basis.className = "assistant-proposal-inactive";
+      basis.textContent = t("analysisPairedStatsBasis");
+      const scroll = document.createElement("div");
+      scroll.className = "assistant-ttest-stats";
+      const table = document.createElement("table");
+      const thead = document.createElement("thead");
+      const header = document.createElement("tr");
+      for (const text of [t("analysisColumns"), t("analysisCompletePairN"), t("analysisExcludedPairN"), t("analysisMean"), t("analysisSd"), t("analysisMedian"), t("analysisMin"), t("analysisMax")]) {
+        const cell = document.createElement("th");
+        cell.textContent = text;
+        header.append(cell);
+      }
+      thead.append(header);
+      const tbody = document.createElement("tbody");
+      for (const stat of preview.stats) {
+        const row = document.createElement("tr");
+        for (const [index, value] of [stat.column, stat.n, stat.missing, stat.mean, stat.sd, stat.median, stat.min, stat.max].entries()) {
+          const cell = document.createElement(index === 0 ? "th" : "td");
+          cell.textContent = value ?? "—";
+          row.append(cell);
+        }
+        tbody.append(row);
+      }
+      table.append(thead, tbody);
+      scroll.append(table);
+      card.append(label, basis, scroll);
+    }
+    const differences = preview.difference_stats || {};
+    for (const [field, key] of [["n", "analysisCompletePairN"], ["mean", "analysisMean"], ["sd", "analysisSd"], ["median", "analysisMedian"], ["min", "analysisMin"], ["max", "analysisMax"]]) {
+      appendProposalField(details, `${t("analysisPairedDifferenceStats")} · ${t(key)}`, differences[field] ?? "—");
+    }
+    for (const warning of preview.warnings || []) {
+      const text = document.createElement("p");
+      text.className = "assistant-proposal-inactive";
+      text.textContent = warning;
+      card.append(text);
+    }
+    return options.paired_samples_confirmed === true && columns.length === 2 && columns[0] !== columns[1] &&
+      Boolean(options.unit_column) && !columns.includes(options.unit_column) && Boolean(preview.counts) && preview.stats_basis === "complete_pairs" &&
+      Boolean(preview.difference_stats) && pairing.unit_column === options.unit_column && pairing.direction === "first_minus_second" &&
+      pairing.missing === "complete_pairs" && JSON.stringify(pairing.columns) === JSON.stringify(columns);
+  }
+
   function appendAnalysisProposal(card, details, payload) {
     const isTTest = payload.method === "ttest_independent";
+    const isPaired = payload.method === "ttest_paired";
     appendProposalField(details, t("analysisDataset"), payload.dataset_name || payload.dataset_id || "—");
     appendProposalField(details, t("analysisDatasetHash"), payload.dataset_sha256 || "—");
     appendProposalField(details, t("analysisEngine"), payload.engine === "r" ? "R" : "Python");
     appendProposalField(details, t("analysisColumns"), Array.isArray(payload.columns) ? payload.columns.join(", ") : "—");
-    const scientificReady = isTTest ? appendTtestProposal(card, details, payload) : true;
-    appendProposalField(details, t("analysisRecipe"), `${payload.recipe_id || (isTTest ? "ttest-independent-rstats-v1" : "describe-v1")} · v${payload.recipe_version || 1}`);
+    const scientificReady = isTTest ? appendTtestProposal(card, details, payload) : isPaired ? appendPairedProposal(card, details, payload) : true;
+    const defaultRecipe = isPaired ? "ttest-paired-rstats-v1" : isTTest ? "ttest-independent-rstats-v1" : "describe-v1";
+    appendProposalField(details, t("analysisRecipe"), `${payload.recipe_id || defaultRecipe} · v${payload.recipe_version || 1}`);
     appendProposalField(details, t("analysisRecipeHash"), payload.recipe_sha256 || "—");
     const state = analysisRecipe(payload);
     const label = document.createElement("strong");
@@ -941,7 +1056,7 @@ export function createAssistant(adapter) {
     elements.proposals.append(heading);
     for (const proposal of turn.proposals) {
       const payload = proposal.payload && typeof proposal.payload === "object" ? proposal.payload : {};
-      const isAnalysis = ["run_analysis", "run_t_test"].includes(proposal.kind);
+      const isAnalysis = ["run_analysis", "run_t_test", "run_paired_t_test"].includes(proposal.kind);
       const isCancelAnalysis = proposal.kind === "cancel_analysis";
       const isDatasetSelection = proposal.kind === "create_dataset_selection";
       const isCreateChart = proposal.kind === "create_chart";
@@ -1458,12 +1573,12 @@ export function createAssistant(adapter) {
         body: JSON.stringify({ approved, proposal_sha256: proposal.sha256 })
       });
       upsertTurn(entry, updated);
-      entry.status = { key: approved ? ["run_analysis", "run_t_test"].includes(proposal.kind) ? "analysisQueued" : proposal.kind === "cancel_analysis" ? "analysisCancelled" : proposal.kind === "create_dataset_selection" ? "selectionCreated" : "confirmed" : "rejectedDone", kind: "success" };
+      entry.status = { key: approved ? ["run_analysis", "run_t_test", "run_paired_t_test"].includes(proposal.kind) ? "analysisQueued" : proposal.kind === "cancel_analysis" ? "analysisCancelled" : proposal.kind === "create_dataset_selection" ? "selectionCreated" : "confirmed" : "rejectedDone", kind: "success" };
       if (approved) {
         await adapter.refreshAfterAgent(paperId, proposal.kind);
         const result = updated.proposals?.find((item) => item.id === proposal.id)?.result;
         const analysisId = result?.analysis_id;
-        if (["run_analysis", "run_t_test", "cancel_analysis"].includes(proposal.kind) && analysisId && adapter.getDocument()?.id === paperId) await adapter.openAnalysisJob?.(paperId, analysisId);
+        if (["run_analysis", "run_t_test", "run_paired_t_test", "cancel_analysis"].includes(proposal.kind) && analysisId && adapter.getDocument()?.id === paperId) await adapter.openAnalysisJob?.(paperId, analysisId);
         const chartId = result?.chart_id || proposal.payload?.chart_id || result?.id;
         if (["create_chart", "restore_chart"].includes(proposal.kind) && chartId && adapter.getDocument()?.id === paperId) await adapter.openChart?.(paperId, chartId);
         if (proposal.kind === "create_dataset_selection") await acceptDatasetSelectionResult(paperId, entry, proposal, result);

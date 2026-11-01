@@ -87,6 +87,7 @@ def cleanup_failed(directory):
     for name in ('input.tsv','analysis.py','analysis.R','raw-summary.tsv','summary.json','summary.csv','chart.svg','parameters.json',
                  'ttest-options.json','ttest-options.tsv','test-result.json','test.csv','jmv-result.json','r-stats-result.tsv','environment.json','statistics-lock.json'):
         (directory/name).unlink(missing_ok=True)
+    for name in ('pair-map.json','preparation-sources.json','paired_ttest_data.py','tabular.py'):(directory/name).unlink(missing_ok=True)
 
 
 def execute(service,row,stop,timeout=30):
@@ -97,7 +98,13 @@ def execute(service,row,stop,timeout=30):
         source=service.datasets.checked(data);profile,rows=parse(source,data['delimiter'])
         directory.mkdir(exist_ok=False)
         prepared=None
-        if payload.method=='ttest_independent':
+        if payload.method=='ttest_paired':
+            from .paired_ttest_data import prepare,write_input,preparation_hash
+            options=payload.paired.model_dump(mode='json')
+            prepared,values,mapping=prepare(profile,rows,payload.columns,options)
+            mapping.update(dataset_id=data['id'],dataset_sha256=data['sha256'],preparation_sha256=preparation_hash())
+            write_input(directory,prepared,values,mapping,options)
+        elif payload.method=='ttest_independent':
             from .ttest_data import prepare
             prepared,values=prepare(profile,rows,payload.columns,payload.ttest.model_dump(mode='json'))
             with (directory/'input.tsv').open('w',encoding='utf-8',newline='') as stream:
@@ -132,7 +139,11 @@ def execute(service,row,stop,timeout=30):
         service.datasets.checked(data)
         if hashlib.sha256(script.read_bytes()).hexdigest()!=payload.recipe_sha256:raise ValueError()
         if prepared is not None:
-            from . import ttest_result
+            if payload.method=='ttest_paired':
+                from . import paired_ttest_result as ttest_result
+                if recipe(payload.engine,payload.method)['sha256']!=payload.recipe_sha256:
+                    raise WorkspaceError('recipe_changed','配对准备代码版本已变化，本次结果未发布。',409)
+            else:from . import ttest_result
             service.catalog.statistics.require(payload.library_sha256)
             result=ttest_result.result(directory,prepared,payload,service.catalog.statistics,engine['version'])
             files=ttest_result.artifacts(directory,result,analysis_payload(payload),engine['version'],service.catalog.statistics)

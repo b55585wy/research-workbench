@@ -116,10 +116,11 @@ class Proposals:
                 payload=ChartMutation(request_id=request_id,expected_revision=data['expected_revision'],data_sha256=data['data_sha256'])
                 chart=service.mutate_in(connection,document_id,data['chart_id'],'delete' if kind=='delete_chart' else 'restore',payload)
             return {'chart_id':chart['id'],'dataset_id':chart['dataset_id'],'kind':chart['kind'],'revision':chart['revision'],'url':chart['viewer_url']}
-        if kind in ('run_analysis','run_t_test'):
+        if kind in ('run_analysis','run_t_test','run_paired_t_test'):
             if self.analysis is None:raise WorkspaceError('agent_tool_unavailable','分析服务尚未安装。',409)
             fields={key:data[key] for key in ('dataset_id','dataset_sha256','engine','columns','recipe_sha256')}
             if kind=='run_t_test':fields.update({key:data[key] for key in ('method','ttest','library_sha256')})
+            if kind=='run_paired_t_test':fields.update({key:data[key] for key in ('method','paired','library_sha256')})
             row,_=self.analysis.create_in(connection,document_id,AnalysisCreate(request_id=request_id,**fields))
             return {'analysis_id':row['id'],'status':row['status'],'url':f"/?document={document_id}&analysis={row['id']}"}
         if kind=='cancel_analysis':

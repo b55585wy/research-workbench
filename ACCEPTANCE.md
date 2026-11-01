@@ -208,3 +208,13 @@ bounds and order, current edits/deletion/restoration, typed null-page anchors,
 one-snapshot concurrent reads and zero material writes. Native tests require
 study/PDF source navigation, drafts, late query/clear/retry, safe literal markup,
 keyboard/zh-en/390px/blue, no automatic sharing/model calls and no study PDF request.
+
+## v0.19 paired t-test
+
+Requirements S01–S10 are recorded before implementation in paired-ttest-v1/SCENARIOS.md.
+Require strict paired ID/two-column/design parameters, complete-pair counts and
+exclusions, exact IDs, missing/duplicate/constant/nonfinite boundaries, independent
+60-digit numeric references, old hashes, actual worker and failure cleanup, all
+artifact checks, Notebook/export and confirmed Agent/task flow. Native UI covers
+review/retry/source notes/method labels, real configured model/public sleep and
+old method workflows. schema13/all28 live rows and source bytes must be preserved.

@@ -42,6 +42,7 @@ const messages = {
     unavailable: "当前不可用",
     describe: "描述统计",
     ttest_independent: "独立样本 t 检验",
+    ttest_paired: "配对样本 t 检验",
     analysis_counts: "分析计数",
     histogram: "直方图",
     scatter: "散点图",
@@ -112,6 +113,7 @@ const messages = {
     unavailable: "Currently unavailable",
     describe: "Descriptive analysis",
     ttest_independent: "Independent-samples t-test",
+    ttest_paired: "Paired-samples t-test",
     analysis_counts: "Analysis counts",
     histogram: "Histogram",
     scatter: "Scatter plot",
@@ -185,7 +187,7 @@ export function createResearchRecord(adapter) {
   }
 
   function methodName(method) {
-    return t(method === "ttest_independent" ? "ttest_independent" : "describe");
+    return t(["ttest_independent", "ttest_paired"].includes(method) ? method : "describe");
   }
 
   function kindName(kind) {

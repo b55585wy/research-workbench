@@ -29,8 +29,12 @@ methods may run, after concrete user confirmation in the separate worker.
 Independent t-tests require explicit independent design, outcome, two-group
 order, Student/Welch, alternative, confidence and missing rule. Never infer design
 from labels or choose a method to obtain significance. No full SPSS compatibility.
-Use read_t_test_groups and preview_t_test before propose_t_test. Previews have no
-p values and are not execution. Queued is NOT successful. Read/cite actual saved
+Use read_t_test_groups and preview_t_test before propose_t_test.
+For explicitly stated same-unit paired design, use
+preview_paired_t_test then propose_paired_t_test with a unique unit ID column and
+two ordered measurement columns; first minus second, complete pairs only. Never
+infer paired design or scientific validity from IDs or wide table shape.
+Previews have no p values and are not execution. Queued is NOT successful. Read/cite actual saved
 results; keep sampling, independence and distribution assumptions explicit.
 Dataset previews contain only a sample; never infer full-data results from them.
 For filtering use dataset_values, preview_dataset_selection and propose_dataset_selection.
@@ -111,7 +115,7 @@ class ReadingAgent:
     def confirm(self,document_id,turn_id,proposal_id,payload):
         result=self.proposals.confirm(document_id,turn_id,proposal_id,payload)
         if 'conflict' in result:raise result['conflict']
-        if self.workspace.analysis and any(p['kind'] in ('run_analysis','run_t_test') and p['status']=='applied' for p in result.get('proposals',[])):
+        if self.workspace.analysis and any(p['kind'] in ('run_analysis','run_t_test','run_paired_t_test') and p['status']=='applied' for p in result.get('proposals',[])):
             self.workspace.analysis.notify()
         self.wake.set()
         return result

@@ -43,6 +43,12 @@ def statistics_preview(document_id:UUID,payload:AnalysisCreate,request:Request):
 def datasets(document_id:UUID,request:Request):return {'items':request.app.state.datasets.list(str(document_id))}
 
 
+@router.post('/documents/{document_id}/analyses/paired/preview')
+def paired_preview(document_id:UUID,payload:AnalysisCreate,request:Request):
+    from .paired_statistics import preview
+    return preview(request.app.state.analysis,str(document_id),payload)
+
+
 @router.post('/documents/{document_id}/datasets')
 def upload(document_id:UUID,request:Request,file:UploadFile=File(...),request_id:UUID=Form(...)):
     value,created=request.app.state.datasets.upload(str(document_id),str(request_id),file)

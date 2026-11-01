@@ -2902,8 +2902,20 @@ async function addAnalysisCitation(documentId, job) {
   url.searchParams.set("analysis", job.id);
   url.searchParams.set("workspace", "data");
   url.searchParams.set("tool", "analysis");
-  const method = job.method === "ttest_independent" ? "Independent-samples t-test" : "Descriptive analysis";
-  const citation = `Analysis: ${method} · ${job.dataset_name}\n${url.pathname}${url.search}`;
+  const isPaired = job.method === "ttest_paired";
+  const method = job.method === "ttest_independent" ? "Independent-samples t-test" : isPaired ? "Paired t-test" : "Descriptive analysis";
+  let citation = `Analysis: ${method} · ${job.dataset_name}\n${url.pathname}${url.search}`;
+  if (isPaired) {
+    const result = job.result || {};
+    const test = result.test || {};
+    const pairing = result.pairing || {};
+    const columns = Array.isArray(test.columns) ? test.columns : Array.isArray(pairing.columns) ? pairing.columns : job.columns || [];
+    const first = columns[0] || "—";
+    const second = columns[1] || "—";
+    const unit = test.unit_column || pairing.unit_column || job.paired?.unit_column || "—";
+    const counts = result.counts || {};
+    citation = `Analysis: ${method} · ${job.dataset_name}\nPaired columns: ${first}, ${second}\nUnit ID: ${unit}\nDifference (first − second): ${first} − ${second}\nComplete pairs: ${counts.used ?? "—"} · Excluded pairs: ${counts.excluded ?? "—"}\n${url.pathname}${url.search}`;
+  }
   if (isStudy()) {
     workspace?.showNotes();
     return study?.addCitation("analysis", job, citation) || false;

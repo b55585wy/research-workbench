@@ -1,0 +1,464 @@
+{
+  "reference": "mpmath1.3.0,60 decimals; Student CDF via regularized incomplete beta; independent paired-difference formulas",
+  "source_url": "https://stat.ethz.ch/R-manual/R-devel/library/datasets/html/sleep.html",
+  "sleep_wide_sha256": "9ca08bb7f09dd52f2756b3e756c773cbe1bd56cc70c9806771236d60dcd19e76",
+  "sleep_original_sha256": "c1d2c2140d17654ddca094ed3992ef496872a4368010e010028e245799a37a98",
+  "cases": [
+    {
+      "sample": "synthetic",
+      "alternative": "two_sided",
+      "confidence": 0.5,
+      "reverse": false,
+      "expected": {
+        "statistic": -4.0,
+        "df": 2.0,
+        "p_value": 0.05719095841793664,
+        "difference": -1.3333333333333333,
+        "standard_error": 0.3333333333333333,
+        "ci": {
+          "lower": -1.605498860309242,
+          "upper": -1.0611678063574246,
+          "lower_unbounded": false,
+          "upper_unbounded": false
+        }
+      }
+    },
+    {
+      "sample": "synthetic",
+      "alternative": "two_sided",
+      "confidence": 0.5,
+      "reverse": true,
+      "expected": {
+        "statistic": 4.0,
+        "df": 2.0,
+        "p_value": 0.05719095841793664,
+        "difference": 1.3333333333333333,
+        "standard_error": 0.3333333333333333,
+        "ci": {
+          "lower": 1.0611678063574246,
+          "upper": 1.605498860309242,
+          "lower_unbounded": false,
+          "upper_unbounded": false
+        }
+      }
+    },
+    {
+      "sample": "synthetic",
+      "alternative": "two_sided",
+      "confidence": 0.95,
+      "reverse": false,
+      "expected": {
+        "statistic": -4.0,
+        "df": 2.0,
+        "p_value": 0.05719095841793664,
+        "difference": -1.3333333333333333,
+        "standard_error": 0.3333333333333333,
+        "ci": {
+          "lower": -2.767550909916488,
+          "upper": 0.10088424324982129,
+          "lower_unbounded": false,
+          "upper_unbounded": false
+        }
+      }
+    },
+    {
+      "sample": "synthetic",
+      "alternative": "two_sided",
+      "confidence": 0.95,
+      "reverse": true,
+      "expected": {
+        "statistic": 4.0,
+        "df": 2.0,
+        "p_value": 0.05719095841793664,
+        "difference": 1.3333333333333333,
+        "standard_error": 0.3333333333333333,
+        "ci": {
+          "lower": -0.10088424324982129,
+          "upper": 2.767550909916488,
+          "lower_unbounded": false,
+          "upper_unbounded": false
+        }
+      }
+    },
+    {
+      "sample": "synthetic",
+      "alternative": "two_sided",
+      "confidence": 0.999,
+      "reverse": false,
+      "expected": {
+        "statistic": -4.0,
+        "df": 2.0,
+        "p_value": 0.05719095841793664,
+        "difference": -1.3333333333333333,
+        "standard_error": 0.3333333333333333,
+        "ci": {
+          "lower": -11.866351525481207,
+          "upper": 9.19968485881454,
+          "lower_unbounded": false,
+          "upper_unbounded": false
+        }
+      }
+    },
+    {
+      "sample": "synthetic",
+      "alternative": "two_sided",
+      "confidence": 0.999,
+      "reverse": true,
+      "expected": {
+        "statistic": 4.0,
+        "df": 2.0,
+        "p_value": 0.05719095841793664,
+        "difference": 1.3333333333333333,
+        "standard_error": 0.3333333333333333,
+        "ci": {
+          "lower": -9.19968485881454,
+          "upper": 11.866351525481207,
+          "lower_unbounded": false,
+          "upper_unbounded": false
+        }
+      }
+    },
+    {
+      "sample": "synthetic",
+      "alternative": "less",
+      "confidence": 0.5,
+      "reverse": false,
+      "expected": {
+        "statistic": -4.0,
+        "df": 2.0,
+        "p_value": 0.02859547920896832,
+        "difference": -1.3333333333333333,
+        "standard_error": 0.3333333333333333,
+        "ci": {
+          "lower": null,
+          "upper": -1.3333333333333333,
+          "lower_unbounded": true,
+          "upper_unbounded": false
+        }
+      }
+    },
+    {
+      "sample": "synthetic",
+      "alternative": "less",
+      "confidence": 0.5,
+      "reverse": true,
+      "expected": {
+        "statistic": 4.0,
+        "df": 2.0,
+        "p_value": 0.9714045207910317,
+        "difference": 1.3333333333333333,
+        "standard_error": 0.3333333333333333,
+        "ci": {
+          "lower": null,
+          "upper": 1.3333333333333333,
+          "lower_unbounded": true,
+          "upper_unbounded": false
+        }
+      }
+    },
+    {
+      "sample": "synthetic",
+      "alternative": "less",
+      "confidence": 0.95,
+      "reverse": false,
+      "expected": {
+        "statistic": -4.0,
+        "df": 2.0,
+        "p_value": 0.02859547920896832,
+        "difference": -1.3333333333333333,
+        "standard_error": 0.3333333333333333,
+        "ci": {
+          "lower": null,
+          "upper": -0.3600048065487581,
+          "lower_unbounded": true,
+          "upper_unbounded": false
+        }
+      }
+    },
+    {
+      "sample": "synthetic",
+      "alternative": "less",
+      "confidence": 0.95,
+      "reverse": true,
+      "expected": {
+        "statistic": 4.0,
+        "df": 2.0,
+        "p_value": 0.9714045207910317,
+        "difference": 1.3333333333333333,
+        "standard_error": 0.3333333333333333,
+        "ci": {
+          "lower": null,
+          "upper": 2.3066618601179085,
+          "lower_unbounded": true,
+          "upper_unbounded": false
+        }
+      }
+    },
+    {
+      "sample": "synthetic",
+      "alternative": "less",
+      "confidence": 0.999,
+      "reverse": false,
+      "expected": {
+        "statistic": -4.0,
+        "df": 2.0,
+        "p_value": 0.02859547920896832,
+        "difference": -1.3333333333333333,
+        "standard_error": 0.3333333333333333,
+        "ci": {
+          "lower": null,
+          "upper": 6.109041590039959,
+          "lower_unbounded": true,
+          "upper_unbounded": false
+        }
+      }
+    },
+    {
+      "sample": "synthetic",
+      "alternative": "less",
+      "confidence": 0.999,
+      "reverse": true,
+      "expected": {
+        "statistic": 4.0,
+        "df": 2.0,
+        "p_value": 0.9714045207910317,
+        "difference": 1.3333333333333333,
+        "standard_error": 0.3333333333333333,
+        "ci": {
+          "lower": null,
+          "upper": 8.775708256706626,
+          "lower_unbounded": true,
+          "upper_unbounded": false
+        }
+      }
+    },
+    {
+      "sample": "synthetic",
+      "alternative": "greater",
+      "confidence": 0.5,
+      "reverse": false,
+      "expected": {
+        "statistic": -4.0,
+        "df": 2.0,
+        "p_value": 0.9714045207910317,
+        "difference": -1.3333333333333333,
+        "standard_error": 0.3333333333333333,
+        "ci": {
+          "lower": -1.3333333333333333,
+          "upper": null,
+          "lower_unbounded": false,
+          "upper_unbounded": true
+        }
+      }
+    },
+    {
+      "sample": "synthetic",
+      "alternative": "greater",
+      "confidence": 0.5,
+      "reverse": true,
+      "expected": {
+        "statistic": 4.0,
+        "df": 2.0,
+        "p_value": 0.02859547920896832,
+        "difference": 1.3333333333333333,
+        "standard_error": 0.3333333333333333,
+        "ci": {
+          "lower": 1.3333333333333333,
+          "upper": null,
+          "lower_unbounded": false,
+          "upper_unbounded": true
+        }
+      }
+    },
+    {
+      "sample": "synthetic",
+      "alternative": "greater",
+      "confidence": 0.95,
+      "reverse": false,
+      "expected": {
+        "statistic": -4.0,
+        "df": 2.0,
+        "p_value": 0.9714045207910317,
+        "difference": -1.3333333333333333,
+        "standard_error": 0.3333333333333333,
+        "ci": {
+          "lower": -2.3066618601179085,
+          "upper": null,
+          "lower_unbounded": false,
+          "upper_unbounded": true
+        }
+      }
+    },
+    {
+      "sample": "synthetic",
+      "alternative": "greater",
+      "confidence": 0.95,
+      "reverse": true,
+      "expected": {
+        "statistic": 4.0,
+        "df": 2.0,
+        "p_value": 0.02859547920896832,
+        "difference": 1.3333333333333333,
+        "standard_error": 0.3333333333333333,
+        "ci": {
+          "lower": 0.3600048065487581,
+          "upper": null,
+          "lower_unbounded": false,
+          "upper_unbounded": true
+        }
+      }
+    },
+    {
+      "sample": "synthetic",
+      "alternative": "greater",
+      "confidence": 0.999,
+      "reverse": false,
+      "expected": {
+        "statistic": -4.0,
+        "df": 2.0,
+        "p_value": 0.9714045207910317,
+        "difference": -1.3333333333333333,
+        "standard_error": 0.3333333333333333,
+        "ci": {
+          "lower": -8.775708256706626,
+          "upper": null,
+          "lower_unbounded": false,
+          "upper_unbounded": true
+        }
+      }
+    },
+    {
+      "sample": "synthetic",
+      "alternative": "greater",
+      "confidence": 0.999,
+      "reverse": true,
+      "expected": {
+        "statistic": 4.0,
+        "df": 2.0,
+        "p_value": 0.02859547920896832,
+        "difference": 1.3333333333333333,
+        "standard_error": 0.3333333333333333,
+        "ci": {
+          "lower": -6.109041590039959,
+          "upper": null,
+          "lower_unbounded": false,
+          "upper_unbounded": true
+        }
+      }
+    },
+    {
+      "sample": "sleep",
+      "alternative": "two_sided",
+      "confidence": 0.95,
+      "reverse": false,
+      "expected": {
+        "statistic": -4.062127683382036,
+        "df": 9.0,
+        "p_value": 0.002832890197384273,
+        "difference": -1.58,
+        "standard_error": 0.38895872388839525,
+        "ci": {
+          "lower": -2.459885763276983,
+          "upper": -0.7001142367230172,
+          "lower_unbounded": false,
+          "upper_unbounded": false
+        }
+      }
+    },
+    {
+      "sample": "sleep",
+      "alternative": "two_sided",
+      "confidence": 0.95,
+      "reverse": true,
+      "expected": {
+        "statistic": 4.062127683382036,
+        "df": 9.0,
+        "p_value": 0.002832890197384273,
+        "difference": 1.58,
+        "standard_error": 0.38895872388839525,
+        "ci": {
+          "lower": 0.7001142367230172,
+          "upper": 2.459885763276983,
+          "lower_unbounded": false,
+          "upper_unbounded": false
+        }
+      }
+    },
+    {
+      "sample": "sleep",
+      "alternative": "less",
+      "confidence": 0.95,
+      "reverse": false,
+      "expected": {
+        "statistic": -4.062127683382036,
+        "df": 9.0,
+        "p_value": 0.0014164450986921364,
+        "difference": -1.58,
+        "standard_error": 0.38895872388839525,
+        "ci": {
+          "lower": null,
+          "upper": -0.8669947329707162,
+          "lower_unbounded": true,
+          "upper_unbounded": false
+        }
+      }
+    },
+    {
+      "sample": "sleep",
+      "alternative": "less",
+      "confidence": 0.95,
+      "reverse": true,
+      "expected": {
+        "statistic": 4.062127683382036,
+        "df": 9.0,
+        "p_value": 0.9985835549013079,
+        "difference": 1.58,
+        "standard_error": 0.38895872388839525,
+        "ci": {
+          "lower": null,
+          "upper": 2.293005267029284,
+          "lower_unbounded": true,
+          "upper_unbounded": false
+        }
+      }
+    },
+    {
+      "sample": "sleep",
+      "alternative": "greater",
+      "confidence": 0.95,
+      "reverse": false,
+      "expected": {
+        "statistic": -4.062127683382036,
+        "df": 9.0,
+        "p_value": 0.9985835549013079,
+        "difference": -1.58,
+        "standard_error": 0.38895872388839525,
+        "ci": {
+          "lower": -2.293005267029284,
+          "upper": null,
+          "lower_unbounded": false,
+          "upper_unbounded": true
+        }
+      }
+    },
+    {
+      "sample": "sleep",
+      "alternative": "greater",
+      "confidence": 0.95,
+      "reverse": true,
+      "expected": {
+        "statistic": 4.062127683382036,
+        "df": 9.0,
+        "p_value": 0.0014164450986921364,
+        "difference": 1.58,
+        "standard_error": 0.38895872388839525,
+        "ci": {
+          "lower": 0.8669947329707162,
+          "upper": null,
+          "lower_unbounded": false,
+          "upper_unbounded": true
+        }
+      }
+    }
+  ]
+}

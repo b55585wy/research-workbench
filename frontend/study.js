@@ -897,7 +897,10 @@ export function createStudy(adapter) {
     if (!owner) return false;
     const entry = entryFor(owner.id);
     if (entry.notePending || entry.mutations.size || entry.edit) return false;
-    const hash = kind === "analysis" ? item?.outputs?.["summary.json"]?.sha256 : item?.data_sha256;
+    const summary = kind === "analysis" && Array.isArray(item?.outputs)
+      ? item.outputs.find((output) => output?.name === "summary.json")
+      : null;
+    const hash = kind === "analysis" ? summary?.sha256 : item?.data_sha256;
     const source = copySource({ kind, id: item?.id, sha256: hash });
     if (!source) {
       setNoteStatus(entry, { key: "citationUnavailable", kind: "error" });

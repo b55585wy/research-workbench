@@ -5,7 +5,7 @@ const ACTIVE_JOBS = new Set(["queued", "running"]);
 const messages = {
   zh: {
     panel: "数据与分析",
-    help: "导入 CSV、TSV、SAV 或 ZSAV，选择描述统计或独立样本 t 检验，并核对固定分析代码。结果不构成科学结论。",
+    help: "导入 CSV、TSV、SAV 或 ZSAV，选择描述统计、独立样本 t 检验或配对 t 检验，并核对固定分析代码。结果不构成科学结论。",
     upload: "导入数据",
     selectDataset: "选择数据",
     noDataset: "尚未选择数据",
@@ -149,11 +149,41 @@ const messages = {
     selectionSourceRowsHash: "源行映射 SHA-256",
     selectionParentLink: "打开父数据",
     selectionRowsLink: "查看逐行来源映射",
-    selectionDictionaryNote: "原始 SPSS 字典和缺失值规则保留在父数据中；派生表的缺失值数量会重新计算。"
+    selectionDictionaryNote: "原始 SPSS 字典和缺失值规则保留在父数据中；派生表的缺失值数量会重新计算。",
+    ttestPaired: "配对 t 检验（r-stats）",
+    pairedMethodUnavailable: "配对 t 检验当前不可用。",
+    pairedUnit: "唯一配对单位 ID 列",
+    pairedFirst: "第 1 个数值列",
+    pairedSecond: "第 2 个数值列",
+    choosePairedColumn: "请选择列",
+    pairedDirection: "差值方向始终为第 1 列减去第 2 列。",
+    pairedMissing: "缺失处理：仅使用两个数值和配对单位 ID 均完整的配对",
+    paired_two_sided: "双侧（第 1 列与第 2 列的差值不为零）",
+    paired_greater: "第 1 列减去第 2 列大于零",
+    paired_less: "第 1 列减去第 2 列小于零",
+    pairedLabel: "我确认第 1 列和第 2 列按唯一、非空的单位 ID 精确配对，并已核对配对设计。",
+    pairedStatement: "已确认按唯一、非空单位 ID 精确配对，并已核对配对设计。",
+    pairedAssumptions: "此工具不会推断配对设计、差值正态性、不同单位之间的独立性或科学有效性；运行前请自行核对这些设计与前提。",
+    pairedCounts: "完整配对计数与排除",
+    pairedTotal: "总配对数",
+    pairedUsed: "完整配对数",
+    pairedExcluded: "排除配对数",
+    pairedMissingFirstOnly: "仅第 1 列缺失",
+    pairedMissingSecondOnly: "仅第 2 列缺失",
+    pairedMissingBoth: "两列均缺失",
+    pairedStats: "完整配对摘要",
+    pairedDifferenceStats: "配对差值摘要（第 1 列 − 第 2 列）",
+    pairedStatsBasis: "统计基础：仅完整配对；n 为完整配对数，missing 为排除配对数。",
+    pairedN: "完整配对",
+    pairedMissingStat: "排除配对",
+    pairedTestResult: "配对 t 检验结果",
+    pairedDifference: "均值差（第 1 列 − 第 2 列）",
+    pairedResultNote: "以下配对结果不包含显著性结论，也不表示配对设计、差值正态性、不同单位之间的独立性或科学有效性已得到验证。",
+    pairedIdentity: "配对标识：精确、唯一、非空"
   },
   en: {
     panel: "Data & analysis",
-    help: "Import CSV, TSV, SAV, or ZSAV, choose descriptive statistics or an independent-samples t-test, and review the fixed code. Results are not scientific conclusions.",
+    help: "Import CSV, TSV, SAV, or ZSAV, choose descriptive statistics, an independent-samples t-test, or a paired t-test, and review the fixed code. Results are not scientific conclusions.",
     upload: "Import data",
     selectDataset: "Choose data",
     noDataset: "No data selected",
@@ -297,7 +327,37 @@ const messages = {
     selectionSourceRowsHash: "Source-row mapping SHA-256",
     selectionParentLink: "Open parent data",
     selectionRowsLink: "View row-level source mapping",
-    selectionDictionaryNote: "The parent data retains the original SPSS dictionary and missing-value rules; missing-value counts are recalculated for the derived table."
+    selectionDictionaryNote: "The parent data retains the original SPSS dictionary and missing-value rules; missing-value counts are recalculated for the derived table.",
+    ttestPaired: "Paired t-test (r-stats)",
+    pairedMethodUnavailable: "The paired t-test is currently unavailable.",
+    pairedUnit: "Unique pairing unit ID column",
+    pairedFirst: "First numeric column",
+    pairedSecond: "Second numeric column",
+    choosePairedColumn: "Choose a column",
+    pairedDirection: "The difference is always the first column minus the second column.",
+    pairedMissing: "Missing data: only pairs with both numeric values and the pairing unit ID present are used",
+    paired_two_sided: "Two-sided (first minus second is nonzero)",
+    paired_greater: "First minus second is greater than zero",
+    paired_less: "First minus second is less than zero",
+    pairedLabel: "I confirm that the first and second columns are exactly paired by unique, nonempty unit IDs and I have reviewed the paired design.",
+    pairedStatement: "Exact pairing by unique, nonempty unit IDs and the paired design are confirmed.",
+    pairedAssumptions: "This tool does not infer the paired design, normality of differences, independence across units, or scientific validity; review the design and prerequisites before running.",
+    pairedCounts: "Complete-pair counts and exclusions",
+    pairedTotal: "Total pairs",
+    pairedUsed: "Complete pairs",
+    pairedExcluded: "Excluded pairs",
+    pairedMissingFirstOnly: "First column only missing",
+    pairedMissingSecondOnly: "Second column only missing",
+    pairedMissingBoth: "Both columns missing",
+    pairedStats: "Complete-pair summaries",
+    pairedDifferenceStats: "Paired-difference summary (first − second)",
+    pairedStatsBasis: "Basis: complete pairs only; n is used pairs and missing is excluded pairs.",
+    pairedN: "Complete pairs",
+    pairedMissingStat: "Excluded pairs",
+    pairedTestResult: "Paired t-test result",
+    pairedDifference: "Mean difference (first − second)",
+    pairedResultNote: "These paired results include no significance verdict and do not claim that the paired design, normality of differences, independence across units, or scientific validity has been verified.",
+    pairedIdentity: "Pairing identity: exact, unique, nonempty"
   }
 };
 
@@ -330,6 +390,15 @@ export function createAnalysis(adapter) {
     ttestConfidence: byId("ttest-confidence"),
     ttestIndependent: byId("ttest-independent-confirmed"),
     ttestPreview: byId("ttest-preview"),
+    pairedOptions: byId("analysis-paired-fields"),
+    pairedUnit: byId("analysis-paired-unit"),
+    pairedFirst: byId("analysis-paired-first"),
+    pairedSecond: byId("analysis-paired-second"),
+    pairedDirection: byId("analysis-paired-direction"),
+    pairedAlternative: byId("analysis-paired-alternative"),
+    pairedConfidence: byId("analysis-paired-confidence"),
+    pairedConfirmed: byId("analysis-paired-confirmed"),
+    pairedPreview: byId("analysis-paired-preview"),
     confirmation: byId("analysis-confirmation"),
     confirmationDetails: document.querySelector(".analysis-confirmation-details"),
     code: byId("analysis-code"),
@@ -378,6 +447,7 @@ export function createAnalysis(adapter) {
         method: "describe",
         methodStatus: null,
         ttestDrafts: new Map(),
+        pairedDrafts: new Map(),
         engine: "python",
         runtime: null,
         confirmation: null,
@@ -418,7 +488,9 @@ export function createAnalysis(adapter) {
   }
 
   function methodName(method) {
-    return method === "ttest_independent" ? t("ttestIndependent") : t("describe");
+    if (method === "ttest_independent") return t("ttestIndependent");
+    if (method === "ttest_paired") return t("ttestPaired");
+    return t("describe");
   }
 
   function ttestDraft(entry) {
@@ -464,6 +536,30 @@ export function createAnalysis(adapter) {
       draft.outcome !== draft.groupColumn && labels.length === 2 && labels.includes(draft.group1) && labels.includes(draft.group2) &&
       draft.group1 !== draft.group2 && draft.independentConfirmed && Number.isFinite(draft.confidence) &&
       draft.confidence > 0 && draft.confidence < 1 && !draft.groupsPending && !entry.confirmation?.pending);
+  }
+
+  function pairedDraft(entry) {
+    const dataset = selectedDataset(entry);
+    if (!entry || !dataset) return null;
+    if (!entry.pairedDrafts.has(dataset.id)) {
+      entry.pairedDrafts.set(dataset.id, {
+        unit: "",
+        first: "",
+        second: "",
+        alternative: "two_sided",
+        confidence: 0.95,
+        pairedConfirmed: false
+      });
+    }
+    return entry.pairedDrafts.get(dataset.id);
+  }
+
+  function pairedReady(entry, draft) {
+    const dataset = selectedDataset(entry);
+    const info = methodInfo(entry, "ttest_paired");
+    return Boolean(dataset && draft && info?.available && info.library?.available && engineInfo(entry, "r")?.available &&
+      draft.unit && draft.first && draft.second && draft.unit !== draft.first && draft.unit !== draft.second && draft.first !== draft.second &&
+      draft.pairedConfirmed && Number.isFinite(draft.confidence) && draft.confidence >= 0.5 && draft.confidence <= 0.999 && !entry.confirmation?.pending);
   }
 
   function fillSelect(select, items, value, placeholder = null) {
@@ -648,19 +744,25 @@ export function createAnalysis(adapter) {
 
   function renderMethod(entry) {
     const isTTest = entry?.method === "ttest_independent";
-    const info = methodInfo(entry, "ttest_independent");
+    const isPaired = entry?.method === "ttest_paired";
+    const isStatMethod = isTTest || isPaired;
+    const independentInfo = methodInfo(entry, "ttest_independent");
+    const pairedInfo = methodInfo(entry, "ttest_paired");
+    const info = isPaired ? pairedInfo : independentInfo;
     fillSelect(elements.method, [
       { value: "describe", label: t("describe") },
-      { value: "ttest_independent", label: t("ttestIndependent"), disabled: Boolean(methodCatalog && !info?.available) }
+      { value: "ttest_independent", label: t("ttestIndependent"), disabled: Boolean(methodCatalog && !independentInfo?.available) },
+      { value: "ttest_paired", label: t("ttestPaired"), disabled: Boolean(methodCatalog && !pairedInfo?.available) }
     ], entry?.method || "describe");
     elements.method.disabled = !entry || Boolean(entry?.confirmation?.pending);
-    elements.fieldset.hidden = isTTest;
-    elements.engine.hidden = isTTest;
-    elements.engineLabel.hidden = isTTest;
-    elements.prepare.hidden = isTTest;
+    elements.fieldset.hidden = isStatMethod;
+    elements.engine.hidden = isStatMethod;
+    elements.engineLabel.hidden = isStatMethod;
+    elements.prepare.hidden = isStatMethod;
     elements.ttestOptions.hidden = !isTTest;
+    elements.pairedOptions.hidden = !isPaired;
     elements.methodStatus.replaceChildren();
-    const status = entry?.methodStatus || (methodCatalog && (!info?.available || !info.library?.available) ? { key: info?.available ? "libraryUnavailable" : "methodUnavailable", kind: "error", retry: () => discoverMethods(entry, true) } : null);
+    const status = entry?.methodStatus || (methodCatalog && (!info?.available || !info.library?.available) ? { key: info?.available ? "libraryUnavailable" : isPaired ? "pairedMethodUnavailable" : "methodUnavailable", kind: "error", retry: () => discoverMethods(entry, true) } : null);
     if (status) {
       elements.methodStatus.dataset.kind = status.kind || "info";
       elements.methodStatus.append(make("span", "", errorText(status, "methodFailed")));
@@ -714,14 +816,34 @@ export function createAnalysis(adapter) {
     }
   }
 
+  function renderPaired(entry) {
+    const draft = pairedDraft(entry);
+    const dataset = selectedDataset(entry);
+    const locked = !dataset || Boolean(entry?.confirmation?.pending);
+    const numeric = (dataset?.columns || []).filter((column) => column.numeric).map((column) => ({ value: column.name, label: column.name }));
+    const columns = (dataset?.columns || []).map((column) => ({ value: column.name, label: column.name }));
+    fillSelect(elements.pairedUnit, columns, draft?.unit, t("choosePairedColumn"));
+    fillSelect(elements.pairedFirst, numeric, draft?.first, t("choosePairedColumn"));
+    fillSelect(elements.pairedSecond, numeric, draft?.second, t("choosePairedColumn"));
+    elements.pairedAlternative.value = draft?.alternative || "two_sided";
+    if (document.activeElement !== elements.pairedConfidence) elements.pairedConfidence.value = String(draft?.confidence ?? 0.95);
+    elements.pairedConfirmed.checked = Boolean(draft?.pairedConfirmed);
+    for (const control of [elements.pairedUnit, elements.pairedFirst, elements.pairedSecond, elements.pairedAlternative, elements.pairedConfidence, elements.pairedConfirmed]) control.disabled = locked;
+    elements.pairedDirection.textContent = `${t("pairedDirection")}${draft?.first && draft?.second ? ` ${draft.first} − ${draft.second}` : ""} ${t("pairedMissing")}`;
+    elements.pairedPreview.disabled = !pairedReady(entry, draft);
+    elements.pairedPreview.textContent = t(entry?.confirmation?.method === "ttest_paired" && entry.confirmation.pending && entry.confirmation.phase === "preview" ? "previewing" : "preview");
+  }
+
   function renderRuntime(entry) {
-    if (entry?.method === "ttest_independent") {
-      const info = methodInfo(entry, "ttest_independent");
+    if (["ttest_independent", "ttest_paired"].includes(entry?.method)) {
+      const method = entry.method;
+      const info = methodInfo(entry, method);
       const runtime = engineInfo(entry, "r");
+      const fallbackRecipe = method === "ttest_paired" ? "ttest-paired-rstats-v1" : "ttest-independent-rstats-v1";
       elements.runtime.replaceChildren();
       elements.runtime.dataset.kind = info?.available && info.library?.available && runtime?.available ? "info" : "error";
       elements.runtime.append(make("p", "", info?.available && info.library?.available
-        ? t("libraryAvailable", { version: info.library.version || "—", recipe: info.recipe_id || "ttest-independent-rstats-v1" })
+        ? t("libraryAvailable", { version: info.library.version || "—", recipe: info.recipe_id || fallbackRecipe })
         : t("libraryUnavailable")));
       if (entry.runtime) elements.runtime.append(make("p", "", t("worker", { state: t(`worker_${entry.runtime.worker_state || "unavailable"}`) })));
       return;
@@ -784,6 +906,43 @@ export function createAnalysis(adapter) {
     container.append(scroll);
   }
 
+  function appendPairedCounts(container, counts) {
+    if (!counts) return;
+    container.append(make("h4", "ttest-preview-heading", t("pairedCounts")));
+    const list = make("dl", "ttest-counts");
+    for (const [field, key] of [["total", "pairedTotal"], ["used", "pairedUsed"], ["excluded", "pairedExcluded"], ["missing_first_only", "pairedMissingFirstOnly"], ["missing_second_only", "pairedMissingSecondOnly"], ["missing_both", "pairedMissingBoth"]]) {
+      appendField(list, t(key), counts[field] ?? "—");
+    }
+    container.append(list);
+  }
+
+  function appendPairedStats(container, stats, differenceStats = null) {
+    container.append(make("h4", "ttest-preview-heading", t("pairedStats")), make("p", "analysis-muted", t("pairedStatsBasis")));
+    const scroll = make("div", "analysis-table-scroll");
+    const table = make("table", "analysis-table analysis-result-table");
+    const thead = document.createElement("thead");
+    const header = document.createElement("tr");
+    header.append(make("th", "", t("selectedColumns")));
+    for (const key of ["n", "missing", "mean", "median", "sd", "min", "max"]) header.append(make("th", "", key === "n" ? t("pairedN") : key === "missing" ? t("pairedMissingStat") : t(`statistic_${key}`)));
+    thead.append(header);
+    const tbody = document.createElement("tbody");
+    for (const stat of stats || []) {
+      const row = document.createElement("tr");
+      row.append(make("th", "", stat.column));
+      for (const key of ["n", "missing", "mean", "median", "sd", "min", "max"]) row.append(make("td", "", stat[key] ?? "—"));
+      tbody.append(row);
+    }
+    table.append(thead, tbody);
+    scroll.append(table);
+    container.append(scroll);
+    if (differenceStats) {
+      container.append(make("h4", "ttest-preview-heading", t("pairedDifferenceStats")));
+      const differences = make("dl", "ttest-counts");
+      for (const key of ["n", "mean", "median", "sd", "min", "max"]) appendField(differences, key === "n" ? t("pairedN") : t(`statistic_${key}`), differenceStats[key] ?? "—");
+      container.append(differences);
+    }
+  }
+
   function renderConfirmation(entry) {
     const confirmation = entry?.confirmation;
     elements.confirmation.hidden = !confirmation;
@@ -792,7 +951,8 @@ export function createAnalysis(adapter) {
       elements.code.textContent = "";
       return;
     }
-    const list = make("dl", confirmation.method === "ttest_independent" ? "analysis-confirmation-list ttest-confirmation-list" : "analysis-confirmation-list");
+    const isStatMethod = ["ttest_independent", "ttest_paired"].includes(confirmation.method);
+    const list = make("dl", isStatMethod ? "analysis-confirmation-list ttest-confirmation-list" : "analysis-confirmation-list");
     appendField(list, t("dataset"), confirmation.datasetName);
     appendField(list, t("datasetHash"), confirmation.datasetHash);
     if (confirmation.method === "ttest_independent") {
@@ -808,6 +968,18 @@ export function createAnalysis(adapter) {
       appendField(list, t("confidence"), `${Number(options.confidence) * 100}%`);
       appendField(list, t("independentStatement"), t("missingCompleteCases"));
       appendField(list, "r-stats SHA-256", confirmation.body.library_sha256);
+    } else if (confirmation.method === "ttest_paired") {
+      const options = confirmation.body.paired;
+      appendField(list, t("method"), t("ttestPaired"));
+      appendField(list, t("pairedFirst"), confirmation.body.columns[0]);
+      appendField(list, t("pairedSecond"), confirmation.body.columns[1]);
+      appendField(list, t("pairedUnit"), options.unit_column);
+      appendField(list, t("pairedDifference"), `${confirmation.body.columns[0]} − ${confirmation.body.columns[1]}`);
+      appendField(list, t("alternative"), t(`paired_${options.alternative}`));
+      appendField(list, t("confidence"), `${Number(options.confidence) * 100}%`);
+      appendField(list, t("pairedStatement"), t("pairedIdentity"));
+      appendField(list, t("pairedMissing"), "complete_pairs");
+      appendField(list, "r-stats SHA-256", confirmation.body.library_sha256);
     } else {
       appendField(list, t("selectedColumns"), confirmation.columns.join(", "));
       appendField(list, t("language"), engineName(confirmation.engine));
@@ -817,17 +989,22 @@ export function createAnalysis(adapter) {
     elements.confirmationDetails.append(list);
     if (confirmation.preview) {
       const preview = make("div", "ttest-preview-summary");
-      appendTtestCounts(preview, confirmation.preview.counts);
-      appendTtestStats(preview, confirmation.preview.stats);
+      if (confirmation.method === "ttest_paired") {
+        appendPairedCounts(preview, confirmation.preview.counts);
+        appendPairedStats(preview, confirmation.preview.stats, confirmation.preview.difference_stats);
+      } else {
+        appendTtestCounts(preview, confirmation.preview.counts);
+        appendTtestStats(preview, confirmation.preview.stats);
+      }
       for (const warning of confirmation.preview.warnings || []) preview.append(make("p", "ttest-assumptions", warning));
       elements.confirmationDetails.append(preview);
     }
     elements.code.textContent = confirmation.recipe.code;
-    const needsPreview = confirmation.method === "ttest_independent" && !confirmation.preview;
+    const needsPreview = isStatMethod && !confirmation.preview;
     elements.confirm.disabled = confirmation.pending || needsPreview;
     elements.confirm.textContent = t(confirmation.pending
       ? confirmation.phase === "preview" ? "previewing" : "runningRequest"
-      : confirmation.runFailed || confirmation.method !== "ttest_independent" && confirmation.requestId ? "retry" : "confirm");
+      : confirmation.runFailed || !isStatMethod && confirmation.requestId ? "retry" : "confirm");
     elements.cancelConfirm.disabled = confirmation.pending;
     elements.cancelConfirm.textContent = t("cancel");
   }
@@ -926,6 +1103,42 @@ export function createAnalysis(adapter) {
     }
   }
 
+  function renderPairedResult(container, job) {
+    const result = job.result;
+    const test = result.test || {};
+    const pairing = result.pairing || {};
+    const columns = Array.isArray(test.columns) ? test.columns : Array.isArray(pairing.columns) ? pairing.columns : job.columns || [];
+    const options = job.paired || {};
+    container.append(make("p", "analysis-result-note", t("pairedResultNote")), make("p", "ttest-assumptions", t("pairedAssumptions")));
+    const definition = make("dl", "ttest-definition");
+    appendField(definition, t("pairedFirst"), columns[0] || "—");
+    appendField(definition, t("pairedSecond"), columns[1] || "—");
+    appendField(definition, t("pairedUnit"), test.unit_column || pairing.unit_column || options.unit_column || "—");
+    appendField(definition, t("pairedIdentity"), pairing.identity || "exact_unique_nonempty");
+    appendField(definition, t("alternative"), t(`paired_${test.alternative || options.alternative || "two_sided"}`));
+    appendField(definition, t("pairedMissing"), pairing.missing || options.missing || "complete_pairs");
+    container.append(definition);
+    appendPairedCounts(container, result.counts);
+    appendPairedStats(container, result.stats, result.difference_stats);
+    container.append(make("h4", "ttest-result-heading", t("pairedTestResult")));
+    const values = make("dl", "ttest-test-values");
+    appendField(values, t("statistic"), test.statistic ?? "—");
+    appendField(values, t("df"), test.df ?? "—");
+    appendField(values, t("pValue"), test.p_value ?? "—");
+    appendField(values, `${t("pairedDifference")}: ${columns[0] || "—"} − ${columns[1] || "—"}`, test.difference ?? "—");
+    appendField(values, t("standardError"), test.standard_error ?? "—");
+    const confidence = Number(test.confidence ?? options.confidence ?? 0.95) * 100;
+    appendField(values, t("confidenceInterval", { confidence }), `[${confidenceBound(test.ci, true)}, ${confidenceBound(test.ci, false)}]`);
+    appendField(values, t("software"), softwareText(job));
+    container.append(values);
+    if (result.warnings?.length) {
+      container.append(make("h4", "ttest-result-heading", t("warnings")));
+      const warnings = make("ul", "ttest-warning-list");
+      for (const warning of result.warnings) warnings.append(make("li", "", warning));
+      container.append(warnings);
+    }
+  }
+
   function renderDescriptiveResult(container, job) {
     container.append(make("p", "analysis-result-note", t("resultNote")));
     const scroll = make("div", "analysis-table-scroll");
@@ -974,7 +1187,7 @@ export function createAnalysis(adapter) {
     if (job.status === "succeeded") {
       const actions = make("div", "analysis-result-actions");
       actions.append(jobButton("view-notebook", t("viewNotebook"), () => notebook.open(currentId, job)));
-      if (job.method === "ttest_independent") {
+      if (["ttest_independent", "ttest_paired"].includes(job.method)) {
         actions.append(jobButton("analysis-note", t("note"), async () => {
           const added = await adapter.addAnalysisCitation?.(currentId, job);
           if (added && entry === currentEntry()) {
@@ -988,6 +1201,7 @@ export function createAnalysis(adapter) {
     if (job.error) elements.result.append(make("p", "analysis-error", t("jobError", { message: job.error.message || job.error.code || "—" })));
     if (job.status === "succeeded" && job.result) {
       if (job.method === "ttest_independent" || job.result.method === "ttest_independent") renderTtestResult(elements.result, job);
+      else if (job.method === "ttest_paired" || job.result.method === "ttest_paired") renderPairedResult(elements.result, job);
       else renderDescriptiveResult(elements.result, job);
     }
     renderLog(entry, job);
@@ -1015,6 +1229,7 @@ export function createAnalysis(adapter) {
     elements.share.disabled = !selectedDataset(entry);
     elements.share.nextElementSibling.textContent = t("share");
     renderTtest(entry);
+    renderPaired(entry);
     renderRuntime(entry);
     const dataset = selectedDataset(entry);
     elements.prepare.disabled = entry?.method !== "describe" || !dataset || !entry?.selectedColumns.size || !engineInfo(entry)?.available || Boolean(entry?.confirmation?.pending);
@@ -1205,6 +1420,94 @@ export function createAnalysis(adapter) {
     if (entry === currentEntry()) render();
   }
 
+  async function previewPaired(entry) {
+    const dataset = selectedDataset(entry);
+    const draft = pairedDraft(entry);
+    const documentId = currentId;
+    if (!entry || !dataset || !draft || !documentId || entry.confirmation?.pending) return;
+    let confirmation = entry.confirmation?.method === "ttest_paired" ? entry.confirmation : null;
+    if (confirmation) confirmation.preview = null;
+    entry.status = { key: "previewing", kind: "info" };
+    render();
+    try {
+      if (!methodCatalog) await discoverMethods(entry);
+      if (entry !== currentEntry() || currentId !== documentId || pairedDraft(entry) !== draft || entry.method !== "ttest_paired") return;
+      const info = methodInfo(entry, "ttest_paired");
+      if (!info?.available || !info.library?.available) throw new Error("library_unavailable");
+      if (!confirmation) {
+        if (!pairedReady(entry, draft)) throw new Error("ttest_preview_required");
+        const recipe = await getRecipe("r", "ttest_paired");
+        if (entry !== currentEntry() || currentId !== documentId || pairedDraft(entry) !== draft || entry.method !== "ttest_paired") return;
+        if (recipe.sha256 !== info.recipe_sha256) throw new Error("recipeMismatch");
+        const requestId = crypto.randomUUID();
+        const body = {
+          request_id: requestId,
+          dataset_id: dataset.id,
+          dataset_sha256: dataset.sha256,
+          engine: "r",
+          method: "ttest_paired",
+          columns: [draft.first, draft.second],
+          recipe_sha256: recipe.sha256,
+          library_sha256: info.library.sha256,
+          paired: {
+            unit_column: draft.unit,
+            alternative: draft.alternative,
+            confidence: draft.confidence,
+            missing: "complete_pairs",
+            paired_samples_confirmed: true
+          }
+        };
+        confirmation = {
+          method: "ttest_paired",
+          documentId,
+          datasetId: dataset.id,
+          datasetName: dataset.original_filename,
+          datasetHash: dataset.sha256,
+          engine: "r",
+          recipe,
+          requestId,
+          body,
+          preview: null,
+          phase: "preview",
+          pending: false,
+          runFailed: false
+        };
+        entry.confirmation = confirmation;
+      }
+      confirmation.phase = "preview";
+      confirmation.pending = true;
+      entry.status = { key: "previewing", kind: "info" };
+      render();
+      const preview = await adapter.api(`/api/v1/documents/${encodeURIComponent(documentId)}/analyses/paired/preview`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(confirmation.body)
+      });
+      if (entry.confirmation !== confirmation || pairedDraft(entry) !== draft) return;
+      const pairing = preview?.pairing;
+      if (preview?.saved !== false || JSON.stringify(canonical(preview.parameters)) !== JSON.stringify(canonical(confirmation.body)) ||
+        preview.recipe?.sha256 !== confirmation.body.recipe_sha256 || preview.library?.sha256 !== confirmation.body.library_sha256 ||
+        !preview.counts || !Array.isArray(preview.stats) || preview.stats_basis !== "complete_pairs" || !preview.difference_stats ||
+        pairing?.unit_column !== confirmation.body.paired.unit_column || pairing?.direction !== "first_minus_second" || pairing?.missing !== "complete_pairs" ||
+        JSON.stringify(pairing?.columns) !== JSON.stringify(confirmation.body.columns)) throw new Error("previewFailed");
+      confirmation.preview = preview;
+      confirmation.pending = false;
+      entry.status = { key: "previewReady", kind: "success" };
+    } catch (error) {
+      const currentAttempt = confirmation
+        ? entry.confirmation === confirmation
+        : !entry.confirmation && entry === currentEntry() && currentId === documentId;
+      if (currentAttempt && pairedDraft(entry) === draft) {
+        if (confirmation) {
+          confirmation.preview = null;
+          confirmation.pending = false;
+        }
+        entry.status = { key: error.code || error.message || "previewFailed", kind: "error", retry: () => previewPaired(entry) };
+      }
+    }
+    if (entry === currentEntry()) render();
+  }
+
   async function prepare(entry) {
     const documentId = currentId;
     const dataset = selectedDataset(entry);
@@ -1242,14 +1545,14 @@ export function createAnalysis(adapter) {
 
   async function confirmRun(entry) {
     const confirmation = entry.confirmation;
-    if (!confirmation || confirmation.pending || confirmation.method === "ttest_independent" && !confirmation.preview) return;
+    const isStatMethod = ["ttest_independent", "ttest_paired"].includes(confirmation?.method);
+    if (!confirmation || confirmation.pending || isStatMethod && !confirmation.preview) return;
     const documentId = confirmation.documentId;
     const navigationGeneration = adapter.getNavigationGeneration?.();
     const requestSequence = ++entry.jobRequestSequence;
     entry.datasetRequestSequence += 1;
-    const isTTest = confirmation.method === "ttest_independent";
     if (!confirmation.requestId) confirmation.requestId = crypto.randomUUID();
-    const body = isTTest ? confirmation.body : {
+    const body = isStatMethod ? confirmation.body : {
       request_id: confirmation.requestId,
       dataset_id: confirmation.datasetId,
       dataset_sha256: confirmation.datasetHash,
@@ -1657,9 +1960,9 @@ export function createAnalysis(adapter) {
   elements.method.addEventListener("change", () => {
     const entry = currentEntry();
     if (!entry) return;
-    entry.method = elements.method.value === "ttest_independent" ? "ttest_independent" : "describe";
+    entry.method = ["ttest_independent", "ttest_paired"].includes(elements.method.value) ? elements.method.value : "describe";
     invalidateConfirmation(entry);
-    if (entry.method === "ttest_independent") discoverMethods(entry);
+    if (entry.method !== "describe") discoverMethods(entry);
     render();
   });
   elements.ttestOutcome.addEventListener("change", () => {
@@ -1714,6 +2017,36 @@ export function createAnalysis(adapter) {
   elements.ttestPreview.addEventListener("click", () => {
     const entry = currentEntry();
     if (entry) previewTtest(entry);
+  });
+  for (const [control, field] of [[elements.pairedUnit, "unit"], [elements.pairedFirst, "first"], [elements.pairedSecond, "second"], [elements.pairedAlternative, "alternative"]]) {
+    control.addEventListener("change", () => {
+      const entry = currentEntry();
+      const draft = pairedDraft(entry);
+      if (!draft) return;
+      draft[field] = control.value;
+      invalidateConfirmation(entry);
+      render();
+    });
+  }
+  elements.pairedConfidence.addEventListener("input", () => {
+    const entry = currentEntry();
+    const draft = pairedDraft(entry);
+    if (!draft) return;
+    draft.confidence = Number(elements.pairedConfidence.value);
+    invalidateConfirmation(entry);
+    render();
+  });
+  elements.pairedConfirmed.addEventListener("change", () => {
+    const entry = currentEntry();
+    const draft = pairedDraft(entry);
+    if (!draft) return;
+    draft.pairedConfirmed = elements.pairedConfirmed.checked;
+    invalidateConfirmation(entry);
+    render();
+  });
+  elements.pairedPreview.addEventListener("click", () => {
+    const entry = currentEntry();
+    if (entry) previewPaired(entry);
   });
   elements.uploadButton.addEventListener("click", () => elements.uploadInput.click());
   elements.uploadInput.addEventListener("change", () => {
@@ -1783,7 +2116,7 @@ export function createAnalysis(adapter) {
       entry.confirmation = null;
       entry.status = null;
       render();
-      (entry.method === "ttest_independent" ? elements.ttestPreview : elements.prepare).focus();
+      (entry.method === "ttest_independent" ? elements.ttestPreview : entry.method === "ttest_paired" ? elements.pairedPreview : elements.prepare).focus();
     }
   });
   elements.log.addEventListener("toggle", () => {
@@ -1814,6 +2147,17 @@ export function createAnalysis(adapter) {
       elements.ttestIndependent.nextElementSibling.textContent = t("independentLabel");
       elements.ttestOptions.querySelector(".ttest-assumptions").textContent = t("assumptions");
       elements.ttestOptions.setAttribute("aria-label", t("ttestIndependent"));
+      elements.panel.querySelector('label[for="analysis-paired-unit"]').textContent = t("pairedUnit");
+      elements.panel.querySelector('label[for="analysis-paired-first"]').textContent = t("pairedFirst");
+      elements.panel.querySelector('label[for="analysis-paired-second"]').textContent = t("pairedSecond");
+      elements.panel.querySelector('label[for="analysis-paired-alternative"]').textContent = t("alternative");
+      elements.panel.querySelector('label[for="analysis-paired-confidence"]').textContent = t("confidence");
+      elements.pairedAlternative.querySelector('option[value="two_sided"]').textContent = t("paired_two_sided");
+      elements.pairedAlternative.querySelector('option[value="greater"]').textContent = t("paired_greater");
+      elements.pairedAlternative.querySelector('option[value="less"]').textContent = t("paired_less");
+      elements.pairedConfirmed.nextElementSibling.textContent = t("pairedLabel");
+      elements.pairedOptions.querySelector(".ttest-assumptions").textContent = t("pairedAssumptions");
+      elements.pairedOptions.setAttribute("aria-label", t("ttestPaired"));
       elements.confirmation.setAttribute("aria-label", t("confirmation"));
       elements.result.setAttribute("aria-label", t("jobs"));
       notebook.applyLanguage(nextLanguage);

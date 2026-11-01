@@ -605,3 +605,14 @@ Includes legacy API compatibility and concurrent metadata/note edits within one
 read snapshot. Isolated native and affected old browser workflows cover explicit
 search, exact source reopening, drafts, races, retry and no automatic model calls.
 Schema13/all28 original tables and material bytes remain unchanged at deployment.
+
+## v0.19 paired t-test
+
+R stats paired execution is compared against independent mpmath1.3.0/60-decimal
+Student CDF/quantile references over 24 synthetic/public combinations of direction,
+confidence and reversed columns. The verification library remains outside product
+dependencies. Public sleep is reshaped by exact ID with original side-row mapping.
+Checks include complete-pair means, ID uniqueness/NA/Unicode/leading zeros, preview
+without writes, trace drift, publication failures, atomic proposal receipts and
+continuous study/scatter/note. Native source-note tests cover the analysis outputs
+array bridge. No clinical/design validity or automatic assumption checking is claimed.

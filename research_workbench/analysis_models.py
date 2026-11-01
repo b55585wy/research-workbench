@@ -1,7 +1,7 @@
 from typing import Literal
 from uuid import UUID
 from pydantic import BaseModel,ConfigDict,Field,field_validator,model_validator
-from .statistics_models import TTestOptions
+from .statistics_models import TTestOptions,PairedOptions
 
 
 class AnalysisCreate(BaseModel):
@@ -12,16 +12,20 @@ class AnalysisCreate(BaseModel):
     engine:Literal['python','r']
     columns:list[str]=Field(min_length=1,max_length=50)
     recipe_sha256:str=Field(pattern='^[a-f0-9]{64}$')
-    method:Literal['describe','ttest_independent']='describe'
+    method:Literal['describe','ttest_independent','ttest_paired']='describe'
     ttest:TTestOptions|None=None
+    paired:PairedOptions|None=None
     library_sha256:str|None=Field(default=None,pattern='^[a-f0-9]{64}$')
 
     @model_validator(mode='after')
     def method_fields(self):
         if self.method=='describe':
-            if self.ttest is not None or self.library_sha256 is not None:raise ValueError('Unexpected statistical parameters')
-        elif self.engine!='r' or len(self.columns)!=1 or self.ttest is None or self.library_sha256 is None:
-            raise ValueError('T-test requires one outcome, R, explicit options and verified library')
+            if self.ttest is not None or self.paired is not None or self.library_sha256 is not None:raise ValueError('Unexpected statistical parameters')
+        elif self.method=='ttest_independent':
+            if self.engine!='r' or len(self.columns)!=1 or self.ttest is None or self.paired is not None or self.library_sha256 is None:
+                raise ValueError('Independent t-test requires one outcome, R, explicit options and verified library')
+        elif self.engine!='r' or len(self.columns)!=2 or self.paired is None or self.ttest is not None or self.library_sha256 is None or self.paired.unit_column in self.columns:
+            raise ValueError('Paired t-test requires R, two ordered outcomes, a separate unit ID and verified library')
         return self
 
     @field_validator('columns')
@@ -33,6 +37,8 @@ class AnalysisCreate(BaseModel):
 
 def analysis_payload(payload):
     value=payload.model_dump(mode='json')
+    if payload.method!='ttest_paired':value.pop('paired')
+    else:value.pop('ttest')
     if payload.method=='describe':
         for key in ('method','ttest','library_sha256'):value.pop(key)
     return value

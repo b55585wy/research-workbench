@@ -9,8 +9,8 @@ from .studies import verify_owner as verify_source
 from .models import WorkspaceError
 
 ACTIVE=('running','waiting_confirmation','waiting_analysis')
-WRITES={'analysis':('run_analysis','run_t_test'),'chart':('create_chart',),'note':('create_note',)}
-WRITE_TOOLS={'analysis':{'propose_analysis','propose_t_test'},'chart':{'propose_chart'},'note':{'propose_note'}}
+WRITES={'analysis':('run_analysis','run_t_test','run_paired_t_test'),'chart':('create_chart',),'note':('create_note',)}
+WRITE_TOOLS={'analysis':{'propose_analysis','propose_t_test','propose_paired_t_test'},'chart':{'propose_chart'},'note':{'propose_note'}}
 READ_TOOLS={'read_context','read_page','read_dataset','analysis_methods','analysis_status','list_analyses',
             'read_analysis','read_t_test_groups','preview_t_test','chart_capabilities','list_charts',
             'read_chart','preview_chart','list_notes','read_note','complete_task'}
@@ -138,7 +138,7 @@ class AgentTasks:
         return ('This is an explicitly authorized THREE-STAGE research task: analysis, then chart, then a source note. '
                 'User confirms EVERY write. Current stage is '+phase+'. Explain the overall plan briefly, then propose only this stage. '
                 'When the stage is feasible, you MUST call its installed proposal tool ('+
-                {'analysis':'propose_analysis or propose_t_test','chart':'propose_chart','note':'propose_note'}[phase]+
+                {'analysis':'propose_analysis, propose_t_test or propose_paired_t_test','chart':'propose_chart','note':'propose_note'}[phase]+
                 ') to create the concrete pending UI proposal. The user confirms that UI proposal; do NOT ask for preliminary '
                 'permission in prose or end with only a plan. A proposal call itself does NOT execute or save the business operation. '
                 'Do not repeat completed work or treat queued analysis as success. Read actual saved owned records before deriving a chart/note. '

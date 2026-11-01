@@ -339,6 +339,7 @@
           <select id="analysis-method" disabled>
             <option value="describe">描述统计</option>
             <option value="ttest_independent">独立样本 t 检验</option>
+            <option value="ttest_paired">配对 t 检验</option>
           </select>
           <div id="analysis-method-status" class="analysis-status" role="status" aria-live="polite"></div>
           <fieldset id="analysis-columns-fieldset" class="analysis-columns-fieldset" disabled>
@@ -387,6 +388,29 @@
             </label>
             <p class="ttest-assumptions">运行前请检查设计、异常值和所选方法的前提；此工具不会自动确认前提成立。</p>
             <button id="ttest-preview" class="button button-secondary" type="button" disabled>预览完整数据与固定代码</button>
+          </section>
+          <section id="analysis-paired-fields" class="ttest-options" aria-label="配对 t 检验设置" hidden>
+            <label class="analysis-label" for="analysis-paired-unit">唯一配对单位 ID 列</label>
+            <select id="analysis-paired-unit" disabled></select>
+            <label class="analysis-label" for="analysis-paired-first">第 1 个数值列</label>
+            <select id="analysis-paired-first" disabled></select>
+            <label class="analysis-label" for="analysis-paired-second">第 2 个数值列</label>
+            <select id="analysis-paired-second" disabled></select>
+            <p id="analysis-paired-direction" class="ttest-direction">差值方向始终为第 1 列减去第 2 列；仅使用两个数值和配对单位 ID 均完整的配对。</p>
+            <label class="analysis-label" for="analysis-paired-alternative">备择方向</label>
+            <select id="analysis-paired-alternative" disabled>
+              <option value="two_sided">双侧（第 1 列与第 2 列的差值不为零）</option>
+              <option value="greater">第 1 列减去第 2 列大于零</option>
+              <option value="less">第 1 列减去第 2 列小于零</option>
+            </select>
+            <label class="analysis-label" for="analysis-paired-confidence">置信水平</label>
+            <input id="analysis-paired-confidence" type="number" min="0.5" max="0.999" step="0.01" value="0.95" inputmode="decimal" disabled>
+            <label class="ttest-independent" for="analysis-paired-confirmed">
+              <input id="analysis-paired-confirmed" type="checkbox" disabled>
+              <span>我确认第 1 列和第 2 列按唯一、非空的单位 ID 精确配对，并已核对配对设计。</span>
+            </label>
+            <p class="ttest-assumptions">此工具不会推断配对设计、差值正态性、不同单位之间的独立性或科学有效性；运行前请自行核对这些设计与前提。</p>
+            <button id="analysis-paired-preview" class="button button-secondary" type="button" disabled>预览完整数据与固定代码</button>
           </section>
           <div class="analysis-runtime" role="status"></div>
           <button id="analysis-prepare" class="button button-secondary" type="button" disabled>查看并准备运行</button>

@@ -100,6 +100,7 @@ export function createWorkspace(adapter) {
     byId("analysis-engine-label"),
     byId("analysis-engine"),
     byId("ttest-options"),
+    byId("analysis-paired-fields"),
     analysisBody.querySelector(".analysis-runtime"),
     byId("analysis-prepare"),
     byId("analysis-confirmation")

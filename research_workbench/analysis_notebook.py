@@ -47,6 +47,9 @@ def literal_summary(job):
 
 
 def result_table(result):
+    if result.get('method')=='ttest_paired':
+        from .paired_ttest_result import table
+        return table(result)
     keys=('column','n','missing','mean','median','sd','min','max')
     header='<tr>'+''.join('<th>'+key+'</th>' for key in keys)+'</tr>'
     rows=['<tr>'+''.join('<td>'+escape(str(item[key]) if item[key] is not None else '—')+'</td>' for key in keys)+'</tr>' for item in result['stats']]
@@ -70,6 +73,7 @@ def notebook_from_snapshot(job,files):
         expected={'request_id':job['id'],'dataset_id':job['dataset_id'],'dataset_sha256':job['dataset_sha256'],
                   'engine':job['engine'],'columns':job['columns'],'recipe_sha256':job['recipe']['sha256']}
         if job.get('method')=='ttest_independent':expected.update({k:job[k] for k in ('method','ttest','library_sha256')})
+        if job.get('method')=='ttest_paired':expected.update({k:job[k] for k in ('method','paired','library_sha256')})
         if any(parameters['parameters'][k]!=v for k,v in expected.items()):raise invalid()
         if parameters['engine_version']!=job['engine_version'] or json.loads(files['summary.json'])!=job['result']:raise invalid()
         logs=[{'output_type':'stream','name':name,'text':files[name+'.txt'].decode('utf-8')} for name in ('stdout','stderr') if files[name+'.txt']]

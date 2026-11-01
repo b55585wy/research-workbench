@@ -230,3 +230,13 @@ GET /api/v1/search adds include_studies=true for saved study names/questions and
 active null-page study notes. Default/false preserves legacy response keys and
 PDF-only results. One read snapshot, bounded literal casefold matching, no model
 invocation or writes. Full fields and scope: [UNIFIED-SEARCH.md](UNIFIED-SEARCH.md).
+
+## v0.19 paired t-test
+
+AnalysisCreate adds method=ttest_paired and mutually exclusive paired options.
+POST .../analyses/paired/preview validates explicit unique unit ID plus two ordered
+numeric columns and reports complete/excluded pairs without job/p values. Runs
+use the existing confirmed analyses endpoint; old payload serialization and recipes
+remain exact. New Agent tools preview_paired_t_test/propose_paired_t_test and
+run_paired_t_test proposal retain source hashes and explicit confirmations.
+Full fields/result/artifacts: [PAIRED-T-TEST.md](PAIRED-T-TEST.md).
