@@ -10,6 +10,7 @@ import { createAssistant } from "/assistant.js";
 import { createRichText, renderRichHtml } from "/rich-text.js";
 import { createResearchRecord } from "/research-record.js";
 import { createStudy } from "/study.js";
+import { createReaderFind } from "/reader-find.js";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = "/vendor/pdfjs/build/pdf.worker.mjs";
 
@@ -254,6 +255,37 @@ const messages = {
     annotationStyleSaved: "标注样式已保存。",
     addToAssistant: "加入助手",
     notePageAnnotation: "第 {page} 页 · 文字标注",
+    viewMode: "阅读模式",
+    viewContinuous: "连续滚动",
+    viewSingle: "单页",
+    findInPdf: "查找正文",
+    findPlaceholder: "在当前 PDF 中查找",
+    findClose: "关闭",
+    findPrevious: "上一个匹配",
+    findNext: "下一个匹配",
+    findSearching: "正在检索第 {page} / {total} 页…",
+    findEmpty: "输入文字以查找当前 PDF。",
+    findNoMatches: "没有找到匹配文字，共检索 {scanned} 页。",
+    findCount: "{current} / {count} 个匹配 · 第 {page} 页 · 已检索 {scanned} 页",
+    findCountPartial: "{current} / {count} 个匹配 · 第 {page} 页 · 结果已达上限，检索不完整",
+    findPartial: "部分页面未检索或内容已截断；已检索 {scanned} 页。",
+    findScanned: "其中 {count} 页没有可检索文字；未进行 OCR。",
+    findFailed: "有 {count} 页文字读取失败，结果不完整。请重试。",
+    findRetry: "查找未完成，请重试。",
+    crossPageSelection: "不支持跨页选择；请在一页内重新选择文字。",
+    pageRenderRetry: "此页显示失败。",
+    notesFilterText: "筛选笔记",
+    notesFilterPlaceholder: "搜索正文或原始引文",
+    filterAll: "全部",
+    selectVisible: "选择当前显示",
+    clearSelection: "清除选择",
+    batchAddAssistant: "将所选加入助手",
+    notesVisibleCount: "显示 {visible} / {total} 条",
+    notesNoMatch: "没有符合筛选条件的笔记。",
+    notesSelectedCount: "已选择 {count} 条",
+    notesBatchLimit: "最多向助手加入 8 条唯一笔记（包含已有引用）；请减少选择。",
+    notesBatchAdded: "已将 {count} 条笔记加入助手，尚未发送。",
+    notesBatchInvalid: "所选笔记已变化或不可用，未加入任何引用。请刷新选择。",
     untitled: "未命名文献"
   },
   en: {
@@ -489,6 +521,37 @@ const messages = {
     annotationStyleSaved: "Annotation style saved.",
     addToAssistant: "Add to assistant",
     notePageAnnotation: "Page {page} · text annotation",
+    viewMode: "Reading mode",
+    viewContinuous: "Continuous",
+    viewSingle: "Single page",
+    findInPdf: "Find in PDF",
+    findPlaceholder: "Find in the current PDF",
+    findClose: "Close",
+    findPrevious: "Previous match",
+    findNext: "Next match",
+    findSearching: "Searching page {page} of {total}…",
+    findEmpty: "Enter text to find in the current PDF.",
+    findNoMatches: "No matches found across {scanned} scanned pages.",
+    findCount: "Match {current} of {count} · page {page} · {scanned} pages scanned",
+    findCountPartial: "Match {current} of {count} · page {page} · result limit reached; search is partial",
+    findPartial: "Some pages were not scanned or their text was truncated; {scanned} pages scanned.",
+    findScanned: "{count} pages had no searchable text; OCR was not performed.",
+    findFailed: "Text could not be read on {count} pages, so results are incomplete. Try again.",
+    findRetry: "Find did not finish. Try again.",
+    crossPageSelection: "Cross-page selection is not supported. Select text within one page.",
+    pageRenderRetry: "This page could not be displayed.",
+    notesFilterText: "Filter notes",
+    notesFilterPlaceholder: "Search note text or original quote",
+    filterAll: "All",
+    selectVisible: "Select visible",
+    clearSelection: "Clear selection",
+    batchAddAssistant: "Add selected to assistant",
+    notesVisibleCount: "Showing {visible} of {total}",
+    notesNoMatch: "No notes match these filters.",
+    notesSelectedCount: "{count} selected",
+    notesBatchLimit: "Add at most 8 unique notes to the assistant, including existing references. Select fewer notes.",
+    notesBatchAdded: "Added {count} notes to the assistant. Nothing was sent.",
+    notesBatchInvalid: "Selected notes changed or are unavailable. No references were added; refresh your selection.",
     untitled: "Untitled paper"
   }
 };
@@ -522,6 +585,8 @@ const elements = {
   zoomOut: $("zoom-out"),
   zoomFit: $("zoom-fit"),
   zoomLabel: $("zoom-label"),
+  viewMode: $("reader-view-mode"),
+  findToggle: $("reader-find-toggle"),
   exportReadingRecord: $("export-reading-record"),
   metadataPanel: $("metadata-panel"),
   metadataForm: $("metadata-form"),
@@ -569,6 +634,15 @@ const elements = {
   notesList: $("notes-list"),
   notesEmpty: $("notes-empty"),
   notesCount: $("notes-count"),
+  notesFilterPanel: $("notes-filter-panel"),
+  notesFilterQuery: $("notes-filter-query"),
+  notesFilterColor: $("notes-filter-color"),
+  notesFilterKind: $("notes-filter-kind"),
+  notesFilterClear: $("notes-filter-clear"),
+  notesFilterStatus: $("notes-filter-status"),
+  notesSelectVisible: $("notes-select-visible"),
+  notesSelectionClear: $("notes-selection-clear"),
+  notesBatchAgent: $("notes-batch-agent"),
   editModeLabel: $("edit-mode-label"),
   editCancel: $("edit-cancel"),
   deletedNotes: $("deleted-notes"),
@@ -597,12 +671,21 @@ const state = {
   pdf: null,
   pdfTask: null,
   page: 1,
+  viewMode: readViewMode(),
+  readerPages: new Map(),
+  readerPagesContainer: null,
+  activePageRecord: null,
+  continuousFrame: null,
+  readerLayoutSequence: 0,
+  readerLayoutLocked: false,
+  pointerDragPage: null,
   notes: [],
   noteStates: [],
   noteStatesLoaded: false,
   excerpts: [],
   drafts: new Map(),
   editDrafts: new Map(),
+  noteTools: new Map(),
   metadata: new Map(),
   search: {
     query: "",
@@ -623,7 +706,6 @@ const state = {
   renderSequence: 0,
   renderQueue: Promise.resolve(),
   renderTask: null,
-  textLayerTask: null,
   capturedTextSelection: null,
   loadController: null,
   pendingUpload: false,
@@ -662,10 +744,12 @@ let datasetSelection = null;
 let dataImports = null;
 let charts = null;
 let workspace = null;
+let readerWorkspaceVisible = false;
 let assistant = null;
 let richText = null;
 let researchRecord = null;
 let study = null;
+let readerFind = null;
 
 function isStudy(document = state.document) {
   return document?.kind === "study";
@@ -684,6 +768,14 @@ function readTheme() {
     return localStorage.getItem("research-workbench-theme") === "doraemon-blue" ? "doraemon-blue" : "default";
   } catch {
     return "default";
+  }
+}
+
+function readViewMode() {
+  try {
+    return localStorage.getItem("research-workbench-reader-view-mode") === "single" ? "single" : "continuous";
+  } catch {
+    return "continuous";
   }
 }
 
@@ -770,6 +862,7 @@ function applyLanguage() {
   richText?.applyLanguage(state.language);
   researchRecord?.applyLanguage(state.language);
   study?.applyLanguage(state.language);
+  readerFind?.applyLanguage();
 }
 
 class ApiError extends Error {
@@ -1781,6 +1874,9 @@ function renderDocumentDetails() {
   elements.uploadInput.disabled = state.pendingUpload;
   elements.exportReadingRecord.disabled = !document || isStudy(document) || richText?.isOpen() || state.pendingSaves > 0 || state.pendingExcerpts.size > 0 || state.pendingExports.size > 0 || state.pendingMutations.size > 0 || state.pendingMetadata.size > 0 || state.editDrafts.has(document.id) || Boolean(document && !isStudy(document) && ensureMetadata(document.id).draft);
   elements.exportReadingRecord.textContent = t(state.pendingExports.size > 0 ? "exporting" : "exportReadingRecord");
+  elements.viewMode.disabled = !hasPdf;
+  elements.viewMode.value = state.viewMode || "continuous";
+  readerFind?.update();
   assistant?.contextChanged();
 }
 
@@ -1916,20 +2012,72 @@ function appendRichNoteBody(item, note, noteState) {
   return true;
 }
 
+function ensureNoteTools(documentId) {
+  if (!state.noteTools.has(documentId)) {
+    state.noteTools.set(documentId, { query: "", color: "all", kind: "all", selected: new Set(), message: null });
+  }
+  return state.noteTools.get(documentId);
+}
+
+function filteredPaperNotes(document) {
+  if (!document) return [];
+  const tools = ensureNoteTools(document.id);
+  const query = tools.query.trim().toLocaleLowerCase();
+  return state.notes.filter((note) => {
+    const noteState = noteStateFor(note.id);
+    if (noteState?.deleted_at || noteState?.purged || noteState?.document_id && noteState.document_id !== document.id) return false;
+    const annotation = noteState?.annotation || note.annotation || null;
+    if (tools.color !== "all" && annotation?.color !== tools.color) return false;
+    if (tools.kind !== "all" && annotation?.kind !== tools.kind) return false;
+    if (!query) return true;
+    return `${note.text || ""}\n${annotation?.quote || ""}`.toLocaleLowerCase().includes(query);
+  });
+}
+
+function renderNoteTools(document, visibleNotes) {
+  const paper = document && !isStudy(document) ? document : null;
+  elements.notesFilterPanel.hidden = !paper;
+  if (!paper) return;
+  elements.notesFilterPanel.setAttribute("aria-label", t("notesFilterText"));
+  const tools = ensureNoteTools(paper.id);
+  const visibleIds = new Set(visibleNotes.map((note) => note.id));
+  for (const id of [...tools.selected]) {
+    if (!visibleIds.has(id)) tools.selected.delete(id);
+  }
+  if (elements.notesFilterQuery.value !== tools.query) elements.notesFilterQuery.value = tools.query;
+  elements.notesFilterColor.value = tools.color;
+  elements.notesFilterKind.value = tools.kind;
+  const filtered = Boolean(tools.query || tools.color !== "all" || tools.kind !== "all");
+  elements.notesFilterClear.disabled = !filtered;
+  elements.notesSelectVisible.disabled = !visibleNotes.length;
+  elements.notesSelectionClear.disabled = !tools.selected.size;
+  elements.notesBatchAgent.disabled = !tools.selected.size || tools.selected.size > 8 || state.pendingSaves > 0 || state.pendingMutations.size > 0;
+  const status = [t("notesVisibleCount", { visible: visibleNotes.length, total: state.notes.length })];
+  if (state.notes.length && !visibleNotes.length) status.push(t("notesNoMatch"));
+  if (tools.selected.size) status.push(t("notesSelectedCount", { count: tools.selected.size }));
+  if (tools.selected.size > 8) status.push(t("notesBatchLimit"));
+  if (tools.message) status.push(t(tools.message.key, tools.message.values));
+  elements.notesFilterStatus.textContent = status.join(" · ");
+  elements.notesFilterStatus.dataset.kind = tools.message?.kind || (tools.selected.size > 8 ? "error" : "info");
+}
+
 function renderNotes() {
   if (isStudy()) {
+    elements.notesFilterPanel.hidden = true;
     study?.renderNotes();
     return;
   }
   elements.notesList.replaceChildren();
   const document = state.document;
   const hasDocument = Boolean(document);
-  elements.notesEmpty.hidden = !hasDocument || state.notes.length > 0;
-  elements.notesEmpty.textContent = t("emptyNotes");
+  const visibleNotes = filteredPaperNotes(document);
+  elements.notesEmpty.hidden = !hasDocument || visibleNotes.length > 0;
+  elements.notesEmpty.textContent = t(state.notes.length ? "notesNoMatch" : "emptyNotes");
   elements.notesCount.textContent = hasDocument && state.notes.length ? String(state.notes.length) : "";
   const actionsLocked = state.pendingSaves > 0 || state.pendingMutations.size > 0 || state.pendingExcerpts.size > 0 || (document && state.editDrafts.has(document.id));
+  renderNoteTools(document, visibleNotes);
 
-  for (const note of state.notes) {
+  for (const note of visibleNotes) {
     const noteState = noteStateFor(note.id);
     const annotation = noteState?.annotation || note.annotation || null;
     const reviewStatus = noteState?.review_status || "unreviewed";
@@ -1955,7 +2103,24 @@ function renderNotes() {
       quote.textContent = annotation.quote;
       button.append(quote);
     }
-    item.append(button);
+    const selectionRow = window.document.createElement("div");
+    selectionRow.className = "note-selection-row";
+    const checkbox = window.document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.dataset.noteSelect = note.id;
+    const tools = ensureNoteTools(document.id);
+    checkbox.checked = tools.selected.has(note.id);
+    checkbox.disabled = !noteState || state.pendingSaves > 0 || state.pendingMutations.size > 0;
+    const summary = (annotation?.quote || note.text || "").trim().slice(0, 100);
+    checkbox.setAttribute("aria-label", `${source.textContent}: ${summary}`);
+    checkbox.addEventListener("change", () => {
+      if (checkbox.checked) tools.selected.add(note.id);
+      else tools.selected.delete(note.id);
+      tools.message = null;
+      renderNoteTools(document, filteredPaperNotes(document));
+    });
+    selectionRow.append(checkbox, button);
+    item.append(selectionRow);
     if (!appendRichNoteBody(item, note, noteState)) {
       const text = window.document.createElement("span");
       text.className = "note-text-preview";
@@ -2148,6 +2313,7 @@ function showMissingDocument() {
 }
 
 function cancelDocumentWork() {
+  readerFind?.documentChanged();
   richText?.close({ restoreFocus: false });
   imageViewer?.close({ restoreFocus: false });
   researchRecord?.documentChanged();
@@ -2165,6 +2331,8 @@ function cancelDocumentWork() {
     }
     state.renderTask = null;
   }
+  state.pointerDragPage = null;
+  destroyReaderPages();
   if (state.pdfTask) {
     state.pdfTask.destroy().catch(() => {});
     state.pdfTask = null;
@@ -2385,77 +2553,578 @@ async function loadExcerpts(document, sequence, signal) {
   renderNotes();
 }
 
-async function goToPage(page, options = {}) {
-  if (!state.pdf || !state.document) return;
-  const nextPage = Math.max(1, Math.min(state.document.page_count, Math.trunc(Number(page) || 1)));
-  state.page = nextPage;
-  if (!options.preserveHighlight) {
-    state.highlight = null;
-    state.highlightRevealId = null;
-    updateUrl(state.document.id);
-  }
-  setRegionMode(false);
-  renderDocumentDetails();
-  await requestRender();
+const PAGE_ID_FIELDS = {
+  surface: "page-surface",
+  canvas: "reader-canvas",
+  textLayer: "reader-text-layer",
+  textAnnotationsLayer: "text-annotations-layer",
+  overlay: "region-overlay",
+  activeSelection: "active-selection"
+};
+
+function availableReaderWidth() {
+  const style = getComputedStyle(elements.readerStage);
+  return Math.max(160, elements.readerStage.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight) || 600);
 }
 
-function cancelTextLayer() {
-  const selection = window.getSelection();
-  if (selection?.anchorNode && elements.textLayer.contains(selection.anchorNode)) selection.removeAllRanges();
-  state.capturedTextSelection = null;
-  resetTextAnnotationToolbar();
-  elements.textAnnotationsLayer.replaceChildren();
-  if (state.textLayerTask) {
-    try {
-      state.textLayerTask.cancel();
-    } catch {
-      // Stale layers are also detached and rejected by the render sequence.
-    }
-    state.textLayerTask = null;
-  }
-  elements.textLayer.replaceChildren();
-  delete elements.textLayer.dataset.documentId;
-  delete elements.textLayer.dataset.page;
-  elements.textStatus.hidden = true;
+function setPageEstimate(record) {
+  const baseWidth = record.baseWidth || 612;
+  const baseHeight = record.baseHeight || 792;
+  const scale = state.zoomMode === "fit" ? availableReaderWidth() / baseWidth : state.zoom;
+  const width = Math.max(1, Math.floor(baseWidth * scale));
+  const height = Math.max(1, Math.floor(baseHeight * scale));
+  record.surface.style.width = `${width}px`;
+  record.surface.style.height = `${height}px`;
+  record.surface.style.setProperty("--scale-factor", String(scale));
+  record.surface.style.setProperty("--total-scale-factor", String(scale));
+  record.surface.style.setProperty("--scale-round-x", "1px");
+  record.surface.style.setProperty("--scale-round-y", "1px");
+  record.scale = scale;
 }
 
-async function renderTextLayer(page, viewport, sequence, documentId, pageNumber) {
-  const task = new pdfjsLib.TextLayer({
-    textContentSource: page.streamTextContent(),
-    container: elements.textLayer,
-    viewport
-  });
-  state.textLayerTask = task;
-  elements.textLayer.dataset.documentId = documentId;
-  elements.textLayer.dataset.page = String(pageNumber);
+function createReaderPage(pageNumber, useLegacy = false) {
+  let nodes;
+  if (useLegacy) {
+    nodes = {
+      surface: elements.pageSurface,
+      canvas: elements.canvas,
+      textLayer: elements.textLayer,
+      textAnnotationsLayer: elements.textAnnotationsLayer,
+      overlay: elements.overlay,
+      activeSelection: elements.activeSelection
+    };
+  } else {
+    const surface = window.document.createElement("div");
+    surface.className = "page-surface";
+    const canvas = window.document.createElement("canvas");
+    canvas.setAttribute("aria-label", t("pdfPage"));
+    const textLayer = window.document.createElement("div");
+    textLayer.className = "textLayer";
+    textLayer.setAttribute("aria-label", t("pdfPage"));
+    const textAnnotationsLayer = window.document.createElement("div");
+    textAnnotationsLayer.className = "text-annotations-layer";
+    textAnnotationsLayer.setAttribute("aria-hidden", "true");
+    const overlay = window.document.createElement("div");
+    overlay.className = "region-overlay";
+    overlay.setAttribute("aria-hidden", "true");
+    overlay.dataset.active = String(state.regionActive);
+    const activeSelection = window.document.createElement("div");
+    activeSelection.className = "active-selection";
+    activeSelection.hidden = true;
+    overlay.append(activeSelection);
+    surface.append(canvas, textLayer, textAnnotationsLayer, overlay);
+    nodes = { surface, canvas, textLayer, textAnnotationsLayer, overlay, activeSelection };
+  }
+  const status = window.document.createElement("div");
+  status.className = "reader-page-status";
+  status.hidden = true;
+  nodes.surface.append(status);
+  const record = {
+    ...nodes,
+    pageNumber,
+    status,
+    page: null,
+    baseWidth: 612,
+    baseHeight: 792,
+    scale: 1,
+    rendered: false,
+    textReady: false,
+    hasText: null,
+    renderTask: null,
+    textTask: null,
+    textTaskPromise: null,
+    textLayerSequence: 0,
+    sequence: -1,
+    queuedSequence: null,
+    queuedPromise: null,
+    desired: true
+  };
+  nodes.surface.classList.add("reader-page-wrap");
+  nodes.surface.dataset.readerPage = String(pageNumber);
+  nodes.canvas.width = 1;
+  nodes.canvas.height = 1;
+  nodes.textLayer.dataset.page = String(pageNumber);
+  nodes.canvas.dataset.page = String(pageNumber);
+  setPageEstimate(record);
+  return record;
+}
+
+function setRecordIdentity(record, active) {
+  for (const [field, id] of Object.entries(PAGE_ID_FIELDS)) {
+    if (active) record[field].id = id;
+    else record[field].removeAttribute("id");
+  }
+  if (active) {
+    elements.pageSurface = record.surface;
+    elements.canvas = record.canvas;
+    elements.textLayer = record.textLayer;
+    elements.textAnnotationsLayer = record.textAnnotationsLayer;
+    elements.overlay = record.overlay;
+    elements.activeSelection = record.activeSelection;
+    elements.canvas.dataset.testid = "reader-canvas";
+    elements.overlay.dataset.testid = "region-overlay";
+  } else {
+    record.canvas.removeAttribute("data-testid");
+    record.overlay.removeAttribute("data-testid");
+  }
+  record.surface.dataset.activePage = String(active);
+}
+
+function activateReaderPage(record, notify = true) {
+  if (!record) return;
+  const previous = state.activePageRecord;
+  if (previous && previous !== record) {
+    setRecordIdentity(previous, false);
+    previous.activeSelection.hidden = true;
+  }
+  state.activePageRecord = record;
+  state.page = record.pageNumber;
+  state.effectiveScale = record.scale || state.effectiveScale;
+  state.fitScale = Math.max(0.1, availableReaderWidth() / (record.baseWidth || 612));
+  setRecordIdentity(record, true);
+  elements.textStatus.hidden = !record.textReady || record.hasText !== false;
+  if (record.textReady && record.hasText === false) elements.textStatus.textContent = t("noTextLayer");
+  if (notify) renderDocumentDetails();
+}
+
+function removeReaderPage(record) {
   try {
-    await task.render();
-    if (state.textLayerTask !== task || sequence !== state.renderSequence || state.document?.id !== documentId || state.page !== pageNumber) return;
+    record.renderTask?.cancel();
+    record.textTask?.cancel();
+  } catch {
+    // Stale page records are detached and sequence checked.
+  }
+  record.canvas.width = 1;
+  record.canvas.height = 1;
+  record.surface.remove();
+}
+
+function ensureReaderPages() {
+  if (!state.pdf || !state.document || isStudy()) return;
+  if (!state.readerPagesContainer) {
+    state.readerPagesContainer = window.document.createElement("div");
+    state.readerPagesContainer.className = "reader-pages";
+  }
+  const container = state.readerPagesContainer;
+  if (!container.isConnected) elements.readerStage.append(container);
+  if (!state.activePageRecord) {
+    const record = createReaderPage(state.page, true);
+    state.readerPages.set(record.pageNumber, record);
+    container.append(record.surface);
+    activateReaderPage(record, false);
+  } else if (!container.contains(state.activePageRecord.surface)) {
+    container.append(state.activePageRecord.surface);
+  }
+  elements.readerStage.dataset.viewMode = state.viewMode;
+  const count = state.document.page_count;
+  if (state.viewMode === "continuous") {
+    for (let pageNumber = 1; pageNumber <= count; pageNumber += 1) {
+      let record = state.readerPages.get(pageNumber);
+      if (!record) {
+        record = createReaderPage(pageNumber);
+        state.readerPages.set(pageNumber, record);
+      }
+      const currentAtPosition = container.children[pageNumber - 1];
+      if (currentAtPosition !== record.surface) container.insertBefore(record.surface, currentAtPosition || null);
+      record.surface.hidden = false;
+    }
+  } else {
+    let current = state.readerPages.get(state.page);
+    if (!current) {
+      current = createReaderPage(state.page);
+      state.readerPages.set(state.page, current);
+    }
+    for (const record of [...state.readerPages.values()]) {
+      if (record !== current) {
+        state.readerPages.delete(record.pageNumber);
+        removeReaderPage(record);
+      }
+    }
+    container.append(current.surface);
+    current.surface.hidden = false;
+    activateReaderPage(current, false);
+  }
+}
+
+function destroyReaderPages() {
+  for (const record of state.readerPages.values()) {
+    try {
+      record.renderTask?.cancel();
+      record.textTask?.cancel();
+    } catch {
+      // Document teardown also destroys the PDF loading task.
+    }
+    if (record !== state.activePageRecord) record.surface.remove();
+  }
+  if (state.activePageRecord?.surface) elements.readerStage.append(state.activePageRecord.surface);
+  state.readerPagesContainer?.remove();
+  state.readerPagesContainer = null;
+  state.readerPages.clear();
+  state.activePageRecord = null;
+}
+
+function releaseReaderPage(record) {
+  if (state.activePageRecord === record) return;
+  try {
+    record.renderTask?.cancel();
+    record.textTask?.cancel();
+  } catch {
+    // Released records cannot repaint without passing current generation checks.
+  }
+  record.renderTask = null;
+  record.textTask = null;
+  record.page = null;
+  record.rendered = false;
+  record.textReady = false;
+  record.sequence = -1;
+  record.canvas.width = 1;
+  record.canvas.height = 1;
+  record.textLayer.replaceChildren();
+  record.textAnnotationsLayer.replaceChildren();
+  record.overlay.querySelectorAll(".source-highlight").forEach((node) => node.remove());
+  record.surface.querySelector(".reader-find-layer")?.replaceChildren();
+  record.status.hidden = true;
+  setPageEstimate(record);
+}
+
+function visibleReaderBounds() {
+  const bounds = elements.readerStage.getBoundingClientRect();
+  if (getComputedStyle(elements.readerStage).visibility !== "visible" || bounds.width <= 0 || bounds.height <= 0) return null;
+  return bounds;
+}
+
+function captureReaderAnchor() {
+  const record = state.activePageRecord;
+  if (!record || state.viewMode !== "continuous" || !visibleReaderBounds()) return null;
+  const height = Math.max(1, record.surface.offsetHeight);
+  return { page: record.pageNumber, ratio: (elements.readerStage.scrollTop - record.surface.offsetTop) / height };
+}
+
+function restoreReaderAnchor(anchor) {
+  if (!anchor || state.viewMode !== "continuous" || !visibleReaderBounds()) return;
+  const record = state.readerPages.get(anchor.page) || state.activePageRecord;
+  if (!record) return;
+  elements.readerStage.scrollTop = Math.max(0, record.surface.offsetTop + anchor.ratio * Math.max(1, record.surface.offsetHeight));
+}
+
+function beginReaderLayout() {
+  const sequence = ++state.readerLayoutSequence;
+  state.readerLayoutLocked = true;
+  elements.readerStage.dataset.readerLayoutLocked = "true";
+  if (state.continuousFrame) cancelAnimationFrame(state.continuousFrame);
+  state.continuousFrame = null;
+  return sequence;
+}
+
+function finishReaderLayout(sequence) {
+  if (sequence !== state.readerLayoutSequence) return;
+  state.readerLayoutLocked = false;
+  delete elements.readerStage.dataset.readerLayoutLocked;
+  if (state.continuousFrame) cancelAnimationFrame(state.continuousFrame);
+  state.continuousFrame = null;
+}
+
+function desiredContinuousPages() {
+  ensureReaderPages();
+  const bounds = elements.readerStage.getBoundingClientRect();
+  const center = bounds.top + bounds.height / 2;
+  const records = [...state.readerPages.values()].map((record) => {
+    const rect = record.surface.getBoundingClientRect();
+    return {
+      record,
+      visible: rect.bottom >= bounds.top && rect.top <= bounds.bottom,
+      distance: Math.abs(rect.top + rect.height / 2 - center)
+    };
+  });
+  records.sort((a, b) => Number(b.visible) - Number(a.visible) || a.distance - b.distance || a.record.pageNumber - b.record.pageNumber);
+  const selected = records.filter((item) => item.visible || item.distance <= bounds.height * 1.5).slice(0, 5);
+  const include = (record) => {
+    if (!record || selected.some((item) => item.record === record)) return;
+    if (selected.length >= 5) selected.pop();
+    selected.push({ record });
+  };
+  include(state.activePageRecord);
+  include(state.selection?.record || state.readerPages.get(state.pointerDragPage));
+  return selected.map((item) => item.record);
+}
+
+function queueReaderPage(record) {
+  const sequence = state.renderSequence;
+  if (record.rendered && record.sequence === sequence) return Promise.resolve();
+  if (record.queuedSequence === sequence && record.queuedPromise) return record.queuedPromise;
+  record.queuedSequence = sequence;
+  const promise = state.renderQueue.catch(() => {}).then(() => renderReaderPage(record, sequence));
+  record.queuedPromise = promise;
+  state.renderQueue = promise;
+  return promise.finally(() => {
+    if (record.queuedPromise === promise) {
+      record.queuedPromise = null;
+      record.queuedSequence = null;
+    }
+  });
+}
+
+function renderVisibleContinuous() {
+  if (state.viewMode !== "continuous" || !state.pdf || !visibleReaderBounds()) return Promise.resolve();
+  const desired = desiredContinuousPages();
+  const wanted = new Set(desired);
+  for (const record of state.readerPages.values()) {
+    record.desired = wanted.has(record);
+    if (!record.desired && (record.rendered || record.renderTask || record.textTask || record.textLayer.childNodes.length)) releaseReaderPage(record);
+  }
+  return Promise.all(desired.map((record) => queueReaderPage(record)));
+}
+
+function setReaderPageError(record) {
+  record.status.replaceChildren();
+  const text = window.document.createElement("span");
+  text.textContent = t("pageRenderRetry");
+  const retry = window.document.createElement("button");
+  retry.type = "button";
+  retry.className = "button button-quiet";
+  retry.textContent = t("retry");
+  retry.addEventListener("click", () => {
+    record.rendered = false;
+    record.sequence = -1;
+    void queueReaderPage(record);
+  });
+  record.status.append(text, retry);
+  record.status.hidden = false;
+}
+
+async function renderReaderTextLayer(record, sequence, documentId) {
+  const textLayerSequence = ++record.textLayerSequence;
+  const previousTask = record.textTask;
+  const previousPromise = record.textTaskPromise;
+  record.textTask = null;
+  record.textTaskPromise = null;
+  try {
+    previousTask?.cancel();
+  } catch {
+    // A replaced task is still bounded by its render promise.
+  }
+  record.textLayer.replaceChildren();
+  record.textReady = false;
+  if (previousPromise) {
+    try {
+      await previousPromise;
+    } catch {
+      // Cancellation is the expected completion for a replaced task.
+    }
+    if (record.textLayerSequence !== textLayerSequence || sequence !== state.renderSequence || state.document?.id !== documentId || state.readerPages.get(record.pageNumber) !== record || state.viewMode === "continuous" && !record.desired) return;
+    record.textLayer.replaceChildren();
+  }
+  const task = new pdfjsLib.TextLayer({
+    textContentSource: record.page.streamTextContent(),
+    container: record.textLayer,
+    viewport: record.viewport
+  });
+  record.textTask = task;
+  record.textLayer.dataset.documentId = documentId;
+  record.textLayer.dataset.page = String(record.pageNumber);
+  const isCurrent = () => record.textLayerSequence === textLayerSequence && record.textTask === task && sequence === state.renderSequence && state.document?.id === documentId && state.readerPages.get(record.pageNumber) === record && (state.viewMode !== "continuous" || record.desired);
+  try {
+    const promise = task.render();
+    record.textTaskPromise = promise;
+    await promise;
+    if (!isCurrent()) return;
+    record.textTask = null;
+    record.textTaskPromise = null;
+    record.textReady = true;
     const hasText = task.textContentItemsStr.some((text) => text.trim());
-    elements.textStatus.hidden = hasText;
-    if (!hasText) elements.textStatus.textContent = t("noTextLayer");
+    record.hasText = hasText;
+    if (state.activePageRecord === record) {
+      elements.textStatus.hidden = hasText;
+      if (!hasText) elements.textStatus.textContent = t("noTextLayer");
+    }
+    readerFind?.pageRendered(record.pageNumber);
   } catch (error) {
-    if (error?.name === "AbortException" || error?.name === "AbortError" || sequence !== state.renderSequence) return;
-    if (state.textLayerTask === task && state.document?.id === documentId) {
+    if (!isCurrent()) return;
+    record.textTask = null;
+    record.textTaskPromise = null;
+    record.textLayer.replaceChildren();
+    if (["AbortException", "AbortError", "RenderingCancelledException"].includes(error?.name) || sequence !== state.renderSequence) return;
+    if (state.activePageRecord === record) {
       elements.textStatus.hidden = false;
       elements.textStatus.textContent = t("textLayerUnavailable");
     }
   }
 }
 
+async function renderReaderPage(record, sequence) {
+  const pdf = state.pdf;
+  const documentId = state.document?.id;
+  if (!pdf || !documentId || sequence !== state.renderSequence || state.readerPages.get(record.pageNumber) !== record || !elements.readerStage.clientWidth) return;
+  if (state.viewMode === "continuous" && !record.desired) return;
+  if (record.rendered && record.sequence === sequence) return;
+  try {
+    record.status.hidden = true;
+    record.page = record.page || await pdf.getPage(record.pageNumber);
+    if (sequence !== state.renderSequence || state.pdf !== pdf || state.document?.id !== documentId || state.viewMode === "continuous" && !record.desired) return;
+    const baseViewport = record.page.getViewport({ scale: 1 });
+    record.baseWidth = baseViewport.width;
+    record.baseHeight = baseViewport.height;
+    const fitScale = Math.max(0.1, availableReaderWidth() / baseViewport.width);
+    const scale = state.zoomMode === "fit" ? fitScale : state.zoom;
+    record.scale = scale;
+    if (state.activePageRecord === record) {
+      state.fitScale = fitScale;
+      state.effectiveScale = scale;
+    }
+    const viewport = record.page.getViewport({ scale });
+    record.viewport = viewport;
+    const cssWidth = Math.max(1, Math.floor(viewport.width));
+    const cssHeight = Math.max(1, Math.floor(viewport.height));
+    const ratioCap = Math.min(Math.sqrt(MAX_CANVAS_PIXELS / (cssWidth * cssHeight)), MAX_CANVAS_AXIS / cssWidth, MAX_CANVAS_AXIS / cssHeight);
+    const pixelRatio = Math.min(window.devicePixelRatio || 1, MAX_DEVICE_PIXEL_RATIO, ratioCap);
+    const outputViewport = record.page.getViewport({ scale: scale * pixelRatio });
+    record.canvas.width = Math.max(1, Math.floor(cssWidth * pixelRatio));
+    record.canvas.height = Math.max(1, Math.floor(cssHeight * pixelRatio));
+    record.canvas.style.width = `${cssWidth}px`;
+    record.canvas.style.height = `${cssHeight}px`;
+    record.surface.style.width = `${cssWidth}px`;
+    record.surface.style.height = `${cssHeight}px`;
+    record.surface.style.setProperty("--scale-factor", String(scale));
+    record.surface.style.setProperty("--total-scale-factor", String(scale));
+    record.surface.hidden = false;
+    elements.readerEmpty.hidden = true;
+    if (state.activePageRecord === record) renderDocumentDetails();
+    const context = record.canvas.getContext("2d", { alpha: false });
+    record.renderTask = record.page.render({ canvasContext: context, viewport: outputViewport });
+    if (state.activePageRecord === record) state.renderTask = record.renderTask;
+    await record.renderTask.promise;
+    record.renderTask = null;
+    if (state.activePageRecord === record) state.renderTask = null;
+    if (sequence !== state.renderSequence || state.pdf !== pdf || state.document?.id !== documentId || state.viewMode === "continuous" && !record.desired) return;
+    record.canvas.dataset.documentId = documentId;
+    elements.readerStage.dataset.page = String(state.page);
+    elements.readerStage.dataset.documentId = documentId;
+    await renderReaderTextLayer(record, sequence, documentId);
+    if (sequence !== state.renderSequence || state.readerPages.get(record.pageNumber) !== record || state.viewMode === "continuous" && !record.desired) return;
+    record.rendered = true;
+    record.sequence = sequence;
+    renderTextAnnotations();
+    const highlight = drawHighlight();
+    if (highlight && state.highlightRevealId === highlight.dataset.noteId) {
+      state.highlightRevealId = null;
+      highlight.scrollIntoView({ block: "nearest", inline: "nearest" });
+    }
+  } catch (error) {
+    if (["RenderingCancelledException", "AbortException", "AbortError"].includes(error?.name) || sequence !== state.renderSequence) return;
+    record.rendered = false;
+    setReaderPageError(record);
+    if (state.activePageRecord === record) setStatus("renderFailed", "error", {}, () => requestRender());
+  }
+}
+
+function handleContinuousScroll() {
+  if (state.readerLayoutLocked) {
+    if (state.continuousFrame) cancelAnimationFrame(state.continuousFrame);
+    state.continuousFrame = null;
+    return;
+  }
+  if (state.continuousFrame) cancelAnimationFrame(state.continuousFrame);
+  state.continuousFrame = requestAnimationFrame(() => {
+    state.continuousFrame = null;
+    if (state.readerLayoutLocked || state.viewMode !== "continuous" || !state.pdf) return;
+    const bounds = visibleReaderBounds();
+    if (!bounds) return;
+    if (!state.pointerDragPage && !state.selection) {
+      const center = bounds.top + bounds.height / 2;
+      let closest = null;
+      let distance = Infinity;
+      for (const record of state.readerPages.values()) {
+        const rect = record.surface.getBoundingClientRect();
+        if (rect.bottom < bounds.top || rect.top > bounds.bottom) continue;
+        const nextDistance = Math.max(rect.top - center, center - rect.bottom, 0);
+        if (nextDistance < distance) {
+          closest = record;
+          distance = nextDistance;
+        }
+      }
+      if (closest && closest !== state.activePageRecord) activateReaderPage(closest);
+    }
+    void renderVisibleContinuous();
+  });
+}
+
+async function goToPage(page, options = {}) {
+  if (!state.pdf || !state.document) return;
+  const nextPage = Math.max(1, Math.min(state.document.page_count, Math.trunc(Number(page) || 1)));
+  const layoutSequence = beginReaderLayout();
+  try {
+    state.page = nextPage;
+    if (!options.preserveHighlight) {
+      state.highlight = null;
+      state.highlightRevealId = null;
+      updateUrl(state.document.id);
+    }
+    setRegionMode(false);
+    ensureReaderPages();
+    activateReaderPage(state.readerPages.get(nextPage));
+    if (state.viewMode === "continuous") {
+      const record = state.readerPages.get(nextPage);
+      elements.readerStage.scrollTop = Math.max(0, record.surface.offsetTop - 8);
+      await renderVisibleContinuous();
+      if (layoutSequence !== state.readerLayoutSequence) return;
+      restoreReaderAnchor({ page: nextPage, ratio: 0 });
+      const highlight = drawHighlight();
+      if (highlight && state.highlightRevealId === highlight.dataset.noteId) {
+        state.highlightRevealId = null;
+        highlight.scrollIntoView({ block: "nearest", inline: "nearest" });
+      }
+    } else {
+      await requestRender();
+    }
+  } finally {
+    finishReaderLayout(layoutSequence);
+  }
+}
+
+function cancelTextLayer() {
+  const selection = window.getSelection();
+  if (selection?.anchorNode && elements.readerStage.contains(selection.anchorNode)) selection.removeAllRanges();
+  state.capturedTextSelection = null;
+  resetTextAnnotationToolbar();
+  for (const record of state.readerPages.values()) {
+    try {
+      record.textTask?.cancel();
+    } catch {
+      // Stale layers are detached and rejected by the render sequence.
+    }
+    record.textTask = null;
+    record.textLayer.replaceChildren();
+    record.textAnnotationsLayer.replaceChildren();
+  }
+  elements.textStatus.hidden = true;
+}
+
 function readPdfTextSelection() {
   const selection = window.getSelection();
   if (!selection || selection.isCollapsed || !selection.rangeCount) return null;
-  if (elements.textLayer.dataset.documentId !== state.document?.id || elements.textLayer.dataset.page !== String(state.page)) return null;
-  if (!elements.textLayer.contains(selection.anchorNode) || !elements.textLayer.contains(selection.focusNode)) return null;
+  const layerForNode = (node) => {
+    const element = node?.nodeType === Node.ELEMENT_NODE ? node : node?.parentElement;
+    return element?.closest(".textLayer") || null;
+  };
+  const textLayer = layerForNode(selection.anchorNode);
+  const focusLayer = layerForNode(selection.focusNode);
+  if (textLayer !== focusLayer && (textLayer || focusLayer)) {
+    if (elements.readerStage.contains(textLayer || focusLayer)) setStatus("crossPageSelection", "error");
+    return null;
+  }
+  if (!textLayer || !elements.readerStage.contains(textLayer) || !textLayer.contains(selection.anchorNode) || !textLayer.contains(selection.focusNode)) return null;
+  const pageNumber = Number(textLayer.dataset.page);
+  const record = state.readerPages.get(pageNumber);
+  if (!record || textLayer.dataset.documentId !== state.document?.id) return null;
+  if (state.activePageRecord !== record) activateReaderPage(record);
   const text = selection.toString().trim();
   if (!text) return null;
-  const bounds = elements.textLayer.getBoundingClientRect();
+  const bounds = textLayer.getBoundingClientRect();
   if (!bounds.width || !bounds.height) return null;
   const clientRects = [];
   for (let index = 0; index < selection.rangeCount; index += 1) {
     const range = selection.getRangeAt(index);
-    if (!elements.textLayer.contains(range.commonAncestorContainer)) return null;
+    if (!textLayer.contains(range.commonAncestorContainer)) return null;
     clientRects.push(...range.getClientRects());
   }
   const rects = [];
@@ -2489,8 +3158,8 @@ function readPdfTextSelection() {
   ];
   return {
     documentId: state.document.id,
-    page: state.page,
-    sequence: state.renderSequence,
+    page: pageNumber,
+    sequence: state.loadSequence,
     text,
     rect: union,
     rects,
@@ -2505,7 +3174,7 @@ function readPdfTextSelection() {
 
 function currentPdfTextSelection() {
   const captured = state.capturedTextSelection;
-  return captured?.documentId === state.document?.id && captured.page === state.page && captured.sequence === state.renderSequence
+  return captured?.documentId === state.document?.id && captured.sequence === state.loadSequence && state.readerPages.has(captured.page)
     ? captured
     : readPdfTextSelection();
 }
@@ -2566,11 +3235,12 @@ function addTextSelectionToNote() {
 }
 
 function renderTextAnnotations() {
-  elements.textAnnotationsLayer.replaceChildren();
+  for (const record of state.readerPages.values()) record.textAnnotationsLayer.replaceChildren();
   if (!state.document || !state.pdf) return;
   for (const note of state.noteStates) {
     const annotation = note.annotation;
-    if (note.deleted_at || note.purged || note.document_id !== state.document.id || note.page !== state.page || !annotation) continue;
+    const record = state.readerPages.get(note.page);
+    if (!record || note.deleted_at || note.purged || note.document_id !== state.document.id || !annotation) continue;
     if (!["highlight", "underline"].includes(annotation.kind) || !["yellow", "green", "blue", "pink"].includes(annotation.color) || !Array.isArray(annotation.rects)) continue;
     for (const rect of annotation.rects.slice(0, 256)) {
       if (!Array.isArray(rect) || rect.length !== 4 || !rect.every(Number.isFinite) || rect[0] < 0 || rect[1] < 0 || rect[2] > 1 || rect[3] > 1 || rect[2] <= rect[0] || rect[3] <= rect[1]) continue;
@@ -2583,21 +3253,23 @@ function renderTextAnnotations() {
       markup.style.top = `${rect[1] * 100}%`;
       markup.style.width = `${(rect[2] - rect[0]) * 100}%`;
       markup.style.height = `${(rect[3] - rect[1]) * 100}%`;
-      elements.textAnnotationsLayer.append(markup);
+      record.textAnnotationsLayer.append(markup);
     }
   }
 }
 
 function openTextAnnotationAtPoint(event) {
-  if (state.regionActive || elements.overlay.contains(event.target) || !window.getSelection()?.isCollapsed || !state.document) return;
-  const bounds = elements.pageSurface.getBoundingClientRect();
+  const surface = event.target.closest(".page-surface");
+  if (state.regionActive || event.target.closest(".region-overlay") || !window.getSelection()?.isCollapsed || !state.document || !surface) return;
+  const pageNumber = Number(surface.dataset.readerPage);
+  const bounds = surface.getBoundingClientRect();
   if (!bounds.width || !bounds.height) return;
   const x = (event.clientX - bounds.left) / bounds.width;
   const y = (event.clientY - bounds.top) / bounds.height;
   if (x < 0 || x > 1 || y < 0 || y > 1) return;
   for (const note of state.noteStates) {
     const annotation = note.annotation;
-    if (note.deleted_at || note.purged || note.document_id !== state.document.id || note.page !== state.page || !Array.isArray(annotation?.rects)) continue;
+    if (note.deleted_at || note.purged || note.document_id !== state.document.id || note.page !== pageNumber || !Array.isArray(annotation?.rects)) continue;
     if (annotation.rects.some((rect) => Array.isArray(rect) && rect.length === 4 && x >= rect[0] && x <= rect[2] && y >= rect[1] - 0.004 && y <= rect[3] + 0.004)) {
       void openNote(note.id);
       return;
@@ -2700,95 +3372,56 @@ function submitTextAnnotation(kind) {
 }
 
 function requestRender() {
+  if (!state.pdf || !state.document) return Promise.resolve();
+  const anchor = captureReaderAnchor();
+  const layoutSequence = beginReaderLayout();
   const sequence = ++state.renderSequence;
-  cancelTextLayer();
-  if (state.renderTask) {
-    try {
-      state.renderTask.cancel();
-    } catch {
-      // The queue still prevents simultaneous canvas rendering.
-    }
-  }
-  state.renderQueue = state.renderQueue.catch(() => {}).then(() => renderCurrentPage(sequence));
-  return state.renderQueue;
-}
-
-async function renderCurrentPage(sequence) {
-  const pdf = state.pdf;
-  const document = state.document;
-  const pageNumber = state.page;
-  if (!pdf || !document || sequence !== state.renderSequence || !elements.readerStage.clientWidth) return;
-
   clearHighlights();
-  try {
-    const page = await pdf.getPage(pageNumber);
-    if (sequence !== state.renderSequence || state.pdf !== pdf || state.document?.id !== document.id || !elements.readerStage.clientWidth) return;
-
-    const baseViewport = page.getViewport({ scale: 1 });
-    const stageStyle = getComputedStyle(elements.readerStage);
-    const availableWidth = Math.max(160, elements.readerStage.clientWidth - parseFloat(stageStyle.paddingLeft) - parseFloat(stageStyle.paddingRight));
-    state.fitScale = Math.max(0.1, availableWidth / baseViewport.width);
-    const scale = state.zoomMode === "fit" ? state.fitScale : state.zoom;
-    state.effectiveScale = scale;
-    const cssViewport = page.getViewport({ scale });
-    const cssWidth = Math.max(1, Math.floor(cssViewport.width));
-    const cssHeight = Math.max(1, Math.floor(cssViewport.height));
-    const ratioCap = Math.min(
-      Math.sqrt(MAX_CANVAS_PIXELS / (cssWidth * cssHeight)),
-      MAX_CANVAS_AXIS / cssWidth,
-      MAX_CANVAS_AXIS / cssHeight
-    );
-    const pixelRatio = Math.min(window.devicePixelRatio || 1, MAX_DEVICE_PIXEL_RATIO, ratioCap);
-    const outputViewport = page.getViewport({ scale: scale * pixelRatio });
-
-    elements.canvas.width = Math.max(1, Math.floor(cssWidth * pixelRatio));
-    elements.canvas.height = Math.max(1, Math.floor(cssHeight * pixelRatio));
-    elements.canvas.style.width = `${cssWidth}px`;
-    elements.canvas.style.height = `${cssHeight}px`;
-    elements.pageSurface.style.width = `${cssWidth}px`;
-    elements.pageSurface.style.height = `${cssHeight}px`;
-    elements.pageSurface.style.setProperty("--scale-factor", String(scale));
-    elements.pageSurface.style.setProperty("--total-scale-factor", String(scale));
-    elements.pageSurface.style.setProperty("--scale-round-x", "1px");
-    elements.pageSurface.style.setProperty("--scale-round-y", "1px");
-    elements.pageSurface.hidden = false;
-    elements.readerEmpty.hidden = true;
-    renderDocumentDetails();
-
-    const context = elements.canvas.getContext("2d", { alpha: false });
-    const task = page.render({ canvasContext: context, viewport: outputViewport });
-    state.renderTask = task;
-    await task.promise;
-    state.renderTask = null;
-    if (sequence !== state.renderSequence || state.pdf !== pdf || state.document?.id !== document.id) return;
-
-    elements.canvas.dataset.page = String(pageNumber);
-    elements.canvas.dataset.documentId = document.id;
-    elements.readerStage.dataset.page = String(pageNumber);
-    elements.readerStage.dataset.documentId = document.id;
-    void renderTextLayer(page, cssViewport, sequence, document.id, pageNumber);
-    renderTextAnnotations();
-    const highlight = drawHighlight();
-    if (highlight && state.highlightRevealId === highlight.dataset.noteId) {
-      state.highlightRevealId = null;
-      highlight.scrollIntoView({ block: "nearest", inline: "nearest" });
+  readerFind?.clearHighlights();
+  const selection = window.getSelection();
+  if (selection?.anchorNode && elements.readerStage.contains(selection.anchorNode)) selection.removeAllRanges();
+  for (const record of state.readerPages.values()) {
+    try {
+      record.renderTask?.cancel();
+      record.textTask?.cancel();
+    } catch {
+      // The serial queue and generation checks reject stale work.
     }
-  } catch (error) {
-    if (error?.name === "RenderingCancelledException" || error?.name === "AbortError" || sequence !== state.renderSequence) return;
-    if (state.document?.id === document.id) {
-      setStatus("renderFailed", "error", {}, () => requestRender());
-    }
+    record.renderTask = null;
+    record.textTask = null;
+    record.rendered = false;
+    record.textReady = false;
+    record.sequence = -1;
+    record.textLayer.replaceChildren();
+    record.textAnnotationsLayer.replaceChildren();
+    setPageEstimate(record);
   }
+  state.renderTask = null;
+  state.capturedTextSelection = null;
+  resetTextAnnotationToolbar();
+  elements.textStatus.hidden = true;
+  ensureReaderPages();
+  activateReaderPage(state.readerPages.get(state.page), false);
+  if (state.viewMode === "continuous") {
+    if (!anchor) restoreReaderAnchor({ page: state.page, ratio: 0 });
+    return renderVisibleContinuous()
+      .then(() => {
+        if (layoutSequence === state.readerLayoutSequence) restoreReaderAnchor(anchor);
+      })
+      .finally(() => finishReaderLayout(layoutSequence));
+  }
+  return queueReaderPage(state.activePageRecord).finally(() => finishReaderLayout(layoutSequence));
 }
 
 function clearHighlights() {
-  elements.overlay.querySelectorAll(".source-highlight").forEach((node) => node.remove());
+  elements.readerStage.querySelectorAll(".source-highlight").forEach((node) => node.remove());
 }
 
 function drawHighlight() {
   clearHighlights();
   const note = state.highlight;
-  if (!note || !state.document || note.document_id !== state.document.id || note.page !== state.page) return null;
+  const record = note ? state.readerPages.get(note.page) : null;
+  if (!note || !record || !state.document || note.document_id !== state.document.id) return null;
   const highlight = window.document.createElement("div");
   highlight.className = "source-highlight";
   highlight.dataset.noteId = note.id;
@@ -2812,7 +3445,7 @@ function drawHighlight() {
       highlight.append(line);
     }
   }
-  elements.overlay.append(highlight);
+  record.overlay.append(highlight);
   return highlight;
 }
 
@@ -2873,13 +3506,15 @@ function setRegionMode(active) {
   elements.regionMode.textContent = t(state.regionActive ? "cancelRegion" : "regionMode");
   elements.readerRegionMode.setAttribute("aria-pressed", String(state.regionActive));
   elements.readerRegionMode.textContent = t(state.regionActive ? "cancelRegion" : "regionMode");
-  elements.overlay.dataset.active = String(state.regionActive);
+  elements.readerStage.querySelectorAll(".region-overlay").forEach((overlay) => {
+    overlay.dataset.active = String(state.regionActive);
+  });
   elements.anchorHelp.textContent = state.regionActive ? t("regionInstructions") : t("anchorHelp");
   if (!state.regionActive) cancelSelection();
 }
 
-function eventPoint(event) {
-  const bounds = elements.overlay.getBoundingClientRect();
+function eventPoint(event, overlay = state.selection?.overlay || elements.overlay) {
+  const bounds = overlay.getBoundingClientRect();
   return {
     x: Math.max(0, Math.min(bounds.width, event.clientX - bounds.left)),
     y: Math.max(0, Math.min(bounds.height, event.clientY - bounds.top)),
@@ -2893,30 +3528,33 @@ function paintSelection(selection) {
   const top = Math.min(selection.startY, selection.currentY);
   const width = Math.abs(selection.currentX - selection.startX);
   const height = Math.abs(selection.currentY - selection.startY);
-  elements.activeSelection.hidden = false;
-  elements.activeSelection.style.left = `${left}px`;
-  elements.activeSelection.style.top = `${top}px`;
-  elements.activeSelection.style.width = `${width}px`;
-  elements.activeSelection.style.height = `${height}px`;
+  selection.activeSelection.hidden = false;
+  selection.activeSelection.style.left = `${left}px`;
+  selection.activeSelection.style.top = `${top}px`;
+  selection.activeSelection.style.width = `${width}px`;
+  selection.activeSelection.style.height = `${height}px`;
 }
 
 function cancelSelection() {
+  const selection = state.selection;
   state.selection = null;
-  elements.activeSelection.hidden = true;
+  if (selection) selection.activeSelection.hidden = true;
+  else elements.activeSelection.hidden = true;
 }
 
-function makeRegionPreview(rect) {
+function makeRegionPreview(rect, record) {
   const preview = window.document.createElement("canvas");
-  const left = Math.max(0, Math.floor(rect[0] * elements.canvas.width));
-  const top = Math.max(0, Math.floor(rect[1] * elements.canvas.height));
-  const right = Math.min(elements.canvas.width, Math.ceil(rect[2] * elements.canvas.width));
-  const bottom = Math.min(elements.canvas.height, Math.ceil(rect[3] * elements.canvas.height));
+  const canvas = record.canvas;
+  const left = Math.max(0, Math.floor(rect[0] * canvas.width));
+  const top = Math.max(0, Math.floor(rect[1] * canvas.height));
+  const right = Math.min(canvas.width, Math.ceil(rect[2] * canvas.width));
+  const bottom = Math.min(canvas.height, Math.ceil(rect[3] * canvas.height));
   preview.width = Math.max(1, right - left);
   preview.height = Math.max(1, bottom - top);
   preview.setAttribute("role", "img");
-  preview.setAttribute("aria-label", t("excerptImageAlt", { page: state.page }));
+  preview.setAttribute("aria-label", t("excerptImageAlt", { page: record.pageNumber }));
   const context = preview.getContext("2d");
-  context.drawImage(elements.canvas, left, top, preview.width, preview.height, 0, 0, preview.width, preview.height);
+  context.drawImage(canvas, left, top, preview.width, preview.height, 0, 0, preview.width, preview.height);
   return preview;
 }
 
@@ -2951,13 +3589,13 @@ function finishSelection(event) {
   const width = Math.abs(selection.currentX - selection.startX);
   const height = Math.abs(selection.currentY - selection.startY);
   state.selection = null;
-  elements.activeSelection.hidden = true;
+  selection.activeSelection.hidden = true;
   if (width < 4 || height < 4 || !point.width || !point.height) {
     setStatus("selectionTooSmall", "error");
     return;
   }
   const documentId = state.document?.id;
-  const page = state.page;
+  const page = selection.record.pageNumber;
   if (!documentId || !prepareDraftReplacement(documentId)) {
     setRegionMode(false);
     renderDraft();
@@ -2967,7 +3605,7 @@ function finishSelection(event) {
   const draft = ensureDraft(documentId);
   draft.page = page;
   draft.rect = rect;
-  draft.previewCanvas = makeRegionPreview(rect);
+  draft.previewCanvas = makeRegionPreview(rect, selection.record);
   draft.includeExcerpt = false;
   if (!draft.text.trim()) draft.text = t("regionCaption", { page });
   invalidateRequestId(draft);
@@ -3728,6 +4366,16 @@ elements.zoomFit.addEventListener("click", () => {
   state.zoomMode = "fit";
   requestRender();
 });
+elements.viewMode.addEventListener("change", () => {
+  if (!state.pdf) return;
+  state.viewMode = elements.viewMode.value === "single" ? "single" : "continuous";
+  try {
+    localStorage.setItem("research-workbench-reader-view-mode", state.viewMode);
+  } catch {
+    // The selected mode still applies for this session.
+  }
+  void requestRender();
+});
 elements.exportReadingRecord.addEventListener("click", () => {
   if (state.document) exportReadingRecord(state.document);
 });
@@ -3749,6 +4397,7 @@ elements.textAnnotationUnderline.addEventListener("click", () => submitTextAnnot
 document.addEventListener("selectionchange", updateTextAnnotationToolbar);
 elements.readerStage.addEventListener("scroll", () => {
   if (elements.textAnnotationToolbar.dataset.contextual === "true") updateTextAnnotationToolbar();
+  handleContinuousScroll();
 });
 elements.regionDraftCancel.addEventListener("click", cancelRegionDraft);
 elements.pageNote.addEventListener("click", () => {
@@ -3789,22 +4438,82 @@ elements.noteForm.addEventListener("submit", (event) => {
 });
 elements.editCancel.addEventListener("click", cancelEditNote);
 elements.excerptSave.addEventListener("click", () => submitSave(true));
+elements.notesFilterQuery.addEventListener("input", () => {
+  if (!state.document || isStudy()) return;
+  const tools = ensureNoteTools(state.document.id);
+  tools.query = elements.notesFilterQuery.value.slice(0, 200);
+  tools.message = null;
+  renderNotes();
+});
+for (const [select, field] of [[elements.notesFilterColor, "color"], [elements.notesFilterKind, "kind"]]) {
+  select.addEventListener("change", () => {
+    if (!state.document || isStudy()) return;
+    const tools = ensureNoteTools(state.document.id);
+    tools[field] = select.value;
+    tools.message = null;
+    renderNotes();
+  });
+}
+elements.notesFilterClear.addEventListener("click", () => {
+  if (!state.document || isStudy()) return;
+  const tools = ensureNoteTools(state.document.id);
+  tools.query = "";
+  tools.color = "all";
+  tools.kind = "all";
+  tools.message = null;
+  renderNotes();
+  elements.notesFilterQuery.focus();
+});
+elements.notesSelectVisible.addEventListener("click", () => {
+  if (!state.document || isStudy()) return;
+  const tools = ensureNoteTools(state.document.id);
+  for (const note of filteredPaperNotes(state.document)) tools.selected.add(note.id);
+  tools.message = null;
+  renderNotes();
+});
+elements.notesSelectionClear.addEventListener("click", () => {
+  if (!state.document || isStudy()) return;
+  const tools = ensureNoteTools(state.document.id);
+  tools.selected.clear();
+  tools.message = null;
+  renderNotes();
+});
+elements.notesBatchAgent.addEventListener("click", () => {
+  if (!state.document || isStudy()) return;
+  const document = state.document;
+  const tools = ensureNoteTools(document.id);
+  const selected = [...tools.selected].map((noteId) => noteStateFor(noteId));
+  const result = assistant?.addNoteReferences(document.id, selected) || "invalid";
+  tools.message = result === "added"
+    ? { key: "notesBatchAdded", kind: "success", values: { count: selected.length } }
+    : { key: result === "limit" ? "notesBatchLimit" : "notesBatchInvalid", kind: "error" };
+  renderNotes();
+});
 
-elements.overlay.addEventListener("pointerdown", (event) => {
-  if (!state.regionActive || event.button !== 0 || !state.document) return;
+elements.readerStage.addEventListener("pointerdown", (event) => {
+  const surface = event.target.closest(".page-surface");
+  if (!surface || event.button !== 0 || !state.document) return;
+  state.pointerDragPage = Number(surface.dataset.readerPage);
+  const overlay = event.target.closest(".region-overlay");
+  if (!state.regionActive || !overlay) return;
+  const record = state.readerPages.get(state.pointerDragPage);
+  if (!record) return;
   event.preventDefault();
-  const point = eventPoint(event);
+  const point = eventPoint(event, overlay);
   state.selection = {
     pointerId: event.pointerId,
+    record,
+    overlay,
+    activeSelection: record.activeSelection,
     startX: point.x,
     startY: point.y,
     currentX: point.x,
     currentY: point.y
   };
-  elements.overlay.setPointerCapture(event.pointerId);
+  overlay.setPointerCapture(event.pointerId);
   paintSelection(state.selection);
 });
-elements.overlay.addEventListener("pointermove", (event) => {
+elements.readerStage.addEventListener("pointermove", (event) => {
   const selection = state.selection;
   if (!selection || selection.pointerId !== event.pointerId) return;
   const point = eventPoint(event);
@@ -3812,9 +4521,16 @@ elements.overlay.addEventListener("pointermove", (event) => {
   selection.currentY = point.y;
   paintSelection(selection);
 });
-elements.overlay.addEventListener("pointerup", finishSelection);
-elements.overlay.addEventListener("pointercancel", cancelSelection);
-elements.pageSurface.addEventListener("click", openTextAnnotationAtPoint);
+elements.readerStage.addEventListener("pointerup", finishSelection);
+elements.readerStage.addEventListener("pointercancel", cancelSelection);
+elements.readerStage.addEventListener("click", openTextAnnotationAtPoint);
+document.addEventListener("pointerup", () => {
+  state.pointerDragPage = null;
+  if (state.viewMode === "continuous" && window.getSelection()?.isCollapsed !== false) handleContinuousScroll();
+});
+document.addEventListener("pointercancel", () => {
+  state.pointerDragPage = null;
+});
 
 document.addEventListener("keydown", (event) => {
   if (event.key !== "Escape") return;
@@ -4206,9 +4922,12 @@ workspace = createWorkspace({
   getDocument: () => state.document,
   getLanguage: () => state.language,
   readingVisible: () => {
+    if (readerWorkspaceVisible) return;
+    readerWorkspaceVisible = true;
     if (state.pdf) requestRender();
   },
   toolVisible: (tool) => {
+    readerWorkspaceVisible = false;
     if (tool === "charts") charts?.refreshLayout();
   },
   chartsSelected: (documentId) => charts?.reload(documentId),
@@ -4412,6 +5131,17 @@ assistant = createAssistant({
   navigateSource: navigateAssistantSource,
   reviewResearchRecord: (source) => researchRecord.reviewSource(source),
   refreshAfterAgent
+});
+
+readerFind = createReaderFind({
+  t,
+  getPdf: () => state.pdf,
+  getDocument: () => state.document,
+  isStudy,
+  isReadingVisible: () => workspace.getMode() === "reading",
+  goToPage,
+  getTextLayer: (page) => state.page === page ? elements.textLayer : elements.readerStage.querySelector(`[data-reader-page="${page}"] .textLayer`),
+  getPageSurface: (page) => state.page === page ? elements.pageSurface : elements.readerStage.querySelector(`[data-reader-page="${page}"]`)
 });
 
 applyTheme();

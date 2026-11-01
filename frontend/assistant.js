@@ -757,29 +757,35 @@ export function createAssistant(adapter) {
     }
   }
 
-  function addNoteReference(documentId, note) {
+  function addNoteReferences(documentId, notes) {
     const entry = entryFor(documentId);
-    if (!note?.id || note.document_id !== documentId || note.deleted_at || note.purged || !Number.isInteger(note.revision)) {
-      entry.status = { key: "noteReferenceInvalid", kind: "error" };
+    const fail = (reason) => {
+      entry.status = { key: reason === "limit" ? "noteReferenceLimit" : "noteReferenceInvalid", kind: "error" };
       if (isCurrent(documentId, entry)) render();
-      return false;
-    }
-    const existingIndex = entry.noteRefs.findIndex((item) => item.note_id === note.id);
-    if (existingIndex < 0 && entry.noteRefs.length >= 8) {
-      entry.status = { key: "noteReferenceLimit", kind: "error" };
-      if (isCurrent(documentId, entry)) render();
-      return false;
-    }
-    const snapshot = JSON.parse(JSON.stringify(note));
-    const previous = existingIndex >= 0 ? entry.noteRefs[existingIndex] : null;
-    const reference = {
-      pinId: previous && previous.revision === note.revision ? previous.pinId : crypto.randomUUID(),
-      note_id: note.id,
-      revision: note.revision,
-      note: snapshot
+      return reason;
     };
-    if (existingIndex >= 0) entry.noteRefs[existingIndex] = reference;
-    else entry.noteRefs.push(reference);
+    if (!Array.isArray(notes) || !notes.length) return fail("invalid");
+    const ids = new Set();
+    for (const note of notes) {
+      if (!note?.id || ids.has(note.id) || note.document_id !== documentId || note.deleted_at || note.purged || !Number.isInteger(note.revision)) return fail("invalid");
+      ids.add(note.id);
+    }
+    const aggregateIds = new Set([...entry.noteRefs.map((reference) => reference.note_id), ...ids]);
+    if (aggregateIds.size > 8) return fail("limit");
+    const nextReferences = entry.noteRefs.slice();
+    for (const note of notes) {
+      const existingIndex = nextReferences.findIndex((item) => item.note_id === note.id);
+      const previous = existingIndex >= 0 ? nextReferences[existingIndex] : null;
+      const reference = {
+        pinId: previous && previous.revision === note.revision ? previous.pinId : crypto.randomUUID(),
+        note_id: note.id,
+        revision: note.revision,
+        note: JSON.parse(JSON.stringify(note))
+      };
+      if (existingIndex >= 0) nextReferences[existingIndex] = reference;
+      else nextReferences.push(reference);
+    }
+    entry.noteRefs = nextReferences;
     entry.explicitNoteContext = true;
     if (!entry.draft) entry.draft = t("noteReferencePrompt");
     entry.status = { key: "noteReferenceAdded", kind: "success" };
@@ -789,7 +795,11 @@ export function createAssistant(adapter) {
       render();
       elements.message.focus();
     }
-    return true;
+    return "added";
+  }
+
+  function addNoteReference(documentId, note) {
+    return addNoteReferences(documentId, [note]) === "added";
   }
 
   function renderHistory(entry) {
@@ -1882,6 +1892,7 @@ export function createAssistant(adapter) {
       render();
     },
     addNoteReference,
+    addNoteReferences,
     planAnalysis(documentId, datasetId, navigationGeneration) {
       if (adapter.getDocument()?.id !== documentId || adapter.getSelectedDatasetId?.() !== datasetId || adapter.getSharedDatasetId?.() !== datasetId || navigationGeneration !== adapter.getNavigationGeneration?.()) return false;
       const entry = entryFor(documentId);

@@ -187,6 +187,15 @@
           <button id="zoom-in" class="button button-icon" type="button" data-testid="zoom-in" aria-label="放大" disabled>+</button>
           <button id="zoom-fit" class="button button-quiet fit-button" type="button" data-i18n="fitWidth" disabled>适应宽度</button>
         </div>
+        <div class="reader-reading-controls">
+          <label class="reader-view-label" for="reader-view-mode"><span data-i18n="viewMode">阅读模式</span>
+            <select id="reader-view-mode" disabled>
+              <option value="continuous" data-i18n="viewContinuous">连续滚动</option>
+              <option value="single" data-i18n="viewSingle">单页</option>
+            </select>
+          </label>
+          <button id="reader-find-toggle" class="button button-quiet" type="button" aria-controls="reader-find-panel" aria-expanded="false" data-i18n="findInPdf" disabled>查找正文</button>
+        </div>
         <div class="reader-source-controls" aria-label="原文摘录">
           <button id="text-selection-note" class="button button-secondary" type="button" data-i18n="textSelectionNote" disabled>选中文字加入笔记</button>
           <div id="text-annotation-toolbar" class="text-annotation-toolbar" role="group" aria-label="保存文字标注">
@@ -204,6 +213,18 @@
         </div>
         <button id="export-reading-record" class="button button-secondary export-reading-record" type="button" data-testid="export-reading-record" data-i18n="exportReadingRecord" disabled>导出阅读记录</button>
       </div>
+      <section id="reader-find-panel" class="reader-find-panel" aria-label="查找 PDF 正文" hidden>
+        <div class="reader-find-row">
+          <label class="sr-only" for="reader-find-input" data-i18n="findInPdf">查找正文</label>
+          <input id="reader-find-input" type="search" maxlength="200" autocomplete="off" data-i18n-placeholder="findPlaceholder" placeholder="在当前 PDF 中查找">
+          <button id="reader-find-prev" class="button button-icon" type="button" aria-label="上一个匹配" disabled>↑</button>
+          <button id="reader-find-next" class="button button-icon" type="button" aria-label="下一个匹配" disabled>↓</button>
+          <button id="reader-find-retry" class="button button-quiet" type="button" data-i18n="retry" hidden>重试</button>
+          <button id="reader-find-close" class="button button-quiet" type="button" data-i18n="findClose">关闭</button>
+        </div>
+        <p id="reader-find-status" class="reader-find-status" role="status" aria-live="polite"></p>
+        <ol id="reader-find-results" class="reader-find-results" aria-label="查找结果"></ol>
+      </section>
       <p id="reader-text-status" class="reader-text-status" role="status" aria-live="polite" hidden></p>
 
       <div id="reader-stage" class="reader-stage">
@@ -557,6 +578,36 @@
         <h3 data-i18n="savedNotes">已保存笔记</h3>
         <span id="notes-count" class="notes-count"></span>
       </div>
+      <section id="notes-filter-panel" class="notes-filter-panel" aria-label="筛选和选择笔记" hidden>
+        <div class="notes-filter-grid">
+          <label for="notes-filter-query"><span data-i18n="notesFilterText">筛选笔记</span>
+            <input id="notes-filter-query" type="search" maxlength="200" autocomplete="off" data-i18n-placeholder="notesFilterPlaceholder" placeholder="搜索正文或原始引文">
+          </label>
+          <label for="notes-filter-color"><span data-i18n="annotationColor">标注颜色</span>
+            <select id="notes-filter-color">
+              <option value="all" data-i18n="filterAll">全部</option>
+              <option value="yellow" data-i18n="colorYellow">黄色</option>
+              <option value="green" data-i18n="colorGreen">绿色</option>
+              <option value="blue" data-i18n="colorBlue">蓝色</option>
+              <option value="pink" data-i18n="colorPink">粉色</option>
+            </select>
+          </label>
+          <label for="notes-filter-kind"><span data-i18n="annotationKind">标注类型</span>
+            <select id="notes-filter-kind">
+              <option value="all" data-i18n="filterAll">全部</option>
+              <option value="highlight" data-i18n="annotationKindHighlight">高亮</option>
+              <option value="underline" data-i18n="annotationKindUnderline">下划线</option>
+            </select>
+          </label>
+        </div>
+        <div class="notes-filter-actions">
+          <button id="notes-filter-clear" class="button button-quiet" type="button" data-i18n="searchClear" disabled>清除</button>
+          <button id="notes-select-visible" class="button button-quiet" type="button" data-i18n="selectVisible">选择当前显示</button>
+          <button id="notes-selection-clear" class="button button-quiet" type="button" data-i18n="clearSelection" disabled>清除选择</button>
+          <button id="notes-batch-agent" class="button button-secondary" type="button" data-i18n="batchAddAssistant" disabled>将所选加入助手</button>
+        </div>
+        <p id="notes-filter-status" class="notes-filter-status" role="status" aria-live="polite"></p>
+      </section>
       <p class="review-explainer" data-i18n="reviewExplainer">“已核对原文”仅表示你检查了来源，不代表身份认证或科学验证。</p>
       <div id="notes-empty" class="notes-empty" data-i18n="emptyNotes">这篇文献还没有笔记。</div>
       <ul id="notes-list" class="notes-list" data-testid="notes-list" aria-label="已保存笔记"></ul>

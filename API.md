@@ -250,3 +250,11 @@ compatible; trash/purge responses and schema14 are in [READER-LIBRARY.md](READER
 v0.22 adds optional note annotation/annotation_style and Agent context.note_refs;
 empty/absent refs preserve prior serialized request hashes. Schema15 adds a single
 annotation table. Full shape and limits: [TEXT-ANNOTATIONS.md](TEXT-ANNOTATIONS.md).
+
+
+## v0.23 client-side reading tools
+
+No new HTTP fields/endpoints or migration. PDF find uses the existing locally
+loaded PDF.js document; filters use saved note states; batch insertion uses the
+unchanged context.note_refs contract. Continuous pages keep the actual active
+page/selection in the existing reading context. See [READING-TOOLS.md](READING-TOOLS.md).

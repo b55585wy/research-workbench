@@ -684,3 +684,13 @@ Schema14->15 adds one annotation table; old30 table/file snapshots and original
 PDF bytes stay unchanged at activation. Legacy empty/absent note_refs hashes remain
 compatible. Export includes safe styled quotation and exact JSON metadata. Full
 source test evidence is under E:/research-workbench-pilot-20261030/text-annotations-v1.
+
+
+## v0.23 reading tools
+
+Full backend regression: 1075 passed, 0 skipped. New and affected browser acceptance:
+87 scenario groups passed; every isolated service and actual Kimi process was
+cleaned up. Actual configured-provider synthetic pilot cited two explicitly
+batch-selected saved notes from different pages. No user materials sent in pilot.
+Source/runtime/schema/table/file boundaries are checked again during rollout.
+Evidence and scenario matrix: E:/research-workbench-pilot-20261030/reading-tools-v1.

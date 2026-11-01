@@ -240,3 +240,15 @@ Verify native multi-line geometry, style/comment/quote separation, lifecycle and
 export, atomic retries, explicit removable Agent pins, server-resolved versioned
 sources, legacy hash compatibility, real configured-provider synthetic acceptance
 and unchanged old table/file/runtime boundaries.
+
+
+## v0.23 reading tools
+
+Scenarios were enumerated before changes in reading-tools-v1/SCENARIOS.md.
+Require literal full-document find/no-hit/limits/error/cancellation, exact page
+and per-line focus, current-text/original-quote filters, visible-only multi-select,
+atomic eight-reference budget and explicit source-resolved Agent send. Exercise
+native continuous scrolling, non-first-page text/region anchors, mixed rotation,
+200-page canvas budgets, single-page fallback, zoom/source navigation, keyboard,
+mobile/bilingual/theme and old note/task/data workflows. Preserve schema15/31
+tables, materials, runtime recipes and independent tFUS boundary.
