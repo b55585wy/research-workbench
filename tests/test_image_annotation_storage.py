@@ -24,8 +24,8 @@ def test_schema7_all_seventeen_original_tables_and_fields_are_preserved(tmp_path
         before={t:(table_info(db,t),db.execute(f'SELECT * FROM {t} ORDER BY 1').fetchall()) for t in tables}
     Store(tmp_path)
     with sqlite3.connect(database) as db:
-        assert db.execute('PRAGMA user_version').fetchone()[0]==13
-        assert len(db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").fetchall())==28
+        assert db.execute('PRAGMA user_version').fetchone()[0]==14
+        assert len(db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").fetchall())==30
         for t,(columns,rows) in before.items():assert (table_info(db,t),db.execute(f'SELECT * FROM {t} ORDER BY 1').fetchall())==(columns,rows)
         assert db.execute('SELECT COUNT(*) FROM image_annotations').fetchone()[0]==0
 

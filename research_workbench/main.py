@@ -196,6 +196,8 @@ def create_app(data_root=None, validator=None, renderer=None, *, agent_provider=
     app.state.data_imports=data_imports
     app.state.selections=selections
     app.include_router(selection_router)
+    from .library_lifecycle_api import router as library_lifecycle_router
+    app.include_router(library_lifecycle_router)
     app.state.image_annotations=image_annotations
     app.state.charts=charts
     app.state.records=records

@@ -9,6 +9,7 @@ from .models import WorkspaceError
 from .note_lifecycle import NoteLifecycle, base_note, read_state, read_states, ensure_active
 from .library import Library, DOCUMENT_QUERY, base_document, read_metadata
 from .rich_content import canonical
+from .library_lifecycle import SCHEMA as LIFECYCLE_SCHEMA, PaperTrash, NotePurge, reject_purged
 
 SCHEMA = '''
 BEGIN IMMEDIATE;
@@ -361,6 +362,9 @@ COMMIT;
 '''
 
 
+SCHEMA = SCHEMA.replace('COMMIT;', LIFECYCLE_SCHEMA + '\nPRAGMA user_version=14;\nCOMMIT;')
+
+
 def timestamp():
     return datetime.now(timezone.utc).isoformat()
 
@@ -385,12 +389,15 @@ class Store:
         self.exports.mkdir(exist_ok=True)
         self.database = self.root / 'workspace.sqlite3'
         with self.connection() as connection:
-            if connection.execute('PRAGMA user_version').fetchone()[0] > 13:
+            if connection.execute('PRAGMA user_version').fetchone()[0] > 14:
                 raise RuntimeError('Database requires a newer application')
             from .study_migration import install
             install(connection,SCHEMA)
         self.lifecycle = NoteLifecycle(self)
         self.library = Library(self)
+        self.paper_trash = PaperTrash(self)
+        self.note_purge = NotePurge(self)
+        self.note_purge.resume_pending()
 
     @contextmanager
     def connection(self):
@@ -412,7 +419,8 @@ class Store:
     def list_documents(self):
         with self.connection() as connection:
             return [base_document(row) for row in connection.execute(
-                DOCUMENT_QUERY + ' WHERE d.page_count IS NOT NULL ORDER BY d.created_at DESC,d.id DESC')]
+                DOCUMENT_QUERY + ' WHERE d.page_count IS NOT NULL AND NOT EXISTS '
+                '(SELECT 1 FROM document_trash t WHERE t.document_id=d.id) ORDER BY d.created_at DESC,d.id DESC')]
 
     def get_document(self, identifier):
         with self.connection() as connection:
@@ -423,6 +431,7 @@ class Store:
             connection.execute('BEGIN IMMEDIATE')
             if deduplicate:
                 existing = connection.execute('''SELECT id FROM documents WHERE sha256=? AND byte_size=?
+                    AND NOT EXISTS(SELECT 1 FROM document_trash t WHERE t.document_id=documents.id)
                     ORDER BY created_at,id LIMIT 1''',(record['sha256'],record['byte_size'])).fetchone()
                 if existing is not None:
                     return base_document(read_metadata(connection,existing['id']))
@@ -442,6 +451,7 @@ class Store:
             return self.save_note_in(connection,identifier,payload)
 
     def save_note_in(self, connection, identifier, payload):
+        reject_purged(connection, identifier, str(payload.request_id))
         owner=read_metadata(connection,identifier)
         if owner.get('kind')=='study':return self.study_notes.save_in(connection,identifier,payload)
         if payload.page is None or payload.source is not None:raise WorkspaceError('invalid_page','文献笔记需要实际PDF页码。',422)

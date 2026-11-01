@@ -84,7 +84,7 @@ def test_schema11_migration_preserves_all24_tables_columns_rows_and_file(tmp_pat
     files=tmp_path/'documents';files.mkdir();material=files/(doc+'.pdf');material.write_bytes(b'preserve exact bytes')
     Store(tmp_path)
     with sqlite3.connect(database) as db:
-        assert db.execute('PRAGMA user_version').fetchone()[0]==13 and len(names)==24
-        assert {r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")}-set(names)=={'dataset_selections','studies','study_note_sources','study_papers'}
+        assert db.execute('PRAGMA user_version').fetchone()[0]==14 and len(names)==24
+        assert {r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")}-set(names)=={'dataset_selections','studies','study_note_sources','study_papers','document_trash','purged_notes'}
         assert before=={n:(table_info(db,n),db.execute(f'SELECT * FROM {n} ORDER BY 1').fetchall()) for n in names}
     assert material.read_bytes()==b'preserve exact bytes'

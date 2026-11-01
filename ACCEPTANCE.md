@@ -225,3 +225,10 @@ Scenario matrix: E:/research-workbench-pilot-20261030/result-workflow-v1/SCENARI
 Verify compact and exact result values, p/null/unbounded CI boundaries, per-owner
 disclosure state, explicit sharing, draft-only assistant entry, source-note actions,
 Chinese/English mobile UI and affected prior workspace/task paths.
+
+
+v0.21 reading/library requirements: [READER-LIBRARY.md](READER-LIBRARY.md).
+Scenario matrix: E:/research-workbench-pilot-20261030/reader-library-v1/SCENARIOS.md.
+Check actual PDF selection geometry, visible unsaved/saved excerpt destination,
+content purge and reference retention, menu/metadata retries, recoverable paper
+trash, late-owner safety, schema migration, storage failures and bilingual mobile.

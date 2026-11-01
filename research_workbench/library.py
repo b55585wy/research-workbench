@@ -18,10 +18,12 @@ def base_document(metadata):
     return {key: metadata[key] for key in DOCUMENT_FIELDS}
 
 
-def read_metadata(connection, identifier):
+def read_metadata(connection, identifier, include_trashed=False):
     row = connection.execute(DOCUMENT_QUERY + ' WHERE d.id=?', (identifier,)).fetchone()
     if row is None:
         raise WorkspaceError('not_found', '找不到这篇文献。', 404)
+    if not include_trashed and connection.execute('SELECT 1 FROM document_trash WHERE document_id=?', (identifier,)).fetchone():
+        raise WorkspaceError('document_trashed', '这篇论文已移入回收站，请先恢复。', 410)
     if row['page_count'] is None:
         from .studies import owner
         return owner(connection,dict(row))
@@ -43,6 +45,7 @@ class Library:
     def find_duplicate(self, checksum, byte_size):
         with self.store.connection() as connection:
             row = connection.execute(DOCUMENT_QUERY + ''' WHERE d.sha256=? AND d.byte_size=?
+                AND NOT EXISTS(SELECT 1 FROM document_trash t WHERE t.document_id=d.id)
                 ORDER BY d.created_at,d.id LIMIT 1''',(checksum,byte_size)).fetchone()
             return base_document(row) if row is not None else None
 
@@ -91,12 +94,14 @@ class Library:
         folded = query.casefold()
         with self.store.connection() as connection:
             if not connection.in_transaction:connection.execute('BEGIN')
-            documents = connection.execute(DOCUMENT_QUERY + ' WHERE d.page_count IS NOT NULL ORDER BY d.created_at DESC,d.id DESC')
+            documents = connection.execute(DOCUMENT_QUERY + ' WHERE d.page_count IS NOT NULL AND NOT EXISTS '
+                '(SELECT 1 FROM document_trash t WHERE t.document_id=d.id) ORDER BY d.created_at DESC,d.id DESC')
             result['documents'] = self.find_documents(documents,folded,limit)
             if include_studies:result['studies']=self.find_studies(connection,folded,limit)
             sql = STATE_QUERY.replace('SELECT n.id','SELECT m.title AS document_title,n.id',1)
             sql += ''' JOIN document_metadata m ON m.document_id=n.document_id
-                WHERE s.deleted_at IS NULL'''
+                WHERE s.deleted_at IS NULL AND NOT EXISTS
+                (SELECT 1 FROM document_trash t WHERE t.document_id=n.document_id)'''
             if not include_studies:sql+=' AND n.page IS NOT NULL'
             sql+=' ORDER BY n.created_at DESC,n.id DESC'
             for row in connection.execute(sql):

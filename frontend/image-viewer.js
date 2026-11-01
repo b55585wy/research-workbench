@@ -1180,6 +1180,17 @@ export function createImageViewer(adapter) {
     if (active) cancelDraft(active);
   });
 
+  function clearSource(documentId, kind, sourceId) {
+    entries.delete(contextKey(documentId, kind, sourceId));
+    const context = contexts.get(documentId);
+    if (context?.source_kind === kind && context.source_id === sourceId) {
+      contexts.delete(documentId);
+      adapter.imageClosed?.(documentId);
+      adapter.contextChanged?.();
+    }
+    if (active?.documentId === documentId && active.kind === kind && active.sourceId === sourceId) close({ restoreFocus: false });
+  }
+
   function clearActiveContext(documentId) {
     const id = documentId || active?.documentId || adapter.getDocument()?.id;
     if (!id) return;
@@ -1216,6 +1227,7 @@ export function createImageViewer(adapter) {
       };
     },
     clearActiveContext,
+    clearSource,
     isOpen() {
       return Boolean(active && elements.dialog.open);
     }

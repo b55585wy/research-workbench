@@ -83,6 +83,14 @@ const messages = {
     deletedNotesHelp: "已删除笔记可恢复到原来的来源。",
     deletedNoteRecovery: "这条笔记已删除，可在“已删除笔记”中恢复。",
     unknownNote: "这条笔记不存在或已被删除。",
+    purgeNote: "彻底删除",
+    purgeConfirm: "彻底删除正文和图片摘录，无法恢复；已导出文件、备份和历史对话不受影响。",
+    purging: "正在彻底删除笔记…",
+    purged: "笔记正文和图片摘录已彻底删除，无法恢复。",
+    purgeStorageUnavailable: "笔记内容已不可访问，但文件清理失败。请使用原请求重试完成清理。",
+    notePurgedSource: "这条笔记的正文和图片摘录已彻底删除，无法恢复。",
+    note_not_deleted: "只有已删除笔记才能彻底删除。",
+    note_purged: "这条笔记已彻底删除，无法恢复。",
     request_failed: "操作未完成，请重试。",
     network: "无法连接本地服务。请检查服务后重试。",
     validation_error: "提交的内容无效，请检查后重试。",
@@ -171,6 +179,14 @@ const messages = {
     deletedNotesHelp: "Restore a deleted note to its original source.",
     deletedNoteRecovery: "This note is deleted. Restore it from “Deleted notes”.",
     unknownNote: "This note does not exist or was deleted.",
+    purgeNote: "Delete permanently",
+    purgeConfirm: "Permanently delete the note body and image excerpt; this cannot be undone. Exported files, backups, and past conversations are not affected.",
+    purging: "Permanently deleting note…",
+    purged: "The note body and image excerpt were permanently deleted and cannot be recovered.",
+    purgeStorageUnavailable: "The note content is no longer accessible, but file cleanup failed. Retry the original request to finish cleanup.",
+    notePurgedSource: "This note’s body and image excerpt were permanently deleted and cannot be recovered.",
+    note_not_deleted: "Only a deleted note can be permanently deleted.",
+    note_purged: "This note was permanently deleted and cannot be recovered.",
     request_failed: "The action could not be completed. Try again.",
     network: "Cannot connect to the local service. Check it and retry.",
     validation_error: "The submitted content is invalid. Check it and retry.",
@@ -243,6 +259,7 @@ export function createStudy(adapter) {
   let studies = [];
   let currentId = null;
   let sequence = 0;
+  let noteNavigationSequence = 0;
   let createReviewed = false;
   let createOperation = null;
   let createStatus = null;
@@ -491,7 +508,14 @@ export function createStudy(adapter) {
     if (!appendRichBody(item, note, noteState)) textButton.append(make("span", "note-text-preview", note.text));
     if (textButton.children.length) item.append(textButton);
     if (deleted) {
-      item.append(actionButton("restore-note", t("restoreNote"), () => restoreNote(owner, note), entry.notePending || entry.mutations.size > 0));
+      const disabled = entry.notePending || entry.mutations.size > 0;
+      const failed = entry.failedMutations.get(note.id);
+      const actions = make("div", "note-actions");
+      actions.append(
+        actionButton("restore-note", t("restoreNote"), () => restoreNote(owner, note), disabled),
+        actionButton("purge-note", t(failed?.action === "purge" ? "retry" : "purgeNote"), () => purgeNote(owner, note), disabled)
+      );
+      item.append(actions);
       return item;
     }
     const reviewStatus = noteState.review_status || "unreviewed";
@@ -530,7 +554,7 @@ export function createStudy(adapter) {
     elements.notesEmpty.hidden = notes.length > 0;
     elements.notesList.replaceChildren();
     for (const note of notes) elements.notesList.append(renderNoteItem(note, owner, entry));
-    const deleted = states.filter((note) => note.deleted_at);
+    const deleted = states.filter((note) => note.deleted_at && !note.purged);
     elements.deletedNotes.hidden = !deleted.length;
     elements.deletedNotesCount.textContent = deleted.length ? String(deleted.length) : "";
     elements.deletedNotesList.replaceChildren();
@@ -827,11 +851,11 @@ export function createStudy(adapter) {
     const base = `/api/v1/documents/${encodeURIComponent(owner.id)}/notes/${encodeURIComponent(note.id)}`;
     const change = action === "review" ? { review_status: noteState.review_status === "source_checked" ? "unreviewed" : "source_checked" } : {};
     return {
-      method: action === "delete" ? "DELETE" : action === "restore" ? "POST" : "PATCH",
-      path: action === "restore" ? `${base}/restore` : base,
+      method: action === "delete" ? "DELETE" : ["restore", "purge"].includes(action) ? "POST" : "PATCH",
+      path: ["restore", "purge"].includes(action) ? `${base}/${action}` : base,
       body: { request_id: crypto.randomUUID(), expected_revision: noteState.revision, ...change },
-      pendingStatus: action === "delete" ? "deleting" : action === "restore" ? "restoring" : "reviewSaving",
-      successStatus: action === "delete" ? "deleted" : action === "restore" ? "restored" : noteState.review_status === "source_checked" ? "reviewUnmarked" : "reviewSaved",
+      pendingStatus: action === "delete" ? "deleting" : action === "restore" ? "restoring" : action === "purge" ? "purging" : "reviewSaving",
+      successStatus: action === "delete" ? "deleted" : action === "restore" ? "restored" : action === "purge" ? "purged" : noteState.review_status === "source_checked" ? "reviewUnmarked" : "reviewSaved",
       action
     };
   }
@@ -857,6 +881,19 @@ export function createStudy(adapter) {
     if (entry.notePending || entry.mutations.size || entry.edit) return;
     const failed = entry.failedMutations.get(note.id);
     const operation = failed?.action === "restore" ? failed : lifecycleOperation(owner, note, "restore");
+    if (operation) await runMutation(owner, note.id, operation);
+  }
+
+  async function purgeNote(owner, note) {
+    const entry = entryFor(owner.id);
+    if (entry.notePending || entry.mutations.size || entry.edit) return;
+    const failed = entry.failedMutations.get(note.id);
+    if (failed?.action === "purge") {
+      await runMutation(owner, note.id, failed);
+      return;
+    }
+    if (!window.confirm(t("purgeConfirm"))) return;
+    const operation = lifecycleOperation(owner, note, "purge");
     if (operation) await runMutation(owner, note.id, operation);
   }
 
@@ -890,14 +927,23 @@ export function createStudy(adapter) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(operation.body)
       });
-      adapter.noteStateChanged(owner, saved, operation.action);
+      if (operation.action === "purge") {
+        if (saved?.purged !== true || saved.id !== noteId || saved.document_id !== owner.id) {
+          const error = new Error("request_failed");
+          error.code = "request_failed";
+          throw error;
+        }
+        adapter.notePurged(owner, noteId);
+      } else {
+        adapter.noteStateChanged(owner, saved, operation.action);
+      }
       if (operation.action === "edit" && entry.edit?.operation === operation) entry.edit = null;
       setNoteStatus(entry, { key: operation.successStatus, kind: "success" });
     } catch (error) {
       if (operation.action === "edit" && entry.edit?.operation === operation) entry.edit.saveFailed = true;
       else entry.failedMutations.set(noteId, operation);
       setNoteStatus(entry, {
-        key: error?.code === "revision_conflict" ? "revisionConflict" : errorKey(error),
+        key: error?.code === "revision_conflict" ? "revisionConflict" : operation.action === "purge" && error?.code === "storage_unavailable" ? "purgeStorageUnavailable" : errorKey(error),
         kind: "error",
         retry: error?.code === "revision_conflict" ? () => refreshLatest(owner) : () => runMutation(owner, noteId, operation),
         retryLabel: error?.code === "revision_conflict" ? "viewLatest" : "retry"
@@ -939,7 +985,8 @@ export function createStudy(adapter) {
     return true;
   }
 
-  function openNote(noteId) {
+  async function openNote(noteId) {
+    const navigationSequence = ++noteNavigationSequence;
     const owner = currentDocument();
     if (!owner) return;
     const note = adapter.getNotes().find((item) => item.id === noteId);
@@ -948,13 +995,37 @@ export function createStudy(adapter) {
       return;
     }
     const entry = entryFor(owner.id);
-    if (adapter.getNoteStates().find((item) => item.id === noteId)?.deleted_at) {
-      elements.deletedNotes.open = true;
-      setNoteStatus(entry, { key: "deletedNoteRecovery", kind: "error" });
-    } else {
-      setNoteStatus(entry, { key: "unknownNote", kind: "error" });
+    const ownerSequence = sequence;
+    const navigationGeneration = adapter.getNavigationGeneration?.();
+    const showMissingStatus = (key) => {
+      if (key === "deletedNoteRecovery") elements.deletedNotes.open = true;
+      setNoteStatus(entry, { key, kind: "error" });
+    };
+    const isCurrent = () => navigationSequence === noteNavigationSequence && ownerSequence === sequence && (adapter.getNavigationGeneration?.() ?? navigationGeneration) === navigationGeneration && currentId === owner.id && currentDocument()?.id === owner.id;
+    const noteState = adapter.getNoteStates().find((item) => item.id === noteId);
+    if (noteState?.deleted_at) {
+      showMissingStatus("deletedNoteRecovery");
+      return;
     }
-    statusInto(elements.noteStatus, entry.noteStatus);
+
+    let missingState;
+    try {
+      missingState = await adapter.api(`/api/v1/documents/${encodeURIComponent(owner.id)}/notes/${encodeURIComponent(noteId)}/state`);
+    } catch (error) {
+      if (!isCurrent() || error?.name === "AbortError") return;
+      showMissingStatus(error?.code === "note_purged" ? "notePurgedSource" : error?.code === "not_found" ? "unknownNote" : errorKey(error));
+      return;
+    }
+    if (!isCurrent()) return;
+    if (missingState?.deleted_at) {
+      showMissingStatus("deletedNoteRecovery");
+      return;
+    }
+    if (missingState?.id !== noteId || missingState?.document_id !== owner.id || !noteSource(missingState, owner)) {
+      showMissingStatus("unknownNote");
+      return;
+    }
+    navigateNoteSource(owner, missingState);
   }
 
   elements.newButton.addEventListener("click", () => {
@@ -1052,6 +1123,7 @@ export function createStudy(adapter) {
     documentChanged(document) {
       currentId = document?.kind === "study" ? document.id : null;
       sequence += 1;
+      noteNavigationSequence += 1;
       renderDocument();
       if (currentId) loadPapers(document);
     },

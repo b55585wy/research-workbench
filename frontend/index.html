@@ -98,6 +98,12 @@
         <button id="sample-open" class="button button-secondary" type="button" data-testid="sample-open" data-i18n="sample">试读示例</button>
       </div>
       <ul id="documents-list" class="documents-list" data-testid="documents-list" aria-label="已保存文献"></ul>
+      <details id="library-trash" class="library-trash">
+        <summary><span data-i18n="libraryTrash">文献回收站</span><span id="library-trash-count" class="notes-count"></span></summary>
+        <p class="library-trash-help" data-i18n="libraryTrashHelp">回收站中的文献可恢复；原文、笔记和图片都会保留。</p>
+        <div id="library-trash-status" class="library-trash-status" role="status" aria-live="polite"></div>
+        <ul id="library-trash-list" class="documents-list" aria-label="回收站中的文献"></ul>
+      </details>
     </aside>
 
     <section class="reader-panel" aria-labelledby="reader-heading">
@@ -181,8 +187,13 @@
           <button id="zoom-in" class="button button-icon" type="button" data-testid="zoom-in" aria-label="放大" disabled>+</button>
           <button id="zoom-fit" class="button button-quiet fit-button" type="button" data-i18n="fitWidth" disabled>适应宽度</button>
         </div>
+        <div class="reader-source-controls" aria-label="原文摘录">
+          <button id="text-selection-note" class="button button-secondary" type="button" data-i18n="textSelectionNote" disabled>选中文字加入笔记</button>
+          <button id="reader-region-mode" class="button button-secondary" type="button" data-i18n="regionMode" disabled>框选原文位置</button>
+        </div>
         <button id="export-reading-record" class="button button-secondary export-reading-record" type="button" data-testid="export-reading-record" data-i18n="exportReadingRecord" disabled>导出阅读记录</button>
       </div>
+      <p id="reader-text-status" class="reader-text-status" role="status" aria-live="polite" hidden></p>
 
       <div id="reader-stage" class="reader-stage">
         <div id="reader-empty" class="reader-empty">
@@ -190,6 +201,7 @@
         </div>
         <div id="page-surface" class="page-surface" hidden>
           <canvas id="reader-canvas" data-testid="reader-canvas" aria-label="PDF 页面"></canvas>
+          <div id="reader-text-layer" class="textLayer" aria-label="PDF 文字层"></div>
           <div id="region-overlay" class="region-overlay" data-testid="region-overlay" aria-hidden="true">
             <div id="active-selection" class="active-selection" hidden></div>
           </div>
@@ -505,6 +517,13 @@
           <button id="page-note" class="button button-quiet" type="button" data-i18n="wholePage" disabled>引用整页</button>
         </div>
         <p id="anchor-help" class="anchor-help" data-i18n="anchorHelp">框选页面区域，或引用当前整页。保存前可继续修改笔记。</p>
+        <section id="region-draft" class="region-draft" aria-label="未保存图片摘录" hidden>
+          <div id="region-draft-preview" class="region-draft-preview"></div>
+          <div class="region-draft-footer">
+            <p id="region-draft-status" data-i18n="regionDraftUnsaved">未保存，点击保存图片摘录</p>
+            <button id="region-draft-cancel" class="button button-quiet" type="button" data-i18n="regionDraftCancel">取消图片摘录</button>
+          </div>
+        </section>
         <label for="note-text" class="note-label" data-i18n="noteLabel">笔记内容</label>
         <textarea id="note-text" data-testid="note-text" rows="7" maxlength="10000" data-i18n-placeholder="notePlaceholder" placeholder="记录你的想法…" disabled></textarea>
         <div class="rich-text-draft-actions">
@@ -707,6 +726,25 @@
         </aside>
       </div>
     </div>
+  </dialog>
+
+  <div id="document-actions-menu" class="document-actions-menu" role="menu" aria-label="文献操作" hidden>
+    <button class="button button-quiet" type="button" role="menuitem" data-action="rename-document" data-i18n="renameDocument">重命名</button>
+    <button class="button button-quiet" type="button" role="menuitem" data-action="trash-document" data-i18n="trashDocument">移入回收站</button>
+  </div>
+
+  <dialog id="document-rename-dialog" class="document-rename-dialog" aria-labelledby="document-rename-heading">
+    <form id="document-rename-form">
+      <h2 id="document-rename-heading" data-i18n="renameDocument">重命名文献</h2>
+      <label for="document-rename-title" data-i18n="metadataTitle">标题</label>
+      <input id="document-rename-title" type="text" maxlength="180" autocomplete="off" required>
+      <p id="document-rename-status" class="document-rename-status" role="status" aria-live="polite"></p>
+      <div class="document-rename-actions">
+        <button id="document-rename-retry" class="button button-quiet" type="button" data-i18n="retry" hidden>重试</button>
+        <button id="document-rename-cancel" class="button button-quiet" type="button" data-i18n="metadataCancel">取消</button>
+        <button id="document-rename-save" class="button button-primary" type="submit" data-i18n="metadataSave">保存</button>
+      </div>
+    </form>
   </dialog>
 
   <script type="module" src="/app.js"></script>

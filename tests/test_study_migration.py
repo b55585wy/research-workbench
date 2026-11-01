@@ -21,7 +21,7 @@ def fixture(root):
 def test_schema12_preserves_all25_tables_and_foreign_keys(tmp_path):
     database,doc,before=fixture(tmp_path);store=Store(tmp_path)
     with store.connection() as c:
-        assert c.execute('PRAGMA user_version').fetchone()[0]==13
+        assert c.execute('PRAGMA user_version').fetchone()[0]==14
         assert c.execute('PRAGMA foreign_key_check').fetchall()==[]
         after={n:(table_info(c,n),list(map(tuple,c.execute(f'SELECT * FROM {n} ORDER BY 1')))) for n in before}
         assert before==after and len(before)==25

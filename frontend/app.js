@@ -189,6 +189,51 @@ const messages = {
     metadataValidation: "请填写标题；年份须为 1 至 9999 的整数或留空。",
     research_record_source_mismatch: "请先返回该来源的文献和所选数据，再查看导出范围；当前工作区未切换。",
     research_record_invalid_source: "这条导出范围来源不完整，无法打开。",
+    textSelectionNote: "选中文字加入笔记",
+    selectTextFirst: "请先在当前页选中文字。若页面没有可选择文字，请使用“框选原文位置”保存图片摘录。",
+    textSelectionTooLong: "选中文字超过 10000 字，请缩小选择范围。",
+    noTextLayer: "此页没有可选择的文字。可框选原文位置并保存图片摘录。",
+    textLayerUnavailable: "此页文字暂时无法选择。可重试，或框选原文位置保存图片摘录。",
+    textDraftReady: "选中文字已加入未保存笔记，不会自动保存或发送。",
+    replaceDraftConfirm: "当前有未保存或正在编辑的笔记。用新的原文选择替换当前草稿吗？此操作不会自动保存。",
+    draftPending: "当前笔记操作尚未完成，请完成后再选择新的原文。",
+    regionDraftUnsaved: "未保存，点击保存图片摘录",
+    regionDraftCancel: "取消图片摘录",
+    regionDraftCancelConfirm: "取消此图片摘录的原文位置和预览？笔记文字会保留。",
+    regionCaption: "第 {page} 页图片摘录",
+    libraryTrash: "文献回收站",
+    libraryTrashHelp: "回收站中的文献可恢复；原文、笔记和图片都会保留。",
+    libraryTrashEmpty: "回收站为空。",
+    libraryTrashLoading: "正在加载回收站…",
+    libraryTrashLoadFailed: "无法加载文献回收站，请重试。",
+    documentMenu: "文献操作",
+    renameDocument: "重命名",
+    trashDocument: "移入回收站",
+    restoreDocument: "恢复文献",
+    documentRenameLoading: "正在读取文献标题…",
+    documentRenameSaving: "正在保存新标题…",
+    documentRenamed: "文献标题已保存，原 PDF 和文件名未改变。",
+    documentRenameFailed: "标题保存结果尚未确认。请使用原请求重试。",
+    documentMetadataDraft: "这篇文献有未保存的书目修改。请先保存或取消该修改，再重命名。",
+    documentTrashConfirm: "将这篇文献移入回收站？原文、笔记和图片会保留，可从回收站恢复。",
+    documentTrashing: "正在移入回收站…",
+    documentTrashed: "文献已移入回收站，可从回收站恢复。",
+    documentRestoring: "正在恢复文献…",
+    documentRestored: "文献已恢复到文库，可重新打开。",
+    documentTrashedLink: "这篇文献已在回收站中。恢复后可重新打开原文、笔记和图片。",
+    viewTrash: "查看回收站",
+    document_in_use: "这篇文献已关联研究，请先取消关联后再移入回收站。",
+    document_busy: "这篇文献仍有正在进行的任务或助手操作，请完成或停止后再试。",
+    document_revision_conflict: "文献已在其他地方更新。请刷新后重试。",
+    document_trashed: "这篇文献已在回收站中，请先恢复。",
+    purgeNote: "彻底删除",
+    purgeConfirm: "彻底删除正文和图片摘录，无法恢复；已导出文件、备份和历史对话不受影响。",
+    purging: "正在彻底删除笔记…",
+    purged: "笔记正文和图片摘录已彻底删除，无法恢复。",
+    purgeStorageUnavailable: "笔记内容已不可访问，但图片文件清理失败。请使用原请求重试完成清理。",
+    notePurgedSource: "这条笔记的正文和图片摘录已彻底删除，无法恢复。",
+    note_not_deleted: "只有已删除笔记才能彻底删除。",
+    note_purged: "这条笔记已彻底删除，无法恢复。",
     untitled: "未命名文献"
   },
   en: {
@@ -359,6 +404,51 @@ const messages = {
     metadataValidation: "Enter a title. Year must be a whole number from 1 to 9999, or empty.",
     research_record_source_mismatch: "Return to the source paper and selected data to review this export scope. The current workspace was not changed.",
     research_record_invalid_source: "This export-scope source is incomplete and cannot be opened.",
+    textSelectionNote: "Add selected text to note",
+    selectTextFirst: "Select text on the current page first. If the page has no selectable text, use “Select source region” to save an image excerpt.",
+    textSelectionTooLong: "The selected text exceeds 10,000 characters. Select a smaller passage.",
+    noTextLayer: "This page has no selectable text. Select a source region to save an image excerpt instead.",
+    textLayerUnavailable: "Text is temporarily unavailable on this page. Retry, or select a source region for an image excerpt.",
+    textDraftReady: "The selected text is in an unsaved note. Nothing was saved or sent automatically.",
+    replaceDraftConfirm: "There is an unsaved or edited note. Replace the current draft with the new source selection? Nothing will be saved automatically.",
+    draftPending: "A note operation is still in progress. Finish it before choosing another source.",
+    regionDraftUnsaved: "Unsaved — click Save image excerpt",
+    regionDraftCancel: "Cancel image excerpt",
+    regionDraftCancelConfirm: "Clear this image excerpt’s source and preview? Your note text will be kept.",
+    regionCaption: "Page {page} image excerpt",
+    libraryTrash: "Paper trash",
+    libraryTrashHelp: "Papers in trash can be restored with their original PDF, notes, and images.",
+    libraryTrashEmpty: "Trash is empty.",
+    libraryTrashLoading: "Loading paper trash…",
+    libraryTrashLoadFailed: "Paper trash could not be loaded. Try again.",
+    documentMenu: "Paper actions",
+    renameDocument: "Rename",
+    trashDocument: "Move to trash",
+    restoreDocument: "Restore paper",
+    documentRenameLoading: "Loading the paper title…",
+    documentRenameSaving: "Saving the new title…",
+    documentRenamed: "Paper title saved. The original PDF and filename are unchanged.",
+    documentRenameFailed: "The title save is unconfirmed. Retry the original request.",
+    documentMetadataDraft: "This paper has unsaved bibliography changes. Save or cancel them before renaming.",
+    documentTrashConfirm: "Move this paper to trash? Its PDF, notes, and images will be kept and can be restored.",
+    documentTrashing: "Moving paper to trash…",
+    documentTrashed: "Paper moved to trash. It can be restored from there.",
+    documentRestoring: "Restoring paper…",
+    documentRestored: "Paper restored to the library. You can open it again.",
+    documentTrashedLink: "This paper is in trash. Restore it to reopen its PDF, notes, and images.",
+    viewTrash: "View trash",
+    document_in_use: "This paper is associated with research. Remove the association before moving it to trash.",
+    document_busy: "This paper still has an active job or assistant operation. Finish or stop it before retrying.",
+    document_revision_conflict: "The paper changed elsewhere. Refresh and retry.",
+    document_trashed: "This paper is in trash. Restore it first.",
+    purgeNote: "Delete permanently",
+    purgeConfirm: "Permanently delete the note body and image excerpt; this cannot be undone. Exported files, backups, and past conversations are not affected.",
+    purging: "Permanently deleting note…",
+    purged: "The note body and image excerpt were permanently deleted and cannot be recovered.",
+    purgeStorageUnavailable: "The note content is no longer accessible, but image-file cleanup failed. Retry the original request to finish cleanup.",
+    notePurgedSource: "This note’s body and image excerpt were permanently deleted and cannot be recovered.",
+    note_not_deleted: "Only a deleted note can be permanently deleted.",
+    note_purged: "This note was permanently deleted and cannot be recovered.",
     untitled: "Untitled paper"
   }
 };
@@ -410,6 +500,10 @@ const elements = {
   readerEmpty: $("reader-empty"),
   pageSurface: $("page-surface"),
   canvas: $("reader-canvas"),
+  textLayer: $("reader-text-layer"),
+  textStatus: $("reader-text-status"),
+  textSelectionNote: $("text-selection-note"),
+  readerRegionMode: $("reader-region-mode"),
   overlay: $("region-overlay"),
   activeSelection: $("active-selection"),
   noteForm: $("note-form"),
@@ -423,7 +517,11 @@ const elements = {
   pageNote: $("page-note"),
   activeSource: $("active-source"),
   anchorHelp: $("anchor-help"),
+  regionDraft: $("region-draft"),
+  regionPreview: $("region-draft-preview"),
+  regionDraftCancel: $("region-draft-cancel"),
   characterCount: $("character-count"),
+  notesPanel: $("notes-panel"),
   notesList: $("notes-list"),
   notesEmpty: $("notes-empty"),
   notesCount: $("notes-count"),
@@ -431,7 +529,19 @@ const elements = {
   editCancel: $("edit-cancel"),
   deletedNotes: $("deleted-notes"),
   deletedNotesList: $("deleted-notes-list"),
-  deletedNotesCount: $("deleted-notes-count")
+  deletedNotesCount: $("deleted-notes-count"),
+  libraryTrash: $("library-trash"),
+  libraryTrashList: $("library-trash-list"),
+  libraryTrashCount: $("library-trash-count"),
+  libraryTrashStatus: $("library-trash-status"),
+  documentMenu: $("document-actions-menu"),
+  renameDialog: $("document-rename-dialog"),
+  renameForm: $("document-rename-form"),
+  renameTitle: $("document-rename-title"),
+  renameSave: $("document-rename-save"),
+  renameCancel: $("document-rename-cancel"),
+  renameRetry: $("document-rename-retry"),
+  renameStatus: $("document-rename-status")
 };
 
 const state = {
@@ -465,9 +575,12 @@ const state = {
   fitScale: 1,
   effectiveScale: 1,
   loadSequence: 0,
+  noteNavigationSequence: 0,
   renderSequence: 0,
   renderQueue: Promise.resolve(),
   renderTask: null,
+  textLayerTask: null,
+  capturedTextSelection: null,
   loadController: null,
   pendingUpload: false,
   pendingSaves: 0,
@@ -476,6 +589,18 @@ const state = {
   pendingMutations: new Map(),
   pendingMetadata: new Map(),
   failedMutations: new Map(),
+  documentOperations: new Map(),
+  librarySequence: 0,
+  libraryTrash: {
+    items: [],
+    loaded: false,
+    pending: false,
+    status: null,
+    sequence: 0,
+    operations: new Map()
+  },
+  documentMenu: null,
+  rename: null,
   lastUpload: null,
   highlight: null,
   highlightRevealId: null,
@@ -574,10 +699,15 @@ function applyLanguage() {
   elements.searchResults.setAttribute("aria-label", t("searchResults"));
   elements.notesList.setAttribute("aria-label", t("savedNotesLabel"));
   elements.deletedNotesList.setAttribute("aria-label", t("deletedNotes"));
+  elements.libraryTrashList.setAttribute("aria-label", t("libraryTrash"));
+  elements.textLayer.setAttribute("aria-label", t("pdfPage"));
   document.querySelector(".reader-toolbar").setAttribute("aria-label", t("readerControls"));
   elements.regionMode.textContent = t(state.regionActive ? "cancelRegion" : "regionMode");
+  elements.readerRegionMode.textContent = t(state.regionActive ? "cancelRegion" : "regionMode");
   renderDocuments();
   renderSearch();
+  renderLibraryTrash();
+  renderRenameDialog();
   renderDocumentDetails();
   renderMetadata();
   renderDraft();
@@ -697,20 +827,23 @@ async function openImageViewer(documentId, kind, sourceId, options = {}) {
   await imageViewer?.open(documentId, kind, sourceId, options);
 }
 
+function makeEmptyDraft() {
+  return {
+    text: "",
+    richContent: null,
+    page: null,
+    rect: null,
+    requestId: null,
+    saveFailed: false,
+    imageFailed: false,
+    includeExcerpt: false,
+    imageRequestIds: null,
+    previewCanvas: null
+  };
+}
+
 function ensureDraft(documentId) {
-  if (!state.drafts.has(documentId)) {
-    state.drafts.set(documentId, {
-      text: "",
-      richContent: null,
-      page: null,
-      rect: null,
-      requestId: null,
-      saveFailed: false,
-      imageFailed: false,
-      includeExcerpt: false,
-      imageRequestIds: null
-    });
-  }
+  if (!state.drafts.has(documentId)) state.drafts.set(documentId, makeEmptyDraft());
   return state.drafts.get(documentId);
 }
 
@@ -738,7 +871,60 @@ function invalidateRequestId(draft) {
   draft.imageFailed = false;
 }
 
+function prepareDraftReplacement(documentId) {
+  if (state.pendingSaves > 0 || state.pendingMutations.size > 0 || state.pendingExcerpts.size > 0) {
+    setStatus("draftPending", "error");
+    return false;
+  }
+  const draft = ensureDraft(documentId);
+  const editDraft = state.editDrafts.get(documentId);
+  const hasDraft = Boolean(editDraft || draft.text.trim() || draft.richContent || draft.page !== null || draft.rect);
+  if (hasDraft && !window.confirm(t("replaceDraftConfirm"))) return false;
+  richText?.close({ restoreFocus: false });
+  state.editDrafts.delete(documentId);
+  state.drafts.set(documentId, makeEmptyDraft());
+  return true;
+}
+
+function highlightDraft(documentId, page, rect) {
+  state.highlight = {
+    id: `draft-source-${documentId}`,
+    document_id: documentId,
+    page,
+    rect: rect ? [...rect] : null
+  };
+  state.highlightRevealId = null;
+  drawHighlight();
+}
+
+function closeDocumentMenu(restoreFocus = false) {
+  const menu = state.documentMenu;
+  elements.documentMenu.hidden = true;
+  elements.documentsList.querySelectorAll('[data-action="document-menu"]').forEach((button) => button.setAttribute("aria-expanded", "false"));
+  state.documentMenu = null;
+  if (restoreFocus && menu?.returnFocus?.isConnected) menu.returnFocus.focus();
+}
+
+function openDocumentMenu(documentId, anchor, point = null) {
+  closeDocumentMenu();
+  state.documentMenu = { documentId, returnFocus: anchor };
+  anchor.setAttribute("aria-expanded", "true");
+  elements.documentMenu.hidden = false;
+  elements.documentMenu.style.left = "0px";
+  elements.documentMenu.style.top = "0px";
+  const menuBounds = elements.documentMenu.getBoundingClientRect();
+  const anchorBounds = anchor.getBoundingClientRect();
+  const desiredLeft = point?.x ?? anchorBounds.right - menuBounds.width;
+  const desiredTop = point?.y ?? anchorBounds.bottom + 4;
+  const left = Math.max(8, Math.min(window.innerWidth - menuBounds.width - 8, desiredLeft));
+  const top = Math.max(8, Math.min(window.innerHeight - menuBounds.height - 8, desiredTop));
+  elements.documentMenu.style.left = `${left}px`;
+  elements.documentMenu.style.top = `${top}px`;
+  elements.documentMenu.querySelector("button")?.focus();
+}
+
 function renderDocuments() {
+  closeDocumentMenu();
   elements.documentsList.replaceChildren();
   elements.documentsEmpty.hidden = state.documents.length > 0;
   for (const document of state.documents) {
@@ -759,8 +945,327 @@ function renderDocuments() {
     meta.className = "document-meta";
     meta.textContent = t("pages", { count: document.page_count });
     button.append(name, meta);
-    item.append(button);
+    const menuButton = window.document.createElement("button");
+    menuButton.type = "button";
+    menuButton.className = "document-menu-button";
+    menuButton.dataset.action = "document-menu";
+    menuButton.textContent = "⋯";
+    menuButton.title = t("documentMenu");
+    menuButton.setAttribute("aria-label", `${t("documentMenu")}: ${name.textContent}`);
+    menuButton.setAttribute("aria-haspopup", "menu");
+    menuButton.setAttribute("aria-expanded", "false");
+    menuButton.addEventListener("click", (event) => {
+      event.stopPropagation();
+      openDocumentMenu(document.id, menuButton);
+    });
+    item.addEventListener("contextmenu", (event) => {
+      event.preventDefault();
+      openDocumentMenu(document.id, menuButton, { x: event.clientX, y: event.clientY });
+    });
+    item.append(button, menuButton);
     elements.documentsList.append(item);
+  }
+}
+
+async function refreshActiveLibrary() {
+  const sequence = ++state.librarySequence;
+  try {
+    const [body, studyBody] = await Promise.all([api("/api/v1/documents"), api("/api/v1/studies")]);
+    if (sequence !== state.librarySequence) return;
+    state.documents = Array.isArray(body.items) ? body.items : [];
+    state.studies = Array.isArray(studyBody.items) ? studyBody.items : [];
+    study?.setStudies(state.studies);
+    renderDocuments();
+    if (state.search.query) void performSearch(state.search.query);
+  } catch (error) {
+    if (sequence === state.librarySequence) setStatus(error.code || "request_failed", "error", {}, refreshActiveLibrary);
+  }
+}
+
+function renderLibraryTrash() {
+  const trash = state.libraryTrash;
+  elements.libraryTrashList.replaceChildren();
+  elements.libraryTrashCount.textContent = trash.items.length ? String(trash.items.length) : "";
+  elements.libraryTrashStatus.replaceChildren();
+  if (trash.status) {
+    elements.libraryTrashStatus.dataset.kind = trash.status.kind || "info";
+    const text = window.document.createElement("span");
+    text.textContent = t(trash.status.key);
+    elements.libraryTrashStatus.append(text);
+    if (trash.status.retry) {
+      const retry = window.document.createElement("button");
+      retry.type = "button";
+      retry.className = "status-retry";
+      retry.textContent = t("retry");
+      retry.addEventListener("click", trash.status.retry);
+      elements.libraryTrashStatus.append(retry);
+    }
+  } else {
+    delete elements.libraryTrashStatus.dataset.kind;
+  }
+  if (trash.loaded && !trash.items.length) {
+    const empty = window.document.createElement("li");
+    empty.className = "library-trash-empty";
+    empty.textContent = t("libraryTrashEmpty");
+    elements.libraryTrashList.append(empty);
+    return;
+  }
+  for (const document of trash.items) {
+    const item = window.document.createElement("li");
+    item.className = "document-item library-trash-item";
+    item.dataset.documentId = document.id;
+    const name = window.document.createElement("span");
+    name.className = "document-name";
+    name.textContent = document.title || document.original_filename || t("untitled");
+    const meta = window.document.createElement("span");
+    meta.className = "document-meta";
+    meta.textContent = document.deleted_at || "";
+    const restore = window.document.createElement("button");
+    restore.type = "button";
+    restore.className = "button button-quiet";
+    restore.dataset.action = "restore-document";
+    const operation = trash.operations.get(document.id);
+    restore.disabled = Boolean(operation?.pending);
+    restore.textContent = t(operation?.pending ? "documentRestoring" : operation ? "retry" : "restoreDocument");
+    restore.addEventListener("click", () => restoreDocument(document.id));
+    item.append(name, meta, restore);
+    elements.libraryTrashList.append(item);
+  }
+}
+
+async function loadLibraryTrash() {
+  const trash = state.libraryTrash;
+  if (trash.pending) return;
+  const sequence = ++trash.sequence;
+  trash.pending = true;
+  trash.status = { key: "libraryTrashLoading", kind: "info" };
+  renderLibraryTrash();
+  try {
+    const body = await api("/api/v1/documents/trash");
+    if (sequence !== trash.sequence) return;
+    trash.items = Array.isArray(body.items) ? body.items : [];
+    trash.loaded = true;
+    trash.status = null;
+  } catch (error) {
+    if (sequence !== trash.sequence) return;
+    trash.status = { key: error.code === "network" ? "network" : "libraryTrashLoadFailed", kind: "error", retry: loadLibraryTrash };
+  } finally {
+    if (sequence === trash.sequence) {
+      trash.pending = false;
+      renderLibraryTrash();
+    }
+  }
+}
+
+function documentOperationError(operation, error) {
+  const key = error.code === "revision_conflict" ? "document_revision_conflict" : error.code || "request_failed";
+  const status = {
+    key,
+    kind: "error",
+    retry: error.code === "revision_conflict" ? null : () => runDocumentOperation(operation)
+  };
+  if (operation.action === "restore") state.libraryTrash.status = status;
+  else setStatus(status.key, status.kind, {}, status.retry);
+}
+
+async function runDocumentOperation(operation) {
+  if (operation.pending) return;
+  operation.pending = true;
+  operation.conflicted = false;
+  const operations = operation.action === "restore" ? state.libraryTrash.operations : state.documentOperations;
+  operations.set(operation.documentId, operation);
+  if (operation.action === "restore") state.libraryTrash.status = { key: "documentRestoring", kind: "info" };
+  else setStatus("documentTrashing");
+  renderDocuments();
+  renderLibraryTrash();
+  try {
+    const result = await api(operation.path, {
+      method: operation.method,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(operation.payload)
+    });
+    operations.delete(operation.documentId);
+    if (operation.action === "restore") {
+      state.libraryTrash.items = state.libraryTrash.items.filter((item) => item.id !== operation.documentId);
+      state.libraryTrash.status = { key: "documentRestored", kind: "success" };
+      setStatus("documentRestored", "success");
+    } else {
+      state.documents = state.documents.filter((item) => item.id !== operation.documentId);
+      state.search.documents = state.search.documents.filter((item) => item.id !== operation.documentId);
+      state.search.notes = state.search.notes.filter((item) => item.document_id !== operation.documentId);
+      if (state.document?.id === operation.documentId) {
+        showMissingDocument();
+        updateUrl(null, null, true, "reading");
+      }
+      setStatus("documentTrashed", "success");
+      state.libraryTrash.loaded = false;
+      if (elements.libraryTrash.open) void loadLibraryTrash();
+    }
+    void refreshActiveLibrary();
+    return result;
+  } catch (error) {
+    operation.conflicted = error.code === "revision_conflict";
+    documentOperationError(operation, error);
+    return null;
+  } finally {
+    operation.pending = false;
+    renderDocuments();
+    renderLibraryTrash();
+  }
+}
+
+async function trashDocument(documentId) {
+  closeDocumentMenu();
+  const existing = state.documentOperations.get(documentId);
+  if (existing && !existing.conflicted) {
+    await runDocumentOperation(existing);
+    return;
+  }
+  if (existing) state.documentOperations.delete(documentId);
+  const document = state.documents.find((item) => item.id === documentId);
+  if (!document) return;
+  try {
+    let revision = document.revision ?? ensureMetadata(documentId).snapshot?.revision;
+    if (!Number.isInteger(revision)) {
+      const metadata = await api(`/api/v1/documents/${encodeURIComponent(documentId)}/metadata`);
+      applyMetadataSnapshot(documentId, metadata);
+      revision = metadata.revision;
+    }
+    if (!Number.isInteger(revision)) throw new ApiError("request_failed");
+    if (!window.confirm(t("documentTrashConfirm"))) return;
+    const requestId = crypto.randomUUID();
+    await runDocumentOperation({
+      documentId,
+      action: "trash",
+      method: "DELETE",
+      path: `/api/v1/documents/${encodeURIComponent(documentId)}`,
+      payload: { request_id: requestId, expected_revision: revision },
+      pending: false
+    });
+  } catch (error) {
+    setStatus(error.code || "request_failed", "error");
+  }
+}
+
+async function restoreDocument(documentId) {
+  const existing = state.libraryTrash.operations.get(documentId);
+  if (existing && !existing.conflicted) {
+    await runDocumentOperation(existing);
+    return;
+  }
+  if (existing) state.libraryTrash.operations.delete(documentId);
+  const document = state.libraryTrash.items.find((item) => item.id === documentId);
+  if (!document || !Number.isInteger(document.revision)) return;
+  const requestId = crypto.randomUUID();
+  await runDocumentOperation({
+    documentId,
+    action: "restore",
+    method: "POST",
+    path: `/api/v1/documents/${encodeURIComponent(documentId)}/restore`,
+    payload: { request_id: requestId, expected_revision: document.revision },
+    pending: false
+  });
+}
+
+function renderRenameDialog() {
+  const rename = state.rename;
+  if (!rename) return;
+  elements.renameTitle.disabled = rename.pending || !rename.snapshot;
+  elements.renameSave.disabled = rename.pending || !rename.snapshot || !elements.renameTitle.value.trim();
+  elements.renameCancel.disabled = rename.pending;
+  elements.renameSave.textContent = t(rename.pending ? "documentRenameSaving" : rename.operation ? "retrySave" : "metadataSave");
+  elements.renameStatus.textContent = rename.status ? t(rename.status.key) : "";
+  if (rename.status?.kind) elements.renameStatus.dataset.kind = rename.status.kind;
+  else delete elements.renameStatus.dataset.kind;
+  elements.renameRetry.hidden = !rename.status?.retry || rename.pending;
+}
+
+async function loadRenameMetadata(rename) {
+  rename.pending = true;
+  rename.status = { key: "documentRenameLoading", kind: "info" };
+  renderRenameDialog();
+  try {
+    const metadata = await api(`/api/v1/documents/${encodeURIComponent(rename.documentId)}/metadata`);
+    if (state.rename !== rename) return;
+    rename.snapshot = metadata;
+    rename.pending = false;
+    rename.status = null;
+    applyMetadataSnapshot(rename.documentId, metadata);
+    if (elements.renameTitle.value !== metadata.title) elements.renameTitle.value = metadata.title || "";
+    renderRenameDialog();
+    elements.renameTitle.focus();
+    elements.renameTitle.select();
+  } catch (error) {
+    if (state.rename !== rename) return;
+    rename.pending = false;
+    rename.status = { key: error.code || "request_failed", kind: "error", retry: true };
+    renderRenameDialog();
+  }
+}
+
+async function openRenameDialog(documentId) {
+  closeDocumentMenu();
+  if (ensureMetadata(documentId).draft) {
+    setStatus("documentMetadataDraft", "error");
+    return;
+  }
+  const rename = { documentId, snapshot: null, operation: null, pending: false, status: null };
+  state.rename = rename;
+  elements.renameTitle.value = "";
+  if (!elements.renameDialog.open) elements.renameDialog.showModal();
+  renderRenameDialog();
+  await loadRenameMetadata(rename);
+}
+
+function closeRenameDialog() {
+  if (!state.rename || state.rename.pending) return;
+  state.rename = null;
+  if (elements.renameDialog.open) elements.renameDialog.close();
+}
+
+async function submitRename() {
+  const rename = state.rename;
+  if (!rename?.snapshot || rename.pending) return;
+  if (!rename.operation) {
+    const title = elements.renameTitle.value.trim();
+    if (!title) return;
+    const requestId = crypto.randomUUID();
+    rename.operation = {
+      payload: {
+        request_id: requestId,
+        expected_revision: rename.snapshot.revision,
+        title,
+        authors: rename.snapshot.authors,
+        year: rename.snapshot.year,
+        doi: rename.snapshot.doi
+      }
+    };
+  }
+  const operation = rename.operation;
+  rename.pending = true;
+  rename.status = { key: "documentRenameSaving", kind: "info" };
+  renderRenameDialog();
+  try {
+    const saved = await api(`/api/v1/documents/${encodeURIComponent(rename.documentId)}/metadata`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(operation.payload)
+    });
+    if (state.rename !== rename) return;
+    applyMetadataSnapshot(rename.documentId, saved);
+    rename.pending = false;
+    state.rename = null;
+    elements.renameDialog.close();
+    setStatus("documentRenamed", "success");
+  } catch (error) {
+    if (state.rename !== rename) return;
+    rename.pending = false;
+    rename.status = {
+      key: error.code === "revision_conflict" ? "document_revision_conflict" : error.code === "network" ? "documentRenameFailed" : error.code || "request_failed",
+      kind: "error",
+      retry: error.code !== "revision_conflict"
+    };
+    renderRenameDialog();
   }
 }
 
@@ -1041,7 +1546,8 @@ function applyMetadataSnapshot(documentId, metadata) {
       page_count: metadata.page_count,
       byte_size: metadata.byte_size,
       sha256: metadata.sha256,
-      created_at: metadata.created_at
+      created_at: metadata.created_at,
+      revision: metadata.revision
     };
     state.documents[index] = updated;
     if (state.document?.id === documentId) state.document = updated;
@@ -1212,6 +1718,7 @@ function renderDocumentDetails() {
   elements.zoomIn.disabled = !hasPdf || state.effectiveScale >= ZOOM_MAX;
   elements.zoomOut.disabled = !hasPdf || state.effectiveScale <= ZOOM_MIN;
   elements.zoomFit.disabled = !hasPdf;
+  elements.textSelectionNote.disabled = !hasPdf || state.pendingSaves > 0 || state.pendingMutations.size > 0;
   elements.pageInput.max = String(document?.page_count || 1);
   if (!hasPdf || window.document.activeElement !== elements.pageInput) {
     elements.pageInput.value = hasPdf ? String(state.page) : "";
@@ -1227,6 +1734,8 @@ function renderDocumentDetails() {
 
 function renderDraft() {
   if (isStudy()) {
+    elements.regionDraft.hidden = true;
+    elements.readerRegionMode.disabled = true;
     study?.renderDocument();
     return;
   }
@@ -1235,6 +1744,7 @@ function renderDraft() {
     elements.editModeLabel.hidden = true;
     elements.editCancel.hidden = true;
     elements.excerptSave.hidden = false;
+    elements.regionDraft.hidden = true;
     elements.noteText.value = "";
     elements.noteText.disabled = true;
     elements.noteText.readOnly = false;
@@ -1245,6 +1755,7 @@ function renderDraft() {
     elements.noteSave.disabled = true;
     elements.excerptSave.disabled = true;
     elements.regionMode.disabled = true;
+    elements.readerRegionMode.disabled = true;
     elements.pageNote.disabled = true;
     elements.activeSource.textContent = t("noSource");
     elements.characterCount.textContent = "0 / 10000";
@@ -1263,6 +1774,7 @@ function renderDraft() {
   elements.editModeLabel.hidden = !editDraft;
   elements.editCancel.hidden = !editDraft;
   elements.excerptSave.hidden = Boolean(editDraft);
+  elements.regionDraft.hidden = Boolean(editDraft) || !draft.previewCanvas;
 
   if (editDraft) {
     const note = state.notes.find((item) => item.id === editDraft.noteId) || editDraft.note;
@@ -1272,6 +1784,7 @@ function renderDraft() {
     elements.richTextOpen.disabled = pending;
     elements.richTextPlain.disabled = pending;
     elements.regionMode.disabled = true;
+    elements.readerRegionMode.disabled = true;
     elements.pageNote.disabled = true;
     elements.noteSave.disabled = pending || !editDraft.text.trim();
     elements.excerptSave.disabled = true;
@@ -1281,6 +1794,7 @@ function renderDraft() {
     return;
   }
 
+  if (draft.previewCanvas && elements.regionPreview.firstChild !== draft.previewCanvas) elements.regionPreview.replaceChildren(draft.previewCanvas);
   if (draft.page === null) elements.activeSource.textContent = t("noSource");
   else elements.activeSource.textContent = t(draft.rect ? "pageRegion" : "pageWhole", { page: draft.page });
   const pending = state.pendingSaves > 0;
@@ -1290,7 +1804,9 @@ function renderDraft() {
   elements.richTextOpen.disabled = pending || mutationPending;
   elements.richTextPlain.disabled = pending || mutationPending;
   elements.regionMode.disabled = !ready || pending || mutationPending;
+  elements.readerRegionMode.disabled = !ready || pending || mutationPending;
   elements.pageNote.disabled = !ready || pending || mutationPending;
+  elements.regionDraftCancel.disabled = pending || mutationPending;
   elements.noteSave.disabled = pending || mutationPending || !ready || draft.page === null || !draft.text.trim();
   elements.excerptSave.disabled = pending || mutationPending || !ready || !draft.rect || !draft.text.trim();
   elements.noteSave.textContent = t(draft.saveFailed ? "retrySave" : "saveNote");
@@ -1430,7 +1946,7 @@ function renderNotes() {
 function renderDeletedNotes() {
   elements.deletedNotesList.replaceChildren();
   const document = state.document;
-  const deleted = document ? state.noteStates.filter((item) => item.deleted_at) : [];
+  const deleted = document ? state.noteStates.filter((item) => item.deleted_at && !item.purged) : [];
   elements.deletedNotes.hidden = !deleted.length;
   elements.deletedNotesCount.textContent = deleted.length ? String(deleted.length) : "";
   if (!deleted.length) elements.deletedNotes.open = false;
@@ -1456,7 +1972,12 @@ function renderDeletedNotes() {
       sourceButton.append(text);
     }
     const restore = makeNoteAction("restore-note", t("restoreNote"), () => restoreNote(document, note), disabled);
-    item.append(restore);
+    const failed = state.failedMutations.get(mutationKey(document.id, note.id));
+    const purge = makeNoteAction("purge-note", t(failed?.action === "purge" ? "retry" : "purgeNote"), () => purgeNote(document, note), disabled);
+    const actions = window.document.createElement("div");
+    actions.className = "note-actions";
+    actions.append(restore, purge);
+    item.append(actions);
     elements.deletedNotesList.append(item);
   }
 }
@@ -1536,7 +2057,9 @@ function cancelDocumentWork() {
   imageViewer?.close({ restoreFocus: false });
   researchRecord?.documentChanged();
   state.loadSequence += 1;
+  state.noteNavigationSequence += 1;
   state.renderSequence += 1;
+  cancelTextLayer();
   state.loadController?.abort();
   state.loadController = null;
   if (state.renderTask) {
@@ -1573,12 +2096,19 @@ async function openDocument(documentId, options = {}) {
       document = null;
     }
     if (resolveSequence !== state.loadSequence) return;
-    if (!document && resolveError?.code !== "not_found") {
+    if (!document && !["not_found", "document_trashed"].includes(resolveError?.code)) {
       setStatus(resolveError?.code || "documentOpenFailed", "error", {}, () => openDocument(documentId, options));
       return;
     }
     if (!document) {
       showMissingDocument();
+      if (resolveError?.code === "document_trashed") {
+        setStatus("documentTrashedLink", "error", {}, () => {
+          elements.libraryTrash.open = true;
+          void loadLibraryTrash();
+          elements.libraryTrash.scrollIntoView({ block: "nearest" });
+        }, "viewTrash");
+      }
       return;
     }
     if (isStudy(document)) {
@@ -1594,7 +2124,7 @@ async function openDocument(documentId, options = {}) {
   workspace?.reveal(mode, { tool, showNotes: Boolean(options.noteId || options.imageLink) });
   if (state.document?.id === documentId && (studyOwner ? state.noteStatesLoaded : state.pdf) && !options.force) {
     if (options.imageLink && !studyOwner) await openImageViewer(documentId, options.imageLink.kind, options.imageLink.sourceId, { annotationId: options.imageLink.annotationId });
-    else if (options.noteId) openNote(options.noteId, { preserveUrl: options.preserveUrl });
+    else if (options.noteId) await openNote(options.noteId, { preserveUrl: options.preserveUrl });
     if (options.datasetId) analysis?.openDataset(options.datasetId, { preserveUrl: options.preserveUrl });
     if (options.analysisId) analysis?.openJob(options.analysisId, { preserveUrl: options.preserveUrl });
     if (options.chartId) charts?.openChart(documentId, options.chartId, { preserveUrl: options.preserveUrl });
@@ -1655,22 +2185,20 @@ async function openDocument(documentId, options = {}) {
   }
 
   state.pdf = pdfResult.value;
-  let deletedLink = false;
+  let noteLinkStatus = null;
   if (options.noteId && studyOwner) {
-    study?.openNote(options.noteId);
+    await study?.openNote(options.noteId);
   } else if (options.noteId) {
     const note = state.notes.find((item) => item.id === options.noteId);
     if (note) {
       state.highlight = note;
       state.highlightRevealId = note.id;
       state.page = note.page;
-    } else if (noteStateFor(options.noteId)?.deleted_at) {
-      deletedLink = true;
-      elements.deletedNotes.open = true;
-    } else if (!options.preserveUrl && notesResult.status === "fulfilled" && noteStatesResult.status === "fulfilled") {
-      updateUrl(documentId, null, true);
+    } else {
+      noteLinkStatus = await openNote(options.noteId, { preserveUrl: true });
     }
   }
+  if (sequence !== state.loadSequence || state.document?.id !== documentId) return;
   elements.readerEmpty.hidden = true;
   renderDocumentDetails();
   renderDraft();
@@ -1679,7 +2207,9 @@ async function openDocument(documentId, options = {}) {
     await openImageViewer(documentId, options.imageLink.kind, options.imageLink.sourceId, { annotationId: options.imageLink.annotationId });
   }
 
-  if (sequence === state.loadSequence && notesResult.status === "rejected" && notesResult.reason?.name !== "AbortError") {
+  if (sequence === state.loadSequence && noteLinkStatus) {
+    setStatus(noteLinkStatus, "error");
+  } else if (sequence === state.loadSequence && notesResult.status === "rejected" && notesResult.reason?.name !== "AbortError") {
     setStatus(notesResult.reason?.code || "notesLoadFailed", "error", {}, async () => {
       try {
         await loadNotes(state.document, state.loadSequence);
@@ -1710,8 +2240,6 @@ async function openDocument(documentId, options = {}) {
         setStatus(error.code || "excerptsLoadFailed", "error");
       }
     });
-  } else if (sequence === state.loadSequence && deletedLink) {
-    setStatus("deletedNoteRecovery", "error");
   } else if (sequence === state.loadSequence && state.status?.key === "loadingDocument") {
     clearStatus();
   }
@@ -1750,7 +2278,7 @@ async function loadNoteStates(document, sequence, signal) {
   if (sequence !== state.loadSequence || state.document?.id !== document.id) return;
   state.noteStates = Array.isArray(body.items) ? body.items : [];
   state.noteStatesLoaded = true;
-  state.notes = state.noteStates.filter((item) => !item.deleted_at);
+  state.notes = state.noteStates.filter((item) => !item.deleted_at && !item.purged);
   renderNotes();
 }
 
@@ -1775,8 +2303,116 @@ async function goToPage(page, options = {}) {
   await requestRender();
 }
 
+function cancelTextLayer() {
+  const selection = window.getSelection();
+  if (selection?.anchorNode && elements.textLayer.contains(selection.anchorNode)) selection.removeAllRanges();
+  state.capturedTextSelection = null;
+  if (state.textLayerTask) {
+    try {
+      state.textLayerTask.cancel();
+    } catch {
+      // Stale layers are also detached and rejected by the render sequence.
+    }
+    state.textLayerTask = null;
+  }
+  elements.textLayer.replaceChildren();
+  delete elements.textLayer.dataset.documentId;
+  delete elements.textLayer.dataset.page;
+  elements.textStatus.hidden = true;
+}
+
+async function renderTextLayer(page, viewport, sequence, documentId, pageNumber) {
+  const task = new pdfjsLib.TextLayer({
+    textContentSource: page.streamTextContent(),
+    container: elements.textLayer,
+    viewport
+  });
+  state.textLayerTask = task;
+  elements.textLayer.dataset.documentId = documentId;
+  elements.textLayer.dataset.page = String(pageNumber);
+  try {
+    await task.render();
+    if (state.textLayerTask !== task || sequence !== state.renderSequence || state.document?.id !== documentId || state.page !== pageNumber) return;
+    const hasText = task.textContentItemsStr.some((text) => text.trim());
+    elements.textStatus.hidden = hasText;
+    if (!hasText) elements.textStatus.textContent = t("noTextLayer");
+  } catch (error) {
+    if (error?.name === "AbortException" || error?.name === "AbortError" || sequence !== state.renderSequence) return;
+    if (state.textLayerTask === task && state.document?.id === documentId) {
+      elements.textStatus.hidden = false;
+      elements.textStatus.textContent = t("textLayerUnavailable");
+    }
+  }
+}
+
+function readPdfTextSelection() {
+  const selection = window.getSelection();
+  if (!selection || selection.isCollapsed || !selection.rangeCount) return null;
+  if (elements.textLayer.dataset.documentId !== state.document?.id || elements.textLayer.dataset.page !== String(state.page)) return null;
+  if (!elements.textLayer.contains(selection.anchorNode) || !elements.textLayer.contains(selection.focusNode)) return null;
+  const text = selection.toString().trim();
+  if (!text) return null;
+  const bounds = elements.textLayer.getBoundingClientRect();
+  if (!bounds.width || !bounds.height) return null;
+  const rectangles = [];
+  for (let index = 0; index < selection.rangeCount; index += 1) {
+    const range = selection.getRangeAt(index);
+    if (!elements.textLayer.contains(range.commonAncestorContainer)) return null;
+    rectangles.push(...range.getClientRects());
+  }
+  const left = Math.max(bounds.left, Math.min(...rectangles.map((rect) => rect.left)));
+  const top = Math.max(bounds.top, Math.min(...rectangles.map((rect) => rect.top)));
+  const right = Math.min(bounds.right, Math.max(...rectangles.map((rect) => rect.right)));
+  const bottom = Math.min(bounds.bottom, Math.max(...rectangles.map((rect) => rect.bottom)));
+  if (![left, top, right, bottom].every(Number.isFinite) || right <= left || bottom <= top) return null;
+  return {
+    documentId: state.document.id,
+    page: state.page,
+    sequence: state.renderSequence,
+    text,
+    rect: [
+      (left - bounds.left) / bounds.width,
+      (top - bounds.top) / bounds.height,
+      (right - bounds.left) / bounds.width,
+      (bottom - bounds.top) / bounds.height
+    ].map((value) => Math.max(0, Math.min(1, value)))
+  };
+}
+
+function addTextSelectionToNote() {
+  if (!state.document || !state.pdf || state.pendingSaves > 0 || state.pendingMutations.size > 0) return;
+  const captured = state.capturedTextSelection;
+  const selected = captured?.documentId === state.document.id && captured.page === state.page && captured.sequence === state.renderSequence
+    ? captured
+    : readPdfTextSelection();
+  if (!selected) {
+    setStatus("selectTextFirst", "error");
+    return;
+  }
+  if (selected.text.length > 10000) {
+    setStatus("textSelectionTooLong", "error");
+    return;
+  }
+  if (!prepareDraftReplacement(state.document.id)) return;
+  const draft = ensureDraft(state.document.id);
+  draft.text = selected.text;
+  draft.page = selected.page;
+  draft.rect = [...selected.rect];
+  draft.includeExcerpt = false;
+  invalidateRequestId(draft);
+  highlightDraft(state.document.id, selected.page, selected.rect);
+  state.capturedTextSelection = null;
+  window.getSelection()?.removeAllRanges();
+  workspace?.showNotes();
+  renderDraft();
+  setStatus("textDraftReady", "success");
+  assistant?.contextChanged();
+  elements.noteText.focus();
+}
+
 function requestRender() {
   const sequence = ++state.renderSequence;
+  cancelTextLayer();
   if (state.renderTask) {
     try {
       state.renderTask.cancel();
@@ -1822,6 +2458,10 @@ async function renderCurrentPage(sequence) {
     elements.canvas.style.height = `${cssHeight}px`;
     elements.pageSurface.style.width = `${cssWidth}px`;
     elements.pageSurface.style.height = `${cssHeight}px`;
+    elements.pageSurface.style.setProperty("--scale-factor", String(scale));
+    elements.pageSurface.style.setProperty("--total-scale-factor", String(scale));
+    elements.pageSurface.style.setProperty("--scale-round-x", "1px");
+    elements.pageSurface.style.setProperty("--scale-round-y", "1px");
     elements.pageSurface.hidden = false;
     elements.readerEmpty.hidden = true;
     renderDocumentDetails();
@@ -1837,6 +2477,7 @@ async function renderCurrentPage(sequence) {
     elements.canvas.dataset.documentId = document.id;
     elements.readerStage.dataset.page = String(pageNumber);
     elements.readerStage.dataset.documentId = document.id;
+    void renderTextLayer(page, cssViewport, sequence, document.id, pageNumber);
     const highlight = drawHighlight();
     if (highlight && state.highlightRevealId === highlight.dataset.noteId) {
       state.highlightRevealId = null;
@@ -1871,39 +2512,63 @@ function drawHighlight() {
   return highlight;
 }
 
-function openNote(noteId, options = {}) {
+async function openNote(noteId, options = {}) {
+  const navigationSequence = ++state.noteNavigationSequence;
   if (isStudy()) {
-    study?.openNote(noteId);
-    return;
+    await study?.openNote(noteId);
+    return null;
   }
   if (!state.document) {
     setStatus("unknownNote", "error");
-    return;
+    return "unknownNote";
   }
+  const owner = state.document;
+  const loadSequence = state.loadSequence;
   const note = state.notes.find((item) => item.id === noteId);
-  if (!note) {
-    if (noteStateFor(noteId)?.deleted_at) {
-      state.highlight = null;
-      state.highlightRevealId = null;
-      clearHighlights();
-      elements.deletedNotes.open = true;
-      if (!options.preserveUrl) updateUrl(state.document.id, note.id);
-      setStatus("deletedNoteRecovery", "error");
-    } else {
-      setStatus("unknownNote", "error");
-    }
-    return;
+  if (note) {
+    state.highlight = note;
+    state.highlightRevealId = note.id;
+    if (!options.preserveUrl) updateUrl(owner.id, note.id);
+    goToPage(note.page, { preserveHighlight: true });
+    return null;
   }
-  state.highlight = note;
-  state.highlightRevealId = note.id;
-  if (!options.preserveUrl) updateUrl(state.document.id, note.id);
-  goToPage(note.page, { preserveHighlight: true });
+
+  function showMissingStatus(key) {
+    state.highlight = null;
+    state.highlightRevealId = null;
+    clearHighlights();
+    if (key === "deletedNoteRecovery") elements.deletedNotes.open = true;
+    if (!options.preserveUrl) updateUrl(owner.id, noteId);
+    setStatus(key, "error");
+    return key;
+  }
+
+  if (noteStateFor(noteId)?.deleted_at) return showMissingStatus("deletedNoteRecovery");
+
+  let missingState;
+  try {
+    missingState = await api(`/api/v1/documents/${encodeURIComponent(owner.id)}/notes/${encodeURIComponent(noteId)}/state`, { signal: state.loadController?.signal });
+  } catch (error) {
+    if (error?.name === "AbortError" || navigationSequence !== state.noteNavigationSequence || loadSequence !== state.loadSequence || state.document?.id !== owner.id) return null;
+    return showMissingStatus(error?.code === "note_purged" ? "notePurgedSource" : error?.code === "not_found" ? "unknownNote" : error?.code || "request_failed");
+  }
+  if (navigationSequence !== state.noteNavigationSequence || loadSequence !== state.loadSequence || state.document?.id !== owner.id) return null;
+  if (missingState?.deleted_at) return showMissingStatus("deletedNoteRecovery");
+  if (missingState?.id !== noteId || missingState?.document_id !== owner.id) return showMissingStatus("unknownNote");
+
+  state.highlight = missingState;
+  state.highlightRevealId = missingState.id;
+  if (!options.preserveUrl) updateUrl(owner.id, missingState.id);
+  goToPage(missingState.page, { preserveHighlight: true });
+  return null;
 }
 
 function setRegionMode(active) {
   state.regionActive = Boolean(active && state.pdf && state.document);
   elements.regionMode.setAttribute("aria-pressed", String(state.regionActive));
   elements.regionMode.textContent = t(state.regionActive ? "cancelRegion" : "regionMode");
+  elements.readerRegionMode.setAttribute("aria-pressed", String(state.regionActive));
+  elements.readerRegionMode.textContent = t(state.regionActive ? "cancelRegion" : "regionMode");
   elements.overlay.dataset.active = String(state.regionActive);
   elements.anchorHelp.textContent = state.regionActive ? t("regionInstructions") : t("anchorHelp");
   if (!state.regionActive) cancelSelection();
@@ -1936,6 +2601,40 @@ function cancelSelection() {
   elements.activeSelection.hidden = true;
 }
 
+function makeRegionPreview(rect) {
+  const preview = window.document.createElement("canvas");
+  const left = Math.max(0, Math.floor(rect[0] * elements.canvas.width));
+  const top = Math.max(0, Math.floor(rect[1] * elements.canvas.height));
+  const right = Math.min(elements.canvas.width, Math.ceil(rect[2] * elements.canvas.width));
+  const bottom = Math.min(elements.canvas.height, Math.ceil(rect[3] * elements.canvas.height));
+  preview.width = Math.max(1, right - left);
+  preview.height = Math.max(1, bottom - top);
+  preview.setAttribute("role", "img");
+  preview.setAttribute("aria-label", t("excerptImageAlt", { page: state.page }));
+  const context = preview.getContext("2d");
+  context.drawImage(elements.canvas, left, top, preview.width, preview.height, 0, 0, preview.width, preview.height);
+  return preview;
+}
+
+function cancelRegionDraft() {
+  if (!state.document || state.pendingSaves > 0 || state.pendingMutations.size > 0) return;
+  const draft = ensureDraft(state.document.id);
+  if (!draft.previewCanvas && !draft.rect) return;
+  if (draft.text.trim() && !window.confirm(t("regionDraftCancelConfirm"))) return;
+  draft.page = null;
+  draft.rect = null;
+  draft.includeExcerpt = false;
+  draft.previewCanvas = null;
+  invalidateRequestId(draft);
+  state.highlight = null;
+  state.highlightRevealId = null;
+  clearHighlights();
+  clearStatus();
+  renderDraft();
+  assistant?.contextChanged();
+  elements.noteText.focus();
+}
+
 function finishSelection(event) {
   const selection = state.selection;
   if (!selection || selection.pointerId !== event.pointerId) return;
@@ -1953,14 +2652,54 @@ function finishSelection(event) {
     setStatus("selectionTooSmall", "error");
     return;
   }
-  const draft = ensureDraft(state.document.id);
-  draft.page = state.page;
-  draft.rect = [left / point.width, top / point.height, (left + width) / point.width, (top + height) / point.height];
+  const documentId = state.document?.id;
+  const page = state.page;
+  if (!documentId || !prepareDraftReplacement(documentId)) {
+    setRegionMode(false);
+    renderDraft();
+    return;
+  }
+  const rect = [left / point.width, top / point.height, (left + width) / point.width, (top + height) / point.height];
+  const draft = ensureDraft(documentId);
+  draft.page = page;
+  draft.rect = rect;
+  draft.previewCanvas = makeRegionPreview(rect);
+  draft.includeExcerpt = false;
+  if (!draft.text.trim()) draft.text = t("regionCaption", { page });
   invalidateRequestId(draft);
   setRegionMode(false);
+  highlightDraft(documentId, page, rect);
+  workspace?.showNotes();
   clearStatus();
   renderDraft();
   assistant?.contextChanged();
+  elements.noteText.focus();
+}
+
+function revealSavedNote(noteId) {
+  const item = elements.notesList.querySelector(`[data-note-id="${noteId}"]`);
+  if (!item) return;
+  if (window.matchMedia("(max-width: 820px)").matches) {
+    item.scrollIntoView({ block: "nearest" });
+    return;
+  }
+
+  const pane = elements.notesPanel;
+  const focused = window.document.activeElement;
+  const keepKeyboardFocus = focused && pane.contains(focused) && focused.matches(":focus-visible");
+  const paneBounds = pane.getBoundingClientRect();
+  const itemBounds = item.getBoundingClientRect();
+  const itemTop = itemBounds.top - paneBounds.top + pane.scrollTop - 4;
+  const itemBottom = itemBounds.bottom - paneBounds.top + pane.scrollTop + 4;
+  if (itemTop < pane.scrollTop) pane.scrollTop = itemTop;
+  else if (itemBottom > pane.scrollTop + pane.clientHeight) pane.scrollTop = itemBottom - pane.clientHeight;
+
+  if (keepKeyboardFocus) {
+    const focusedBounds = focused.getBoundingClientRect();
+    if (focusedBounds.top < paneBounds.top || focusedBounds.bottom > paneBounds.bottom) {
+      item.querySelector("button:not(:disabled)")?.focus({ preventScroll: true });
+    }
+  }
 }
 
 async function submitSave(includeExcerpt = false) {
@@ -2043,23 +2782,21 @@ async function submitSave(includeExcerpt = false) {
 
     const currentDraft = ensureDraft(document.id);
     if (currentDraft.requestId === requestId) {
-      state.drafts.set(document.id, {
-        text: "",
-        richContent: null,
-        page: null,
-        rect: null,
-        requestId: null,
-        saveFailed: false,
-        imageFailed: false,
-        includeExcerpt: false,
-        imageRequestIds: null
-      });
+      state.drafts.set(document.id, makeEmptyDraft());
       imageLibrary?.clearNoteSelection(document.id, imageIds);
     }
-    if (imageIds.length) imageLibrary?.reload(document.id);
+    if (imageIds.length || includeImage) imageLibrary?.reload(document.id);
     if (state.document?.id === document.id) {
+      state.highlight = note;
       renderNotes();
       renderDraft();
+      drawHighlight();
+      if (includeImage) {
+        workspace?.showNotes();
+        requestAnimationFrame(() => {
+          if (state.document?.id === document.id) revealSavedNote(note.id);
+        });
+      }
     }
     setStatus(includeImage ? "savedImage" : "saved", "success");
   } catch (error) {
@@ -2155,14 +2892,15 @@ function makeLifecycleMutation(document, note, action, change = {}) {
   const labels = {
     review: ["reviewSaving", noteState.review_status === "source_checked" ? "reviewUnmarked" : "reviewSaved"],
     delete: ["deleting", "deleted"],
-    restore: ["restoring", "restored"]
+    restore: ["restoring", "restored"],
+    purge: ["purging", "purged"]
   }[action];
   return {
     document,
     noteId: note.id,
     action,
-    method: action === "delete" ? "DELETE" : action === "restore" ? "POST" : "PATCH",
-    path: action === "restore" ? `${basePath}/restore` : basePath,
+    method: action === "delete" ? "DELETE" : ["restore", "purge"].includes(action) ? "POST" : "PATCH",
+    path: ["restore", "purge"].includes(action) ? `${basePath}/${action}` : basePath,
     payload: {
       request_id: crypto.randomUUID(),
       expected_revision: noteState.revision,
@@ -2214,6 +2952,37 @@ async function restoreNote(document, note) {
   if (failed?.conflicted) state.failedMutations.delete(key);
   const operation = makeLifecycleMutation(document, note, "restore");
   if (operation) await runMutation(operation);
+}
+
+async function purgeNote(document, note) {
+  if (state.pendingSaves > 0 || state.pendingMutations.size > 0 || state.editDrafts.has(document.id)) return;
+  const key = mutationKey(document.id, note.id);
+  const failed = state.failedMutations.get(key);
+  if (failed?.action === "purge" && !failed.conflicted) {
+    await runMutation(failed);
+    return;
+  }
+  if (failed?.conflicted) state.failedMutations.delete(key);
+  if (!window.confirm(t("purgeConfirm"))) return;
+  const operation = makeLifecycleMutation(document, note, "purge");
+  if (operation) await runMutation(operation);
+}
+
+function applyNotePurge(document, noteId) {
+  state.search.notes = state.search.notes.filter((item) => item.id !== noteId || item.document_id !== document.id);
+  imageViewer?.clearSource(document.id, "pdf_excerpt", noteId);
+  imageLibrary?.reload(document.id);
+  if (state.document?.id !== document.id) return;
+  state.noteStates = state.noteStates.filter((item) => item.id !== noteId);
+  state.notes = state.notes.filter((item) => item.id !== noteId);
+  state.excerpts = state.excerpts.filter((item) => item.note_id !== noteId);
+  if (state.highlight?.id === noteId) {
+    state.highlight = null;
+    state.highlightRevealId = null;
+    clearHighlights();
+  }
+  const urlNoteId = new URLSearchParams(window.location.search).get("note");
+  if (urlNoteId === noteId) updateUrl(document.id);
 }
 
 function applyMutationState(operation, savedState) {
@@ -2276,8 +3045,13 @@ async function runMutation(operation) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(operation.payload)
     });
+    if (action === "purge") {
+      if (savedState?.purged !== true || savedState.id !== noteId || savedState.document_id !== document.id) throw new ApiError("request_failed");
+      applyNotePurge(document, noteId);
+    } else {
+      applyMutationState(operation, savedState);
+    }
     state.failedMutations.delete(key);
-    applyMutationState(operation, savedState);
     if (action === "edit") {
       const currentDraft = state.editDrafts.get(document.id);
       if (currentDraft?.requestId === operation.payload.request_id) state.editDrafts.delete(document.id);
@@ -2300,7 +3074,8 @@ async function runMutation(operation) {
     if (conflicted) {
       setStatus("revisionConflict", "error", {}, () => refreshLatest(document), "viewLatest");
     } else {
-      setStatus(error.code || "request_failed", "error", {}, () => retryMutation(operation));
+      const key = action === "purge" && error.code === "storage_unavailable" ? "purgeStorageUnavailable" : error.code || "request_failed";
+      setStatus(key, "error", {}, () => retryMutation(operation));
     }
   } finally {
     state.pendingMutations.delete(key);
@@ -2486,6 +3261,46 @@ elements.statusRetry.addEventListener("click", () => {
   if (retry) retry();
 });
 
+elements.documentMenu.addEventListener("click", (event) => {
+  const action = event.target.closest("[data-action]")?.dataset.action;
+  const documentId = state.documentMenu?.documentId;
+  if (!documentId) return;
+  if (action === "rename-document") void openRenameDialog(documentId);
+  else if (action === "trash-document") void trashDocument(documentId);
+});
+document.addEventListener("pointerdown", (event) => {
+  if (state.documentMenu && !elements.documentMenu.contains(event.target) && !event.target.closest('[data-action="document-menu"]')) closeDocumentMenu();
+});
+elements.libraryTrash.addEventListener("toggle", () => {
+  if (elements.libraryTrash.open && !state.libraryTrash.loaded && !state.libraryTrash.pending) void loadLibraryTrash();
+});
+elements.renameForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  void submitRename();
+});
+elements.renameTitle.addEventListener("input", () => {
+  const rename = state.rename;
+  if (!rename || rename.pending) return;
+  if (rename.operation && rename.operation.payload.title !== elements.renameTitle.value.trim()) rename.operation = null;
+  rename.status = null;
+  renderRenameDialog();
+});
+elements.renameCancel.addEventListener("click", closeRenameDialog);
+elements.renameRetry.addEventListener("click", () => {
+  const rename = state.rename;
+  if (!rename || rename.pending) return;
+  if (rename.operation) void submitRename();
+  else void loadRenameMetadata(rename);
+});
+elements.renameDialog.addEventListener("cancel", (event) => {
+  if (state.rename?.pending) {
+    event.preventDefault();
+    return;
+  }
+  event.preventDefault();
+  closeRenameDialog();
+});
+
 elements.searchForm.addEventListener("submit", (event) => {
   event.preventDefault();
   performSearch(elements.searchInput.value);
@@ -2590,14 +3405,23 @@ elements.exportReadingRecord.addEventListener("click", () => {
   if (state.document) exportReadingRecord(state.document);
 });
 elements.regionMode.addEventListener("click", () => setRegionMode(!state.regionActive));
+elements.readerRegionMode.addEventListener("click", () => elements.regionMode.click());
+elements.textSelectionNote.addEventListener("mousedown", (event) => {
+  if (event.button !== 0 || elements.textSelectionNote.disabled) return;
+  event.preventDefault();
+  state.capturedTextSelection = readPdfTextSelection();
+});
+elements.textSelectionNote.addEventListener("click", addTextSelectionToNote);
+elements.regionDraftCancel.addEventListener("click", cancelRegionDraft);
 elements.pageNote.addEventListener("click", () => {
-  if (!state.document || !state.pdf) return;
+  if (!state.document || !state.pdf || !prepareDraftReplacement(state.document.id)) return;
   const draft = ensureDraft(state.document.id);
   draft.page = state.page;
   draft.rect = null;
   draft.includeExcerpt = false;
   invalidateRequestId(draft);
   setRegionMode(false);
+  highlightDraft(state.document.id, state.page, null);
   clearStatus();
   renderDraft();
   assistant?.contextChanged();
@@ -2654,7 +3478,13 @@ elements.overlay.addEventListener("pointerup", finishSelection);
 elements.overlay.addEventListener("pointercancel", cancelSelection);
 
 document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape" && state.regionActive) setRegionMode(false);
+  if (event.key !== "Escape") return;
+  if (state.documentMenu) {
+    event.preventDefault();
+    closeDocumentMenu(true);
+  } else if (state.regionActive) {
+    setRegionMode(false);
+  }
 });
 
 window.addEventListener("popstate", () => {
@@ -2720,10 +3550,14 @@ window.addEventListener("popstate", () => {
   }
 });
 
+let observedStageWidth = null;
 const resizeObserver = new ResizeObserver(() => {
   if (state.resizeFrame) cancelAnimationFrame(state.resizeFrame);
   state.resizeFrame = requestAnimationFrame(() => {
-    if (!elements.readerStage.clientWidth) return;
+    const width = elements.readerStage.clientWidth;
+    if (width === observedStageWidth) return;
+    observedStageWidth = width;
+    if (!width) return;
     if (state.zoomMode === "fit" && state.pdf) requestRender();
     else drawHighlight();
   });
@@ -3198,6 +4032,9 @@ study = createStudy({
     state.notes = savedState.deleted_at
       ? state.notes.filter((item) => item.id !== savedState.id)
       : [{ ...savedState }, ...state.notes.filter((item) => item.id !== savedState.id)];
+  },
+  notePurged(owner, noteId) {
+    applyNotePurge(owner, noteId);
   }
 });
 

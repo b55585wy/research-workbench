@@ -42,7 +42,7 @@ def test_explicit_scope_exports_exact_saved_artifacts_without_writes(tmp_path,re
         if chart:assert archive.read('chart/chart.json')==c.get(chart_prefix(doc)+'/'+graph['id']+'/data').content
         assert c.get(plan['download_url']).status_code==200
         with app.state.store.connection() as db:
-            assert db.execute('PRAGMA user_version').fetchone()[0]==13 and len(names)==28
+            assert db.execute('PRAGMA user_version').fetchone()[0]==14 and len(names)==30
             assert before=={n:list(map(tuple,db.execute(f'SELECT * FROM {n} ORDER BY 1'))) for n in names}
 
 

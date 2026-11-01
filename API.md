@@ -240,3 +240,8 @@ use the existing confirmed analyses endpoint; old payload serialization and reci
 remain exact. New Agent tools preview_paired_t_test/propose_paired_t_test and
 run_paired_t_test proposal retain source hashes and explicit confirmations.
 Full fields/result/artifacts: [PAIRED-T-TEST.md](PAIRED-T-TEST.md).
+
+
+v0.21 adds recoverable paper trash and confirmed note-content purge, with strict
+versioned idempotent requests. Original document/note JSON and methods remain
+compatible; trash/purge responses and schema14 are in [READER-LIBRARY.md](READER-LIBRARY.md).

@@ -636,3 +636,29 @@ and tFUS/global dispatcher boundaries are checked during activation.
 
 Evidence: E:/research-workbench-pilot-20261030/result-workflow-v1/release-summary.json.
 Limits: this is behavior/visual verification, not an external usability study.
+
+
+## v0.21 reading/library lifecycle
+
+1029 backend requirement scenarios pass with real configured R/statistics/import
+runtimes, no skipped tests. 54 isolated browser scenario groups cover actual
+mouse-selected PDF text, source draft/save/reopen, zoom/rotation/resize, no-text
+fallback, unsaved and saved image region visibility, preserved/cancelled drafts,
+confirmed permanent removal in paper/study notes, lost-response retry, missing
+source links and late-owner guards, paper rename/trash/restore, and previous
+workspace, result, study and continuous-task controls. Original migrations keep
+all old row/column snapshots; schema14 adds exactly two lifecycle tables.
+
+Purge tests cover exact concurrent retries, current/original/rich body removal,
+PNG and excerpt annotation cleanup, retention of independent uploaded images and
+other notes, failed filesystem cleanup/resume on restart, transaction rollback,
+and preserved completed-task references. SQL reference tombstones do not contain
+note body. Exports/backups and prior chat copies are outside purge scope.
+
+Actual reuse: installed PDF.js6.4.299 TextLayer. Zotero official reading/library
+flows were reviewed as the completeness baseline; no Zotero reader code was
+copied. The screenshots use explicitly synthetic text and colored geometry,
+not research evidence. Deployment checks retain all28 existing tables and file
+bytes while adding two empty tables; no destructive acceptance runs against live.
+
+Evidence: E:/research-workbench-pilot-20261030/reader-library-v1/release-summary.json.

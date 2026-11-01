@@ -34,6 +34,10 @@ def base_note(state):
 
 
 def read_state(connection, identifier, note_id):
+    from .library import read_metadata
+    from .library_lifecycle import reject_purged
+    read_metadata(connection, identifier)
+    reject_purged(connection, identifier, note_id)
     row = connection.execute(STATE_QUERY + ' WHERE n.document_id=? AND n.id=?',
                              (identifier, note_id)).fetchone()
     if row is None:
@@ -42,7 +46,9 @@ def read_state(connection, identifier, note_id):
 
 
 def read_states(connection, identifier, include_deleted=True, ascending=False):
-    condition = '' if include_deleted else ' AND s.deleted_at IS NULL'
+    condition = ' AND NOT EXISTS(SELECT 1 FROM purged_notes p WHERE p.note_id=n.id)'
+    if not include_deleted:
+        condition += ' AND s.deleted_at IS NULL'
     direction = 'ASC' if ascending else 'DESC'
     rows = connection.execute(STATE_QUERY + ' WHERE n.document_id=?' + condition +
         f' ORDER BY n.created_at {direction},n.id {direction}', (identifier,))
