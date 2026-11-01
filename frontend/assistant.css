@@ -374,6 +374,52 @@
   padding: 0 12px 10px;
 }
 
+#assistant-note-references {
+  display: grid;
+  gap: 6px;
+  max-height: 224px;
+  padding: 8px 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+#assistant-note-references:empty {
+  display: none;
+}
+
+.assistant-note-reference {
+  padding: 8px;
+  border: 1px solid var(--ui-border);
+  border-radius: 4px;
+  background: var(--ui-surface-subtle);
+}
+
+.assistant-note-reference-summary {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.assistant-note-reference-meta {
+  margin-top: 3px;
+  color: var(--ui-text-muted);
+  font-size: 11px;
+}
+
+.assistant-note-reference-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.assistant-note-reference-actions .button {
+  min-height: 32px;
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
 #assistant-message {
   display: block;
   width: 100%;

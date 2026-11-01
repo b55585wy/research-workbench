@@ -59,4 +59,4 @@ def test_schema10_migration_preserves_original_rows_and_adds_only_two_tables(tmp
         after={n:(table_info(db,n),list(db.execute(f'SELECT * FROM {n}'))) for n in names}
         allnames={r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")}
         assert before==after and len(names)==22
-        assert allnames-set(names)=={'agent_tasks','agent_task_operations','dataset_selections','studies','study_note_sources','study_papers','document_trash','purged_notes'} and db.execute('PRAGMA user_version').fetchone()[0]==14
+        assert allnames-set(names)=={'agent_tasks','agent_task_operations','dataset_selections','studies','study_note_sources','study_papers','document_trash','purged_notes','note_text_annotations'} and db.execute('PRAGMA user_version').fetchone()[0]==15

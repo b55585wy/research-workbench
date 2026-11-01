@@ -23,7 +23,7 @@ def test_schema6_all_sixteen_tables_and_original_rows_survive(tmp_path):
         assert len(tables)==16;before={t:db.execute(f'SELECT * FROM {t} ORDER BY 1').fetchall() for t in tables}
     store=Store(tmp_path)
     with sqlite3.connect(database) as db:
-        assert db.execute('PRAGMA user_version').fetchone()[0]==14
+        assert db.execute('PRAGMA user_version').fetchone()[0]==15
         for table,rows in before.items():assert db.execute(f'SELECT * FROM {table} ORDER BY 1').fetchall()==rows
         assert db.execute('SELECT COUNT(*) FROM note_rich_content').fetchone()[0]==0
     assert 'rich_content' not in store.lifecycle.get(doc,note)

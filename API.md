@@ -245,3 +245,8 @@ Full fields/result/artifacts: [PAIRED-T-TEST.md](PAIRED-T-TEST.md).
 v0.21 adds recoverable paper trash and confirmed note-content purge, with strict
 versioned idempotent requests. Original document/note JSON and methods remain
 compatible; trash/purge responses and schema14 are in [READER-LIBRARY.md](READER-LIBRARY.md).
+
+
+v0.22 adds optional note annotation/annotation_style and Agent context.note_refs;
+empty/absent refs preserve prior serialized request hashes. Schema15 adds a single
+annotation table. Full shape and limits: [TEXT-ANNOTATIONS.md](TEXT-ANNOTATIONS.md).

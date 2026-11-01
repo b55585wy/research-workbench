@@ -189,6 +189,17 @@
         </div>
         <div class="reader-source-controls" aria-label="原文摘录">
           <button id="text-selection-note" class="button button-secondary" type="button" data-i18n="textSelectionNote" disabled>选中文字加入笔记</button>
+          <div id="text-annotation-toolbar" class="text-annotation-toolbar" role="group" aria-label="保存文字标注">
+            <button id="text-annotation-highlight" class="button button-secondary" type="button" data-action="annotation-kind" data-kind="highlight" data-i18n="annotationHighlight" disabled>保存高亮</button>
+            <button id="text-annotation-underline" class="button button-secondary" type="button" data-action="annotation-kind" data-kind="underline" data-i18n="annotationUnderline" disabled>保存下划线</button>
+            <fieldset class="text-annotation-colors">
+              <legend class="sr-only" data-i18n="annotationColor">标注颜色</legend>
+              <label><input type="radio" name="annotation-color" value="yellow" data-annotation-color="yellow" checked><span data-i18n="colorYellow">黄色</span></label>
+              <label><input type="radio" name="annotation-color" value="green" data-annotation-color="green"><span data-i18n="colorGreen">绿色</span></label>
+              <label><input type="radio" name="annotation-color" value="blue" data-annotation-color="blue"><span data-i18n="colorBlue">蓝色</span></label>
+              <label><input type="radio" name="annotation-color" value="pink" data-annotation-color="pink"><span data-i18n="colorPink">粉色</span></label>
+            </fieldset>
+          </div>
           <button id="reader-region-mode" class="button button-secondary" type="button" data-i18n="regionMode" disabled>框选原文位置</button>
         </div>
         <button id="export-reading-record" class="button button-secondary export-reading-record" type="button" data-testid="export-reading-record" data-i18n="exportReadingRecord" disabled>导出阅读记录</button>
@@ -202,6 +213,7 @@
         <div id="page-surface" class="page-surface" hidden>
           <canvas id="reader-canvas" data-testid="reader-canvas" aria-label="PDF 页面"></canvas>
           <div id="reader-text-layer" class="textLayer" aria-label="PDF 文字层"></div>
+          <div id="text-annotations-layer" class="text-annotations-layer" aria-hidden="true"></div>
           <div id="region-overlay" class="region-overlay" data-testid="region-overlay" aria-hidden="true">
             <div id="active-selection" class="active-selection" hidden></div>
           </div>
@@ -585,6 +597,7 @@
         <span>连续完成分析、图表和笔记</span>
       </label>
       <p id="assistant-continue-task-help" class="assistant-task-option-help">默认关闭。开启后仍须逐一确认每次分析、图表和笔记写入。</p>
+      <div id="assistant-note-references" aria-label="已加入的笔记来源" aria-live="polite"></div>
       <label class="sr-only" for="assistant-message">给研究助手的消息</label>
       <textarea id="assistant-message" rows="4" maxlength="8000" placeholder="询问当前页面或已选图片…"></textarea>
       <div class="assistant-send-row">

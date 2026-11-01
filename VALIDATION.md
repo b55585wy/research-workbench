@@ -662,3 +662,25 @@ not research evidence. Deployment checks retain all28 existing tables and file
 bytes while adding two empty tables; no destructive acceptance runs against live.
 
 Evidence: E:/research-workbench-pilot-20261030/reader-library-v1/release-summary.json.
+
+
+## v0.22 text annotations and pinned Agent notes
+
+1075 backend requirement scenarios pass with configured R/statistics/import
+runtimes and no skipped tests. 62 isolated browser scenario groups cover
+actual native two-line highlight/underline/color saves, immutable quote and editable
+comment, per-line persistent geometry, source focus, deletion/restore, drafts,
+owner scope, removable pins, stale-reference rejection and frozen retry receipts.
+Explicit creation/style/send response loss does not duplicate writes or model calls.
+Legacy reader/image regions, paper trash/rename, no-text fallback, study/results/
+workspace and continuous-task paths pass. Chinese/English desktop/mobile remain usable.
+
+Actual configured provider acceptance uses an explicitly synthetic PDF only. The
+model reads the attached underline, original quotation, personal comment, page and
+correct source citation; adding a chip alone makes no model call. No clinical
+evidence or independent verification of the manual quote is claimed.
+
+Schema14->15 adds one annotation table; old30 table/file snapshots and original
+PDF bytes stay unchanged at activation. Legacy empty/absent note_refs hashes remain
+compatible. Export includes safe styled quotation and exact JSON metadata. Full
+source test evidence is under E:/research-workbench-pilot-20261030/text-annotations-v1.

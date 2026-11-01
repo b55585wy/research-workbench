@@ -29,6 +29,7 @@ def grant_signature(context):
 def source_signature(context):
     result=grant_signature(context)
     result.update(active_note=context.get('active_note'),active_image=context.get('active_image'))
+    if context.get('pinned_notes'):result['pinned_notes']=context['pinned_notes']
     chart=context.get('active_chart')
     if chart:result['chart']={k:chart.get(k) for k in ('id','data_sha256','revision')}
     return result

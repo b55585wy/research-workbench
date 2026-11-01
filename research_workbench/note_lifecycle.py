@@ -4,17 +4,20 @@ import json
 
 from .models import WorkspaceError
 from .rich_content import validate_content,plaintext,add_to_state,canonical
+from .text_annotations import add_record as add_annotation_record
 
 NOTE_FIELDS = ('id', 'document_id', 'page', 'rect', 'text', 'created_at')
 STATE_QUERY = '''SELECT n.id,n.document_id,n.page,n.rect,s.current_text AS text,
-    n.created_at,s.revision,s.review_status,s.reviewed_at,s.updated_at,s.deleted_at,r.current_json,a.source_json
+    n.created_at,s.revision,s.review_status,s.reviewed_at,s.updated_at,s.deleted_at,r.current_json,a.source_json,t.current_json AS annotation_json
     FROM notes n JOIN note_states s ON s.note_id=n.id
-    LEFT JOIN note_rich_content r ON r.note_id=n.id LEFT JOIN study_note_sources a ON a.note_id=n.id'''
+    LEFT JOIN note_rich_content r ON r.note_id=n.id LEFT JOIN study_note_sources a ON a.note_id=n.id
+    LEFT JOIN note_text_annotations t ON t.note_id=n.id'''
 
 
 def state_record(row):
     result = dict(row)
     result['rect'] = json.loads(result['rect']) if result['rect'] else None
+    add_annotation_record(result, result.pop('annotation_json', None))
     source=result.pop('source_json')
     if source is not None:result['source']=json.loads(source)
     result['review_provenance'] = 'self_reported' if result['review_status'] == 'source_checked' else None
@@ -116,6 +119,10 @@ class NoteLifecycle:
         if kind == 'patch':
             if current['deleted_at'] is not None:
                 raise WorkspaceError('note_deleted', '请先恢复这条笔记，再修改或核对。', 409)
+            if 'annotation_style' in data:
+                if not current.get('annotation'):
+                    raise WorkspaceError('text_annotation_required', '这条笔记没有可修改样式的文字批注。', 409)
+                result['annotation'] = {**current['annotation'], **data['annotation_style']}
             result['text'] = data.get('text', current['text'])
             text_changed = result['text'] != current['text']
             if 'rich_content' in data:add_to_state(result,data['rich_content'])
@@ -132,6 +139,7 @@ class NoteLifecycle:
         else:
             raise ValueError('Unknown lifecycle action')
         meaningful = any(current[key] != result[key] for key in ('text', 'review_status', 'reviewed_at', 'deleted_at')) or current.get('rich_content')!=result.get('rich_content')
+        meaningful = meaningful or result.get('annotation') != current.get('annotation')
         if meaningful:
             result.update(revision=current['revision'] + 1, updated_at=now)
         result['review_provenance'] = 'self_reported' if result['review_status'] == 'source_checked' else None
@@ -147,6 +155,9 @@ class NoteLifecycle:
             current['updated_at'], current['deleted_at'], current['id'], previous['revision']))
         if cursor.rowcount != 1:
             raise conflict()
+        if previous.get('annotation') != current.get('annotation'):
+            connection.execute('UPDATE note_text_annotations SET current_json=? WHERE note_id=?',
+                               (canonical(current['annotation']), current['id']))
         if previous.get('rich_content')!=current.get('rich_content'):
             content=current.get('rich_content')
             value=canonical(content) if content is not None else None

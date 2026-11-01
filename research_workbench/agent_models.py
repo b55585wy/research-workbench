@@ -1,7 +1,7 @@
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator, model_serializer
 
 from .models import NoteCreate
 from .image_annotation_models import ImageSelection
@@ -18,6 +18,12 @@ class ImageNoteCreate(NoteCreate):
         return value
 
 
+class NoteReference(BaseModel):
+    model_config=ConfigDict(extra='forbid')
+    note_id: UUID
+    revision: int=Field(strict=True,ge=1)
+
+
 class ReadingContext(BaseModel):
     model_config=ConfigDict(extra='forbid')
     page: int | None=Field(...,strict=True,ge=1,le=200)
@@ -29,6 +35,21 @@ class ReadingContext(BaseModel):
     active_image: ImageSelection | None=None
     active_chart_id: UUID | None=None
     language: Literal['zh','en']='zh'
+    note_refs: list[NoteReference]=Field(default_factory=list,max_length=8)
+
+    @field_validator('note_refs')
+    @classmethod
+    def unique_note_refs(cls, values):
+        if len({value.note_id for value in values}) != len(values):
+            raise ValueError('Pinned notes must be unique')
+        return values
+
+    @model_serializer(mode='wrap')
+    def compatible_serialization(self, handler):
+        value=handler(self)
+        if not value.get('note_refs'):
+            value.pop('note_refs',None)
+        return value
 
     @field_validator('rect',mode='before')
     @classmethod
@@ -63,7 +84,7 @@ class AgentSubmission(BaseModel):
 
     @model_validator(mode='after')
     def nonempty_message(self):
-        if not self.message and not self.context.image_ids:
+        if not self.message and not self.context.image_ids and not self.context.note_refs:
             raise ValueError('Message or images required')
         return self
 

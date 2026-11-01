@@ -6,6 +6,7 @@ import re
 import tempfile
 from uuid import UUID
 import zipfile
+from .text_annotations import export_markup as text_annotation_markup
 
 from starlette.responses import FileResponse
 
@@ -55,6 +56,12 @@ def reading_documents(document, notes, excerpts, exported_at,annotation_groups=N
         markdown.extend([review_label, ''])
         markdown.extend('> ' + markdown_text(line) for line in note['text'].splitlines())
         body = render_html(note['rich_content']) if note.get('rich_content') else '<p>'+html.escape(note['text']).replace('\n', '<br>')+'</p>'
+        if note.get('annotation'):
+            annotation = note['annotation']
+            markdown.extend(['', 'Text annotation: '+annotation['kind']+' / '+annotation['color'], ''])
+            if annotation['quote'] != note['text']:
+                markdown.extend('> '+markdown_text(line) for line in annotation['quote'].splitlines())
+            body = text_annotation_markup(note) + (body if annotation['quote'] != note['text'] else '')
         section = f'<section><h2>{index}. 第 {note["page"]} 页 / Page {note["page"]}</h2>'
         section += f'<p><a href="{source_link}">查看原文 / View source</a></p><p class="review-status">{review_label}</p>'+body
         image_path = f'images/{identifier}.png' if image else None

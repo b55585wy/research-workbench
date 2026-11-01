@@ -133,7 +133,7 @@ class NotePurge:
         db.execute('DELETE FROM image_annotation_operations WHERE annotation_id IN '
                    '(SELECT id FROM image_annotations WHERE excerpt_note_id=?)', (note_id,))
         db.execute('DELETE FROM image_annotations WHERE excerpt_note_id=?', (note_id,))
-        for table in ('excerpts', 'note_images', 'note_rich_content', 'study_note_sources'):
+        for table in ('excerpts', 'note_images', 'note_rich_content', 'study_note_sources', 'note_text_annotations'):
             db.execute(f'DELETE FROM {table} WHERE note_id=?', (note_id,))
         db.execute("UPDATE notes SET text='[purged]',rect=NULL WHERE document_id=? AND id=?", (identifier, note_id))
         db.execute("UPDATE note_states SET current_text='[purged]',revision=revision+1,"

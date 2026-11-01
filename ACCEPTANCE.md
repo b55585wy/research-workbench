@@ -232,3 +232,11 @@ Scenario matrix: E:/research-workbench-pilot-20261030/reader-library-v1/SCENARIO
 Check actual PDF selection geometry, visible unsaved/saved excerpt destination,
 content purge and reference retention, menu/metadata retries, recoverable paper
 trash, late-owner safety, schema migration, storage failures and bilingual mobile.
+
+
+v0.22 text markup and pinned-source requirements: [TEXT-ANNOTATIONS.md](TEXT-ANNOTATIONS.md).
+Matrix: E:/research-workbench-pilot-20261030/text-annotations-v1/SCENARIOS.md.
+Verify native multi-line geometry, style/comment/quote separation, lifecycle and
+export, atomic retries, explicit removable Agent pins, server-resolved versioned
+sources, legacy hash compatibility, real configured-provider synthetic acceptance
+and unchanged old table/file/runtime boundaries.

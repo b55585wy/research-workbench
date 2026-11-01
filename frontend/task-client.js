@@ -303,7 +303,10 @@ export function createTaskClient(adapter) {
         ...(activeImage.annotation_id ? { annotation_id: activeImage.annotation_id } : {})
       } : null,
       active_chart_id: original.active_chart_id || null,
-      language
+      language,
+      ...(Array.isArray(original.note_refs) && original.note_refs.length ? {
+        note_refs: original.note_refs.map((reference) => ({ note_id: reference.note_id, revision: reference.revision }))
+      } : {})
     };
   }
 

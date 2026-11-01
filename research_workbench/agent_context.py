@@ -64,6 +64,32 @@ class ReadingWorkspace:
             if context.active_note_id:
                 active_note=ensure_active(read_state(connection,identifier,str(context.active_note_id)))
                 active_note.pop('rich_html',None)
+            pinned_notes=[]
+            budget=0
+            source_verified=False
+            for ref in context.note_refs:
+                note=ensure_active(read_state(connection,identifier,str(ref.note_id)))
+                if note['revision'] != ref.revision:
+                    raise WorkspaceError('note_reference_changed','加入的笔记或批注已变化，请移除后重新加入。',409)
+                note.pop('rich_html',None)
+                note.pop('rich_content',None)
+                body=note['text']
+                note['text']=body[:4000]
+                note['text_truncated']=len(body)>4000
+                budget+=len(note['text'])
+                annotation=note.get('annotation')
+                if annotation:
+                    if annotation['source_sha256']!=document.get('sha256'):
+                        raise WorkspaceError('text_annotation_changed','批注对应的原文版本已变化。',409)
+                    if not source_verified:
+                        verify_source(self.store,document)
+                        source_verified=True
+                    quote=annotation['quote']
+                    note['annotation']={**annotation,'quote':quote[:4000],'quote_truncated':len(quote)>4000}
+                    budget+=len(note['annotation']['quote'])
+                if budget>12000:
+                    raise WorkspaceError('note_reference_limit','加入的引文总量过大，请减少引用后发送。',422)
+                pinned_notes.append(note)
             images=[image_record(self.images.row(connection,identifier,str(i))) for i in context.image_ids]
             dataset=None
             active_analysis=None
@@ -108,6 +134,8 @@ class ReadingWorkspace:
                 'initiator':{'identity_source':'local_compat','authenticated':False}}
         if active_image is not None:result['active_image']=active_image
         if active_chart is not None:result.update(active_chart_id=active_chart['id'],active_chart=active_chart)
+        if pinned_notes:
+            result['pinned_notes']=pinned_notes
         return result
 
     def page(self,document_id,number):
@@ -163,11 +191,16 @@ class Sources:
             image_id=value['id'],url=value['preview_url'],source_sha256=self.context['document']['sha256'])
 
     def note(self,value):
-        return self.add('note',f"第 {value['page']} 页笔记" if value['page'] else '研究笔记',document_id=value['document_id'],page=value['page'],
+        annotation=value.get('annotation')
+        extra={}
+        if annotation:
+            quote=annotation['quote']
+            extra={'annotation':{**annotation,'quote':quote[:4000],'quote_truncated':bool(annotation.get('quote_truncated')) or len(quote)>4000},'notice':'Manual PDF text annotation; original quotation is separate from editable note text, not scientific validation.'}
+        return self.add('note',f"第 {value['page']} 页文字批注" if annotation else f"第 {value['page']} 页笔记" if value['page'] else '研究笔记',document_id=value['document_id'],page=value['page'],
             rect=value['rect'],note_id=value['id'],revision=value['revision'],text=value['text'][:4000],
-            truncated=len(value['text'])>4000,url=f"/?document={value['document_id']}&note={value['id']}",
+            truncated=bool(value.get('text_truncated')) or len(value['text'])>4000,url=f"/?{'study' if value['page'] is None else 'document'}={value['document_id']}&note={value['id']}",
             source_sha256=self.context['document']['sha256'] if value['document_id']==self.document_id else None,
-            **({'source':value['source']} if 'source' in value else {}))
+            **({'source':value['source']} if 'source' in value else {}),**extra)
 
     def image_annotation(self,value,source):
         return self.add('image_annotation','图片标注 · '+source['label'],source_kind=value['source_kind'],source_id=value['source_id'],

@@ -92,5 +92,5 @@ def test_schema9_upgrade_preserves_every_old_table(tmp_path):
     store=Store(root)
     with store.connection() as db:
         after={name:[tuple(row) for row in db.execute(f'SELECT * FROM {name} ORDER BY 1')] for name in tables}
-        assert before==after and db.execute('PRAGMA user_version').fetchone()[0]==14
+        assert before==after and db.execute('PRAGMA user_version').fetchone()[0]==15
         assert db.execute('SELECT COUNT(*) FROM data_imports').fetchone()[0]==0

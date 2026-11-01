@@ -164,9 +164,11 @@ class ReadingAgent:
         sources.selection()
         if context.get('dataset'):sources.dataset(context['dataset'])
         if context['active_note']:sources.note(context['active_note'])
+        for note in context.get('pinned_notes',[]):sources.note(note)
         for image in context['images']:sources.image(image)
         text='CAPTURED WORKSPACE DATA: '+canonical(bounded({'context':context,'sources':sources.items}))
-        content=[{'type':'text','text':text},{'type':'text','text':turn['message'] or '请阅读我选择的图片。'}]
+        fallback=('Explain the notes and annotations I attached, retaining their sources.' if context['language']=='en' else '请解释我加入的笔记和批注，并保留来源。') if context.get('pinned_notes') else '请阅读我选择的图片。'
+        content=[{'type':'text','text':text},{'type':'text','text':turn['message'] or fallback}]
         for image in context['images']:
             content.append({'type':'image_url','image_url':{'url':self.workspace.pixels(turn['document_id'],image)}})
         messages.append({'role':'user','content':content})

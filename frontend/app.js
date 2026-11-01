@@ -234,6 +234,26 @@ const messages = {
     notePurgedSource: "这条笔记的正文和图片摘录已彻底删除，无法恢复。",
     note_not_deleted: "只有已删除笔记才能彻底删除。",
     note_purged: "这条笔记已彻底删除，无法恢复。",
+    annotationHighlight: "保存高亮",
+    annotationUnderline: "保存下划线",
+    annotationTools: "保存文字标注",
+    annotationKindHighlight: "高亮",
+    annotationKindUnderline: "下划线",
+    annotationColor: "标注颜色",
+    colorYellow: "黄色",
+    colorGreen: "绿色",
+    colorBlue: "蓝色",
+    colorPink: "粉色",
+    annotationSaving: "正在保存文字标注…",
+    annotationSaved: "文字标注和笔记已保存。",
+    annotationSaveFailed: "文字标注的保存结果尚未确认。请按原请求重试，不会重复创建。",
+    annotationTooManyRects: "选中文字的行数过多，请缩小选择范围。",
+    annotationRetryRequired: "请先重试尚未确认的文字标注保存请求。",
+    annotationKind: "标注类型",
+    annotationStyleSaving: "正在保存标注样式…",
+    annotationStyleSaved: "标注样式已保存。",
+    addToAssistant: "加入助手",
+    notePageAnnotation: "第 {page} 页 · 文字标注",
     untitled: "未命名文献"
   },
   en: {
@@ -449,6 +469,26 @@ const messages = {
     notePurgedSource: "This note’s body and image excerpt were permanently deleted and cannot be recovered.",
     note_not_deleted: "Only a deleted note can be permanently deleted.",
     note_purged: "This note was permanently deleted and cannot be recovered.",
+    annotationHighlight: "Save highlight",
+    annotationUnderline: "Save underline",
+    annotationTools: "Save text annotation",
+    annotationKindHighlight: "Highlight",
+    annotationKindUnderline: "Underline",
+    annotationColor: "Annotation color",
+    colorYellow: "Yellow",
+    colorGreen: "Green",
+    colorBlue: "Blue",
+    colorPink: "Pink",
+    annotationSaving: "Saving text annotation…",
+    annotationSaved: "Text annotation and note saved.",
+    annotationSaveFailed: "The text annotation save is unconfirmed. Retry the exact request; it will not create a duplicate.",
+    annotationTooManyRects: "The selection spans too many text lines. Select a smaller passage.",
+    annotationRetryRequired: "Retry the unconfirmed text annotation save before creating another one.",
+    annotationKind: "Annotation type",
+    annotationStyleSaving: "Saving annotation style…",
+    annotationStyleSaved: "Annotation style saved.",
+    addToAssistant: "Add to assistant",
+    notePageAnnotation: "Page {page} · text annotation",
     untitled: "Untitled paper"
   }
 };
@@ -501,8 +541,12 @@ const elements = {
   pageSurface: $("page-surface"),
   canvas: $("reader-canvas"),
   textLayer: $("reader-text-layer"),
+  textAnnotationsLayer: $("text-annotations-layer"),
   textStatus: $("reader-text-status"),
   textSelectionNote: $("text-selection-note"),
+  textAnnotationToolbar: $("text-annotation-toolbar"),
+  textAnnotationHighlight: $("text-annotation-highlight"),
+  textAnnotationUnderline: $("text-annotation-underline"),
   readerRegionMode: $("reader-region-mode"),
   overlay: $("region-overlay"),
   activeSelection: $("active-selection"),
@@ -584,6 +628,7 @@ const state = {
   loadController: null,
   pendingUpload: false,
   pendingSaves: 0,
+  annotationSaves: new Map(),
   pendingExcerpts: new Set(),
   pendingExports: new Set(),
   pendingMutations: new Map(),
@@ -701,6 +746,7 @@ function applyLanguage() {
   elements.deletedNotesList.setAttribute("aria-label", t("deletedNotes"));
   elements.libraryTrashList.setAttribute("aria-label", t("libraryTrash"));
   elements.textLayer.setAttribute("aria-label", t("pdfPage"));
+  elements.textAnnotationToolbar.setAttribute("aria-label", t("annotationTools"));
   document.querySelector(".reader-toolbar").setAttribute("aria-label", t("readerControls"));
   elements.regionMode.textContent = t(state.regionActive ? "cancelRegion" : "regionMode");
   elements.readerRegionMode.textContent = t(state.regionActive ? "cancelRegion" : "regionMode");
@@ -1718,7 +1764,13 @@ function renderDocumentDetails() {
   elements.zoomIn.disabled = !hasPdf || state.effectiveScale >= ZOOM_MAX;
   elements.zoomOut.disabled = !hasPdf || state.effectiveScale <= ZOOM_MIN;
   elements.zoomFit.disabled = !hasPdf;
-  elements.textSelectionNote.disabled = !hasPdf || state.pendingSaves > 0 || state.pendingMutations.size > 0;
+  const annotationDisabled = !hasPdf || state.pendingSaves > 0 || state.pendingMutations.size > 0;
+  elements.textSelectionNote.disabled = annotationDisabled;
+  elements.textAnnotationHighlight.disabled = annotationDisabled;
+  elements.textAnnotationUnderline.disabled = annotationDisabled;
+  elements.textAnnotationToolbar.querySelectorAll("[data-annotation-color]").forEach((input) => {
+    input.disabled = annotationDisabled;
+  });
   elements.pageInput.max = String(document?.page_count || 1);
   if (!hasPdf || window.document.activeElement !== elements.pageInput) {
     elements.pageInput.value = hasPdf ? String(state.page) : "";
@@ -1833,6 +1885,28 @@ function makeNoteAction(action, label, handler, disabled) {
   return button;
 }
 
+function makeAnnotationStyleControl(document, note, annotation, field, disabled) {
+  const label = window.document.createElement("label");
+  label.className = "annotation-style-control";
+  label.textContent = t(field === "kind" ? "annotationKind" : "annotationColor");
+  const select = window.document.createElement("select");
+  select.dataset.action = field === "kind" ? "annotation-kind" : "annotation-color";
+  select.dataset.noteId = note.id;
+  select.disabled = disabled;
+  select.setAttribute("aria-label", `${label.textContent}: ${note.annotation?.quote || note.text}`);
+  const values = field === "kind" ? ["highlight", "underline"] : ["yellow", "green", "blue", "pink"];
+  for (const value of values) {
+    const option = window.document.createElement("option");
+    option.value = value;
+    option.textContent = t(field === "kind" ? `annotationKind${value[0].toUpperCase()}${value.slice(1)}` : `color${value[0].toUpperCase()}${value.slice(1)}`);
+    option.selected = annotation[field] === value;
+    select.append(option);
+  }
+  select.addEventListener("change", () => changeAnnotationStyle(document, note, { [field]: select.value }));
+  label.append(select);
+  return label;
+}
+
 function appendRichNoteBody(item, note, noteState) {
   if (!noteState?.rich_content || typeof noteState.rich_html !== "string") return false;
   const body = window.document.createElement("div");
@@ -1857,19 +1931,30 @@ function renderNotes() {
 
   for (const note of state.notes) {
     const noteState = noteStateFor(note.id);
+    const annotation = noteState?.annotation || note.annotation || null;
     const reviewStatus = noteState?.review_status || "unreviewed";
     const item = window.document.createElement("li");
     item.className = "note-item";
     item.dataset.noteId = note.id;
     item.dataset.reviewStatus = reviewStatus;
+    if (annotation) {
+      item.dataset.annotationKind = annotation.kind;
+      item.dataset.annotationColor = annotation.color;
+    }
     const button = window.document.createElement("button");
     button.type = "button";
     button.className = "note-open";
     button.addEventListener("click", () => openNote(note.id));
     const source = window.document.createElement("span");
     source.className = "note-source";
-    source.textContent = t(note.rect ? "notePageRegion" : "notePageWhole", { page: note.page });
+    source.textContent = t(annotation ? "notePageAnnotation" : note.rect ? "notePageRegion" : "notePageWhole", { page: note.page });
     button.append(source);
+    if (annotation?.quote && annotation.quote.trim() !== note.text.trim()) {
+      const quote = window.document.createElement("span");
+      quote.className = "note-annotation-quote";
+      quote.textContent = annotation.quote;
+      button.append(quote);
+    }
     item.append(button);
     if (!appendRichNoteBody(item, note, noteState)) {
       const text = window.document.createElement("span");
@@ -1930,9 +2015,19 @@ function renderNotes() {
       item.append(create);
     }
 
+    if (annotation) {
+      const styleControls = window.document.createElement("div");
+      styleControls.className = "annotation-style-controls";
+      styleControls.append(
+        makeAnnotationStyleControl(document, note, annotation, "kind", actionsLocked || !noteState),
+        makeAnnotationStyleControl(document, note, annotation, "color", actionsLocked || !noteState)
+      );
+      item.append(styleControls);
+    }
     const actions = window.document.createElement("div");
     actions.className = "note-actions";
     actions.append(
+      makeNoteAction("annotation-agent", t("addToAssistant"), () => assistant?.addNoteReference(document.id, noteState), actionsLocked || !noteState),
       makeNoteAction("edit-note", t("editNote"), () => startEditNote(document, note), actionsLocked || !noteState),
       makeNoteAction("review-note", t(reviewStatus === "source_checked" ? "markUnchecked" : "markChecked"), () => reviewNote(document, note), actionsLocked || !noteState),
       makeNoteAction("delete-note", t("deleteNote"), () => deleteNote(document, note), actionsLocked || !noteState)
@@ -2280,6 +2375,7 @@ async function loadNoteStates(document, sequence, signal) {
   state.noteStatesLoaded = true;
   state.notes = state.noteStates.filter((item) => !item.deleted_at && !item.purged);
   renderNotes();
+  renderTextAnnotations();
 }
 
 async function loadExcerpts(document, sequence, signal) {
@@ -2307,6 +2403,8 @@ function cancelTextLayer() {
   const selection = window.getSelection();
   if (selection?.anchorNode && elements.textLayer.contains(selection.anchorNode)) selection.removeAllRanges();
   state.capturedTextSelection = null;
+  resetTextAnnotationToolbar();
+  elements.textAnnotationsLayer.replaceChildren();
   if (state.textLayerTask) {
     try {
       state.textLayerTask.cancel();
@@ -2354,37 +2452,93 @@ function readPdfTextSelection() {
   if (!text) return null;
   const bounds = elements.textLayer.getBoundingClientRect();
   if (!bounds.width || !bounds.height) return null;
-  const rectangles = [];
+  const clientRects = [];
   for (let index = 0; index < selection.rangeCount; index += 1) {
     const range = selection.getRangeAt(index);
     if (!elements.textLayer.contains(range.commonAncestorContainer)) return null;
-    rectangles.push(...range.getClientRects());
+    clientRects.push(...range.getClientRects());
   }
-  const left = Math.max(bounds.left, Math.min(...rectangles.map((rect) => rect.left)));
-  const top = Math.max(bounds.top, Math.min(...rectangles.map((rect) => rect.top)));
-  const right = Math.min(bounds.right, Math.max(...rectangles.map((rect) => rect.right)));
-  const bottom = Math.min(bounds.bottom, Math.max(...rectangles.map((rect) => rect.bottom)));
-  if (![left, top, right, bottom].every(Number.isFinite) || right <= left || bottom <= top) return null;
+  const rects = [];
+  const seen = new Set();
+  const clippedClientRects = [];
+  for (const clientRect of clientRects) {
+    const left = Math.max(bounds.left, clientRect.left);
+    const top = Math.max(bounds.top, clientRect.top);
+    const right = Math.min(bounds.right, clientRect.right);
+    const bottom = Math.min(bounds.bottom, clientRect.bottom);
+    if (![left, top, right, bottom].every(Number.isFinite) || right <= left || bottom <= top) continue;
+    const rect = [
+      (left - bounds.left) / bounds.width,
+      (top - bounds.top) / bounds.height,
+      (right - bounds.left) / bounds.width,
+      (bottom - bounds.top) / bounds.height
+    ].map((value) => Math.max(0, Math.min(1, value)));
+    if (rect[2] <= rect[0] || rect[3] <= rect[1]) continue;
+    const key = rect.map((value) => value.toFixed(6)).join(":");
+    if (seen.has(key)) continue;
+    seen.add(key);
+    rects.push(rect);
+    clippedClientRects.push({ left, top, right, bottom });
+  }
+  if (!rects.length) return null;
+  const union = [
+    Math.min(...rects.map((rect) => rect[0])),
+    Math.min(...rects.map((rect) => rect[1])),
+    Math.max(...rects.map((rect) => rect[2])),
+    Math.max(...rects.map((rect) => rect[3]))
+  ];
   return {
     documentId: state.document.id,
     page: state.page,
     sequence: state.renderSequence,
     text,
-    rect: [
-      (left - bounds.left) / bounds.width,
-      (top - bounds.top) / bounds.height,
-      (right - bounds.left) / bounds.width,
-      (bottom - bounds.top) / bounds.height
-    ].map((value) => Math.max(0, Math.min(1, value)))
+    rect: union,
+    rects,
+    clientRect: {
+      left: Math.min(...clippedClientRects.map((rect) => rect.left)),
+      top: Math.min(...clippedClientRects.map((rect) => rect.top)),
+      right: Math.max(...clippedClientRects.map((rect) => rect.right)),
+      bottom: Math.max(...clippedClientRects.map((rect) => rect.bottom))
+    }
   };
+}
+
+function currentPdfTextSelection() {
+  const captured = state.capturedTextSelection;
+  return captured?.documentId === state.document?.id && captured.page === state.page && captured.sequence === state.renderSequence
+    ? captured
+    : readPdfTextSelection();
+}
+
+function resetTextAnnotationToolbar() {
+  elements.textAnnotationToolbar.dataset.contextual = "false";
+  elements.textAnnotationToolbar.style.left = "";
+  elements.textAnnotationToolbar.style.top = "";
+}
+
+function updateTextAnnotationToolbar() {
+  const selected = readPdfTextSelection();
+  state.capturedTextSelection = selected;
+  if (!selected || state.pendingSaves > 0 || state.pendingMutations.size > 0) {
+    resetTextAnnotationToolbar();
+    return;
+  }
+  const toolbar = elements.textAnnotationToolbar;
+  toolbar.dataset.contextual = "true";
+  toolbar.style.left = "8px";
+  toolbar.style.top = "8px";
+  const width = toolbar.offsetWidth;
+  const height = toolbar.offsetHeight;
+  const left = Math.max(8, Math.min(window.innerWidth - width - 8, selected.clientRect.left));
+  const preferredTop = selected.clientRect.top - height - 8;
+  const top = preferredTop >= 8 ? preferredTop : Math.max(8, Math.min(window.innerHeight - height - 8, selected.clientRect.bottom + 8));
+  toolbar.style.left = `${left}px`;
+  toolbar.style.top = `${top}px`;
 }
 
 function addTextSelectionToNote() {
   if (!state.document || !state.pdf || state.pendingSaves > 0 || state.pendingMutations.size > 0) return;
-  const captured = state.capturedTextSelection;
-  const selected = captured?.documentId === state.document.id && captured.page === state.page && captured.sequence === state.renderSequence
-    ? captured
-    : readPdfTextSelection();
+  const selected = currentPdfTextSelection();
   if (!selected) {
     setStatus("selectTextFirst", "error");
     return;
@@ -2403,11 +2557,146 @@ function addTextSelectionToNote() {
   highlightDraft(state.document.id, selected.page, selected.rect);
   state.capturedTextSelection = null;
   window.getSelection()?.removeAllRanges();
+  resetTextAnnotationToolbar();
   workspace?.showNotes();
   renderDraft();
   setStatus("textDraftReady", "success");
   assistant?.contextChanged();
   elements.noteText.focus();
+}
+
+function renderTextAnnotations() {
+  elements.textAnnotationsLayer.replaceChildren();
+  if (!state.document || !state.pdf) return;
+  for (const note of state.noteStates) {
+    const annotation = note.annotation;
+    if (note.deleted_at || note.purged || note.document_id !== state.document.id || note.page !== state.page || !annotation) continue;
+    if (!["highlight", "underline"].includes(annotation.kind) || !["yellow", "green", "blue", "pink"].includes(annotation.color) || !Array.isArray(annotation.rects)) continue;
+    for (const rect of annotation.rects.slice(0, 256)) {
+      if (!Array.isArray(rect) || rect.length !== 4 || !rect.every(Number.isFinite) || rect[0] < 0 || rect[1] < 0 || rect[2] > 1 || rect[3] > 1 || rect[2] <= rect[0] || rect[3] <= rect[1]) continue;
+      const markup = window.document.createElement("div");
+      markup.className = "text-annotation";
+      markup.dataset.annotationId = note.id;
+      markup.dataset.kind = annotation.kind;
+      markup.dataset.color = annotation.color;
+      markup.style.left = `${rect[0] * 100}%`;
+      markup.style.top = `${rect[1] * 100}%`;
+      markup.style.width = `${(rect[2] - rect[0]) * 100}%`;
+      markup.style.height = `${(rect[3] - rect[1]) * 100}%`;
+      elements.textAnnotationsLayer.append(markup);
+    }
+  }
+}
+
+function openTextAnnotationAtPoint(event) {
+  if (state.regionActive || elements.overlay.contains(event.target) || !window.getSelection()?.isCollapsed || !state.document) return;
+  const bounds = elements.pageSurface.getBoundingClientRect();
+  if (!bounds.width || !bounds.height) return;
+  const x = (event.clientX - bounds.left) / bounds.width;
+  const y = (event.clientY - bounds.top) / bounds.height;
+  if (x < 0 || x > 1 || y < 0 || y > 1) return;
+  for (const note of state.noteStates) {
+    const annotation = note.annotation;
+    if (note.deleted_at || note.purged || note.document_id !== state.document.id || note.page !== state.page || !Array.isArray(annotation?.rects)) continue;
+    if (annotation.rects.some((rect) => Array.isArray(rect) && rect.length === 4 && x >= rect[0] && x <= rect[2] && y >= rect[1] - 0.004 && y <= rect[3] + 0.004)) {
+      void openNote(note.id);
+      return;
+    }
+  }
+}
+
+async function runTextAnnotationSave(operation) {
+  if (operation.pending) return;
+  const documentId = operation.payload ? operation.documentId : null;
+  if (!documentId || (state.annotationSaves.has(documentId) && state.annotationSaves.get(documentId) !== operation)) return;
+  operation.pending = true;
+  state.annotationSaves.set(documentId, operation);
+  state.pendingSaves += 1;
+  renderDocumentDetails();
+  renderNotes();
+  setStatus("annotationSaving");
+  try {
+    const note = await api(`/api/v1/documents/${encodeURIComponent(documentId)}/notes`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(operation.payload)
+    });
+    const savedState = await api(`/api/v1/documents/${encodeURIComponent(documentId)}/notes/${encodeURIComponent(note.id)}/state`);
+    if (savedState.id !== note.id || savedState.document_id !== documentId || !savedState.annotation) throw new ApiError("request_failed");
+    if (state.document?.id === documentId) {
+      state.noteStates = [savedState, ...state.noteStates.filter((item) => item.id !== savedState.id)];
+      state.notes = [savedState, ...state.notes.filter((item) => item.id !== savedState.id)];
+      state.highlight = savedState;
+      state.highlightRevealId = savedState.id;
+      renderNotes();
+      renderTextAnnotations();
+      drawHighlight();
+      workspace?.showNotes();
+      requestAnimationFrame(() => {
+        if (state.document?.id === documentId) revealSavedNote(savedState.id);
+      });
+    }
+    if (state.annotationSaves.get(documentId) === operation) state.annotationSaves.delete(documentId);
+    if (state.capturedTextSelection?.documentId === documentId && state.capturedTextSelection.sequence === operation.selectionSequence && state.capturedTextSelection.text === operation.payload.annotation.quote) {
+      state.capturedTextSelection = null;
+      window.getSelection()?.removeAllRanges();
+      resetTextAnnotationToolbar();
+    }
+    setStatus("annotationSaved", "success");
+  } catch (error) {
+    operation.pending = false;
+    setStatus(error.code || "annotationSaveFailed", "error", {}, () => retryTextAnnotationSave(operation));
+  } finally {
+    state.pendingSaves -= 1;
+    renderDocumentDetails();
+    renderNotes();
+  }
+}
+
+async function retryTextAnnotationSave(operation) {
+  if (state.document?.id !== operation.documentId) await openDocument(operation.documentId, { force: true });
+  await runTextAnnotationSave(operation);
+}
+
+function submitTextAnnotation(kind) {
+  if (!state.document || !state.pdf || state.pendingSaves > 0 || state.pendingMutations.size > 0) return;
+  const existing = state.annotationSaves.get(state.document.id);
+  if (existing) {
+    setStatus("annotationRetryRequired", "error", {}, () => retryTextAnnotationSave(existing));
+    return;
+  }
+  const selected = currentPdfTextSelection();
+  if (!selected) {
+    setStatus("selectTextFirst", "error");
+    return;
+  }
+  if (selected.text.length > 10000) {
+    setStatus("textSelectionTooLong", "error");
+    return;
+  }
+  if (!selected.rects.length || selected.rects.length > 256) {
+    setStatus("annotationTooManyRects", "error");
+    return;
+  }
+  const color = elements.textAnnotationToolbar.querySelector("[data-annotation-color]:checked")?.value || "yellow";
+  const operation = {
+    documentId: selected.documentId,
+    selectionSequence: selected.sequence,
+    pending: false,
+    payload: {
+      request_id: crypto.randomUUID(),
+      page: selected.page,
+      rect: [...selected.rect],
+      text: selected.text,
+      annotation: {
+        kind,
+        color,
+        quote: selected.text,
+        rects: selected.rects.map((rect) => [...rect])
+      }
+    }
+  };
+  void runTextAnnotationSave(operation);
 }
 
 function requestRender() {
@@ -2478,6 +2767,7 @@ async function renderCurrentPage(sequence) {
     elements.readerStage.dataset.page = String(pageNumber);
     elements.readerStage.dataset.documentId = document.id;
     void renderTextLayer(page, cssViewport, sequence, document.id, pageNumber);
+    renderTextAnnotations();
     const highlight = drawHighlight();
     if (highlight && state.highlightRevealId === highlight.dataset.noteId) {
       state.highlightRevealId = null;
@@ -2508,6 +2798,20 @@ function drawHighlight() {
   highlight.style.top = `${rect[1] * 100}%`;
   highlight.style.width = `${(rect[2] - rect[0]) * 100}%`;
   highlight.style.height = `${(rect[3] - rect[1]) * 100}%`;
+  const annotation = noteStateFor(note.id)?.annotation || note.annotation;
+  if (note.rect && Array.isArray(annotation?.rects)) {
+    highlight.dataset.textAnnotation = "true";
+    for (const lineRect of annotation.rects.slice(0, 256)) {
+      if (!Array.isArray(lineRect) || lineRect.length !== 4 || !lineRect.every(Number.isFinite) || lineRect[2] <= lineRect[0] || lineRect[3] <= lineRect[1]) continue;
+      const line = window.document.createElement("div");
+      line.className = "source-highlight-line";
+      line.style.left = `${((lineRect[0] - rect[0]) / (rect[2] - rect[0])) * 100}%`;
+      line.style.top = `${((lineRect[1] - rect[1]) / (rect[3] - rect[1])) * 100}%`;
+      line.style.width = `${((lineRect[2] - lineRect[0]) / (rect[2] - rect[0])) * 100}%`;
+      line.style.height = `${((lineRect[3] - lineRect[1]) / (rect[3] - rect[1])) * 100}%`;
+      highlight.append(line);
+    }
+  }
   elements.overlay.append(highlight);
   return highlight;
 }
@@ -2891,6 +3195,7 @@ function makeLifecycleMutation(document, note, action, change = {}) {
   const basePath = `/api/v1/documents/${encodeURIComponent(document.id)}/notes/${encodeURIComponent(note.id)}`;
   const labels = {
     review: ["reviewSaving", noteState.review_status === "source_checked" ? "reviewUnmarked" : "reviewSaved"],
+    style: ["annotationStyleSaving", "annotationStyleSaved"],
     delete: ["deleting", "deleted"],
     restore: ["restoring", "restored"],
     purge: ["purging", "purged"]
@@ -2909,6 +3214,26 @@ function makeLifecycleMutation(document, note, action, change = {}) {
     pendingStatus: labels[0],
     successStatus: labels[1]
   };
+}
+
+async function changeAnnotationStyle(document, note, change) {
+  if (state.pendingSaves > 0 || state.pendingMutations.size > 0 || state.editDrafts.has(document.id)) return;
+  const key = mutationKey(document.id, note.id);
+  const failed = state.failedMutations.get(key);
+  if (failed?.action === "style") {
+    if (!failed.conflicted) await runMutation(failed);
+    else setStatus("revisionConflict", "error", {}, () => refreshLatest(document), "viewLatest");
+    return;
+  }
+  const noteState = noteStateFor(note.id);
+  if (!noteState?.annotation) return;
+  const annotationStyle = {
+    kind: change.kind || noteState.annotation.kind,
+    color: change.color || noteState.annotation.color
+  };
+  if (annotationStyle.kind === noteState.annotation.kind && annotationStyle.color === noteState.annotation.color) return;
+  const operation = makeLifecycleMutation(document, note, "style", { annotation_style: annotationStyle });
+  if (operation) await runMutation(operation);
 }
 
 async function reviewNote(document, note) {
@@ -2983,6 +3308,7 @@ function applyNotePurge(document, noteId) {
   }
   const urlNoteId = new URLSearchParams(window.location.search).get("note");
   if (urlNoteId === noteId) updateUrl(document.id);
+  renderTextAnnotations();
 }
 
 function applyMutationState(operation, savedState) {
@@ -3011,6 +3337,7 @@ function applyMutationState(operation, savedState) {
     if (state.highlight?.id === noteId) state.highlight = note;
   }
   renderNotes();
+  renderTextAnnotations();
   renderDraft();
   if (action === "restore") {
     const retry = async () => {
@@ -3412,6 +3739,17 @@ elements.textSelectionNote.addEventListener("mousedown", (event) => {
   state.capturedTextSelection = readPdfTextSelection();
 });
 elements.textSelectionNote.addEventListener("click", addTextSelectionToNote);
+elements.textAnnotationToolbar.addEventListener("pointerdown", (event) => {
+  if (event.button !== 0 || !event.target.closest("button, input, label")) return;
+  event.preventDefault();
+  state.capturedTextSelection = readPdfTextSelection() || currentPdfTextSelection();
+});
+elements.textAnnotationHighlight.addEventListener("click", () => submitTextAnnotation("highlight"));
+elements.textAnnotationUnderline.addEventListener("click", () => submitTextAnnotation("underline"));
+document.addEventListener("selectionchange", updateTextAnnotationToolbar);
+elements.readerStage.addEventListener("scroll", () => {
+  if (elements.textAnnotationToolbar.dataset.contextual === "true") updateTextAnnotationToolbar();
+});
 elements.regionDraftCancel.addEventListener("click", cancelRegionDraft);
 elements.pageNote.addEventListener("click", () => {
   if (!state.document || !state.pdf || !prepareDraftReplacement(state.document.id)) return;
@@ -3476,6 +3814,7 @@ elements.overlay.addEventListener("pointermove", (event) => {
 });
 elements.overlay.addEventListener("pointerup", finishSelection);
 elements.overlay.addEventListener("pointercancel", cancelSelection);
+elements.pageSurface.addEventListener("click", openTextAnnotationAtPoint);
 
 document.addEventListener("keydown", (event) => {
   if (event.key !== "Escape") return;

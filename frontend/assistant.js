@@ -240,6 +240,26 @@ const messages = {
     decisionFailed: "决定未保存，原提案仍保留。请重试。",
     newConversation: "新对话",
     conversation: "对话 {date}",
+    noteReferences: "已加入的笔记来源",
+    noteReferencePrompt: "请结合已加入的笔记来源回答问题，并引用相应出处。",
+    noteReferenceAdded: "笔记来源已加入，尚未发送。",
+    noteReferenceRemoved: "已移除笔记来源。",
+    noteReferenceLimit: "最多加入 8 条不同的笔记来源。请先移除一条，或重新加入已有来源以更新它。",
+    noteReferenceInvalid: "只有当前文献中已保存且未删除的笔记才能加入助手。",
+    noteReferenceOpen: "打开笔记来源",
+    noteReferenceRemove: "移除这条笔记来源",
+    noteReferencePage: "第 {page} 页",
+    noteReferenceStyle: "{kind} · {color}",
+    highlight: "高亮",
+    underline: "下划线",
+    yellow: "黄色",
+    green: "绿色",
+    blue: "蓝色",
+    pink: "粉色",
+    note_reference_changed: "笔记在加入后已修改。原请求和来源仍保留；请移除后重新加入最新版本，或按原请求重试。",
+    note_reference_limit: "笔记来源数量超出限制。请移除多余来源后重新发送。",
+    note_purged: "一条笔记来源已彻底删除。请移除它或重新加入其他已保存笔记。",
+    noteReferenceUnavailable: "一条笔记来源不存在、已删除或不属于当前文献。请移除后重新加入。",
     untitled: "未命名文献"
   },
   en: {
@@ -477,6 +497,26 @@ const messages = {
     decisionFailed: "The decision was not saved. The original proposal is retained; try again.",
     newConversation: "New conversation",
     conversation: "Conversation {date}",
+    noteReferences: "Pinned note sources",
+    noteReferencePrompt: "Answer using the pinned note sources and cite the relevant sources.",
+    noteReferenceAdded: "Note source pinned. Nothing has been sent.",
+    noteReferenceRemoved: "Note source removed.",
+    noteReferenceLimit: "You can pin up to 8 unique note sources. Remove one first, or pin an existing source again to update it.",
+    noteReferenceInvalid: "Only saved, active notes from the current paper can be pinned.",
+    noteReferenceOpen: "Open note source",
+    noteReferenceRemove: "Remove this note source",
+    noteReferencePage: "Page {page}",
+    noteReferenceStyle: "{kind} · {color}",
+    highlight: "Highlight",
+    underline: "Underline",
+    yellow: "Yellow",
+    green: "Green",
+    blue: "Blue",
+    pink: "Pink",
+    note_reference_changed: "A pinned note changed after it was added. The original request and pins are retained; remove and re-add the latest version, or retry the exact request.",
+    note_reference_limit: "The note-source limit was exceeded. Remove extra pins before sending again.",
+    note_purged: "A pinned note was permanently deleted. Remove it or pin another saved note.",
+    noteReferenceUnavailable: "A pinned note is missing, deleted, or belongs to another paper. Remove it and pin a valid note.",
     untitled: "Untitled paper"
   }
 };
@@ -496,6 +536,7 @@ export function createAssistant(adapter) {
     proposals: byId("assistant-proposals"),
     status: byId("assistant-status"),
     form: byId("assistant-form"),
+    noteReferences: byId("assistant-note-references"),
     message: byId("assistant-message"),
     send: byId("assistant-send"),
     cancel: byId("assistant-cancel"),
@@ -559,6 +600,8 @@ export function createAssistant(adapter) {
         loadSequence: 0,
         loadController: null,
         pendingSend: null,
+        noteRefs: [],
+        explicitNoteContext: false,
         pendingDecision: null,
         chartPreviews: new Map(),
         cancelling: null,
@@ -606,7 +649,7 @@ export function createAssistant(adapter) {
     entry.fresh = false;
   }
 
-  function renderContext() {
+  function renderContext(entry) {
     elements.context.replaceChildren();
     const paper = adapter.getDocument();
     if (!paper) {
@@ -622,7 +665,11 @@ export function createAssistant(adapter) {
       t("contextPage", { page: context.page }),
       t(context.rect ? "contextRegion" : "contextWhole")
     ];
-    if (context.activeNoteId) badges.push(t("contextNote"));
+    const pendingContext = entry?.pendingSend?.payload?.context;
+    const hasNoteContext = pendingContext
+      ? Boolean(pendingContext.active_note_id || pendingContext.note_refs?.length)
+      : entry?.explicitNoteContext ? Boolean(entry.noteRefs.length) : Boolean(context.activeNoteId);
+    if (hasNoteContext) badges.push(t("contextNote"));
     if (images.length) badges.push(t("contextImages", { count: images.length }));
     if (adapter.getSharedDatasetId?.()) badges.push(t("contextDataset"));
     if (adapter.getActiveAnalysisId?.()) badges.push(t("contextAnalysis"));
@@ -661,6 +708,88 @@ export function createAssistant(adapter) {
       clear.addEventListener("click", () => adapter.clearActiveImage(paper.id));
       elements.context.append(badge, clear);
     }
+  }
+
+  function renderNoteReferences(entry) {
+    elements.noteReferences.replaceChildren();
+    elements.noteReferences.setAttribute("aria-label", t("noteReferences"));
+    const paper = adapter.getDocument();
+    if (!paper || !entry) return;
+    for (const reference of entry.noteRefs) {
+      const note = reference.note;
+      const annotation = note.annotation;
+      const chip = document.createElement("article");
+      chip.className = "assistant-note-reference";
+      chip.dataset.noteReferenceId = reference.note_id;
+      const summary = document.createElement("div");
+      summary.className = "assistant-note-reference-summary";
+      const sourceText = String(annotation?.quote || note.text || "");
+      summary.textContent = sourceText.length > 280 ? `${sourceText.slice(0, 280)}…` : sourceText;
+      const meta = document.createElement("div");
+      meta.className = "assistant-note-reference-meta";
+      const labels = [t("noteReferencePage", { page: note.page })];
+      if (annotation) labels.push(t("noteReferenceStyle", { kind: t(annotation.kind), color: t(annotation.color) }));
+      meta.textContent = labels.join(" · ");
+      const actions = document.createElement("div");
+      actions.className = "assistant-note-reference-actions";
+      const open = document.createElement("button");
+      open.type = "button";
+      open.className = "button button-quiet";
+      open.dataset.action = "open-note-reference";
+      open.textContent = t("noteReferenceOpen");
+      open.setAttribute("aria-label", `${t("noteReferenceOpen")}: ${summary.textContent}`);
+      open.addEventListener("click", () => adapter.navigateSource({ document_id: paper.id, note_id: reference.note_id, page: note.page, rect: note.rect }));
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "button button-quiet";
+      remove.dataset.action = "remove-note-reference";
+      remove.textContent = t("noteReferenceRemove");
+      remove.setAttribute("aria-label", `${t("noteReferenceRemove")}: ${summary.textContent}`);
+      remove.addEventListener("click", () => {
+        entry.explicitNoteContext = true;
+        entry.noteRefs = entry.noteRefs.filter((item) => item.pinId !== reference.pinId);
+        entry.status = { key: "noteReferenceRemoved", kind: "info" };
+        render();
+      });
+      actions.append(open, remove);
+      chip.append(summary, meta, actions);
+      elements.noteReferences.append(chip);
+    }
+  }
+
+  function addNoteReference(documentId, note) {
+    const entry = entryFor(documentId);
+    if (!note?.id || note.document_id !== documentId || note.deleted_at || note.purged || !Number.isInteger(note.revision)) {
+      entry.status = { key: "noteReferenceInvalid", kind: "error" };
+      if (isCurrent(documentId, entry)) render();
+      return false;
+    }
+    const existingIndex = entry.noteRefs.findIndex((item) => item.note_id === note.id);
+    if (existingIndex < 0 && entry.noteRefs.length >= 8) {
+      entry.status = { key: "noteReferenceLimit", kind: "error" };
+      if (isCurrent(documentId, entry)) render();
+      return false;
+    }
+    const snapshot = JSON.parse(JSON.stringify(note));
+    const previous = existingIndex >= 0 ? entry.noteRefs[existingIndex] : null;
+    const reference = {
+      pinId: previous && previous.revision === note.revision ? previous.pinId : crypto.randomUUID(),
+      note_id: note.id,
+      revision: note.revision,
+      note: snapshot
+    };
+    if (existingIndex >= 0) entry.noteRefs[existingIndex] = reference;
+    else entry.noteRefs.push(reference);
+    entry.explicitNoteContext = true;
+    if (!entry.draft) entry.draft = t("noteReferencePrompt");
+    entry.status = { key: "noteReferenceAdded", kind: "success" };
+    if (isCurrent(documentId, entry)) {
+      elements.panel.hidden = false;
+      elements.toggle.setAttribute("aria-expanded", "true");
+      render();
+      elements.message.focus();
+    }
+    return true;
   }
 
   function renderHistory(entry) {
@@ -1322,7 +1451,8 @@ export function createAssistant(adapter) {
 
   function render() {
     const { paper, entry } = current();
-    renderContext();
+    renderContext(entry);
+    renderNoteReferences(entry);
     renderHistory(entry);
     renderMessages(entry);
     const turn = latestTurn(entry || { turns: [] });
@@ -1336,7 +1466,7 @@ export function createAssistant(adapter) {
     const active = entry ? activeTurn(entry) : null;
     const sending = Boolean(entry?.pendingSend?.pending);
     const taskBusy = Boolean(paper && entry && tasks.isBusy(paper.id, entry.conversationId));
-    elements.send.disabled = !paper || sending || Boolean(active) || taskBusy || Boolean(entry?.pendingDecision) || (!entry?.draft.trim() && !adapter.getChatImages(paper?.id).length && !entry?.pendingSend);
+    elements.send.disabled = !paper || sending || Boolean(active) || taskBusy || Boolean(entry?.pendingDecision) || (!entry?.draft.trim() && !adapter.getChatImages(paper?.id).length && !entry?.noteRefs.length && !entry?.pendingSend);
     elements.send.textContent = t(entry?.pendingSend ? "retry" : "send");
     elements.cancel.hidden = !active;
     elements.cancel.disabled = !active || Boolean(entry?.cancelling);
@@ -1441,8 +1571,10 @@ export function createAssistant(adapter) {
     if (!entry.pendingSend) {
       const context = adapter.getContext();
       const imageIds = adapter.getChatImages(paperId).map((image) => image.id);
+      const noteRefs = entry.noteRefs.map((reference) => ({ note_id: reference.note_id, revision: reference.revision }));
+      const sentNoteRefs = entry.noteRefs.map((reference) => ({ pinId: reference.pinId, note_id: reference.note_id, revision: reference.revision }));
       const message = entry.draft;
-      if (!message.trim() && !imageIds.length) return;
+      if (!message.trim() && !imageIds.length && !noteRefs.length) return;
       if (!provider.configured) {
         entry.status = { key: "agent_not_configured", kind: "error" };
         render();
@@ -1455,6 +1587,7 @@ export function createAssistant(adapter) {
       }
       entry.pendingSend = {
         pending: false,
+        noteRefs: sentNoteRefs,
         payload: {
           request_id: crypto.randomUUID(),
           conversation_id: entry.conversationId || null,
@@ -1462,7 +1595,7 @@ export function createAssistant(adapter) {
           context: {
             page: context.page,
             rect: context.rect ? [...context.rect] : null,
-            active_note_id: context.activeNoteId || null,
+            active_note_id: entry.explicitNoteContext ? null : context.activeNoteId || null,
             active_image: context.activeImage ? {
               source_kind: context.activeImage.source_kind,
               source_id: context.activeImage.source_id,
@@ -1472,7 +1605,8 @@ export function createAssistant(adapter) {
             dataset_id: adapter.getSharedDatasetId?.() || null,
             active_analysis_id: context.activeAnalysisId || null,
             active_chart_id: context.activeChartId || null,
-            language
+            language,
+            ...(noteRefs.length ? { note_refs: noteRefs } : {})
           }
         }
       };
@@ -1490,6 +1624,7 @@ export function createAssistant(adapter) {
       });
       if (entry.pendingSend === operation) entry.pendingSend = null;
       if (entry.draft === operation.payload.message) entry.draft = "";
+      entry.noteRefs = entry.noteRefs.filter((reference) => !(operation.noteRefs || []).some((sent) => sent.pinId === reference.pinId && sent.note_id === reference.note_id && sent.revision === reference.revision));
       upsertTurn(entry, turn);
       tasks.acceptTurn(paperId, turn.conversation_id, turn);
       entry.status = null;
@@ -1498,7 +1633,8 @@ export function createAssistant(adapter) {
       if (ACTIVE_STATES.has(turn.status)) startPolling(paperId, entry, turn.id);
     } catch (error) {
       operation.pending = false;
-      entry.status = { key: error.code || "network", kind: "error" };
+      const code = operation.payload.context.note_refs?.length && error.code === "not_found" ? "noteReferenceUnavailable" : error.code || "network";
+      entry.status = { key: code, kind: "error" };
       if (isCurrent(paperId, entry)) render();
     }
   }
@@ -1745,6 +1881,7 @@ export function createAssistant(adapter) {
       tasks.applyLanguage(nextLanguage);
       render();
     },
+    addNoteReference,
     planAnalysis(documentId, datasetId, navigationGeneration) {
       if (adapter.getDocument()?.id !== documentId || adapter.getSelectedDatasetId?.() !== datasetId || adapter.getSharedDatasetId?.() !== datasetId || navigationGeneration !== adapter.getNavigationGeneration?.()) return false;
       const entry = entryFor(documentId);

@@ -2,8 +2,9 @@ import math
 from uuid import UUID
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator, model_serializer
 from .rich_content import validate_content,plaintext
+from .text_annotations import AnnotationCreate, AnnotationStyle
 
 MAX_FILE_BYTES = 20 * 1024 * 1024
 MAX_PAGES = 200
@@ -30,6 +31,14 @@ class NoteCreate(BaseModel):
     rect: tuple[float, float, float, float] | None = None
     text: str = Field(min_length=1, max_length=10_000)
     rich_content: dict | None = None
+    annotation: AnnotationCreate | None = None
+
+    @model_serializer(mode='wrap')
+    def compatible_serialization(self, handler):
+        value = handler(self)
+        if value.get('annotation') is None:
+            value.pop('annotation', None)
+        return value
 
     @field_validator('rich_content')
     @classmethod
@@ -40,6 +49,11 @@ class NoteCreate(BaseModel):
     def consistent_rich_content(self):
         if self.rich_content is not None and plaintext(self.rich_content)!=self.text:
             raise ValueError('Rich and plain text must match')
+        if self.annotation is not None:
+            if self.page is None or self.rect is None or self.source is not None or self.text != self.annotation.quote:
+                raise ValueError('A text annotation requires its selected quote and PDF page anchor')
+            if any(abs(a-b) > 1e-6 for a, b in zip(self.annotation.bounds(), self.rect)):
+                raise ValueError('Annotation union must match the legacy note rectangle')
         return self
 
     @field_validator('text')
@@ -107,6 +121,7 @@ class NoteUpdate(NoteMutation):
     text: str | None = Field(default=None, min_length=1, max_length=10_000)
     review_status: Literal['unreviewed', 'source_checked'] | None = None
     rich_content: dict | None = None
+    annotation_style: AnnotationStyle | None = None
 
     @field_validator('rich_content')
     @classmethod
@@ -122,8 +137,10 @@ class NoteUpdate(NoteMutation):
 
     @model_validator(mode='after')
     def has_change(self):
-        if not ({'text', 'review_status'} & self.model_fields_set):
+        if not ({'text', 'review_status', 'annotation_style'} & self.model_fields_set):
             raise ValueError('No change supplied')
+        if 'annotation_style' in self.model_fields_set and self.annotation_style is None:
+            raise ValueError('Annotation style cannot be null')
         if 'review_status' in self.model_fields_set and self.review_status is None:
             raise ValueError('Review status cannot be null')
         if 'rich_content' in self.model_fields_set and 'text' not in self.model_fields_set:

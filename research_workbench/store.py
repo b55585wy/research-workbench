@@ -10,6 +10,7 @@ from .note_lifecycle import NoteLifecycle, base_note, read_state, read_states, e
 from .library import Library, DOCUMENT_QUERY, base_document, read_metadata
 from .rich_content import canonical
 from .library_lifecycle import SCHEMA as LIFECYCLE_SCHEMA, PaperTrash, NotePurge, reject_purged
+from .text_annotations import SCHEMA as TEXT_ANNOTATION_SCHEMA, creation_json
 
 SCHEMA = '''
 BEGIN IMMEDIATE;
@@ -363,6 +364,7 @@ COMMIT;
 
 
 SCHEMA = SCHEMA.replace('COMMIT;', LIFECYCLE_SCHEMA + '\nPRAGMA user_version=14;\nCOMMIT;')
+SCHEMA = SCHEMA.replace('COMMIT;', TEXT_ANNOTATION_SCHEMA + '\nPRAGMA user_version=15;\nCOMMIT;')
 
 
 def timestamp():
@@ -389,7 +391,7 @@ class Store:
         self.exports.mkdir(exist_ok=True)
         self.database = self.root / 'workspace.sqlite3'
         with self.connection() as connection:
-            if connection.execute('PRAGMA user_version').fetchone()[0] > 14:
+            if connection.execute('PRAGMA user_version').fetchone()[0] > 15:
                 raise RuntimeError('Database requires a newer application')
             from .study_migration import install
             install(connection,SCHEMA)
@@ -453,6 +455,7 @@ class Store:
     def save_note_in(self, connection, identifier, payload):
         reject_purged(connection, identifier, str(payload.request_id))
         owner=read_metadata(connection,identifier)
+        annotation = creation_json(payload, owner.get('sha256'))
         if owner.get('kind')=='study':return self.study_notes.save_in(connection,identifier,payload)
         if payload.page is None or payload.source is not None:raise WorkspaceError('invalid_page','文献笔记需要实际PDF页码。',422)
         rectangle = json.dumps(payload.rect) if payload.rect is not None else None
@@ -463,9 +466,15 @@ class Store:
             raise WorkspaceError('not_found', '找不到这份资料，请重新选择。', 404)
         if payload.page > document['page_count']:
             raise WorkspaceError('invalid_page', '笔记页码超出了这份资料的范围。')
+        if payload.annotation is not None:
+            from .excerpts import verify_source
+            verify_source(self, owner)
         existing = connection.execute('SELECT * FROM notes WHERE id=?', (note['id'],)).fetchone()
         if existing is not None:
             self.repeated_note(existing, note)
+            old_annotation = connection.execute('SELECT original_json FROM note_text_annotations WHERE note_id=?', (note['id'],)).fetchone()
+            if (old_annotation[0] if old_annotation else None) != annotation:
+                raise WorkspaceError('idempotency_conflict', '文字批注与原保存请求不一致。', 409)
             body=connection.execute('SELECT original_json FROM note_rich_content WHERE note_id=?',(note['id'],)).fetchone()
             original=body['original_json'] if body is not None else None
             proposed=canonical(payload.rich_content) if payload.rich_content is not None else None
@@ -476,6 +485,8 @@ class Store:
                 raise WorkspaceError('note_deleted', '这条笔记已删除，可在已删除笔记中恢复。', 409)
             return base_note(current), False
         connection.execute('INSERT INTO notes VALUES (?,?,?,?,?,?)', tuple(note.values()))
+        if annotation is not None:
+            connection.execute('INSERT INTO note_text_annotations VALUES (?,?,?)', (note['id'], annotation, annotation))
         if payload.rich_content is not None:
             body=canonical(payload.rich_content)
             connection.execute('INSERT INTO note_rich_content VALUES (?,?,?)',(note['id'],body,body))
