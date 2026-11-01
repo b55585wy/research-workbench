@@ -200,3 +200,11 @@ old table values, original files and conditional nullability constraints.
 Concurrent writer plus nested reads must complete; outer failures roll back all
 nested writes. Native mobile/zh-en, actual provider and old PDF paths are required.
 Details: [DATA-FIRST-STUDY.md](DATA-FIRST-STUDY.md).
+
+## v0.18 unified search
+
+Verify default/false response compatibility, literal Unicode matching, per-group
+bounds and order, current edits/deletion/restoration, typed null-page anchors,
+one-snapshot concurrent reads and zero material writes. Native tests require
+study/PDF source navigation, drafts, late query/clear/retry, safe literal markup,
+keyboard/zh-en/390px/blue, no automatic sharing/model calls and no study PDF request.

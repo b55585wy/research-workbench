@@ -151,17 +151,23 @@ const messages = {
     noteStatesLoadFailed: "无法加载笔记状态，请重试。",
     note_deleted: "这条笔记已删除，请先恢复再操作。",
     revision_conflict: "这条笔记已在其他地方更新。",
-    searchLabel: "搜索文献和笔记",
-    searchPlaceholder: "搜索标题、作者、DOI 或笔记",
+    searchLabel: "搜索研究、文献和笔记",
+    searchPlaceholder: "搜索研究、标题、作者、DOI 或笔记",
     searchSubmit: "搜索",
     searchClear: "清除",
     searchResults: "搜索结果",
+    searchStudies: "研究",
     searchPapers: "文献",
     searchNotes: "笔记",
+    searchSourceStudy: "研究问题",
+    searchSourceDataset: "当前数据",
+    searchSourceAnalysis: "已保存分析",
+    searchSourceChart: "已保存图表",
+    searchSourceUnavailable: "来源不可用",
     searching: "正在搜索…",
     searchFailed: "搜索失败，请重试。",
-    searchEmpty: "没有找到匹配的文献或笔记。",
-    searchResultCount: "找到 {documents} 篇文献、{notes} 条笔记。",
+    searchEmpty: "没有找到匹配的研究、文献或笔记。",
+    searchResultCount: "找到 {studies} 项研究、{documents} 篇文献、{notes} 条笔记。",
     searchMore: "结果较多，仅显示部分匹配。请缩小搜索范围。",
     alreadyInLibrary: "这篇文献已在文库中，已打开原文。",
     bibliography: "书目信息",
@@ -315,17 +321,23 @@ const messages = {
     noteStatesLoadFailed: "Note states could not be loaded. Try again.",
     note_deleted: "This note is deleted. Restore it before making changes.",
     revision_conflict: "This note was updated elsewhere.",
-    searchLabel: "Search papers and notes",
-    searchPlaceholder: "Search title, authors, DOI, or notes",
+    searchLabel: "Search research, papers, and notes",
+    searchPlaceholder: "Search research, title, authors, DOI, or notes",
     searchSubmit: "Search",
     searchClear: "Clear",
     searchResults: "Search results",
+    searchStudies: "Research",
     searchPapers: "Papers",
     searchNotes: "Notes",
+    searchSourceStudy: "Research question",
+    searchSourceDataset: "Current data",
+    searchSourceAnalysis: "Saved analysis",
+    searchSourceChart: "Saved chart",
+    searchSourceUnavailable: "Source unavailable",
     searching: "Searching…",
     searchFailed: "Search failed. Try again.",
-    searchEmpty: "No matching papers or notes found.",
-    searchResultCount: "Found {documents} papers and {notes} notes.",
+    searchEmpty: "No matching research, papers, or notes found.",
+    searchResultCount: "Found {studies} research entries, {documents} papers, and {notes} notes.",
     searchMore: "More matches are available. Narrow your search to see them.",
     alreadyInLibrary: "This paper is already in your library. The existing source is open.",
     bibliography: "Bibliography",
@@ -440,6 +452,7 @@ const state = {
   metadata: new Map(),
   search: {
     query: "",
+    studies: [],
     documents: [],
     notes: [],
     hasMore: false,
@@ -782,6 +795,25 @@ function renderSearch() {
     elements.searchResults.append(section);
   };
 
+  appendGroup(t("searchStudies"), search.studies, (study) => {
+    const item = window.document.createElement("li");
+    item.className = "search-result-item";
+    item.dataset.studyId = study.id;
+    const button = window.document.createElement("button");
+    button.type = "button";
+    button.className = "search-result-open";
+    button.addEventListener("click", () => openDocument(study.id, { ownerKind: "study" }));
+    const title = window.document.createElement("span");
+    title.className = "search-result-title";
+    title.textContent = study.name || study.title || t("searchStudies");
+    const question = window.document.createElement("span");
+    question.className = "search-result-meta";
+    question.textContent = study.question || "";
+    button.append(title, question);
+    item.append(button);
+    return item;
+  });
+
   appendGroup(t("searchPapers"), search.documents, (document) => {
     const item = window.document.createElement("li");
     item.className = "search-result-item";
@@ -802,10 +834,12 @@ function renderSearch() {
   });
 
   appendGroup(t("searchNotes"), search.notes, (note) => {
+    const studyNote = note.owner_kind === "study";
     const item = window.document.createElement("li");
     item.className = "search-result-item";
     item.dataset.documentId = note.document_id;
     item.dataset.noteId = note.id;
+    if (studyNote) item.dataset.ownerKind = "study";
     const button = window.document.createElement("button");
     button.type = "button";
     button.className = "search-result-open";
@@ -815,7 +849,17 @@ function renderSearch() {
     title.textContent = note.document_title || t("untitled");
     const source = window.document.createElement("span");
     source.className = "search-result-meta";
-    source.textContent = t(note.rect ? "notePageRegion" : "notePageWhole", { page: note.page });
+    if (studyNote) {
+      const sourceType = {
+        study: "searchSourceStudy",
+        dataset: "searchSourceDataset",
+        analysis: "searchSourceAnalysis",
+        chart: "searchSourceChart"
+      }[note.source?.kind] || "searchSourceUnavailable";
+      source.textContent = [note.source?.label, t(sourceType)].filter(Boolean).join(" · ");
+    } else {
+      source.textContent = t(note.rect ? "notePageRegion" : "notePageWhole", { page: note.page });
+    }
     const text = window.document.createElement("span");
     text.className = "search-result-note";
     text.textContent = note.text;
@@ -843,6 +887,7 @@ async function performSearch(query) {
   const controller = new AbortController();
   state.search.controller = controller;
   state.search.query = trimmed;
+  state.search.studies = [];
   state.search.documents = [];
   state.search.notes = [];
   state.search.hasMore = false;
@@ -850,19 +895,21 @@ async function performSearch(query) {
   renderSearch();
 
   try {
-    const params = new URLSearchParams({ q: trimmed, limit: "40" });
+    const params = new URLSearchParams({ q: trimmed, limit: "40", include_studies: "true" });
     const body = await api(`/api/v1/search?${params}`, { signal: controller.signal });
     if (sequence !== state.search.sequence || state.search.query !== trimmed) return;
+    state.search.studies = Array.isArray(body.studies) ? body.studies : [];
     state.search.documents = Array.isArray(body.documents) ? body.documents : [];
     state.search.notes = Array.isArray(body.notes) ? body.notes : [];
     state.search.hasMore = Boolean(body.has_more);
     state.search.status = {
-      key: state.search.documents.length || state.search.notes.length ? "searchResultCount" : "searchEmpty",
+      key: state.search.studies.length || state.search.documents.length || state.search.notes.length ? "searchResultCount" : "searchEmpty",
       kind: "info",
-      values: { documents: state.search.documents.length, notes: state.search.notes.length }
+      values: { studies: state.search.studies.length, documents: state.search.documents.length, notes: state.search.notes.length }
     };
   } catch (error) {
     if (error?.name === "AbortError" || sequence !== state.search.sequence || state.search.query !== trimmed) return;
+    state.search.studies = [];
     state.search.documents = [];
     state.search.notes = [];
     state.search.hasMore = false;
@@ -884,6 +931,7 @@ function clearSearch() {
   state.search.controller?.abort();
   state.search.controller = null;
   state.search.query = "";
+  state.search.studies = [];
   state.search.documents = [];
   state.search.notes = [];
   state.search.hasMore = false;

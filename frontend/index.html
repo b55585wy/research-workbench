@@ -55,6 +55,19 @@
 
   <main class="workspace">
     <aside class="documents-panel" aria-labelledby="documents-heading">
+      <form id="library-search-form" class="library-search" role="search">
+        <label for="library-search-input" class="library-search-label" data-i18n="searchLabel">搜索研究、文献和笔记</label>
+        <div class="library-search-row">
+          <input id="library-search-input" data-testid="library-search-input" type="search" maxlength="200" autocomplete="off" data-i18n-placeholder="searchPlaceholder" placeholder="搜索研究、标题、作者、DOI 或笔记">
+          <button id="library-search-submit" class="button button-secondary" type="submit" data-testid="library-search-submit" data-i18n="searchSubmit">搜索</button>
+          <button id="library-search-clear" class="button button-quiet" type="button" data-testid="library-search-clear" data-i18n="searchClear" disabled>清除</button>
+        </div>
+      </form>
+      <div id="library-search-status" class="library-search-status" data-testid="library-search-status" role="status" aria-live="polite" hidden>
+        <span id="library-search-status-text"></span>
+        <button id="library-search-retry" class="status-retry" type="button" data-i18n="retry" hidden>重试</button>
+      </div>
+      <div id="library-search-results" class="library-search-results" data-testid="library-search-results" aria-label="搜索结果" hidden></div>
       <section class="study-library" aria-labelledby="study-library-heading">
         <div class="panel-heading study-library-heading">
           <h2 id="study-library-heading">研究</h2>
@@ -80,19 +93,6 @@
         <button id="upload-button" class="button button-primary upload-button" type="button" data-i18n="upload">上传 PDF</button>
         <input id="upload-input" data-testid="upload-input" type="file" accept="application/pdf,.pdf" hidden>
       </div>
-      <form id="library-search-form" class="library-search" role="search">
-        <label for="library-search-input" class="sr-only" data-i18n="searchLabel">搜索文献和笔记</label>
-        <div class="library-search-row">
-          <input id="library-search-input" data-testid="library-search-input" type="search" maxlength="200" autocomplete="off" data-i18n-placeholder="searchPlaceholder" placeholder="搜索标题、作者、DOI 或笔记">
-          <button id="library-search-submit" class="button button-secondary" type="submit" data-testid="library-search-submit" data-i18n="searchSubmit">搜索</button>
-          <button id="library-search-clear" class="button button-quiet" type="button" data-testid="library-search-clear" data-i18n="searchClear" disabled>清除</button>
-        </div>
-      </form>
-      <div id="library-search-status" class="library-search-status" data-testid="library-search-status" role="status" aria-live="polite" hidden>
-        <span id="library-search-status-text"></span>
-        <button id="library-search-retry" class="status-retry" type="button" data-i18n="retry" hidden>重试</button>
-      </div>
-      <div id="library-search-results" class="library-search-results" data-testid="library-search-results" aria-label="搜索结果" hidden></div>
       <div id="documents-empty" class="empty-state">
         <p data-i18n="emptyDocuments">还没有文献。上传 PDF，或打开两页示例开始阅读。</p>
         <button id="sample-open" class="button button-secondary" type="button" data-testid="sample-open" data-i18n="sample">试读示例</button>

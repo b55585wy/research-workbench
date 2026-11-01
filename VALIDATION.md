@@ -597,3 +597,11 @@ Store regression covers nested write rollback, thread-local isolation and a
 waiting writer without nested-reader deadlock. Native browser and actual model
 acceptance use isolated data; no public sample is inserted into the live library.
 This is software validation, not validation of an experimental design or inference.
+
+## v0.18 unified search
+
+Requirement cases are enumerated before implementation in unified-search-v1/SCENARIOS.md.
+Includes legacy API compatibility and concurrent metadata/note edits within one
+read snapshot. Isolated native and affected old browser workflows cover explicit
+search, exact source reopening, drafts, races, retry and no automatic model calls.
+Schema13/all28 original tables and material bytes remain unchanged at deployment.

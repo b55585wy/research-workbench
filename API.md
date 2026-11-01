@@ -223,3 +223,10 @@ hash-bound association endpoints. Existing owned data/result/note routes accept
 study IDs without creating a PDF. Null-page notes require typed source anchors;
 PDF APIs retain their old shapes and reject study page/file operations.
 Contract, limits and schema13 migration: [DATA-FIRST-STUDY.md](DATA-FIRST-STUDY.md).
+
+## v0.18 opt-in unified search
+
+GET /api/v1/search adds include_studies=true for saved study names/questions and
+active null-page study notes. Default/false preserves legacy response keys and
+PDF-only results. One read snapshot, bounded literal casefold matching, no model
+invocation or writes. Full fields and scope: [UNIFIED-SEARCH.md](UNIFIED-SEARCH.md).

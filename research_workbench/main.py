@@ -235,8 +235,8 @@ def create_app(data_root=None, validator=None, renderer=None, *, agent_provider=
         return {'items': store.list_documents()}
 
     @app.get('/api/v1/search')
-    def search(q: str = Query(default='',max_length=200), limit: int = Query(default=40,ge=1,le=100)):
-        return store.library.search(q,limit)
+    def search(q: str = Query(default='',max_length=200), limit: int = Query(default=40,ge=1,le=100), include_studies: bool = Query(default=False)):
+        return store.library.search(q,limit,include_studies)
 
     @app.post('/api/v1/documents', status_code=201)
     def upload_document(file: UploadFile = File(...), deduplicate: bool = Form(False)):

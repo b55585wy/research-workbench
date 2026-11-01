@@ -743,6 +743,14 @@ h3 {
   border-bottom: 1px solid var(--ui-border);
 }
 
+.library-search-label {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--ui-text-soft);
+  font-size: 13px;
+  font-weight: 650;
+}
+
 .library-search-row {
   display: flex;
   flex-wrap: wrap;

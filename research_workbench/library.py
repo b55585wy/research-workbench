@@ -82,28 +82,46 @@ class Library:
             raise revision_conflict()
         return current
 
-    def search(self, query, limit=40):
+    def search(self, query, limit=40, include_studies=False):
         query = query.strip()
         result = {'query':query,'documents':[],'notes':[],'has_more':False}
+        if include_studies:result['studies']=[]
         if not query:
             return result
         folded = query.casefold()
         with self.store.connection() as connection:
-            connection.execute('BEGIN')
+            if not connection.in_transaction:connection.execute('BEGIN')
             documents = connection.execute(DOCUMENT_QUERY + ' WHERE d.page_count IS NOT NULL ORDER BY d.created_at DESC,d.id DESC')
             result['documents'] = self.find_documents(documents,folded,limit)
+            if include_studies:result['studies']=self.find_studies(connection,folded,limit)
             sql = STATE_QUERY.replace('SELECT n.id','SELECT m.title AS document_title,n.id',1)
             sql += ''' JOIN document_metadata m ON m.document_id=n.document_id
-                WHERE s.deleted_at IS NULL AND n.page IS NOT NULL ORDER BY n.created_at DESC,n.id DESC'''
+                WHERE s.deleted_at IS NULL'''
+            if not include_studies:sql+=' AND n.page IS NOT NULL'
+            sql+=' ORDER BY n.created_at DESC,n.id DESC'
             for row in connection.execute(sql):
                 if folded in row['text'].casefold():
-                    result['notes'].append(state_record(row))
+                    note=state_record(row)
+                    if note['page'] is None:note['owner_kind']='study'
+                    result['notes'].append(note)
                 if len(result['notes']) > limit:
                     break
-        result['has_more'] = len(result['documents']) > limit or len(result['notes']) > limit
+        result['has_more'] = any(len(result[key])>limit for key in ('documents','notes','studies') if key in result)
         result['documents'] = result['documents'][:limit]
         result['notes'] = result['notes'][:limit]
+        if include_studies:result['studies']=result['studies'][:limit]
         return result
+
+    @staticmethod
+    def find_studies(connection,folded,limit):
+        found=[]
+        rows=connection.execute('''SELECT d.id,d.title,s.question FROM studies s
+            JOIN documents d ON d.id=s.document_id ORDER BY d.created_at DESC,d.id DESC''')
+        for row in rows:
+            matches=[key for key,value in (('name',row['title']),('question',row['question'])) if folded in value.casefold()]
+            if matches:found.append({**read_metadata(connection,row['id']),'matched_fields':matches})
+            if len(found)>limit:break
+        return found
 
     @staticmethod
     def find_documents(rows, folded, limit):
