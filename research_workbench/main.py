@@ -21,6 +21,7 @@ from .pdf_validation import PdfValidator
 from .store import Store, timestamp
 from .excerpts import Excerpts, checked_image, verify_excerpt_source, verify_source
 from .reading_export import build_export, ExportResponse
+from .annotated_pdf_export import AnnotatedPdfExport
 from .images import ImageLibrary
 from .agent_provider import ModelConnection
 from .agent_runtime import ReadingAgent
@@ -191,6 +192,7 @@ def create_app(data_root=None, validator=None, renderer=None, *, agent_provider=
     app = FastAPI(title='Research workbench', version=__version__, docs_url=None, redoc_url=None,lifespan=lifespan)
     app.state.store, app.state.validator = store, validator
     app.state.excerpts = Excerpts(store, renderer)
+    app.state.annotated_pdf = AnnotatedPdfExport(store)
     app.state.images,app.state.agent=images,agent
     app.state.datasets,app.state.analysis=datasets,analysis
     app.state.data_imports=data_imports
@@ -319,6 +321,12 @@ def create_app(data_root=None, validator=None, renderer=None, *, agent_provider=
     def export_reading(identifier: UUID):
         path, filename = build_export(store, str(identifier))
         return ExportResponse(path, media_type='application/zip', filename=filename)
+
+    @app.get('/api/v1/documents/{identifier}/export/annotated.pdf')
+    def export_annotated_pdf(identifier: UUID):
+        path, filename = app.state.annotated_pdf.build(str(identifier))
+        return ExportResponse(path, media_type='application/pdf', filename=filename,
+                              headers={'Cache-Control': 'no-store'})
 
     app.include_router(agent_router)
     app.include_router(analysis_router)

@@ -212,6 +212,10 @@
           <button id="reader-region-mode" class="button button-secondary" type="button" data-i18n="regionMode" disabled>框选原文位置</button>
         </div>
         <button id="export-reading-record" class="button button-secondary export-reading-record" type="button" data-testid="export-reading-record" data-i18n="exportReadingRecord" disabled>导出阅读记录</button>
+        <div class="annotated-pdf-export">
+          <button id="export-annotated-pdf" class="button button-quiet" type="button" data-testid="export-annotated-pdf" data-i18n="exportAnnotatedPdf" aria-describedby="annotated-pdf-help" disabled>下载批注 PDF</button>
+          <span id="annotated-pdf-help" class="annotated-pdf-help" data-i18n="annotatedPdfHelp">仅导出已保存的 PDF 笔记和标注；附件、富文本格式和独立图片批注仍保留在完整阅读记录中。原 PDF 保持不变，下载的是批注副本。</span>
+        </div>
       </div>
       <section id="reader-find-panel" class="reader-find-panel" aria-label="查找 PDF 正文" hidden>
         <div class="reader-find-row">

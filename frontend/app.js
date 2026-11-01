@@ -55,6 +55,11 @@ const messages = {
     exportReadingRecord: "导出阅读记录",
     exporting: "正在导出阅读记录…",
     exported: "阅读记录已导出。",
+    exportAnnotatedPdf: "下载批注 PDF",
+    exportingAnnotatedPdf: "正在生成批注 PDF…",
+    exportedAnnotatedPdf: "批注 PDF 已下载。",
+    annotatedPdfHelp: "仅导出已保存的 PDF 笔记和标注；附件、富文本格式和独立图片批注仍保留在完整阅读记录中。原 PDF 保持不变，下载的是批注副本。",
+    annotatedPdf: "批注 PDF",
     readingRecord: "阅读记录",
     savedNotes: "已保存笔记",
     emptyNotes: "这篇文献还没有笔记。",
@@ -111,6 +116,8 @@ const messages = {
     origin_rejected: "请求来源未被接受。",
     region_required: "只有区域笔记可以生成图片摘录。",
     source_changed: "原文文件已变化，无法完成此操作。",
+    source_has_no_pdf: "这项内容没有可导出的 PDF 原文。",
+    storage_failure: "本地存储暂时不可用，请稍后重试。",
     renderer_busy: "图片处理正忙，请稍后重试。",
     renderer_timeout: "图片生成超时，请重试。",
     renderer_failed: "图片生成失败，请重试。",
@@ -118,6 +125,13 @@ const messages = {
     excerpt_missing: "图片文件已缺失，请重试。",
     excerpt_corrupt: "图片文件已损坏，无法使用。",
     export_too_large: "阅读记录过大，无法导出。",
+    pdf_export_empty: "没有可导出的已保存 PDF 笔记或标注。",
+    pdf_export_invalid: "文献或笔记记录无效，无法生成批注 PDF。",
+    pdf_export_too_large: "批注 PDF 超出导出限制，请减少笔记或标注后重试。",
+    pdf_export_busy: "另一个批注 PDF 正在生成，请稍后重试。",
+    pdf_export_timeout: "批注 PDF 生成超时，请重试。",
+    pdf_export_failed: "批注 PDF 生成失败，请重试。",
+    pdf_export_unavailable: "批注 PDF 导出暂时不可用，请稍后重试。",
     request_failed: "操作未完成，请重试。",
     invalidFileType: "请选择 PDF 文件。",
     unknownNote: "这条笔记不存在或已被删除。",
@@ -323,6 +337,11 @@ const messages = {
     exportReadingRecord: "Export reading record",
     exporting: "Exporting reading record…",
     exported: "Reading record exported.",
+    exportAnnotatedPdf: "Download annotated PDF",
+    exportingAnnotatedPdf: "Generating annotated PDF…",
+    exportedAnnotatedPdf: "Annotated PDF downloaded.",
+    annotatedPdfHelp: "Exports only saved PDF notes and marks. Attachments, rich formatting, and independent image annotations remain in the full reading record. The original PDF is preserved; this download is an annotated copy.",
+    annotatedPdf: "Annotated PDF",
     readingRecord: "Reading record",
     savedNotes: "Saved notes",
     emptyNotes: "This paper has no notes yet.",
@@ -379,6 +398,8 @@ const messages = {
     origin_rejected: "The request origin was not accepted.",
     region_required: "Only region notes can have image excerpts.",
     source_changed: "The source file has changed, so this action cannot be completed.",
+    source_has_no_pdf: "This item has no source PDF to export.",
+    storage_failure: "Local storage is temporarily unavailable. Try again shortly.",
     renderer_busy: "Image processing is busy. Try again shortly.",
     renderer_timeout: "Image creation timed out. Try again.",
     renderer_failed: "The image could not be created. Try again.",
@@ -386,6 +407,13 @@ const messages = {
     excerpt_missing: "The image file is missing. Try again.",
     excerpt_corrupt: "The image file is damaged and cannot be used.",
     export_too_large: "The reading record is too large to export.",
+    pdf_export_empty: "There are no saved PDF notes or marks to export.",
+    pdf_export_invalid: "The paper or note records are invalid, so an annotated PDF cannot be generated.",
+    pdf_export_too_large: "The annotated PDF exceeds the export limit. Reduce the notes or marks and try again.",
+    pdf_export_busy: "Another annotated PDF is being generated. Try again shortly.",
+    pdf_export_timeout: "Annotated PDF generation timed out. Try again.",
+    pdf_export_failed: "The annotated PDF could not be generated. Try again.",
+    pdf_export_unavailable: "Annotated PDF export is temporarily unavailable. Try again shortly.",
     request_failed: "The action could not be completed. Try again.",
     invalidFileType: "Choose a PDF file.",
     unknownNote: "This note does not exist or was deleted.",
@@ -593,6 +621,7 @@ const elements = {
   viewMode: $("reader-view-mode"),
   findToggle: $("reader-find-toggle"),
   exportReadingRecord: $("export-reading-record"),
+  exportAnnotatedPdf: $("export-annotated-pdf"),
   metadataPanel: $("metadata-panel"),
   metadataForm: $("metadata-form"),
   metadataTitle: $("metadata-title"),
@@ -1868,6 +1897,10 @@ function mutationKey(documentId, noteId) {
   return `${documentId}:${noteId}`;
 }
 
+function hasActiveSavedPdfNotes(document) {
+  return Boolean(document && !isStudy(document) && state.noteStatesLoaded && state.noteStates.some((note) => note.document_id === document.id && !note.deleted_at && !note.purged));
+}
+
 function renderDocumentDetails() {
   const document = state.document;
   elements.documentTitle.textContent = document ? document.title || document.original_filename || t("untitled") : "";
@@ -1898,6 +1931,8 @@ function renderDocumentDetails() {
   elements.uploadInput.disabled = state.pendingUpload;
   elements.exportReadingRecord.disabled = !document || isStudy(document) || richText?.isOpen() || state.pendingSaves > 0 || state.pendingExcerpts.size > 0 || state.pendingExports.size > 0 || state.pendingMutations.size > 0 || state.pendingMetadata.size > 0 || state.editDrafts.has(document.id) || Boolean(document && !isStudy(document) && ensureMetadata(document.id).draft);
   elements.exportReadingRecord.textContent = t(state.pendingExports.size > 0 ? "exporting" : "exportReadingRecord");
+  elements.exportAnnotatedPdf.disabled = !hasActiveSavedPdfNotes(document) || richText?.isOpen() || state.pendingSaves > 0 || state.pendingExcerpts.size > 0 || state.pendingExports.size > 0 || state.pendingMutations.size > 0 || state.pendingMetadata.size > 0 || state.editDrafts.has(document.id) || Boolean(document && !isStudy(document) && ensureMetadata(document.id).draft);
+  elements.exportAnnotatedPdf.textContent = t(document && state.pendingExports.has(`annotated-pdf:${document.id}`) ? "exportingAnnotatedPdf" : "exportAnnotatedPdf");
   elements.viewMode.disabled = !hasPdf;
   elements.viewMode.value = state.viewMode || "continuous";
   readerFind?.update();
@@ -2712,6 +2747,7 @@ async function loadNoteStates(document, sequence, signal) {
   state.noteStates = Array.isArray(body.items) ? body.items : [];
   state.noteStatesLoaded = true;
   state.notes = state.noteStates.filter((item) => !item.deleted_at && !item.purged);
+  renderDocumentDetails();
   renderNotes();
   renderTextAnnotations();
 }
@@ -4314,6 +4350,57 @@ async function exportReadingRecord(document) {
   }
 }
 
+function makeAnnotatedPdfExportRequest(document) {
+  return {
+    documentId: document.id,
+    title: document.title || document.original_filename || t("annotatedPdf"),
+    sha256: document.sha256,
+    loadSequence: state.loadSequence
+  };
+}
+
+function annotatedPdfExportRequestIsCurrent(request) {
+  return Boolean(state.document && !isStudy(state.document) && state.document.id === request.documentId && state.document.sha256 === request.sha256 && state.loadSequence === request.loadSequence);
+}
+
+async function exportAnnotatedPdf(request) {
+  if (!annotatedPdfExportRequestIsCurrent(request) || !hasActiveSavedPdfNotes(state.document) || richText?.isOpen() || state.pendingExports.size > 0 || state.pendingSaves > 0 || state.pendingExcerpts.size > 0 || state.pendingMutations.size > 0 || state.pendingMetadata.size > 0 || state.editDrafts.has(request.documentId) || ensureMetadata(request.documentId).draft) return;
+  const pendingKey = `annotated-pdf:${request.documentId}`;
+  state.pendingExports.add(pendingKey);
+  renderDocumentDetails();
+  setStatus("exportingAnnotatedPdf");
+  try {
+    const response = await checkedFetch(`/api/v1/documents/${encodeURIComponent(request.documentId)}/export/annotated.pdf`);
+    const contentType = response.headers.get("Content-Type")?.split(";", 1)[0].trim().toLowerCase();
+    if (contentType !== "application/pdf") throw new ApiError("pdf_export_failed");
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const link = window.document.createElement("a");
+    const base = request.title
+      .replace(/[<>:"/\\|?*\x00-\x1F\x7F]/g, "_")
+      .trim()
+      .slice(0, 80);
+    try {
+      link.href = url;
+      link.download = `${base || t("annotatedPdf")}-annotated.pdf`;
+      link.hidden = true;
+      window.document.body.append(link);
+      link.click();
+    } finally {
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+    if (annotatedPdfExportRequestIsCurrent(request)) setStatus("exportedAnnotatedPdf", "success");
+  } catch (error) {
+    if (annotatedPdfExportRequestIsCurrent(request)) {
+      setStatus(error.code || "request_failed", "error", {}, () => exportAnnotatedPdf(request));
+    }
+  } finally {
+    state.pendingExports.delete(pendingKey);
+    renderDocumentDetails();
+  }
+}
+
 async function uploadFile(file) {
   if (!file || state.pendingUpload) return;
   if (file.size > MAX_FILE_BYTES) {
@@ -4558,6 +4645,9 @@ elements.viewMode.addEventListener("change", () => {
 });
 elements.exportReadingRecord.addEventListener("click", () => {
   if (state.document) exportReadingRecord(state.document);
+});
+elements.exportAnnotatedPdf.addEventListener("click", () => {
+  if (state.document && hasActiveSavedPdfNotes(state.document)) void exportAnnotatedPdf(makeAnnotatedPdfExportRequest(state.document));
 });
 elements.regionMode.addEventListener("click", () => setRegionMode(!state.regionActive));
 elements.readerRegionMode.addEventListener("click", () => elements.regionMode.click());

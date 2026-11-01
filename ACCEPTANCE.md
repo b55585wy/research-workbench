@@ -257,3 +257,8 @@ tables, materials, runtime recipes and independent tFUS boundary.
 ## v0.24 reading continuity
 
 P01 continuous page/within-page restore after reload/reopen, no bootstrap overwrite; P02 independent positions for identical filenames/different bytes; P03 single-page, boundaries and mode changes; P04 explicit note/image/page/data/analysis/chart precedence; P05 corrupt/oversized/wrong owner or SHA/invalid bounds ignored; P06 denied/quota storage failure remains usable; P07 delayed owner switches and hidden reader retain lifetime ownership; P08 mobile/rotated/blank/200-page bounded rendering; P09 existing annotation, excerpt, find, filters, drafts, batch Agent and task/grant regressions; P10 local-only bilingual accessible status and fresh-browser defaults; P11 backend regression and guarded preservation of live data/tFUS boundaries. See [READING-PROGRESS.md](READING-PROGRESS.md).
+
+
+## v0.25 portable native PDF annotations
+
+A01 real file/pages/text/original integrity; A02 multiline gaps/four colors/revised comment/immutable quote/Unicode/existing annotations; A03 all rotations/crops/nonzero origins/inherited rotation/UserUnit/short and last pages; A04 active saved lifecycle and old ZIP; A05 empty/missing/trashed/study/corrupt record/source; A06 strict note/rectangle/payload/input/output/protocol limits; A07 busy/timeout/crash/spawn/storage/disconnect cleanup and continued reading; A08 fixed snapshot under concurrent edits and rechecked source; A09 actual browser download/draft/pending/owner identity; A10 visible retry/keyboard/mobile/themes/bilingual; A11 reading/find/filters/references/progress/analysis/tasks compatibility; A12 guarded backup and complete live table/file/source/tFUS preservation. See [ANNOTATED-PDF.md](ANNOTATED-PDF.md).

@@ -574,6 +574,23 @@ h3 {
   margin-left: auto;
 }
 
+.annotated-pdf-export {
+  display: flex;
+  flex: 0 1 380px;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+  min-width: 0;
+}
+
+.annotated-pdf-help {
+  flex: 1 1 220px;
+  min-width: 0;
+  color: var(--ui-text-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
 .page-label {
   display: flex;
 }

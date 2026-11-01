@@ -263,3 +263,10 @@ page/selection in the existing reading context. See [READING-TOOLS.md](READING-T
 ## v0.24 browser-local reading progress
 
 No server API or schema changes (schema15). Browser-local version1 preferences are bound to document UUID and original SHA256; strict bounded page/normalized center fields contain no research text. Explicit sources outrank progress. See [READING-PROGRESS.md](READING-PROGRESS.md). Health version is 0.24.0.
+
+
+## v0.25 annotated PDF derivative
+
+GET `/api/v1/documents/{id}/export/annotated.pdf` -> application/pdf attachment, no-store. Server resolves active saved notes in one read transaction; no request body or research-record write. Highlight/underline retain quads/colors/quote/comment, region notes are Square annotations, page notes are Text comments. Original PDF/old ZIP are preserved.
+
+One concurrent generator,20-second timeout,512MiB child memory limit; source<=20MiB/200pages,<=1000notes/16384rectangles,<=8MiB UTF8 snapshot, output<=64MiB. Codes: pdf_export_empty409; pdf_export_invalid409; pdf_export_too_large413; pdf_export_busy429; pdf_export_timeout422; pdf_export_failed422; pdf_export_unavailable503. Existing file_missing/source_changed/document_trashed/not_found/source_has_no_pdf and structured storage errors remain. No partial output; request-owned temporary files removed after response/disconnect/failure. Schema15/31tables unchanged. Health version0.25.0. See [ANNOTATED-PDF.md](ANNOTATED-PDF.md).
