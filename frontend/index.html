@@ -115,8 +115,11 @@
           <h2 id="study-view-title"></h2>
           <p id="study-view-question" class="study-view-question"></p>
         </header>
-        <section class="study-papers-section" aria-labelledby="study-papers-heading">
-          <h3 id="study-papers-heading">关联论文</h3>
+        <details id="study-papers-details" class="study-papers-section" aria-labelledby="study-papers-heading">
+          <summary class="study-papers-summary">
+            <span id="study-papers-heading" role="heading" aria-level="3">关联论文</span>
+            <span id="study-papers-count" class="notes-count">0</span>
+          </summary>
           <p id="study-papers-help" class="study-papers-help">关联只用于汇集论文，不会移动研究数据或笔记，也不会自动向助手提供论文内容。</p>
           <div class="study-paper-link-row">
             <label class="sr-only" for="study-paper-select">选择要关联的论文</label>
@@ -125,7 +128,7 @@
           </div>
           <div id="study-papers-status" class="study-status" role="status" aria-live="polite"></div>
           <ul id="study-papers" class="study-papers" aria-label="已关联论文"></ul>
-        </section>
+        </details>
       </section>
 
       <details id="metadata-panel" class="metadata-panel">
@@ -220,7 +223,10 @@
         <p id="study-note-edit-label" class="edit-mode-label" hidden>编辑已保存笔记 · 来源保持不变</p>
         <label for="study-note-source" class="note-label">笔记来源</label>
         <select id="study-note-source"></select>
-        <p id="study-note-source-detail" class="study-note-source-detail"></p>
+        <details id="study-note-source-details" class="study-note-source-details">
+          <summary id="study-note-source-details-summary">来源标识</summary>
+          <p id="study-note-source-detail" class="study-note-source-detail"></p>
+        </details>
         <label for="study-note-text" class="note-label">笔记内容</label>
         <textarea id="study-note-text" rows="7" maxlength="10000" placeholder="记录研究问题、数据或结果…"></textarea>
         <div class="note-editor-footer">
@@ -269,6 +275,8 @@
           <div id="dataset-upload-status" class="analysis-status" role="status" aria-live="polite"></div>
           <label class="analysis-label" for="dataset-select">选择数据</label>
           <select id="dataset-select" disabled></select>
+          <button id="analysis-assistant-plan" class="button button-secondary" type="button" aria-describedby="analysis-assistant-plan-help" disabled>让助手规划分析</button>
+          <p id="analysis-assistant-plan-help" class="analysis-assistant-plan-help">请先明确共享所选数据的预览。</p>
           <div id="dataset-preview" class="analysis-preview"></div>
           <details id="dataset-selection" class="dataset-selection">
             <summary id="dataset-selection-toggle">筛选数据</summary>

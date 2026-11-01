@@ -179,7 +179,17 @@ const messages = {
     pairedTestResult: "配对 t 检验结果",
     pairedDifference: "均值差（第 1 列 − 第 2 列）",
     pairedResultNote: "以下配对结果不包含显著性结论，也不表示配对设计、差值正态性、不同单位之间的独立性或科学有效性已得到验证。",
-    pairedIdentity: "配对标识：精确、唯一、非空"
+    pairedIdentity: "配对标识：精确、唯一、非空",
+    resultSummary: "结果摘要",
+    fullResult: "完整结果与原始精度",
+    unavailable: "不可用",
+    contrast: "对比方向",
+    rows: "行数",
+    columnCount: "列数",
+    assistantPlan: "让助手规划分析",
+    assistantPlanHelp: "仅使用已明确共享的数据预览；打开助手不会自动发送。",
+    assistantPlanNoDataset: "请先选择数据，再让助手规划分析。",
+    assistantPlanShareRequired: "请先明确勾选“向助手提供此数据的预览”。"
   },
   en: {
     panel: "Data & analysis",
@@ -357,7 +367,17 @@ const messages = {
     pairedTestResult: "Paired t-test result",
     pairedDifference: "Mean difference (first − second)",
     pairedResultNote: "These paired results include no significance verdict and do not claim that the paired design, normality of differences, independence across units, or scientific validity has been verified.",
-    pairedIdentity: "Pairing identity: exact, unique, nonempty"
+    pairedIdentity: "Pairing identity: exact, unique, nonempty",
+    resultSummary: "Result summary",
+    fullResult: "Full result and original precision",
+    unavailable: "Unavailable",
+    contrast: "Contrast",
+    rows: "Rows",
+    columnCount: "Columns",
+    assistantPlan: "Plan analysis with assistant",
+    assistantPlanHelp: "Uses only the explicitly shared data preview; opening the assistant does not send anything.",
+    assistantPlanNoDataset: "Choose a dataset before asking the assistant to plan an analysis.",
+    assistantPlanShareRequired: "Explicitly select “Provide a preview of this data to the assistant” first."
   }
 };
 
@@ -372,6 +392,8 @@ export function createAnalysis(adapter) {
     preview: byId("dataset-preview"),
     columns: byId("dataset-columns"),
     share: byId("dataset-share"),
+    assistantPlan: byId("analysis-assistant-plan"),
+    assistantPlanHelp: byId("analysis-assistant-plan-help"),
     method: byId("analysis-method"),
     methodStatus: byId("analysis-method-status"),
     engine: byId("analysis-engine"),
@@ -454,6 +476,7 @@ export function createAnalysis(adapter) {
         upload: null,
         status: null,
         selectedJobId: null,
+        resultDetailsOpen: new Map(),
         jobRequestSequence: 0,
         cancelling: new Set(),
         exporting: new Set(),
@@ -1047,8 +1070,82 @@ export function createAnalysis(adapter) {
   function confidenceBound(ci, lower) {
     if (lower && ci?.lower_unbounded || !lower && ci?.upper_unbounded) return lower ? "−∞" : "+∞";
     const value = lower ? ci?.lower : ci?.upper;
-    if (value === null || value === undefined) return lower ? "−∞" : "+∞";
-    return String(value);
+    return value === null || value === undefined ? t("unavailable") : String(value);
+  }
+
+  function summaryNumber(value) {
+    if (value === null || value === undefined || value === "") return t("unavailable");
+    const number = Number(value);
+    if (!Number.isFinite(number)) return t("unavailable");
+    return String(Number(number.toPrecision(4)));
+  }
+
+  function summaryCount(value) {
+    if (value === null || value === undefined || value === "") return t("unavailable");
+    const number = Number(value);
+    if (!Number.isFinite(number)) return t("unavailable");
+    return String(number);
+  }
+
+  function summaryPValue(value) {
+    if (value === null || value === undefined || value === "") return t("unavailable");
+    const number = Number(value);
+    if (!Number.isFinite(number)) return t("unavailable");
+    if (number < 0.001) return "<0.001";
+    if (number > 0.999 && number < 1) return ">0.999";
+    return summaryNumber(number);
+  }
+
+  function summaryConfidenceBound(ci, lower) {
+    if (lower && ci?.lower_unbounded || !lower && ci?.upper_unbounded) return lower ? "−∞" : "+∞";
+    return summaryNumber(lower ? ci?.lower : ci?.upper);
+  }
+
+  function appendTestSummary(list, test, options, contrast, differenceLabel = t("difference")) {
+    appendField(list, t("contrast"), contrast);
+    appendField(list, differenceLabel, summaryNumber(test.difference));
+    const storedConfidence = test.confidence ?? options.confidence;
+    const confidence = storedConfidence === null || storedConfidence === undefined
+      ? t("unavailable")
+      : summaryNumber(Number(storedConfidence) * 100);
+    appendField(list, t("confidenceInterval", { confidence }), `[${summaryConfidenceBound(test.ci, true)}, ${summaryConfidenceBound(test.ci, false)}]`);
+    appendField(list, t("pValue"), summaryPValue(test.p_value));
+  }
+
+  function renderResultSummary(job) {
+    const result = job.result || {};
+    const test = result.test || {};
+    const section = make("section", "analysis-result-summary");
+    section.setAttribute("aria-label", t("resultSummary"));
+    section.append(make("h4", "", t("resultSummary")));
+    const values = make("dl", "analysis-result-summary-values");
+    let reminder = "resultNote";
+    if (job.method === "ttest_independent" || result.method === "ttest_independent") {
+      const groups = Array.isArray(test.groups) ? test.groups : [];
+      const stats = Array.isArray(result.stats) ? result.stats : [];
+      appendField(values, groups[0] || t("group1"), summaryCount(stats[0]?.n));
+      appendField(values, groups[1] || t("group2"), summaryCount(stats[1]?.n));
+      appendField(values, t("excluded"), summaryCount(result.counts?.excluded));
+      appendField(values, t("variant"), t(test.variant || job.ttest?.variant || "welch"));
+      appendTestSummary(values, test, job.ttest || {}, `${groups[0] || "—"} − ${groups[1] || "—"}`);
+      reminder = "resultTtestNote";
+    } else if (job.method === "ttest_paired" || result.method === "ttest_paired") {
+      const pairing = result.pairing || {};
+      const columns = Array.isArray(test.columns) ? test.columns : Array.isArray(pairing.columns) ? pairing.columns : job.columns || [];
+      appendField(values, t("pairedUsed"), summaryCount(result.counts?.used));
+      appendField(values, t("pairedExcluded"), summaryCount(result.counts?.excluded));
+      appendTestSummary(values, test, job.paired || {}, `${columns[0] || "—"} − ${columns[1] || "—"}`, t("pairedDifference"));
+      reminder = "pairedResultNote";
+    } else {
+      const stats = Array.isArray(result.stats) ? result.stats : [];
+      appendField(values, t("rows"), summaryCount(result.row_count));
+      appendField(values, t("columnCount"), summaryCount(stats.length));
+      for (const stat of stats) {
+        appendField(values, stat.column, `${t("statistic_n")} ${summaryCount(stat.n)} · ${t("statistic_mean")} ${summaryNumber(stat.mean)} · ${t("statistic_sd")} ${summaryNumber(stat.sd)}`);
+      }
+    }
+    section.append(values, make("p", "analysis-result-note", t(reminder)));
+    return section;
   }
 
   function softwareText(job) {
@@ -1186,23 +1283,33 @@ export function createAnalysis(adapter) {
     elements.result.append(make("h3", "", job.dataset_name), make("p", "analysis-job-result-status", `${t(job.status)} · ${methodName(job.method)} · ${engineName(job.engine)}`));
     if (job.status === "succeeded") {
       const actions = make("div", "analysis-result-actions");
-      actions.append(jobButton("view-notebook", t("viewNotebook"), () => notebook.open(currentId, job)));
-      if (["ttest_independent", "ttest_paired"].includes(job.method)) {
-        actions.append(jobButton("analysis-note", t("note"), async () => {
+      actions.append(
+        jobButton("view-notebook", t("viewNotebook"), () => notebook.open(currentId, job)),
+        jobButton("analysis-note", t("note"), async () => {
           const added = await adapter.addAnalysisCitation?.(currentId, job);
           if (added && entry === currentEntry()) {
             entry.status = { key: "noteAdded", kind: "success" };
             renderStatus();
           }
-        }));
-      }
+        })
+      );
       elements.result.append(actions);
     }
     if (job.error) elements.result.append(make("p", "analysis-error", t("jobError", { message: job.error.message || job.error.code || "—" })));
     if (job.status === "succeeded" && job.result) {
-      if (job.method === "ttest_independent" || job.result.method === "ttest_independent") renderTtestResult(elements.result, job);
-      else if (job.method === "ttest_paired" || job.result.method === "ttest_paired") renderPairedResult(elements.result, job);
-      else renderDescriptiveResult(elements.result, job);
+      elements.result.append(renderResultSummary(job));
+      const details = make("details", "analysis-result-full");
+      details.id = "analysis-result-details";
+      details.open = entry.resultDetailsOpen.get(job.id) === true;
+      details.setAttribute("aria-label", t("fullResult"));
+      details.append(make("summary", "", t("fullResult")));
+      const full = make("div", "analysis-result-full-content");
+      if (job.method === "ttest_independent" || job.result.method === "ttest_independent") renderTtestResult(full, job);
+      else if (job.method === "ttest_paired" || job.result.method === "ttest_paired") renderPairedResult(full, job);
+      else renderDescriptiveResult(full, job);
+      details.append(full);
+      details.addEventListener("toggle", () => entry.resultDetailsOpen.set(job.id, details.open));
+      elements.result.append(details);
     }
     renderLog(entry, job);
   }
@@ -1225,13 +1332,17 @@ export function createAnalysis(adapter) {
     renderDataset(entry);
     renderMethod(entry);
     renderColumns(entry);
-    elements.share.checked = Boolean(entry?.shared && selectedDataset(entry));
-    elements.share.disabled = !selectedDataset(entry);
+    const dataset = selectedDataset(entry);
+    const shared = Boolean(dataset && entry?.shared);
+    elements.share.checked = shared;
+    elements.share.disabled = !dataset;
     elements.share.nextElementSibling.textContent = t("share");
+    elements.assistantPlan.disabled = !shared;
+    elements.assistantPlan.textContent = t("assistantPlan");
+    elements.assistantPlanHelp.textContent = t(!dataset ? "assistantPlanNoDataset" : shared ? "assistantPlanHelp" : "assistantPlanShareRequired");
     renderTtest(entry);
     renderPaired(entry);
     renderRuntime(entry);
-    const dataset = selectedDataset(entry);
     elements.prepare.disabled = entry?.method !== "describe" || !dataset || !entry?.selectedColumns.size || !engineInfo(entry)?.available || Boolean(entry?.confirmation?.pending);
     elements.prepare.textContent = t("prepare");
     renderConfirmation(entry);
@@ -2094,6 +2205,12 @@ export function createAnalysis(adapter) {
     entry.shared = elements.share.checked;
     adapter.contextChanged?.();
     render();
+  });
+  elements.assistantPlan.addEventListener("click", () => {
+    const entry = currentEntry();
+    const dataset = selectedDataset(entry);
+    if (!entry?.shared || !dataset || !currentId) return;
+    adapter.planAnalysis?.(currentId, dataset.id, adapter.getNavigationGeneration?.());
   });
   elements.engine.addEventListener("change", () => {
     const entry = currentEntry();

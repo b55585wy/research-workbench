@@ -218,3 +218,10 @@ exclusions, exact IDs, missing/duplicate/constant/nonfinite boundaries, independ
 artifact checks, Notebook/export and confirmed Agent/task flow. Native UI covers
 review/retry/source notes/method labels, real configured model/public sleep and
 old method workflows. schema13/all28 live rows and source bytes must be preserved.
+
+
+v0.20 presentation and entry requirements: [RESULT-WORKFLOW.md](RESULT-WORKFLOW.md).
+Scenario matrix: E:/research-workbench-pilot-20261030/result-workflow-v1/SCENARIOS.md.
+Verify compact and exact result values, p/null/unbounded CI boundaries, per-owner
+disclosure state, explicit sharing, draft-only assistant entry, source-note actions,
+Chinese/English mobile UI and affected prior workspace/task paths.

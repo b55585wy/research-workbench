@@ -13,6 +13,7 @@ const messages = {
     emptyHistory: "暂无对话",
     messageLabel: "给研究助手的消息",
     placeholder: "询问当前页面或已选图片…",
+    analysisPlanPrompt: "请检查当前已共享的数据和研究设计，并提出合适的分析方案。只提供建议，不要自动运行分析。",
     send: "发送",
     retry: "按原请求重试",
     cancel: "停止",
@@ -249,6 +250,7 @@ const messages = {
     emptyHistory: "No conversations",
     messageLabel: "Message for the research assistant",
     placeholder: "Ask about the current page or selected images…",
+    analysisPlanPrompt: "Inspect the currently shared data and research design, then propose an appropriate analysis. Provide recommendations only; do not run an analysis automatically.",
     send: "Send",
     retry: "Retry exact request",
     cancel: "Stop",
@@ -1742,6 +1744,16 @@ export function createAssistant(adapter) {
       elements.settingsForm.querySelector(".assistant-vision-option span").textContent = t("providerImages");
       tasks.applyLanguage(nextLanguage);
       render();
+    },
+    planAnalysis(documentId, datasetId, navigationGeneration) {
+      if (adapter.getDocument()?.id !== documentId || adapter.getSelectedDatasetId?.() !== datasetId || adapter.getSharedDatasetId?.() !== datasetId || navigationGeneration !== adapter.getNavigationGeneration?.()) return false;
+      const entry = entryFor(documentId);
+      if (entry.draft === "") entry.draft = t("analysisPlanPrompt");
+      elements.panel.hidden = false;
+      elements.toggle.setAttribute("aria-expanded", "true");
+      render();
+      elements.message.focus();
+      return true;
     },
     documentChanged() {
       const { paper, entry } = current();

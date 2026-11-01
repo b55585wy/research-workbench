@@ -168,6 +168,17 @@
   margin-top: 9px;
 }
 
+#analysis-assistant-plan {
+  margin-top: 8px;
+}
+
+.analysis-assistant-plan-help {
+  margin: 6px 0 0;
+  color: var(--ui-text-muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
 .analysis-runtime {
   margin: 8px 0;
   color: var(--ui-text-muted);
@@ -308,6 +319,57 @@
 
 .analysis-result-note {
   margin: 8px 0;
+}
+
+.analysis-result-summary {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--ui-border);
+  border-radius: 4px;
+  background: var(--ui-surface-subtle);
+}
+
+.analysis-result-summary h4 {
+  margin: 0 0 8px;
+  font-size: 13px;
+}
+
+.analysis-result-summary-values {
+  display: grid;
+  grid-template-columns: minmax(90px, 0.8fr) minmax(0, 1.2fr);
+  gap: 5px 10px;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.analysis-result-summary-values dt {
+  color: var(--ui-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.analysis-result-summary-values dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+
+.analysis-result-full {
+  margin-top: 10px;
+  border-top: 1px solid var(--ui-border);
+}
+
+.analysis-result-full > summary {
+  min-height: 38px;
+  padding: 10px 0 4px;
+  color: var(--ui-text-soft);
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.analysis-result-full-content {
+  padding-top: 4px;
 }
 
 .analysis-result-table {

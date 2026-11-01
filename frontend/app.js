@@ -3102,6 +3102,10 @@ analysis = createAnalysis({
   },
   datasetSelectionChanged: (documentId, dataset) => datasetSelection?.sync(documentId, dataset),
   addAnalysisCitation,
+  planAnalysis(documentId, datasetId, navigationGeneration) {
+    if (state.document?.id !== documentId || analysis.getSelectedDatasetId() !== datasetId || analysis.getSharedDatasetId() !== datasetId || navigationGeneration !== workspace.getNavigationGeneration()) return false;
+    return assistant?.planAnalysis(documentId, datasetId, navigationGeneration) || false;
+  },
   sourcesChanged: (documentId) => {
     if (state.document?.id === documentId) charts?.reload(documentId);
   }
@@ -3206,6 +3210,7 @@ assistant = createAssistant({
   api,
   getDocument: () => state.document,
   getLanguage: () => state.language,
+  getNavigationGeneration: () => workspace.getNavigationGeneration(),
   getContext: assistantContext,
   getSharedDatasetId: () => analysis.getSharedDatasetId(),
   getSelectedDatasetId: () => analysis.getSelectedDatasetId(),

@@ -124,3 +124,10 @@ jmv 隔离安装后发生退出崩溃，未部署；不声称移植了 jmv 或�
 R stats::t.test(paired=TRUE)。保留行/ID映射、准备代码、结果与环境，接入 Agent
 提案、连续任务、Notebook、笔记与导出。旧配方/请求兼容，schema13不变。
 见 [配对方法](PAIRED-T-TEST.md) 与 [公开样例](examples/sleep/README.md)。
+
+
+## v0.20 结果与助手入口
+
+结果先显示核心摘要，完整精度和来源可展开；当前数据旁提供分析助手草稿入口，
+继续要求明确共享和发送。低频论文关联/来源标识折叠，沿用现有保存与审核。
+无API、schema或统计计算变更。见[说明](RESULT-WORKFLOW.md)。

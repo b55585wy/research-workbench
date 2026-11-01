@@ -50,6 +50,7 @@ const messages = {
     sourceAnalysis: "已保存分析",
     sourceChart: "已保存图表",
     sourceUnavailable: "来源不可用",
+    sourceDetails: "来源标识与 SHA-256",
     citationUnavailable: "该结果的来源哈希尚不可用，未加入笔记。",
     editMode: "编辑已保存笔记 · 来源保持不变",
     editFormatted: "以纯文本保存将移除此笔记的现有格式。",
@@ -137,6 +138,7 @@ const messages = {
     sourceAnalysis: "Saved analysis",
     sourceChart: "Saved chart",
     sourceUnavailable: "Source unavailable",
+    sourceDetails: "Source ID and SHA-256",
     citationUnavailable: "The result source hash is unavailable, so nothing was added to the note.",
     editMode: "Editing a saved note · source stays unchanged",
     editFormatted: "Saving as plain text will remove this note’s existing formatting.",
@@ -212,6 +214,8 @@ export function createStudy(adapter) {
     view: byId("study-view"),
     viewTitle: byId("study-view-title"),
     viewQuestion: byId("study-view-question"),
+    papersDetails: byId("study-papers-details"),
+    papersCount: byId("study-papers-count"),
     papers: byId("study-papers"),
     paperSelect: byId("study-paper-select"),
     paperLink: byId("study-paper-link"),
@@ -219,6 +223,7 @@ export function createStudy(adapter) {
     noteForm: byId("study-note-form"),
     noteEditLabel: byId("study-note-edit-label"),
     noteSource: byId("study-note-source"),
+    noteSourceDetails: byId("study-note-source-details"),
     noteSourceDetail: byId("study-note-source-detail"),
     noteText: byId("study-note-text"),
     noteCount: byId("study-note-character-count"),
@@ -267,6 +272,9 @@ export function createStudy(adapter) {
         papersLoaded: false,
         papersPending: false,
         papersStatus: null,
+        papersOpen: false,
+        draftSourceOpen: false,
+        noteSourcesOpen: new Map(),
         selectedPaperId: ""
       });
     }
@@ -402,6 +410,7 @@ export function createStudy(adapter) {
     elements.noteForm.hidden = !owner;
     if (!owner) return;
     const entry = entryFor(owner.id);
+    elements.noteSourceDetails.open = entry.draftSourceOpen;
     const draft = ensureDraft(owner);
     const edit = entry.edit;
     const active = edit || draft;
@@ -465,8 +474,16 @@ export function createStudy(adapter) {
     open.type = "button";
     open.disabled = !source;
     open.addEventListener("click", () => navigateNoteSource(owner, note));
-    open.append(make("span", "note-source", sourceName(source)), make("span", "study-note-source-hash", validSource(source) ? `${source.id}\nSHA-256 ${source.sha256}` : t("sourceUnavailable")));
+    open.append(make("span", "note-source", sourceName(source)));
     item.append(open);
+    const sourceDetails = make("details", "study-note-source-details");
+    sourceDetails.open = entry.noteSourcesOpen.get(note.id) === true;
+    sourceDetails.append(
+      make("summary", "", t("sourceDetails")),
+      make("span", "study-note-source-hash", validSource(source) ? `${source.id}\nSHA-256 ${source.sha256}` : t("sourceUnavailable"))
+    );
+    sourceDetails.addEventListener("toggle", () => entry.noteSourcesOpen.set(note.id, sourceDetails.open));
+    item.append(sourceDetails);
     const textButton = make("button", "note-open");
     textButton.type = "button";
     textButton.disabled = !source;
@@ -526,6 +543,8 @@ export function createStudy(adapter) {
     const owner = currentDocument();
     if (!owner) return;
     const entry = entryFor(owner.id);
+    elements.papersDetails.open = entry.papersOpen;
+    elements.papersCount.textContent = String(entry.papers.length);
     elements.papers.replaceChildren();
     const documents = adapter.getDocuments().filter((paper) => paper.kind !== "study");
     const linkedIds = new Set(entry.papers.map((paper) => paper.id));
@@ -999,6 +1018,14 @@ export function createStudy(adapter) {
   });
   elements.noteForm.addEventListener("submit", submitNote);
   elements.noteEditCancel.addEventListener("click", cancelEdit);
+  elements.papersDetails.addEventListener("toggle", () => {
+    const owner = currentDocument();
+    if (owner) entryFor(owner.id).papersOpen = elements.papersDetails.open;
+  });
+  elements.noteSourceDetails.addEventListener("toggle", () => {
+    const owner = currentDocument();
+    if (owner) entryFor(owner.id).draftSourceOpen = elements.noteSourceDetails.open;
+  });
 
   return {
     applyLanguage(nextLanguage) {
@@ -1007,6 +1034,7 @@ export function createStudy(adapter) {
       byId("study-papers-heading").textContent = t("papers");
       byId("study-papers-help").textContent = t("papersHelp");
       byId("study-paper-select").setAttribute("aria-label", t("paperSelect"));
+      byId("study-note-source-details-summary").textContent = t("sourceDetails");
       elements.papers.setAttribute("aria-label", t("papers"));
       elements.notesList.setAttribute("aria-label", t("savedNotes"));
       elements.deletedNotesList.setAttribute("aria-label", t("deletedNotes"));

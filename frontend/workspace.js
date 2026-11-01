@@ -88,6 +88,9 @@ export function createWorkspace(adapter) {
     byId("dataset-upload-status"),
     analysisBody.querySelector('label[for="dataset-select"]'),
     byId("dataset-select"),
+    analysisBody.querySelector('label[for="dataset-share"]'),
+    byId("analysis-assistant-plan"),
+    byId("analysis-assistant-plan-help"),
     byId("dataset-preview"),
     byId("dataset-selection")
   ]);
@@ -96,7 +99,6 @@ export function createWorkspace(adapter) {
     byId("analysis-method"),
     byId("analysis-method-status"),
     byId("analysis-columns-fieldset"),
-    analysisBody.querySelector('label[for="dataset-share"]'),
     byId("analysis-engine-label"),
     byId("analysis-engine"),
     byId("ttest-options"),

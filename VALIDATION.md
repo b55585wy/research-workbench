@@ -616,3 +616,23 @@ Checks include complete-pair means, ID uniqueness/NA/Unicode/leading zeros, prev
 without writes, trace drift, publication failures, atomic proposal receipts and
 continuous study/scatter/note. Native source-note tests cover the analysis outputs
 array bridge. No clinical/design validity or automatic assumption checking is claimed.
+
+
+## v0.20 result/workflow presentation
+
+48 isolated browser scenario groups pass: compact/exact statistics and p/CI/null/count
+boundaries; owner/draft/share and delayed-history safety; keyboard disclosures;
+actual supervised R paired and Python analyses; Notebook, source notes, charts,
+research exports; prior workspace and continuous task controls; Chinese/English
+blue desktop/mobile screenshots. The prior workspace test explicitly opens the
+new full-result disclosure before inspecting the original exact table.
+
+Backend computation, APIs, dependencies and recipes are unchanged; validation is
+bounded to affected browser paths rather than repeating unchanged backend suites.
+No actual-provider invocation is required to prepare a draft: the new entry is
+verified to send no message or model request. Acceptance data is public/synthetic
+and isolated from formal data. Schema13, all28 live table snapshots, material bytes
+and tFUS/global dispatcher boundaries are checked during activation.
+
+Evidence: E:/research-workbench-pilot-20261030/result-workflow-v1/release-summary.json.
+Limits: this is behavior/visual verification, not an external usability study.
