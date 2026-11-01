@@ -2,7 +2,7 @@
 
 产品整体方向与近期迭代见 [PRODUCT-PLAN.md](PRODUCT-PLAN.md)，版本交付见 [ROADMAP.md](ROADMAP.md)。
 
-当前版本 v0.23.0：[阅读查找与整理](READING-TOOLS.md)支持文内查找、笔记/批注筛选、多选加入助手及上下连续阅读，保留单页模式。v0.22：[文字批注与Agent引用](TEXT-ANNOTATIONS.md)支持逐行高亮、下划线、四色标记和可回源的待发送引用。v0.21：[阅读摘录与资料管理](READER-LIBRARY.md)补齐文字选择、可见图片草稿、笔记彻底删除和论文操作菜单。v0.20：结果优先展示摘要，数据旁可准备分析助手草稿，详见[结果与助手入口](RESULT-WORKFLOW.md)。已有能力：新增同一对象两列测量的 [配对 t 检验](PAIRED-T-TEST.md)，保留 ID、整对排除和来源链。研究、文献与来源笔记已接入同一个搜索框，详见 [统一搜索](UNIFIED-SEARCH.md)。可从研究问题和数据直接开始，无需先上传论文；支持来源笔记、Python/R 分析、图表、数据筛选及统一研究记录导出。原有 PDF 阅读、图片标注、Notebook、SPSS 文件导入和逐项确认的连续任务继续可用。使用与接口边界见 [从数据开始研究](DATA-FIRST-STUDY.md)。
+当前版本 v0.24.0：[阅读位置记忆](READING-PROGRESS.md)在当前浏览器恢复页码和页内位置，指定出处优先。v0.23：[阅读查找与整理](READING-TOOLS.md)支持文内查找、笔记/批注筛选、多选加入助手及上下连续阅读，保留单页模式。v0.22：[文字批注与Agent引用](TEXT-ANNOTATIONS.md)支持逐行高亮、下划线、四色标记和可回源的待发送引用。v0.21：[阅读摘录与资料管理](READER-LIBRARY.md)补齐文字选择、可见图片草稿、笔记彻底删除和论文操作菜单。v0.20：结果优先展示摘要，数据旁可准备分析助手草稿，详见[结果与助手入口](RESULT-WORKFLOW.md)。已有能力：新增同一对象两列测量的 [配对 t 检验](PAIRED-T-TEST.md)，保留 ID、整对排除和来源链。研究、文献与来源笔记已接入同一个搜索框，详见 [统一搜索](UNIFIED-SEARCH.md)。可从研究问题和数据直接开始，无需先上传论文；支持来源笔记、Python/R 分析、图表、数据筛选及统一研究记录导出。原有 PDF 阅读、图片标注、Notebook、SPSS 文件导入和逐项确认的连续任务继续可用。使用与接口边界见 [从数据开始研究](DATA-FIRST-STUDY.md)。
 PDF.js 嵌入我们的页面，FastAPI/SQLite 保存资料与笔记，PDFium 在独立子进程中生成区域图片。
 没有部署 eLabFTW、RSpace 或 JupyterLab，也不依赖 tFUS 数据库和运行进程。
 

@@ -11,6 +11,7 @@ import { createRichText, renderRichHtml } from "/rich-text.js";
 import { createResearchRecord } from "/research-record.js";
 import { createStudy } from "/study.js";
 import { createReaderFind } from "/reader-find.js";
+import { readReaderProgress, writeReaderProgress } from "/reader-progress.js";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = "/vendor/pdfjs/build/pdf.worker.mjs";
 
@@ -286,6 +287,8 @@ const messages = {
     notesBatchLimit: "最多向助手加入 8 条唯一笔记（包含已有引用）；请减少选择。",
     notesBatchAdded: "已将 {count} 条笔记加入助手，尚未发送。",
     notesBatchInvalid: "所选笔记已变化或不可用，未加入任何引用。请刷新选择。",
+    readerProgressRestored: "已恢复上次阅读位置。",
+    readerProgressStorageUnavailable: "无法读取或保存浏览器中的阅读进度；阅读不受影响。",
     untitled: "未命名文献"
   },
   en: {
@@ -552,6 +555,8 @@ const messages = {
     notesBatchLimit: "Add at most 8 unique notes to the assistant, including existing references. Select fewer notes.",
     notesBatchAdded: "Added {count} notes to the assistant. Nothing was sent.",
     notesBatchInvalid: "Selected notes changed or are unavailable. No references were added; refresh your selection.",
+    readerProgressRestored: "Restored your last reading position.",
+    readerProgressStorageUnavailable: "Browser reading progress cannot be read or saved; reading is unaffected.",
     untitled: "Untitled paper"
   }
 };
@@ -608,6 +613,7 @@ const elements = {
   textLayer: $("reader-text-layer"),
   textAnnotationsLayer: $("text-annotations-layer"),
   textStatus: $("reader-text-status"),
+  readerProgressStatus: $("reader-progress-status"),
   textSelectionNote: $("text-selection-note"),
   textAnnotationToolbar: $("text-annotation-toolbar"),
   textAnnotationHighlight: $("text-annotation-highlight"),
@@ -679,6 +685,15 @@ const state = {
   readerLayoutSequence: 0,
   readerLayoutLocked: false,
   pointerDragPage: null,
+  readerProgress: {
+    captureTimer: null,
+    pending: null,
+    loading: false,
+    restoring: false,
+    generation: 0,
+    status: null,
+    last: null
+  },
   notes: [],
   noteStates: [],
   noteStatesLoaded: false,
@@ -851,6 +866,7 @@ function applyLanguage() {
   renderDraft();
   renderNotes();
   renderStatus();
+  renderReaderProgressStatus();
   imageLibrary?.applyLanguage(state.language);
   imageViewer?.applyLanguage(state.language);
   analysis?.applyLanguage(state.language);
@@ -911,18 +927,25 @@ function setOwnerInUrl(url, documentId, studyOwner = isStudy()) {
   }
 }
 
-function updateUrl(documentId, noteId = null, replace = false, mode = "reading", tool = "analysis") {
+function updateUrl(documentId, noteId = null, replace = false, mode = "reading", tool = "analysis", page = null) {
   workspace?.reveal(mode, { tool, showNotes: Boolean(noteId) });
   const url = new URL(window.location.href);
   setOwnerInUrl(url, documentId);
   if (noteId) url.searchParams.set("note", noteId);
   else url.searchParams.delete("note");
+  if (mode === "reading" && !noteId && Number.isInteger(page)) url.searchParams.set("page", String(page));
+  else url.searchParams.delete("page");
   url.searchParams.set("workspace", mode);
   if (mode === "data") url.searchParams.set("tool", tool);
   else url.searchParams.delete("tool");
   for (const key of ["analysis", "dataset", "chart", "image_kind", "image_source", "image_annotation"]) url.searchParams.delete(key);
   const method = replace || url.href === window.location.href ? "replaceState" : "pushState";
   window.history[method]({}, "", url);
+}
+
+function readPageParam(params) {
+  const raw = params.get("page");
+  return /^(?:[1-9]|[1-9][0-9]|1[0-9]{2}|200)$/.test(raw || "") ? Number(raw) : null;
 }
 
 function readImageLink(params) {
@@ -949,7 +972,7 @@ function showImageInUrl(documentId, context) {
   url.searchParams.delete("tool");
   if (context.annotation_id) url.searchParams.set("image_annotation", context.annotation_id);
   else url.searchParams.delete("image_annotation");
-  for (const key of ["note", "analysis", "dataset", "chart"]) url.searchParams.delete(key);
+  for (const key of ["note", "page", "analysis", "dataset", "chart"]) url.searchParams.delete(key);
   window.history.replaceState({}, "", url);
 }
 
@@ -961,7 +984,8 @@ function clearImageInUrl(documentId) {
 }
 
 async function openImageViewer(documentId, kind, sourceId, options = {}) {
-  if (state.document?.id !== documentId) await openDocument(documentId);
+  cancelReaderProgressRestore();
+  if (state.document?.id !== documentId) await openDocument(documentId, { explicitIntent: true });
   if (state.document?.id !== documentId) return;
   await imageViewer?.open(documentId, kind, sourceId, options);
 }
@@ -2254,6 +2278,7 @@ async function loadDocuments() {
     const requestedStudy = params.get("study");
     const requestedDocument = requestedStudy || params.get("document");
     const requestedNote = params.get("note");
+    const requestedPage = readPageParam(params);
     const requestedAnalysis = params.get("analysis");
     const requestedDataset = params.get("dataset");
     const requestedChart = params.get("chart");
@@ -2264,6 +2289,7 @@ async function loadDocuments() {
       await openDocument(requestedDocument, {
         ownerKind: requestedStudy ? "study" : "paper",
         noteId: requestedMode === "reading" ? requestedNote : null,
+        page: requestedMode === "reading" ? requestedPage : null,
         analysisId: requestedMode === "data" ? requestedAnalysis : null,
         datasetId: requestedMode === "data" ? requestedDataset : null,
         chartId: requestedMode === "data" ? requestedChart : null,
@@ -2312,7 +2338,133 @@ function showMissingDocument() {
   setStatus("missingDocument", "error");
 }
 
+function renderReaderProgressStatus() {
+  const key = state.readerProgress.status;
+  elements.readerProgressStatus.hidden = !key;
+  elements.readerProgressStatus.textContent = key ? t(key) : "";
+}
+
+function setReaderProgressStatus(key) {
+  state.readerProgress.status = key;
+  renderReaderProgressStatus();
+}
+
+function readerProgressMatchesCurrentOwner(snapshot) {
+  const owner = state.document;
+  return Boolean(snapshot && owner && snapshot.owner?.id === owner.id && snapshot.owner?.sha256 === owner.sha256 && snapshot.sequence === state.loadSequence);
+}
+
+function cancelReaderProgressRestore() {
+  const progress = state.readerProgress;
+  progress.pending = null;
+  progress.restoring = false;
+  progress.generation += 1;
+  if (state.pdf) progress.loading = false;
+  if (progress.captureTimer) clearTimeout(progress.captureTimer);
+  progress.captureTimer = null;
+  if (progress.status === "readerProgressRestored") setReaderProgressStatus(null);
+}
+
+function snapshotReaderProgress() {
+  const progress = state.readerProgress;
+  const owner = state.document;
+  if (progress.loading || progress.restoring || state.readerLayoutLocked || state.regionActive || state.selection || state.pointerDragPage !== null) return null;
+  if (!state.pdf || !owner || isStudy(owner) || !visibleReaderBounds() || elements.readerStage.clientHeight <= 0) return null;
+  const viewportCenter = elements.readerStage.scrollTop + elements.readerStage.clientHeight / 2;
+  let record = null;
+  for (const candidate of state.readerPages.values()) {
+    if (candidate.surface.hidden || !candidate.surface.isConnected || candidate.surface.offsetHeight <= 0) continue;
+    const top = candidate.surface.offsetTop;
+    if (viewportCenter >= top && viewportCenter <= top + candidate.surface.offsetHeight) {
+      record = candidate;
+      break;
+    }
+  }
+  if (!record) record = state.activePageRecord;
+  if (!record || state.readerPages.get(record.pageNumber) !== record || !record.rendered || record.sequence !== state.renderSequence) return null;
+  const centerFraction = (viewportCenter - record.surface.offsetTop) / record.surface.offsetHeight;
+  const boundedCenterFraction = Math.max(0, Math.min(1, centerFraction));
+  if (!Number.isFinite(boundedCenterFraction) || boundedCenterFraction < 0 || boundedCenterFraction > 1) return null;
+  const snapshot = { owner, sequence: state.loadSequence, page: record.pageNumber, centerFraction: boundedCenterFraction };
+  progress.last = snapshot;
+  return snapshot;
+}
+
+function persistReaderProgressSnapshot(snapshot) {
+  if (!readerProgressMatchesCurrentOwner(snapshot) || isStudy(snapshot.owner)) return;
+  if (!writeReaderProgress(snapshot.owner, snapshot.page, snapshot.centerFraction)) setReaderProgressStatus("readerProgressStorageUnavailable");
+}
+
+function flushReaderProgress() {
+  const progress = state.readerProgress;
+  if (progress.captureTimer) clearTimeout(progress.captureTimer);
+  progress.captureTimer = null;
+  let snapshot = snapshotReaderProgress();
+  if (!snapshot && readerProgressMatchesCurrentOwner(progress.last)) snapshot = progress.last;
+  persistReaderProgressSnapshot(snapshot);
+}
+
+function scheduleReaderProgressCapture() {
+  const progress = state.readerProgress;
+  const snapshot = snapshotReaderProgress();
+  if (!snapshot) return;
+  if (progress.captureTimer) clearTimeout(progress.captureTimer);
+  progress.captureTimer = setTimeout(() => {
+    progress.captureTimer = null;
+    persistReaderProgressSnapshot(snapshot);
+  }, 180);
+}
+
+function prepareReaderProgressRestore(owner, sequence) {
+  const result = readReaderProgress(owner);
+  if (result.unavailable) setReaderProgressStatus("readerProgressStorageUnavailable");
+  if (result.record) state.readerProgress.pending = { owner, sequence, record: result.record };
+}
+
+async function restorePendingReaderProgress() {
+  const progress = state.readerProgress;
+  const pending = progress.pending;
+  if (!pending || progress.restoring || !visibleReaderBounds()) return;
+  if (!readerProgressMatchesCurrentOwner(pending) || state.pdf === null) {
+    progress.pending = null;
+    if (state.pdf) progress.loading = false;
+    return;
+  }
+  progress.pending = null;
+  const generation = ++progress.generation;
+  progress.restoring = true;
+  try {
+    await goToPage(pending.record.page, { restoreProgress: true, preserveUrl: true });
+    if (generation !== progress.generation || !readerProgressMatchesCurrentOwner(pending)) return;
+    if (!visibleReaderBounds()) {
+      progress.pending = pending;
+      return;
+    }
+    setReaderProgressStatus("readerProgressRestored");
+    if (state.viewMode === "continuous") {
+      const record = state.readerPages.get(pending.record.page);
+      if (!record || record.surface.offsetHeight <= 0) {
+        progress.pending = pending;
+        return;
+      }
+      elements.readerStage.scrollTop = Math.max(0, record.surface.offsetTop + pending.record.center_fraction * record.surface.offsetHeight - elements.readerStage.clientHeight / 2);
+      handleContinuousScroll();
+    }
+    progress.loading = false;
+  } finally {
+    if (generation === progress.generation) {
+      progress.restoring = false;
+      if (!progress.pending) progress.loading = false;
+      scheduleReaderProgressCapture();
+    }
+  }
+}
+
 function cancelDocumentWork() {
+  flushReaderProgress();
+  cancelReaderProgressRestore();
+  state.readerProgress.last = null;
+  renderReaderProgressStatus();
   readerFind?.documentChanged();
   richText?.close({ restoreFocus: false });
   imageViewer?.close({ restoreFocus: false });
@@ -2347,6 +2499,8 @@ function cancelDocumentWork() {
 }
 
 async function openDocument(documentId, options = {}) {
+  const explicitIntent = Boolean(options.explicitIntent || options.noteId || options.imageLink || options.analysisId || options.datasetId || options.chartId);
+  if (explicitIntent || state.document && state.document.id !== documentId) cancelReaderProgressRestore();
   let document = state.documents.find((item) => item.id === documentId) || state.studies.find((item) => item.id === documentId);
   if (!document) {
     const resolveSequence = ++state.loadSequence;
@@ -2382,12 +2536,18 @@ async function openDocument(documentId, options = {}) {
     }
   }
   const studyOwner = isStudy(document);
+  const explicitPage = !studyOwner && Number.isInteger(options.page) && options.page >= 1 && options.page <= document.page_count ? options.page : null;
+  const explicitNavigation = Boolean(options.explicitIntent || options.noteId || options.imageLink || explicitPage || options.analysisId || options.datasetId || options.chartId);
   const mode = options.workspace || (options.noteId || options.imageLink ? "reading" : options.analysisId || options.datasetId || options.chartId ? "data" : studyOwner ? "data" : workspace?.getMode() || "reading");
   const tool = options.chartId || options.tool === "charts" ? "charts" : "analysis";
   workspace?.reveal(mode, { tool, showNotes: Boolean(options.noteId || options.imageLink) });
   if (state.document?.id === documentId && (studyOwner ? state.noteStatesLoaded : state.pdf) && !options.force) {
     if (options.imageLink && !studyOwner) await openImageViewer(documentId, options.imageLink.kind, options.imageLink.sourceId, { annotationId: options.imageLink.annotationId });
     else if (options.noteId) await openNote(options.noteId, { preserveUrl: options.preserveUrl });
+    else if (explicitPage) {
+      if (!options.preserveUrl) updateUrl(documentId, null, Boolean(options.replaceUrl), mode, tool, explicitPage);
+      await goToPage(explicitPage, { preserveUrl: true });
+    }
     if (options.datasetId) analysis?.openDataset(options.datasetId, { preserveUrl: options.preserveUrl });
     if (options.analysisId) analysis?.openJob(options.analysisId, { preserveUrl: options.preserveUrl });
     if (options.chartId) charts?.openChart(documentId, options.chartId, { preserveUrl: options.preserveUrl });
@@ -2397,11 +2557,12 @@ async function openDocument(documentId, options = {}) {
   captureCurrentDraft();
   captureCurrentMetadataDraft();
   cancelDocumentWork();
+  state.readerProgress.loading = true;
   const sequence = state.loadSequence;
   const controller = new AbortController();
   state.loadController = controller;
   state.document = document;
-  state.page = 1;
+  state.page = explicitPage || 1;
   state.notes = [];
   state.noteStates = [];
   state.noteStatesLoaded = false;
@@ -2412,7 +2573,7 @@ async function openDocument(documentId, options = {}) {
   elements.pageSurface.hidden = true;
   elements.readerEmpty.hidden = false;
   study?.documentChanged(document);
-  if (!options.preserveUrl) updateUrl(documentId, options.noteId || null, Boolean(options.replaceUrl), mode, tool);
+  if (!options.preserveUrl) updateUrl(documentId, options.noteId || null, Boolean(options.replaceUrl), mode, tool, options.noteId ? null : explicitPage);
   renderDocuments();
   renderDocumentDetails();
   renderMetadata();
@@ -2438,6 +2599,7 @@ async function openDocument(documentId, options = {}) {
   if (sequence !== state.loadSequence || state.document?.id !== documentId) return;
 
   if (pdfResult.status === "rejected") {
+    state.readerProgress.loading = false;
     elements.pageSurface.hidden = true;
     elements.readerEmpty.hidden = false;
     renderDocumentDetails();
@@ -2448,6 +2610,7 @@ async function openDocument(documentId, options = {}) {
   }
 
   state.pdf = pdfResult.value;
+  if (!studyOwner && !explicitNavigation) prepareReaderProgressRestore(document, sequence);
   let noteLinkStatus = null;
   if (options.noteId && studyOwner) {
     await study?.openNote(options.noteId);
@@ -2465,8 +2628,15 @@ async function openDocument(documentId, options = {}) {
   elements.readerEmpty.hidden = true;
   renderDocumentDetails();
   renderDraft();
-  if (!studyOwner) await requestRender();
-  if (!studyOwner && sequence === state.loadSequence && options.imageLink) {
+  if (!studyOwner) {
+    await requestRender();
+    if (sequence === state.loadSequence && state.document?.id === documentId) {
+      if (state.readerProgress.pending) await restorePendingReaderProgress();
+      else state.readerProgress.loading = false;
+    }
+  }
+  if (sequence !== state.loadSequence || state.document?.id !== documentId) return;
+  if (!studyOwner && options.imageLink) {
     await openImageViewer(documentId, options.imageLink.kind, options.imageLink.sourceId, { annotationId: options.imageLink.annotationId });
   }
 
@@ -3050,6 +3220,7 @@ function handleContinuousScroll() {
 
 async function goToPage(page, options = {}) {
   if (!state.pdf || !state.document) return;
+  if (!options.restoreProgress) cancelReaderProgressRestore();
   const nextPage = Math.max(1, Math.min(state.document.page_count, Math.trunc(Number(page) || 1)));
   const layoutSequence = beginReaderLayout();
   try {
@@ -3057,7 +3228,7 @@ async function goToPage(page, options = {}) {
     if (!options.preserveHighlight) {
       state.highlight = null;
       state.highlightRevealId = null;
-      updateUrl(state.document.id);
+      if (!options.preserveUrl) updateUrl(state.document.id);
     }
     setRegionMode(false);
     ensureReaderPages();
@@ -3078,6 +3249,7 @@ async function goToPage(page, options = {}) {
     }
   } finally {
     finishReaderLayout(layoutSequence);
+    scheduleReaderProgressCapture();
   }
 }
 
@@ -3408,9 +3580,15 @@ function requestRender() {
       .then(() => {
         if (layoutSequence === state.readerLayoutSequence) restoreReaderAnchor(anchor);
       })
-      .finally(() => finishReaderLayout(layoutSequence));
+      .finally(() => {
+        finishReaderLayout(layoutSequence);
+        scheduleReaderProgressCapture();
+      });
   }
-  return queueReaderPage(state.activePageRecord).finally(() => finishReaderLayout(layoutSequence));
+  return queueReaderPage(state.activePageRecord).finally(() => {
+    finishReaderLayout(layoutSequence);
+    scheduleReaderProgressCapture();
+  });
 }
 
 function clearHighlights() {
@@ -3450,6 +3628,7 @@ function drawHighlight() {
 }
 
 async function openNote(noteId, options = {}) {
+  cancelReaderProgressRestore();
   const navigationSequence = ++state.noteNavigationSequence;
   if (isStudy()) {
     await study?.openNote(noteId);
@@ -4368,6 +4547,7 @@ elements.zoomFit.addEventListener("click", () => {
 });
 elements.viewMode.addEventListener("change", () => {
   if (!state.pdf) return;
+  flushReaderProgress();
   state.viewMode = elements.viewMode.value === "single" ? "single" : "continuous";
   try {
     localStorage.setItem("research-workbench-reader-view-mode", state.viewMode);
@@ -4398,6 +4578,7 @@ document.addEventListener("selectionchange", updateTextAnnotationToolbar);
 elements.readerStage.addEventListener("scroll", () => {
   if (elements.textAnnotationToolbar.dataset.contextual === "true") updateTextAnnotationToolbar();
   handleContinuousScroll();
+  scheduleReaderProgressCapture();
 });
 elements.regionDraftCancel.addEventListener("click", cancelRegionDraft);
 elements.pageNote.addEventListener("click", () => {
@@ -4542,11 +4723,14 @@ document.addEventListener("keydown", (event) => {
   }
 });
 
+window.addEventListener("pagehide", flushReaderProgress);
+
 window.addEventListener("popstate", () => {
   const params = new URLSearchParams(window.location.search);
   const studyId = params.get("study");
   const documentId = studyId || params.get("document");
   const noteId = params.get("note");
+  const page = readPageParam(params);
   const analysisId = params.get("analysis");
   const datasetId = params.get("dataset");
   const chartId = params.get("chart");
@@ -4554,6 +4738,8 @@ window.addEventListener("popstate", () => {
   const mode = studyId && !hasExplicitMode ? "data" : workspace?.modeForParams(params) || "reading";
   const tool = chartId || params.get("tool") === "charts" ? "charts" : "analysis";
   const imageLink = studyId ? null : readImageLink(params);
+  const validPage = mode === "reading" && page && state.document?.id === documentId && page <= state.document.page_count;
+  if (noteId || imageLink || analysisId || datasetId || chartId || validPage) cancelReaderProgressRestore();
   workspace?.reveal(mode, { tool, showNotes: mode === "reading" && Boolean(noteId || imageLink), focus: false });
   if (!documentId) {
     captureCurrentDraft();
@@ -4586,6 +4772,7 @@ window.addEventListener("popstate", () => {
     else {
       imageViewer?.close({ restoreFocus: false });
       if (mode === "reading" && noteId) openNote(noteId, { preserveUrl: true });
+      else if (mode === "reading" && page && page <= state.document.page_count) goToPage(page, { preserveUrl: true });
     }
     if (mode === "data" && datasetId) analysis?.openDataset(datasetId, { preserveUrl: true, preserveFocus: true });
     if (mode === "data" && analysisId) analysis?.openJob(analysisId, { preserveUrl: true, preserveFocus: true });
@@ -4594,6 +4781,7 @@ window.addEventListener("popstate", () => {
     openDocument(documentId, {
       ownerKind: studyId ? "study" : "paper",
       noteId: mode === "reading" ? noteId : null,
+      page: mode === "reading" ? page : null,
       analysisId: mode === "data" ? analysisId : null,
       datasetId: mode === "data" ? datasetId : null,
       chartId: mode === "data" ? chartId : null,
@@ -4638,6 +4826,7 @@ function assistantContext() {
 
 async function navigateAssistantSource(source) {
   if (!source?.document_id) return;
+  cancelReaderProgressRestore();
   const attached = source.source;
   if (attached?.kind === "study") {
     await openDocument(source.document_id, { ownerKind: "study", workspace: "reading" });
@@ -4684,7 +4873,7 @@ async function navigateAssistantSource(source) {
     return;
   }
   if (state.document?.id !== source.document_id) {
-    await openDocument(source.document_id, { noteId: source.note_id || null });
+    await openDocument(source.document_id, { noteId: source.note_id || null, explicitIntent: true });
   }
   if (state.document?.id !== source.document_id) return;
   if (source.note_id) {
@@ -4737,7 +4926,7 @@ function showDatasetInUrl(documentId, datasetId) {
   url.searchParams.set("dataset", datasetId);
   url.searchParams.set("workspace", "data");
   url.searchParams.set("tool", "analysis");
-  for (const key of ["note", "analysis", "chart", "image_kind", "image_source", "image_annotation"]) url.searchParams.delete(key);
+  for (const key of ["note", "page", "analysis", "chart", "image_kind", "image_source", "image_annotation"]) url.searchParams.delete(key);
   window.history[replace ? "replaceState" : "pushState"]({}, "", url);
 }
 
@@ -4749,12 +4938,13 @@ function showAnalysisInUrl(documentId, analysisId) {
   url.searchParams.set("analysis", analysisId);
   url.searchParams.set("workspace", "data");
   url.searchParams.set("tool", "analysis");
-  for (const key of ["dataset", "note", "chart", "image_kind", "image_source", "image_annotation"]) url.searchParams.delete(key);
+  for (const key of ["dataset", "note", "page", "chart", "image_kind", "image_source", "image_annotation"]) url.searchParams.delete(key);
   window.history[replace ? "replaceState" : "pushState"]({}, "", url);
 }
 
 async function openAnalysisJob(documentId, analysisId) {
   if (!analysisId) return;
+  cancelReaderProgressRestore();
   if (state.document?.id !== documentId) await openDocument(documentId, { analysisId });
   else {
     workspace?.reveal("data", { tool: "analysis" });
@@ -4770,12 +4960,13 @@ function showChartInUrl(documentId, chartId) {
   url.searchParams.set("chart", chartId);
   url.searchParams.set("workspace", "data");
   url.searchParams.set("tool", "charts");
-  for (const key of ["note", "analysis", "dataset", "image_kind", "image_source", "image_annotation"]) url.searchParams.delete(key);
+  for (const key of ["note", "page", "analysis", "dataset", "image_kind", "image_source", "image_annotation"]) url.searchParams.delete(key);
   window.history[replace ? "replaceState" : "pushState"]({}, "", url);
 }
 
 async function openChart(documentId, chartId) {
   if (!chartId) return;
+  cancelReaderProgressRestore();
   if (state.document?.id !== documentId) await openDocument(documentId, { chartId });
   else {
     workspace?.reveal("data", { tool: "charts" });
@@ -4924,7 +5115,7 @@ workspace = createWorkspace({
   readingVisible: () => {
     if (readerWorkspaceVisible) return;
     readerWorkspaceVisible = true;
-    if (state.pdf) requestRender();
+    if (state.pdf) void requestRender().then(restorePendingReaderProgress);
   },
   toolVisible: (tool) => {
     readerWorkspaceVisible = false;

@@ -258,3 +258,8 @@ No new HTTP fields/endpoints or migration. PDF find uses the existing locally
 loaded PDF.js document; filters use saved note states; batch insertion uses the
 unchanged context.note_refs contract. Continuous pages keep the actual active
 page/selection in the existing reading context. See [READING-TOOLS.md](READING-TOOLS.md).
+
+
+## v0.24 browser-local reading progress
+
+No server API or schema changes (schema15). Browser-local version1 preferences are bound to document UUID and original SHA256; strict bounded page/normalized center fields contain no research text. Explicit sources outrank progress. See [READING-PROGRESS.md](READING-PROGRESS.md). Health version is 0.24.0.

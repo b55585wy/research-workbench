@@ -694,3 +694,16 @@ cleaned up. Actual configured-provider synthetic pilot cited two explicitly
 batch-selected saved notes from different pages. No user materials sent in pilot.
 Source/runtime/schema/table/file boundaries are checked again during rollout.
 Evidence and scenario matrix: E:/research-workbench-pilot-20261030/reading-tools-v1.
+
+
+## v0.24 · browser-local PDF reading progress · 2026-11-01
+
+1075 backend requirement cases passed, no skips, using the existing Python/R/import runtimes. One pre-existing Starlette/httpx deprecation warning remains. No server behavior or schema changes.
+
+100 browser scenario groups passed across 16 isolated runs. New progress coverage checks page and normalized within-page geometry on reload/reopen, independent original PDFs with identical filenames, single/continuous modes and boundaries, explicit note/page precedence, corrupt/oversized/wrong-identity/bounds records, blocked reads and quota writes, hidden-workspace and delayed owner lifetimes, desktop/mobile resize and native touch, mixed rotation/blank/200-page rendering, pagehide flush and fresh-browser defaults. Existing regression scenarios retain native markups/excerpts, find, note filters, batch references, source links, drafts, task confirmation and data/analysis/chart entry points. Synthetic fixtures only; model integration pilot used only synthetic sources.
+
+The initial browser run exposed a real lifecycle error: metadata loading replaces the document object, so object-reference comparison incorrectly discarded valid progress. Corrected to stable PDF identity and load generation, then fixed capture for short pages when viewport center lies outside the page. Invalid explicit page and bare data-workspace navigation were checked separately. Harness corrections removed repeated initialization on reload, clipped native touch to the visible viewport, counted allocated canvas pixels instead of placeholders, and compared resized-view reload with its actual latest visible position (fresh mobile opening separately checks the desktop record). A legacy synthetic analysis first reported worker_unavailable; all six study groups passed one isolated retry without backend changes. One redundant older browser run hit its 900-second bound and closed its server; it is excluded. Failed runs and the diagnostic remain external evidence, excluded from passing totals. A PowerShell brace-expansion error during test-file discovery was corrected with explicit paths; no product mutation occurred. Storage validation separately covers the exact 2048/2049-character boundary and rejected nonfinite writes.
+
+Evidence: E:/research-workbench-pilot-20261030/reading-progress-v1/SCENARIOS.md, acceptance-runs.json, pytest-result-01.json and per-run checks.json/result.json. Frontend changes were performed by sequential actual Kimi jobs; Codex owns integration and acceptance. All owned acceptance servers must be closed before release.
+
+Browser preferences contain only UUID/SHA/page/center fields and are not cross-device persistence. No new model sharing, API, schema or tFUS access. Guarded activation, read-only live smoke and post-smoke table/file/source/boundary verification are recorded externally before Git completion. See [READING-PROGRESS.md](READING-PROGRESS.md).

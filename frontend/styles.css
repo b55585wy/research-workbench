@@ -1732,3 +1732,18 @@ h3 {
     grid-column: auto;
   }
 }
+
+.reader-progress-status {
+  margin: 0;
+  padding: 6px 16px;
+  color: var(--ui-text-muted);
+  background: var(--ui-surface);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+@media (max-width: 480px) {
+  .reader-progress-status {
+    padding-inline: 12px;
+  }
+}

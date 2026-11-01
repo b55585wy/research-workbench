@@ -252,3 +252,8 @@ native continuous scrolling, non-first-page text/region anchors, mixed rotation,
 200-page canvas budgets, single-page fallback, zoom/source navigation, keyboard,
 mobile/bilingual/theme and old note/task/data workflows. Preserve schema15/31
 tables, materials, runtime recipes and independent tFUS boundary.
+
+
+## v0.24 reading continuity
+
+P01 continuous page/within-page restore after reload/reopen, no bootstrap overwrite; P02 independent positions for identical filenames/different bytes; P03 single-page, boundaries and mode changes; P04 explicit note/image/page/data/analysis/chart precedence; P05 corrupt/oversized/wrong owner or SHA/invalid bounds ignored; P06 denied/quota storage failure remains usable; P07 delayed owner switches and hidden reader retain lifetime ownership; P08 mobile/rotated/blank/200-page bounded rendering; P09 existing annotation, excerpt, find, filters, drafts, batch Agent and task/grant regressions; P10 local-only bilingual accessible status and fresh-browser defaults; P11 backend regression and guarded preservation of live data/tFUS boundaries. See [READING-PROGRESS.md](READING-PROGRESS.md).
