@@ -182,6 +182,9 @@ def create_app(data_root=None, validator=None, renderer=None, *, agent_provider=
     from .data_workspace import DataWorkspace
     from .data_workspace_api import router as data_workspace_router
     data_workspace=DataWorkspace(store)
+    from .project_resources import ProjectResources
+    from .project_resources_api import router as project_resources_router
+    project_resources=ProjectResources(store,datasets,analysis,charts)
     from .agent_references import ReferenceCatalog
     from .agent_reference_api import router as agent_reference_router
     reference_catalog=ReferenceCatalog(store)
@@ -217,8 +220,10 @@ def create_app(data_root=None, validator=None, renderer=None, *, agent_provider=
     app.state.records=records
     app.state.studies=studies
     app.state.data_workspace=data_workspace
+    app.state.project_resources=project_resources
     app.state.reference_catalog=reference_catalog
     app.include_router(study_router)
+    app.include_router(project_resources_router)
     app.include_router(data_workspace_router)
     app.include_router(record_router)
     app.include_router(chart_router)

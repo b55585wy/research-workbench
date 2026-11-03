@@ -141,6 +141,20 @@
           <div id="study-papers-status" class="study-status" role="status" aria-live="polite"></div>
           <ul id="study-papers" class="study-papers" aria-label="已关联论文"></ul>
         </details>
+        <details id="study-resources-details" class="study-resources-section" aria-labelledby="study-resources-heading">
+          <summary class="study-resources-summary">
+            <span id="study-resources-heading" role="heading" aria-level="3">关联数据与结果</span>
+            <span id="study-resources-count" class="notes-count">0</span>
+          </summary>
+          <p id="study-resources-help" class="study-resources-help">仅保存指向原数据、已完成分析和图表的关联；不会复制、移动或自动运行，也不会向助手共享内容。</p>
+          <div class="study-resource-toolbar">
+            <button id="study-resource-add" class="button button-secondary" type="button" aria-haspopup="dialog" aria-controls="study-resource-picker">添加现有资料</button>
+            <button id="study-resource-refresh" class="button button-quiet" type="button">刷新</button>
+          </div>
+          <div id="study-resources-status" class="study-status" role="status" aria-live="polite"></div>
+          <div id="study-resources-write-status" class="study-status" role="status" aria-live="polite"></div>
+          <ul id="study-resources" class="study-resources" aria-label="关联数据与结果"></ul>
+        </details>
       </section>
 
       <details id="metadata-panel" class="metadata-panel">
@@ -846,6 +860,33 @@
     <button id="assistant-resize-right" class="assistant-resize-edge assistant-resize-right" type="button" aria-label="从右侧调整助手窗口宽度" aria-describedby="assistant-window-help" aria-keyshortcuts="ArrowLeft ArrowRight" title="拖动或使用左右方向键调整宽度；保持左边缘不动"><span aria-hidden="true"></span></button>
     <button id="assistant-resize" class="assistant-resize" type="button" aria-label="调整助手窗口大小" aria-describedby="assistant-window-help" aria-keyshortcuts="ArrowLeft ArrowRight ArrowUp ArrowDown" title="拖动或使用方向键调整窗口大小"><span aria-hidden="true">◢</span></button>
   </aside>
+
+  <dialog id="study-resource-picker" class="study-resource-picker" aria-labelledby="study-resource-picker-heading" aria-describedby="study-resource-picker-help study-resource-candidates-status study-resource-picker-write-status">
+    <div class="study-resource-picker-layout">
+      <header class="study-resource-picker-header">
+        <h2 id="study-resource-picker-heading">添加现有数据与结果</h2>
+        <button id="study-resource-picker-close" class="button button-quiet" type="button" aria-label="关闭">关闭</button>
+      </header>
+      <p id="study-resource-picker-help" class="study-resource-picker-help">这里只读取原始资料的元数据。添加关联不会复制、移动或运行资料。</p>
+      <form id="study-resource-search-form" class="study-resource-search" role="search">
+        <label class="sr-only" for="study-resource-search"><span id="study-resource-search-label">搜索标题或来源</span></label>
+        <input id="study-resource-search" type="search" maxlength="200" autocomplete="off" placeholder="搜索标题或来源">
+        <button id="study-resource-search-submit" class="button button-secondary" type="submit">搜索</button>
+      </form>
+      <div class="study-resource-tabs" role="tablist" aria-label="资料类型">
+        <button id="study-resource-tab-dataset" type="button" role="tab" aria-selected="true" aria-controls="study-resource-candidates">数据</button>
+        <button id="study-resource-tab-analysis" type="button" role="tab" aria-selected="false" aria-controls="study-resource-candidates" tabindex="-1">已完成分析</button>
+        <button id="study-resource-tab-chart" type="button" role="tab" aria-selected="false" aria-controls="study-resource-candidates" tabindex="-1">图表</button>
+      </div>
+      <div id="study-resource-candidates-status" class="study-status" role="status" aria-live="polite"></div>
+      <div id="study-resource-picker-write-status" class="study-status" role="status" aria-live="polite"></div>
+      <ul id="study-resource-candidates" class="study-resource-candidates" role="tabpanel" aria-label="可选数据与结果"></ul>
+      <div class="study-resource-pagination">
+        <button id="study-resource-previous" class="button button-quiet" type="button" disabled>上一页</button>
+        <button id="study-resource-next" class="button button-quiet" type="button" disabled>下一页</button>
+      </div>
+    </div>
+  </dialog>
 
   <dialog id="assistant-reference-picker" class="assistant-reference-picker" aria-labelledby="assistant-reference-picker-heading" aria-describedby="assistant-reference-picker-scope assistant-reference-picker-status">
     <div class="assistant-reference-picker-layout">

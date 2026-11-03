@@ -1,3 +1,31 @@
+# v0.40 non-owning project resource associations
+
+All new endpoints use /api/v1/studies/{study_id}; only normal projects, excluding
+the personal My data owner and PDF owners. Existing owner IDs/records are unchanged.
+
+- GET /resources -> {items:[link]} (<=100), saved metadata/version/lifecycle only.
+  Unavailable sources remain listed/removable. No file reads or supervisors on GET.
+- GET /resource-candidates?kind=dataset|analysis|chart&q=...&limit=1..50&cursor=...
+  -> {items,next_cursor}; metadata search, q<=200, cursor<=2048, newest-first.
+  Analysis candidates require succeeded status and a saved summary.json identity.
+- POST /resources accepts exact {request_id,kind,document_id,resource_id,
+  source_sha256,owner_sha256}. All IDs UUID; hashes lowercase64hex. New201, repeat200.
+  Actual owner/bytes/source version is verified without running a supervisor or calculation.
+  Link labels are resolved server-side; source ownership/files are never changed/copied.
+- DELETE /resources/{link_id} accepts exact {request_id,source_sha256}; returns
+  {id,removed}. Expected hash is the saved link version, so broken sources can be unlinked.
+
+ResourceItem fields: id,study_id,kind,document_id,resource_id,source_sha256,owner_sha256,
+title,owner_title,owner_kind,created_at,available,unavailable_reason,url.
+Candidate omits link-only fields and carries the actual source version required by POST.
+URLs target the original document_id. No raw profiles/results/logs/storage paths are returned.
+Receipts are immutable by request UUID+canonical payload+project/action, with409 on conflicts;
+old Add replay cannot resurrect a removed link. Client always reloads authoritative list.
+Schema21 adds project_resources and project_resource_operations only. Only the targetproject
+has an FK; original source IDs intentionally permit unavailable references after source purge.
+Existing Agent grants, continuous tasks, analysis ownership and paper association APIs stay intact.
+See PROJECT-RESOURCES.md. No functional, browser or model tests were run this increment.
+
 # v0.39 explicit cross-project Agent references
 
 ReadingContext.resource_refs is optional, at most8 unique closed references:

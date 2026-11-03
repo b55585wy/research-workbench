@@ -1,4 +1,5 @@
 import { renderRichHtml } from "/rich-text.js";
+import { createProjectResources } from "/project-resources.js";
 
 const SOURCE_KINDS = new Set(["study", "dataset", "analysis", "chart"]);
 const HEX_64 = /^[0-9a-f]{64}$/i;
@@ -270,6 +271,7 @@ export function createStudy(adapter) {
   let createOperation = null;
   let createStatus = null;
   const entries = new Map();
+  const projectResources = createProjectResources(adapter);
 
   function t(key, values = {}) {
     let text = messages[language]?.[key] || messages.en[key] || key;
@@ -1124,6 +1126,7 @@ export function createStudy(adapter) {
       document.querySelector(".study-view-kicker").textContent = t("overview");
       renderCreate();
       renderDocument();
+      projectResources.applyLanguage(nextLanguage);
     },
     setStudies(items) {
       studies = Array.isArray(items) ? items.filter((item) => item?.kind === "study" && item.workspace_role !== "personal_analysis") : [];
@@ -1136,6 +1139,7 @@ export function createStudy(adapter) {
       currentId = document?.kind === "study" ? document.id : null;
       sequence += 1;
       noteNavigationSequence += 1;
+      projectResources.documentChanged(document);
       renderDocument();
       if (currentId && !isPersonal(document)) loadPapers(document);
     },
@@ -1149,7 +1153,7 @@ export function createStudy(adapter) {
     openNote,
     hasPending(documentId) {
       const entry = entries.get(documentId);
-      return Boolean(entry?.notePending || entry?.mutations.size);
+      return Boolean(entry?.notePending || entry?.mutations.size || projectResources.hasPending(documentId));
     }
   };
 }

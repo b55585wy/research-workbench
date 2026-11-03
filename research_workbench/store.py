@@ -385,6 +385,35 @@ CREATE TABLE IF NOT EXISTS personal_analysis_owner (
 );
 PRAGMA user_version=20;
 COMMIT;''')
+# Version 21 adds non-owning, versioned links from a normal project to existing
+# saved data/results plus a frozen operation receipt.  The original owner and its
+# files are never copied, reassigned or deleted by this schema; document_id has no
+# foreign key on purpose so purging the original source is not blocked.
+SCHEMA = SCHEMA.replace('COMMIT;', '''
+CREATE TABLE IF NOT EXISTS project_resources (
+ id TEXT PRIMARY KEY,
+ study_id TEXT NOT NULL REFERENCES studies(document_id),
+ document_id TEXT NOT NULL,
+ kind TEXT NOT NULL CHECK(kind IN ('dataset','analysis','chart')),
+ resource_id TEXT NOT NULL,
+ source_sha256 TEXT NOT NULL CHECK(length(source_sha256)=64 AND source_sha256 NOT GLOB '*[^0-9a-f]*'),
+ owner_sha256 TEXT NOT NULL CHECK(length(owner_sha256)=64 AND owner_sha256 NOT GLOB '*[^0-9a-f]*'),
+ title TEXT NOT NULL,
+ owner_title TEXT NOT NULL,
+ owner_kind TEXT NOT NULL CHECK(owner_kind IN ('paper','project','personal')),
+ created_at TEXT NOT NULL,
+ UNIQUE(study_id,kind,document_id,resource_id)
+);
+CREATE TABLE IF NOT EXISTS project_resource_operations (
+ request_id TEXT PRIMARY KEY,
+ study_id TEXT NOT NULL REFERENCES studies(document_id),
+ operation TEXT NOT NULL CHECK(operation IN ('add','remove')),
+ request_hash TEXT NOT NULL,
+ result_json TEXT NOT NULL CHECK(json_valid(result_json)),
+ created_at TEXT NOT NULL
+);
+PRAGMA user_version=21;
+COMMIT;''')
 
 
 def timestamp():
@@ -411,7 +440,7 @@ class Store:
         self.exports.mkdir(exist_ok=True)
         self.database = self.root / 'workspace.sqlite3'
         with self.connection() as connection:
-            if connection.execute('PRAGMA user_version').fetchone()[0] > 20:
+            if connection.execute('PRAGMA user_version').fetchone()[0] > 21:
                 raise RuntimeError('Database requires a newer application')
             from .study_migration import install
             install(connection,SCHEMA)
