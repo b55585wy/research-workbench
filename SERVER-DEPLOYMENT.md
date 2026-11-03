@@ -2,10 +2,9 @@
 
 本轮运行于用户指定的 CentOS 7，应用 v0.50.0，代码发布包来自
 `5ab1d09f833c03e3fbd4195c78133aaf6b6d38df`。域名为 `itsyiyi.com`，
-目标服务器为 `103.149.91.75`。当前可通过 **https://103.149.91.75/** 登录访问。
-该 IP 已取得受信任的 Let's Encrypt 证书，由 Caddy 自动续期。
-域名入口等待根域名 A 记录生效后接入。
-当前记录：原 A 记录为 `185.53.179.149`，未发现 AAAA 或 CAA 记录。
+目标服务器为 `103.149.91.75`。域名 `itsyiyi.com` 的 A 记录现已指向该服务器，
+域名站点与 **https://103.149.91.75/** 的 IP 站点并存，使用同一份资料库。
+证书由 Caddy 申请和自动续期；IP 站点使用受信任的短期证书。
 
 ## 运行边界
 
@@ -27,6 +26,7 @@
 | `/opt/research-workspace/runtimes/rstats-4.6.2` | R 4.6.2 |
 | `/opt/research-workspace/runtimes/rstats-manifest` | 已校验的 Linux stats 库清单 |
 | `/opt/research-workspace/runtimes/import-v1` | pyreadstat 1.3.7、NumPy 2.5.4、Narwhals 2.28.0 |
+| `/opt/research-workspace/runtimes/mineru-flash-v415-linux` | MinerU 4.1.5、DocVortex 0.6.11、私有 glibc 2.28 |
 | `/var/lib/research-workspace/data` | 唯一在线 SQLite 资料库及关联文件 |
 | `/etc/research-workspace/access.env` | Caddy bcrypt 哈希，root:root 0600 |
 | `/etc/research-workspace/runtime.env` | 可选运行环境路径 |
@@ -73,10 +73,16 @@ DNS 生效后可将域名站点块加入配置，校验后 reload Caddy；保留
 ## 当前能力与核对范围
 
 应用健康接口返回 v0.50.0；Python/R 引擎和 SPSS 文件读取环境就绪。
-R stats 清单已生成并复核。模型连接等待拥有者在设置中配置。
-MinerU 解析运行环境尚未部署，因此选页解析、沉浸式翻译和段落阅读暂不可用。
-后续配置时必须保持 MinerU 4.1.5 / DocVortex 0.6.11 的契约；Linux venv 要用
-`--copies`，解释器解析后的路径须留在运行环境根内。不要复制 Windows 运行环境。
+R stats 清单已生成并复核。经用户明确同意，已通过 HTTPS 将本机研究助手的
+DeepSeek Flash 连接配置写入服务器，密钥文件属于服务账号、权限 0600。
+模型端点是 `api.deepseek.com`；本轮没有发起模型调用，连接状态仍为未实调用验证。
+
+MinerU 解析环境已接入，118 项固定依赖版本和离线导入检查通过，服务账号导入也通过。
+应用返回 `parser_ready=true`；原文准备、段落阅读与翻译所需运行环境均已启用。
+本轮没有执行 PDF 解析或翻译任务。解析保持 Flash 文本模式、每次最多五页。
+私有 glibc 2.28 仅用于该解析解释器，宿主和核心应用仍为 glibc 2.17。
+部署方法见 [解析环境说明](deploy/server/TRANSLATION-RUNTIME.md)。
+其他 Linux venv 仍需使用 `--copies`，确保解释器解析后的路径留在运行环境根内。
 
 本轮核对源码/资源摘要、依赖版本及导入、服务启动、资源限制和健康接口。
 临时回环代理的 10 项访问检查通过：未登录拒绝页面/API/文件、正确登录放行、
