@@ -37,6 +37,15 @@ class DatasetResourceReference(BaseModel):
     document_id: UUID
     dataset_id: UUID
     sha256: str=Field(pattern='^[a-f0-9]{64}$')
+    allow_analysis: bool=Field(default=False,strict=True)
+
+    @model_serializer(mode='wrap')
+    def compatible_serialization(self,handler):
+        value=handler(self)
+        # Old no-grant payloads, submission hashes and task signatures must stay
+        # byte-identical: a false/absent grant is omitted, an explicit true kept.
+        if value.get('allow_analysis') is False:value.pop('allow_analysis',None)
+        return value
 
 
 ResourceReference = Annotated[

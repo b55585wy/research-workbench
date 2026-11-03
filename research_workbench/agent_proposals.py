@@ -8,6 +8,7 @@ from .library import read_metadata
 from .models import DocumentUpdate,NoteCreate,NoteUpdate,NoteMutation,WorkspaceError
 from .note_lifecycle import read_state
 from .analysis_models import AnalysisCreate
+from .analysis_recipes import recipe
 from .image_annotation_models import ImageAnnotationCreate,ImageAnnotationUpdate,ImageAnnotationMutation
 from .chart_models import ChartCreate,ChartMutation
 
@@ -124,6 +125,8 @@ class Proposals:
             if kind=='run_correlation':fields.update({key:data[key] for key in ('method','correlation','library_sha256')})
             row,_=self.analysis.create_in(connection,document_id,AnalysisCreate(request_id=request_id,**fields))
             return {'analysis_id':row['id'],'status':row['status'],'url':f"/?document={document_id}&analysis={row['id']}"}
+        if kind=='run_reference_analysis':
+            return self.apply_reference_analysis(connection,document_id,proposal_id,data,request_id)
         if kind=='cancel_analysis':
             row=self.analysis.row(connection,document_id,data['analysis_id'])
             if row['dataset_id']!=data['dataset_id']:raise WorkspaceError('analysis_scope','分析来源不匹配。',409)
@@ -172,3 +175,53 @@ class Proposals:
             cls(request_id=request_id,expected_revision=data['expected_revision'],**change))
         return {'outcome':operation,'note_id':value['id'],'document_id':document_id,'revision':value['revision'],
                 'url':f"/?document={document_id}&note={value['id']}"}
+
+    REFERENCE_ANALYSIS_FIELDS={'document_id','source_sha256','target_document_id','target_source_sha256',
+        'target_title','dataset_id','dataset_sha256','dataset_name','engine','columns','method',
+        'recipe_sha256','recipe_id','recipe_version'}
+
+    def apply_reference_analysis(self,connection,document_id,proposal_id,data,request_id):
+        """Queue one fixed describe job in the ORIGINAL owner from persisted TURN grant."""
+        if self.analysis is None:
+            raise WorkspaceError('agent_tool_unavailable','分析服务尚未安装。',409)
+        if set(data)!=self.REFERENCE_ANALYSIS_FIELDS:
+            raise WorkspaceError('agent_proposal_changed','参考资料分析建议内容不完整，请重新生成。',409)
+        row=connection.execute('SELECT turn_id FROM agent_proposals WHERE id=?',(proposal_id,)).fetchone()
+        if row is None:raise WorkspaceError('not_found','找不到这项建议。',404)
+        turn=self.agent_store.read(connection,document_id,row['turn_id'])
+        target,dataset_id=str(data['target_document_id']),str(data['dataset_id'])
+        # The permission is the exact grant persisted with THIS turn, never a
+        # model argument: kind, ids, both hashes and allow_analysis must all match.
+        reference=next((item for item in turn['context'].get('resource_refs',[])
+            if item.get('kind')=='dataset' and item.get('allow_analysis') is True
+            and str(item.get('document_id'))==target
+            and str(item.get('dataset_id'))==dataset_id
+            and item.get('sha256')==data['dataset_sha256']
+            and item.get('owner_sha256')==data['target_source_sha256']),None)
+        if reference is None:
+            raise WorkspaceError('reference_analysis_not_allowed',
+                '参考资料分析授权未随本次对话保存，无法在原数据位置创建分析。',409)
+        if data.get('method')!='describe' or data.get('engine') not in ('python','r'):
+            raise WorkspaceError('invalid_method','这项建议不是受支持的固定描述统计。',409)
+        code=recipe(data['engine'],'describe')
+        if (data.get('recipe_sha256'),data.get('recipe_id'),data.get('recipe_version'))!=(
+                code['sha256'],code['id'],code['version']):
+            raise WorkspaceError('recipe_changed','分析代码版本与建议不一致，请重新确认。',409)
+        columns=data.get('columns')
+        if (not isinstance(columns,list) or not 1<=len(columns)<=20 or len(set(columns))!=len(columns)
+                or any(not isinstance(c,str) or not c or len(c)>100 for c in columns)):
+            raise WorkspaceError('invalid_columns','请选择 1 到 20 个不重复的实际数值列。',409)
+        owner=read_metadata(connection,target)
+        if owner.get('sha256')!=data['target_source_sha256']:
+            raise WorkspaceError('source_changed','原数据位置的资料版本已变化，请重新读取。',409)
+        verify_source(self.store,owner)
+        source=self.analysis.datasets.row(connection,target,dataset_id)
+        if source['sha256']!=data['dataset_sha256']:
+            raise WorkspaceError('dataset_changed','原数据版本已变化，请重新读取。',409)
+        self.analysis.datasets.checked(source)
+        payload=AnalysisCreate(request_id=UUID(request_id),dataset_id=UUID(dataset_id),
+            dataset_sha256=data['dataset_sha256'],engine=data['engine'],columns=columns,
+            recipe_sha256=code['sha256'],method='describe')
+        job,_=self.analysis.create_in(connection,target,payload)
+        return {'document_id':target,'analysis_id':job['id'],'dataset_id':job['dataset_id'],
+                'status':job['status'],'url':f"/?document={target}&analysis={job['id']}"}

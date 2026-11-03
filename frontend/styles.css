@@ -2170,6 +2170,7 @@ h3 {
   min-width: 0;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 8px;
   padding: 6px 8px;
   border: 1px solid var(--ui-border);
@@ -2180,6 +2181,7 @@ h3 {
 .assistant-resource-reference-description {
   display: grid;
   min-width: 0;
+  flex: 1;
   gap: 2px;
   overflow-wrap: anywhere;
   font-size: 12px;
@@ -2188,6 +2190,28 @@ h3 {
 .assistant-resource-reference-description > span {
   color: var(--ui-text-muted);
   font-size: 11px;
+}
+
+.assistant-resource-reference-grant {
+  display: flex;
+  flex: 1 0 100%;
+  align-items: flex-start;
+  gap: 7px;
+  color: var(--ui-text-soft);
+  font-size: 11px;
+  line-height: 1.5;
+  cursor: pointer;
+}
+
+.assistant-resource-reference-grant input {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin: 1px 0 0;
+}
+
+.assistant-resource-reference-grant:has(input:disabled) {
+  cursor: not-allowed;
 }
 
 .assistant-resource-reference-remove {

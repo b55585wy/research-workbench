@@ -24,7 +24,7 @@ MAX_LIMIT = 50
 MAX_LIMIT_DEFAULT = 20
 MAX_CURSOR = 2048
 CURSOR_VERSION = 1
-REFERENCE_SOURCE_KINDS = ('reference_pdf_page', 'reference_dataset_sample')
+REFERENCE_SOURCE_KINDS = ('reference_pdf_page', 'reference_dataset_sample', 'reference_analysis_result')
 
 
 def invalid_cursor():
@@ -184,11 +184,16 @@ def capture_reference(store, analysis, connection, ref):
     if row['sha256'] != expected:
         raise WorkspaceError('reference_changed', '所选数据版本已变化，请移除后重新加入。', 409)
     analysis.datasets.checked(row)
-    return {'kind': 'dataset', 'document_id': document_id, 'dataset_id': str(ref.dataset_id),
-            'title': row['original_filename'], 'sha256': row['sha256'],
-            'owner_title': owner['title'], 'owner_kind': owner_kind(owner),
-            'owner_sha256': owner['sha256'], 'created_at': row['created_at'],
-            'filename': row['original_filename']}
+    result = {'kind': 'dataset', 'document_id': document_id, 'dataset_id': str(ref.dataset_id),
+              'title': row['original_filename'], 'sha256': row['sha256'],
+              'owner_title': owner['title'], 'owner_kind': owner_kind(owner),
+              'owner_sha256': owner['sha256'], 'created_at': row['created_at'],
+              'filename': row['original_filename']}
+    # Only an explicit true grant is captured; false/absent keeps old JSON and
+    # submission hashes byte-compatible.  Capture never creates an analysis.
+    if getattr(ref, 'allow_analysis', False) is True:
+        result['allow_analysis'] = True
+    return result
 
 
 def verify_paper(store, document_id, expected_sha):

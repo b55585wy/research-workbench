@@ -439,6 +439,11 @@ const messages = {
     regions_unavailable: "表格识别暂时不可用，请手动截取。",
     regions_failed: "表格识别失败，请重试或手动截取。",
     navigationSaveOrCancel: "有未保存的批注、截图或正在保存的修改。请先保存或取消，再切换工作区。",
+    navigationPendingWrite: "有修改正在保存或处理。请等待保存完成，再切换工作区。",
+    navigationDrawing: "有未保存的批注。请先保存或取消当前批注，再切换工作区。",
+    navigationScreenshot: "有截图预览尚未处理。请先添加或取消截图，再切换工作区。",
+    navigationSelection: "正在框选区域。请先完成或取消当前选择，再切换工作区。",
+    navigationRichDraftError: "当前笔记有无法保存的富文本修改。请先修复、保存或取消当前笔记，再切换工作区。",
     personalOpenFailed: "无法打开“我的数据”。请重试；现有工作区未更改。",
     untitled: "未命名文献"
   },
@@ -851,6 +856,11 @@ const messages = {
     regions_unavailable: "Table recognition is unavailable. Capture the region manually.",
     regions_failed: "Table recognition failed. Retry or capture manually.",
     navigationSaveOrCancel: "Unsaved annotations, a capture, or a pending save must be saved or cancelled before changing workspaces.",
+    navigationPendingWrite: "Changes are being saved or processed. Wait for saving to finish before changing workspaces.",
+    navigationDrawing: "There are unsaved annotations. Save or cancel the current drawing before changing workspaces.",
+    navigationScreenshot: "A screenshot preview is waiting. Add or cancel the screenshot before changing workspaces.",
+    navigationSelection: "A region is being selected. Finish or cancel the selection before changing workspaces.",
+    navigationRichDraftError: "A rich-text change in the current note could not be preserved. Fix, save, or cancel the note before changing workspaces.",
     personalOpenFailed: "My data could not be opened. Retry; the existing workspace was not changed.",
     untitled: "Untitled paper"
   }
@@ -3301,11 +3311,7 @@ function prepareContextNavigation() {
   captureCurrentDraft();
   captureCurrentMetadataDraft();
   const documentId = state.document?.id;
-  const blocked = Boolean(
-    readerShapes?.hasUnsavedChanges?.() ||
-    state.regionCapture ||
-    state.selection ||
-    richText?.isEditorActive?.() ||
+  const pendingWrite = Boolean(
     state.pendingSaves > 0 ||
     state.pendingMutations.size > 0 ||
     state.pendingMetadata.size > 0 ||
@@ -3314,8 +3320,12 @@ function prepareContextNavigation() {
     documentId && analysis?.hasPending?.(documentId) ||
     dataImports?.isImportPending?.()
   );
-  if (!blocked) return true;
-  setStatus("navigationSaveOrCancel", "error");
+  if (pendingWrite) setStatus("navigationPendingWrite", "info");
+  else if (readerShapes?.hasUnsavedChanges?.()) setStatus("navigationDrawing", "error");
+  else if (state.regionCapture) setStatus("navigationScreenshot", "error");
+  else if (state.selection) setStatus("navigationSelection", "error");
+  else if (richText?.hasUnpreservedChanges?.()) setStatus("navigationRichDraftError", "error");
+  else return true;
   return false;
 }
 
@@ -6766,6 +6776,7 @@ async function navigateAssistantSource(source) {
   }
   if (source.kind === "data") source = { ...source, kind: "dataset_sample", dataset_id: source.dataset_id || source.id };
   if (source.kind === "reference_dataset_sample") source = { ...source, kind: "dataset_sample" };
+  if (source.kind === "reference_analysis_result") source = { ...source, kind: "analysis_result" };
   if (source.kind === "analysis") source = { ...source, kind: "analysis_result", analysis_id: source.analysis_id || source.id };
   if (source.kind === "chart") source = { ...source, kind: "chart_result", chart_id: source.chart_id || source.id };
   if (source.kind === "dataset_sample") {

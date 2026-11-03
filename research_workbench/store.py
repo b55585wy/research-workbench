@@ -414,6 +414,11 @@ CREATE TABLE IF NOT EXISTS project_resource_operations (
 );
 PRAGMA user_version=21;
 COMMIT;''')
+# Version 22 is a compatibility MARKER ONLY: no table is added or altered.  It
+# records that this store may contain the explicit reference-analysis grant and
+# the closed run_reference_analysis proposal kind, which older builds cannot
+# interpret safely.  Existing rows, receipts and hashes are retained unchanged.
+SCHEMA = SCHEMA.replace('COMMIT;', 'PRAGMA user_version=22;\nCOMMIT;')
 
 
 def timestamp():
@@ -440,7 +445,7 @@ class Store:
         self.exports.mkdir(exist_ok=True)
         self.database = self.root / 'workspace.sqlite3'
         with self.connection() as connection:
-            if connection.execute('PRAGMA user_version').fetchone()[0] > 21:
+            if connection.execute('PRAGMA user_version').fetchone()[0] > 22:
                 raise RuntimeError('Database requires a newer application')
             from .study_migration import install
             install(connection,SCHEMA)

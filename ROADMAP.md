@@ -7,7 +7,9 @@
 本页记录版本交付与需求背景。整体产品画像、近期优先级与每轮完成标准见
 [PRODUCT-PLAN.md](PRODUCT-PLAN.md)；后续按实际任务验收，不按功能清单一次性铺开。
 
-当前版本 v0.40.0：[项目资料整理](PROJECT-RESOURCES.md)提供非迁移式关联、来源跳转与失效关联移除。
+当前版本 v0.41.0：[参考数据分析](REFERENCE-ANALYSIS.md)在明确授权与逐项确认后，调用已有 Python/R 描述统计，结果保存在原数据位置，当前聊天可读取实际结果。修正富文本编辑器打开即阻止工作区切换的误判，保留真实未保存修改与活动写入保护。按用户要求未运行测试。
+
+v0.40.0：[项目资料整理](PROJECT-RESOURCES.md)提供非迁移式关联、来源跳转与失效关联移除。
 
 v0.39.0：当前助手对话可引用跨项目论文与数据，见 [AGENT-REFERENCES.md](AGENT-REFERENCES.md)。
 v0.38 入口改版见 [WORKSPACE-ENTRIES.md](WORKSPACE-ENTRIES.md)；阅读体验历史见 [EXPERIENCE-PLAN.md](EXPERIENCE-PLAN.md)。

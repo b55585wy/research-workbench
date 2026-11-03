@@ -708,6 +708,21 @@ export function createRichText(adapter) {
     insertText,
     insertImage,
     isEditorActive: () => Boolean(session?.quill),
+    hasUnpreservedChanges: () => {
+      const target = session;
+      if (!target?.quill || !target.changeError) return false;
+      try {
+        const actual = serializeQuill(target.quill);
+        const draft = adapter.getDraft(target.scope);
+        if (actual.error || !draft) return true;
+        const expectedOps = draft.richContent
+          ? (Array.isArray(draft.richContent.ops) ? draft.richContent.ops : null)
+          : [{ insert: `${draft.text}${draft.text.endsWith("\n") ? "" : "\n"}` }];
+        return actual.text !== draft.text || !expectedOps || JSON.stringify(actual.richContent.ops) !== JSON.stringify(expectedOps);
+      } catch {
+        return true;
+      }
+    },
     focus() {
       if (session?.quill) {
         session.quill.focus();

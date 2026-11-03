@@ -30,12 +30,13 @@ export function normalizeResourceReference(item) {
     owner_title: text(item.owner_title),
     owner_kind: OWNER_KINDS.has(item.owner_kind) ? item.owner_kind : "",
     created_at: text(item.created_at),
+    ...(item.kind === "dataset" && item.allow_analysis === true ? { allow_analysis: true } : {}),
     ...(Number.isInteger(item.page_count) && item.page_count >= 1 ? { page_count: item.page_count } : {})
   });
 }
 
 export function catalogResourceReference(item) {
-  const reference = normalizeResourceReference(item);
+  const reference = normalizeResourceReference({ ...item, allow_analysis: false });
   if (!reference || text(item.id) !== reference.id) return null;
   return reference;
 }
@@ -63,7 +64,8 @@ export function resourceReferenceWire(reference) {
       kind: "dataset",
       document_id: reference.document_id,
       dataset_id: reference.dataset_id,
-      sha256: reference.sha256
+      sha256: reference.sha256,
+      ...(reference.allow_analysis === true ? { allow_analysis: true } : {})
     });
   }
   return Object.freeze({

@@ -1,3 +1,32 @@
+# v0.41 explicit referenced-dataset descriptive analysis
+
+Dataset resource_refs additionally accepts strict optional allow_analysis:true. False/default is
+omitted during nested serialization and capture to preserve older request fingerprints. Papers
+reject this field. The grant is captured with that turn; catalogue/project membership never grants it.
+
+Four tools require the captured grant and original owner/dataset/version checks:
+- reference_analysis_capabilities(document_id,dataset_id): actual numeric-column metadata and Python/R availability.
+- propose_reference_analysis(document_id,dataset_id,engine,columns): fixed describe; 1..20 unique numeric columns.
+- list_reference_analyses(document_id,dataset_id): newest <=20 describe records, metadata/status only.
+- read_reference_analysis(document_id,dataset_id,analysis_id): succeeded saved summary only; verifies actual
+  summary.json bytes, size/SHA and saved JSON; returns <=20 stats with total/returned/truncated flags.
+
+New closed proposal kind run_reference_analysis retains current-chat document_id/source_sha256;
+adds server-derived target_document_id,target_source_sha256,target_title,dataset_id,dataset_sha256,
+dataset_name,engine,columns,method:'describe',recipe_sha256,recipe_id,recipe_version. Confirmation
+rechecks that persisted turn grant plus both owners/versions and recipe, then queues one existing
+worker job in TARGET owner with the deterministic proposal request UUID. No computation before approval.
+Applied/rejected replay remains idempotent. Receipt: {document_id:TARGET,analysis_id,dataset_id,status,url}.
+Queued/running does not mean succeeded. Confirming does not automatically navigate away from chat.
+
+Source kind reference_analysis_result carries original document_id,analysis_id,dataset_id,
+dataset_sha256,source_sha256(owner),result_sha256(summary),page:null,rect:null,title,label,text,url.
+Actual summary source text <=24000 chars; original URL /?document=OWNER&analysis=JOB. Publication
+rechecks source/grant/result SHA; historical references require a fresh verified read. No broadened
+Sources.get, arbitrary scripts, cross-owner notes/charts/cancel, new statistical method or continuous tasks.
+Schema22 is a compatibility marker only; no added/altered tables. See REFERENCE-ANALYSIS.md.
+No tests, browser/HTTP/model probes or imports/syntax checks were run in this increment.
+
 # v0.40 non-owning project resource associations
 
 All new endpoints use /api/v1/studies/{study_id}; only normal projects, excluding

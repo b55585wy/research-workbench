@@ -2,7 +2,7 @@ import { renderRichHtml } from "/rich-text.js";
 import { createTaskClient } from "/task-client.js";
 import { createAssistantWindow } from "/assistant-window.js";
 import { isPdfPageSource, onlineDatasetSourceUrl, pdfPageApplicationUrl, renderAssistantAnswer } from "/assistant-answer.js";
-import { createReferencePicker, resourceReferenceKey, resourceReferencesFromTurn, resourceReferenceWire } from "/assistant-references.js";
+import { createReferencePicker, normalizeResourceReference, resourceReferenceKey, resourceReferencesFromTurn, resourceReferenceWire } from "/assistant-references.js";
 
 const ACTIVE_STATES = new Set(["queued", "running"]);
 const TERMINAL_STATES = new Set(["waiting_confirmation", "completed", "failed", "cancelled", "interrupted"]);
@@ -322,7 +322,7 @@ const messages = {
     note_purged: "一条笔记来源已彻底删除。请移除它或重新加入其他已保存笔记。",
     noteReferenceUnavailable: "一条笔记来源不存在、已删除或不属于当前文献。请移除后重新加入。",
     resourceReferences: "已加入的跨项目资料",
-    resourceReferenceHelp: "固定的资料会在发送时提供给助手；论文按页读取，数据仅提供字段和少量样本行。",
+    resourceReferenceHelp: "固定的资料会在发送时提供给助手；论文按页读取，数据默认仅提供字段和少量样本行，描述统计权限需单独明确开启。",
     contextResourceReferences: "外部资料：{count} 项 · 发送时提供",
     addReferences: "添加资料",
     referencePickerTitle: "添加资料到当前对话",
@@ -332,7 +332,7 @@ const messages = {
     referenceSearchSubmit: "搜索",
     referencePapers: "论文",
     referenceDatasets: "数据",
-    referencePickerScope: "仅在明确添加后共享。论文按页读取；数据仅提供字段和最多 5 行样本，不提供完整数据统计。",
+    referencePickerScope: "仅在明确添加后共享。论文按页读取；数据默认仅提供字段和最多 5 行样本，描述统计权限需在固定后单独开启。",
     referenceResults: "资料搜索结果",
     referencePrevious: "上一页",
     referenceNext: "下一页",
@@ -352,6 +352,23 @@ const messages = {
     resourceReferenceRemoved: "已移除资料；之后的请求不会再提供它。",
     resourceReferenceLimit: "每次最多固定 8 项不同资料。请先移除一项。",
     resourceReferenceBusy: "当前请求或任务未结束，暂时不能修改资料。",
+    referenceAnalysisGrant: "允许 Python/R 描述统计（全表计算，执行前确认）",
+    referenceAnalysisGrantUpdated: "描述统计权限已更新，尚未发送。",
+    referenceAnalysisDecisionPending: "有待确认或发生冲突的跨数据描述统计提案。请先确认、拒绝或放弃该提案，再添加、移除资料或修改权限。",
+    referenceAnalysisTarget: "原数据位置",
+    referenceAnalysisScope: "固定 describe 方法：使用 Python/R 对原数据全表进行本地描述统计。结果保存在原数据位置；确认后仅排队，不会自动打开或切换对话。",
+    analysisDescribe: "描述统计（全表本地计算）",
+    reference_analysis_not_allowed: "该数据未明确允许描述统计。请先勾选对应数据的权限，再重新提出操作。",
+    reference_analysis_source_changed: "原数据位置或来源已变化，未执行或读取分析。",
+    reference_analysis_dataset_changed: "原数据已变化，未执行或读取分析。",
+    reference_analysis_dataset_mismatch: "提案或结果与原数据不匹配，未执行或读取分析。",
+    reference_analysis_not_ready: "分析尚未成功完成，当前没有可读取的结果。",
+    reference_analysis_result_not_ready: "分析结果尚未成功完成，请稍后在下一对话轮次中查询。",
+    reference_analysis_unsupported_method: "仅支持固定 describe 描述统计，未执行其他方法。",
+    reference_analysis_method_unsupported: "仅支持固定 describe 描述统计，未执行其他方法。",
+    dataset_changed: "数据已变化，未执行或读取分析。",
+    analysis_not_ready: "分析尚未成功完成，当前没有可读取的结果。",
+    unsupported_method: "仅支持固定 describe 描述统计，未执行其他方法。",
     referenceContinueTask: "跨项目资料不支持连续任务。请关闭“连续完成分析、图表和笔记”后再发送。",
     agent_reference_task_unsupported: "跨项目资料不支持连续任务。请关闭连续任务后重新发送。",
     resourceReferenceChanged: "固定资料在添加后已变化。可按原请求重试；若要更新资料，请先编辑草稿以取消原重试，再移除并重新添加最新版本。",
@@ -673,7 +690,7 @@ const messages = {
     note_purged: "A pinned note was permanently deleted. Remove it or pin another saved note.",
     noteReferenceUnavailable: "A pinned note is missing, deleted, or belongs to another paper. Remove it and pin a valid note.",
     resourceReferences: "Pinned cross-project references",
-    resourceReferenceHelp: "Pinned references are provided when you send. Papers are read by page; datasets provide only fields and a few sample rows.",
+    resourceReferenceHelp: "Pinned references are provided when you send. Papers are read by page; datasets default to fields and a few sample rows, with a separate explicit grant for descriptive statistics.",
     contextResourceReferences: "External references: {count} · provided on send",
     addReferences: "Add references",
     referencePickerTitle: "Add references to this conversation",
@@ -683,7 +700,7 @@ const messages = {
     referenceSearchSubmit: "Search",
     referencePapers: "Papers",
     referenceDatasets: "Datasets",
-    referencePickerScope: "Nothing is shared until you explicitly add it. Papers are read by page; datasets provide only fields and up to 5 sample rows, not full-data statistics.",
+    referencePickerScope: "Nothing is shared until you explicitly add it. Papers are read by page; datasets default to fields and up to 5 sample rows. Enable descriptive statistics separately after pinning.",
     referenceResults: "Reference search results",
     referencePrevious: "Previous",
     referenceNext: "Next",
@@ -703,6 +720,23 @@ const messages = {
     resourceReferenceRemoved: "Reference removed; later requests will not provide it.",
     resourceReferenceLimit: "Pin at most 8 unique references. Remove one first.",
     resourceReferenceBusy: "References cannot be changed while a request or task is unresolved.",
+    referenceAnalysisGrant: "Allow Python/R descriptive statistics (full-table computation; confirmation required before running)",
+    referenceAnalysisGrantUpdated: "Descriptive-statistics permission updated; nothing has been sent.",
+    referenceAnalysisDecisionPending: "A cross-dataset descriptive-analysis proposal is pending or in conflict. Confirm, reject, or abandon it before adding or removing references or changing permissions.",
+    referenceAnalysisTarget: "Original data owner",
+    referenceAnalysisScope: "Fixed describe method: Python/R computes descriptive statistics locally on the original full table. Results are saved at the original data location; confirmation only queues the job and does not open it or switch conversations.",
+    analysisDescribe: "Descriptive statistics (local full-table computation)",
+    reference_analysis_not_allowed: "This dataset has not been explicitly permitted for descriptive statistics. Enable its permission and request the operation again.",
+    reference_analysis_source_changed: "The original data owner or source changed; the analysis was not run or read.",
+    reference_analysis_dataset_changed: "The original dataset changed; the analysis was not run or read.",
+    reference_analysis_dataset_mismatch: "The proposal or result does not match the original dataset; the analysis was not run or read.",
+    reference_analysis_not_ready: "The analysis has not succeeded, so no result is available to read.",
+    reference_analysis_result_not_ready: "The analysis result is not ready. Ask for it again in a later conversation turn.",
+    reference_analysis_unsupported_method: "Only the fixed describe method is supported; no other method was run.",
+    reference_analysis_method_unsupported: "Only the fixed describe method is supported; no other method was run.",
+    dataset_changed: "The dataset changed; the analysis was not run or read.",
+    analysis_not_ready: "The analysis has not succeeded, so no result is available to read.",
+    unsupported_method: "Only the fixed describe method is supported; no other method was run.",
     referenceContinueTask: "Cross-project references do not support continuation tasks. Turn off “Continue analysis, charts, and notes” before sending.",
     agent_reference_task_unsupported: "Cross-project references do not support continuation tasks. Turn off continuation and send again.",
     resourceReferenceChanged: "A pinned reference changed after it was added. Retry the exact request, or edit the draft to cancel that retry before removing and re-adding the latest version.",
@@ -977,8 +1011,12 @@ export function createAssistant(adapter) {
     }
   }
 
+  function hasPendingReferenceAnalysisDecision(entry) {
+    return entry.turns.some((turn) => turn.status === "waiting_confirmation" && turn.proposals?.some((proposal) => proposal.kind === "run_reference_analysis" && ["pending", "conflict"].includes(proposal.status)));
+  }
+
   function canEditReferences(paperId, entry) {
-    return isCurrent(paperId, entry) && !entry.loading && !entry.conversationsLoading && !entry.pendingSend && !activeTurn(entry) && !entry.pendingDecision && !tasks.isBusy(paperId, entry.conversationId);
+    return isCurrent(paperId, entry) && !entry.loading && !entry.conversationsLoading && !entry.pendingSend && !activeTurn(entry) && !entry.pendingDecision && !hasPendingReferenceAnalysisDecision(entry) && !tasks.isBusy(paperId, entry.conversationId);
   }
 
   function addResourceReference(target, reference) {
@@ -1001,14 +1039,17 @@ export function createAssistant(adapter) {
     elements.resourceReferences.replaceChildren();
     elements.resourceReferences.setAttribute("aria-label", t("resourceReferences"));
     const paper = adapter.getDocument();
-    elements.resourceReferenceHelp.hidden = !paper || !entry?.resourceRefs.length;
-    elements.resourceReferenceHelp.textContent = t("resourceReferenceHelp");
+    const pendingAnalysisDecision = Boolean(entry && hasPendingReferenceAnalysisDecision(entry));
+    elements.resourceReferenceHelp.hidden = !paper || !entry || !entry.resourceRefs.length && !pendingAnalysisDecision;
+    elements.resourceReferenceHelp.textContent = t(pendingAnalysisDecision ? "referenceAnalysisDecisionPending" : "resourceReferenceHelp");
     if (!paper || !entry) return;
     const editable = canEditReferences(paper.id, entry);
     for (const reference of entry.resourceRefs) {
+      const key = resourceReferenceKey(reference);
+      const conversationId = entry.conversationId;
       const chip = document.createElement("article");
       chip.className = "assistant-resource-reference";
-      chip.dataset.referenceKey = resourceReferenceKey(reference);
+      chip.dataset.referenceKey = key;
       const description = document.createElement("div");
       description.className = "assistant-resource-reference-description";
       const title = document.createElement("strong");
@@ -1023,13 +1064,35 @@ export function createAssistant(adapter) {
       remove.setAttribute("aria-label", `${t("resourceReferenceRemove")}: ${title.textContent}`);
       remove.disabled = !editable;
       remove.addEventListener("click", () => {
-        if (!canEditReferences(paper.id, entry)) return;
-        const key = resourceReferenceKey(reference);
+        if (entry.conversationId !== conversationId || !canEditReferences(paper.id, entry)) return;
         entry.resourceRefs = entry.resourceRefs.filter((item) => resourceReferenceKey(item) !== key);
         entry.status = { key: "resourceReferenceRemoved", kind: "info" };
         render();
       });
       chip.append(description, remove);
+      if (reference.kind === "dataset") {
+        const grant = document.createElement("label");
+        grant.className = "assistant-resource-reference-grant";
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.checked = reference.allow_analysis === true;
+        checkbox.disabled = !editable;
+        checkbox.setAttribute("aria-label", `${t("referenceAnalysisGrant")}: ${title.textContent}`);
+        const text = document.createElement("span");
+        text.textContent = t("referenceAnalysisGrant");
+        grant.append(checkbox, text);
+        checkbox.addEventListener("change", () => {
+          if (entry.conversationId !== conversationId || !canEditReferences(paper.id, entry)) return;
+          const index = entry.resourceRefs.findIndex((item) => item === reference && resourceReferenceKey(item) === key);
+          if (index < 0) return;
+          const updated = normalizeResourceReference({ ...reference, allow_analysis: checkbox.checked });
+          if (!updated) return;
+          entry.resourceRefs = [...entry.resourceRefs.slice(0, index), updated, ...entry.resourceRefs.slice(index + 1)];
+          entry.status = { key: "referenceAnalysisGrantUpdated", kind: "info" };
+          render();
+        });
+        chip.append(grant);
+      }
       elements.resourceReferences.append(chip);
     }
   }
@@ -1803,15 +1866,23 @@ export function createAssistant(adapter) {
       JSON.stringify(pairs.columns) === JSON.stringify(columns) && firstTiesReady && secondTiesReady;
   }
 
-  function appendAnalysisProposal(card, details, payload) {
+  function appendAnalysisProposal(card, details, payload, isReferenceAnalysis = false) {
     const isTTest = payload.method === "ttest_independent";
     const isPaired = payload.method === "ttest_paired";
     const isCorrelation = payload.method === "correlation";
+    if (isReferenceAnalysis) appendProposalField(details, t("referenceAnalysisTarget"), payload.target_title || payload.target_document_id || "—");
     appendProposalField(details, t("analysisDataset"), payload.dataset_name || payload.dataset_id || "—");
     appendProposalField(details, t("analysisDatasetHash"), payload.dataset_sha256 || payload.source_sha256 || "—");
     appendProposalField(details, t("analysisEngine"), payload.engine === "r" ? "R" : "Python");
     appendProposalField(details, t("analysisColumns"), Array.isArray(payload.columns) ? payload.columns.join(", ") : "—");
-    const scientificReady = isTTest ? appendTtestProposal(card, details, payload) : isPaired ? appendPairedProposal(card, details, payload) : isCorrelation ? appendCorrelationProposal(card, details, payload) : true;
+    if (isReferenceAnalysis) {
+      appendProposalField(details, t("analysisMethod"), t("analysisDescribe"));
+      const scope = document.createElement("p");
+      scope.className = "assistant-proposal-inactive";
+      scope.textContent = t("referenceAnalysisScope");
+      card.append(scope);
+    }
+    const scientificReady = isReferenceAnalysis ? payload.method === "describe" : isTTest ? appendTtestProposal(card, details, payload) : isPaired ? appendPairedProposal(card, details, payload) : isCorrelation ? appendCorrelationProposal(card, details, payload) : true;
     const defaultRecipe = isCorrelation ? "correlation-rstats-v1" : isPaired ? "ttest-paired-rstats-v1" : isTTest ? "ttest-independent-rstats-v1" : "describe-v1";
     appendProposalField(details, t("analysisRecipe"), `${payload.recipe_id || defaultRecipe} · v${payload.recipe_version || 1}`);
     appendProposalField(details, t("analysisRecipeHash"), payload.recipe_sha256 || "—");
@@ -1857,7 +1928,8 @@ export function createAssistant(adapter) {
     elements.proposals.append(heading);
     for (const proposal of turn.proposals) {
       const payload = proposal.payload && typeof proposal.payload === "object" ? proposal.payload : {};
-      const isAnalysis = ["run_analysis", "run_t_test", "run_paired_t_test", "run_correlation"].includes(proposal.kind);
+      const isReferenceAnalysis = proposal.kind === "run_reference_analysis";
+      const isAnalysis = isReferenceAnalysis || ["run_analysis", "run_t_test", "run_paired_t_test", "run_correlation"].includes(proposal.kind);
       const isCancelAnalysis = proposal.kind === "cancel_analysis";
       const isDatasetSelection = proposal.kind === "create_dataset_selection";
       const isCreateChart = proposal.kind === "create_chart";
@@ -1940,7 +2012,7 @@ export function createAssistant(adapter) {
         warning.textContent = t("formattingRemoved");
         card.append(warning);
       }
-      const analysisReady = isAnalysis ? appendAnalysisProposal(card, details, payload) : true;
+      const analysisReady = isAnalysis ? appendAnalysisProposal(card, details, payload, isReferenceAnalysis) : true;
 
       const changes = payload.changes && typeof payload.changes === "object" ? Object.entries(payload.changes) : [];
       if (changes.length) {
@@ -1964,7 +2036,7 @@ export function createAssistant(adapter) {
         view.addEventListener("click", () => adapter.openImageProposal(paper.id, proposal));
         card.append(view);
       } else if ((isAnalysis || isDatasetSelection) && payload.dataset_id) {
-        appendSourceButton(card, { document_id: paper.id, kind: "dataset_sample", dataset_id: payload.dataset_id }, t(isDatasetSelection ? "selectionParent" : "analysisDataset"));
+        appendSourceButton(card, { document_id: isReferenceAnalysis ? payload.target_document_id : paper.id, kind: "dataset_sample", dataset_id: payload.dataset_id }, t(isDatasetSelection ? "selectionParent" : "analysisDataset"));
       } else if (isCancelAnalysis && payload.analysis_id) {
         appendSourceButton(card, { document_id: paper.id, kind: "analysis_result", analysis_id: payload.analysis_id }, t("analysisOpen"));
       } else if (payload.note_id) {
@@ -2429,7 +2501,7 @@ export function createAssistant(adapter) {
         body: JSON.stringify({ approved, proposal_sha256: proposal.sha256 })
       });
       upsertTurn(entry, updated);
-      entry.status = { key: approved ? ["run_analysis", "run_t_test", "run_paired_t_test", "run_correlation"].includes(proposal.kind) ? "analysisQueued" : proposal.kind === "cancel_analysis" ? "analysisCancelled" : proposal.kind === "create_dataset_selection" ? "selectionCreated" : "confirmed" : "rejectedDone", kind: "success" };
+      entry.status = { key: approved ? ["run_analysis", "run_t_test", "run_paired_t_test", "run_correlation", "run_reference_analysis"].includes(proposal.kind) ? "analysisQueued" : proposal.kind === "cancel_analysis" ? "analysisCancelled" : proposal.kind === "create_dataset_selection" ? "selectionCreated" : "confirmed" : "rejectedDone", kind: "success" };
       if (approved) {
         await adapter.refreshAfterAgent(paperId, proposal.kind);
         const result = updated.proposals?.find((item) => item.id === proposal.id)?.result;
@@ -2441,7 +2513,7 @@ export function createAssistant(adapter) {
       }
     } catch (error) {
       let retry = () => decideProposal(paperId, entry, turnId, proposal, approved);
-      if (approved && ["revision_conflict", "source_changed", "note_deleted", "dataset_changed", "recipe_changed", "preview_changed", "selection_preview_changed", "selection_source_changed", "engine_unavailable", "analysis_busy", "analysis_quota"].includes(error.code)) {
+      if (approved && ["revision_conflict", "source_changed", "note_deleted", "dataset_changed", "recipe_changed", "preview_changed", "selection_preview_changed", "selection_source_changed", "engine_unavailable", "analysis_busy", "analysis_quota", "reference_analysis_not_allowed", "reference_analysis_source_changed", "reference_analysis_dataset_changed", "reference_analysis_dataset_mismatch", "reference_analysis_unsupported_method", "reference_analysis_method_unsupported", "unsupported_method"].includes(error.code)) {
         try {
           const updated = await adapter.api(`/api/v1/documents/${encodeURIComponent(paperId)}/agent/turns/${encodeURIComponent(turnId)}`);
           upsertTurn(entry, updated);

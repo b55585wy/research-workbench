@@ -135,8 +135,9 @@ from .agent_paper_tools import PaperTools,PAPER_DEFINITIONS
 from .agent_correlation_tools import CorrelationTools,CORRELATION_DEFINITIONS
 from .agent_online_data_tools import OnlineDataTools,ONLINE_DEFINITIONS
 from .agent_reference_tools import ReferenceTools,REFERENCE_DEFINITIONS
+from .agent_reference_analysis import ReferenceAnalysisTools,REFERENCE_ANALYSIS_DEFINITIONS
 
-DEFINITIONS+=CHART_DEFINITIONS+STATISTICS_DEFINITIONS+SELECTION_DEFINITIONS+RECORD_DEFINITIONS+PAPER_DEFINITIONS+CORRELATION_DEFINITIONS+ONLINE_DEFINITIONS+REFERENCE_DEFINITIONS
+DEFINITIONS+=CHART_DEFINITIONS+STATISTICS_DEFINITIONS+SELECTION_DEFINITIONS+RECORD_DEFINITIONS+PAPER_DEFINITIONS+CORRELATION_DEFINITIONS+ONLINE_DEFINITIONS+REFERENCE_DEFINITIONS+REFERENCE_ANALYSIS_DEFINITIONS
 
 
 def bounded(value,depth=0):
@@ -147,7 +148,7 @@ def bounded(value,depth=0):
     return value
 
 
-class ReadingTools(OnlineDataTools,CorrelationTools,PaperTools,RecordTools,SelectionTools,StatisticsTools,ChartTools,ReferenceTools):
+class ReadingTools(OnlineDataTools,CorrelationTools,PaperTools,RecordTools,SelectionTools,StatisticsTools,ChartTools,ReferenceTools,ReferenceAnalysisTools):
     def __init__(self,workspace,agent_store,proposals,turn,sources):
         self.workspace,self.store,self.proposals=workspace,agent_store,proposals
         self.turn,self.sources=turn,sources
