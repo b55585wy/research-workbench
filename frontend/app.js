@@ -3324,8 +3324,10 @@ function prepareContextNavigation() {
   else if (readerShapes?.hasUnsavedChanges?.()) setStatus("navigationDrawing", "error");
   else if (state.regionCapture) setStatus("navigationScreenshot", "error");
   else if (state.selection) setStatus("navigationSelection", "error");
-  else if (richText?.hasUnpreservedChanges?.()) setStatus("navigationRichDraftError", "error");
-  else return true;
+  else if (richText?.hasUnpreservedChanges?.()) {
+    workspace?.showNotes();
+    setStatus("navigationRichDraftError", "error");
+  } else return true;
   return false;
 }
 
@@ -3681,6 +3683,7 @@ async function openDocument(documentId, options = {}) {
   } else if (options.noteId) {
     const note = state.notes.find((item) => item.id === options.noteId);
     if (note) {
+      workspace?.showNotes("saved");
       state.highlight = note;
       state.highlightRevealId = note.id;
       state.page = note.page;
@@ -5078,6 +5081,7 @@ async function openNote(noteId, options = {}) {
     setStatus("unknownNote", "error");
     return "unknownNote";
   }
+  workspace?.showNotes("saved");
   const owner = state.document;
   const loadSequence = state.loadSequence;
   const note = state.notes.find((item) => item.id === noteId);
@@ -5367,6 +5371,7 @@ async function addCaptureToNote() {
     setStatus("objectStale", "error");
     return;
   }
+  workspace?.showNotes();
   const draft = state.editDrafts.get(capture.documentId) || ensureDraft(capture.documentId);
   const shouldAnchor = !state.editDrafts.has(capture.documentId) && !draft.text.trim() && draft.page === null;
   const bookmark = richText?.getBookmark();
@@ -5486,6 +5491,7 @@ function finishSelection(event) {
 }
 
 function revealSavedNote(noteId) {
+  workspace?.showNotes("saved");
   const item = elements.notesList.querySelector(`[data-note-id="${noteId}"]`);
   if (!item) return;
   if (window.matchMedia("(max-width: 820px)").matches) {
@@ -5610,6 +5616,7 @@ async function submitSave(includeExcerpt = false) {
     }
     setStatus(includeImage ? "savedImage" : "saved", "success");
   } catch (error) {
+    if (state.document?.id === document.id) workspace?.showNotes();
     const currentDraft = ensureDraft(document.id);
     const imageFailed = noteSaved && includeImage;
     if (currentDraft.requestId === requestId) {
@@ -5924,6 +5931,7 @@ async function runMutation(operation) {
   } catch (error) {
     const conflicted = error.code === "revision_conflict";
     if (action === "edit") {
+      if (state.document?.id === document.id) workspace?.showNotes();
       const currentDraft = state.editDrafts.get(document.id);
       if (currentDraft?.requestId === operation.payload.request_id) {
         currentDraft.saveFailed = true;

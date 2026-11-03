@@ -1,3 +1,12 @@
+# v0.42 frontend organization and paper-association feedback
+
+No new API or schema. POST /api/v1/studies/{id}/papers still accepts {document_id,sha256}
+and returns the exact paper record with201/200. Personal My data is not a project:
+personal_workspace_not_project remains409; backend rejection is unchanged. Frontend now
+explains this and other association errors, guards known personal-owner callbacks and
+validates returned paper identity before updating its list. Retry retains the original
+owner/paper/version rather than silently using a different selection. See DATA-WORKSPACE-CLARITY.md.
+
 # v0.41 explicit referenced-dataset descriptive analysis
 
 Dataset resource_refs additionally accepts strict optional allow_analysis:true. False/default is

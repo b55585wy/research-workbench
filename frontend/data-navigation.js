@@ -91,8 +91,11 @@ export function createDataNavigation(adapter) {
   const states = new Map();
   const body = make("div", "data-catalog-groups");
   for (const kind of KINDS) {
-    const section = make("section", "data-catalog-group");
+    const section = make("details", "data-catalog-group");
+    section.open = kind === "dataset";
+    const summary = make("summary", "data-catalog-group-summary");
     const groupHeading = make("h3", "data-catalog-group-heading");
+    summary.append(groupHeading);
     const list = make("ul", "documents-list data-catalog-list");
     const status = make("div", "data-catalog-status");
     status.setAttribute("role", "status");
@@ -100,7 +103,7 @@ export function createDataNavigation(adapter) {
     const more = make("button", "button button-quiet data-catalog-more");
     more.type = "button";
     more.addEventListener("click", () => load(kind, true));
-    section.append(groupHeading, list, status, more);
+    section.append(summary, list, status, more);
     body.append(section);
     lists.set(kind, { section, groupHeading, list, status, more });
     states.set(kind, {
@@ -230,10 +233,12 @@ export function createDataNavigation(adapter) {
       state.nextCursor = typeof body.next_cursor === "string" ? body.next_cursor : null;
       state.loaded = true;
       stale = false;
+      if (requestQuery && state.items.length) lists.get(kind).section.open = true;
     } catch (error) {
       if (error?.name === "AbortError" || generation !== state.generation) return;
       state.error = error.code || "request_failed";
       state.retryAppend = append;
+      lists.get(kind).section.open = true;
     } finally {
       if (generation === state.generation) {
         state.pending = false;

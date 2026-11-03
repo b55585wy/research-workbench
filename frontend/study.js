@@ -39,6 +39,13 @@ const messages = {
     unlinkingPaper: "正在取消关联…",
     unlinkedPaper: "已取消关联，原论文仍保留在文库中。",
     papersLoadFailed: "无法加载关联论文。",
+    personal_workspace_not_project: "“我的数据”不是项目，不能关联论文。可按需使用项目汇集论文；不创建项目也能分析数据。",
+    paper_quota: "每个项目最多关联 20 篇论文。请先取消不再需要的关联。",
+    invalid_paper: "请选择文库中有效的论文。",
+    file_missing: "论文文件已缺失，无法关联。",
+    document_trashed: "论文已在回收站中，请先恢复再关联。",
+    document_purged: "论文已彻底删除，无法关联。",
+    study_changed: "项目已变化，请重新加载后再关联论文。",
     loading: "正在加载…",
     retry: "重试",
     noteSource: "笔记来源",
@@ -138,6 +145,13 @@ const messages = {
     unlinkingPaper: "Unlinking paper…",
     unlinkedPaper: "Paper unlinked. The original remains in the library.",
     papersLoadFailed: "Associated papers could not be loaded.",
+    personal_workspace_not_project: "My data is not a project and cannot associate papers. Use an optional project to organize papers; you do not need to create one to analyze data.",
+    paper_quota: "A project can associate up to 20 papers. Unlink papers you no longer need first.",
+    invalid_paper: "Choose a valid paper from the library.",
+    file_missing: "The paper file is missing, so it cannot be associated.",
+    document_trashed: "The paper is in trash. Restore it before associating it.",
+    document_purged: "The paper was permanently deleted and cannot be associated.",
+    study_changed: "The project changed. Reload it before changing paper associations.",
     loading: "Loading…",
     retry: "Retry",
     noteSource: "Note source",
@@ -302,6 +316,7 @@ export function createStudy(adapter) {
         papersPending: false,
         papersStatus: null,
         papersOpen: false,
+        paperOperation: null,
         draftSourceOpen: false,
         noteSourcesOpen: new Map(),
         selectedPaperId: ""
@@ -626,6 +641,12 @@ export function createStudy(adapter) {
     const personal = isPersonal(owner);
     elements.main.dataset.ownerKind = personal ? "personal" : owner ? "study" : adapter.getDocument() ? "paper" : "none";
     elements.view.hidden = !owner || personal;
+    elements.papersDetails.hidden = !owner || personal;
+    if (!owner || personal) {
+      elements.paperSelect.disabled = true;
+      elements.paperLink.disabled = true;
+      for (const button of elements.papers.querySelectorAll("button")) button.disabled = true;
+    }
     if (owner && !personal) {
       elements.viewTitle.textContent = owner.name || owner.title || t("untitled");
       elements.viewQuestion.textContent = owner.question || "";
@@ -640,6 +661,7 @@ export function createStudy(adapter) {
   }
 
   async function loadPapers(owner) {
+    if (!owner || isPersonal(owner) || isPersonal() || currentDocument()?.id !== owner.id) return;
     const entry = entryFor(owner.id);
     if (entry.papersPending) return;
     entry.papersPending = true;
@@ -655,16 +677,22 @@ export function createStudy(adapter) {
       entry.papersStatus = { key: errorKey(error) === "request_failed" ? "papersLoadFailed" : errorKey(error), kind: "error", retry: () => loadPapers(owner) };
     } finally {
       entry.papersPending = false;
-      if (requestSequence === sequence && currentId === owner.id) renderPapers();
+      if (requestSequence === sequence && currentId === owner.id && !isPersonal()) renderPapers();
     }
   }
 
-  async function linkPaper() {
-    const owner = currentDocument();
-    if (!owner) return;
-    const entry = entryFor(owner.id);
-    const paper = adapter.getDocuments().find((item) => item.id === entry.selectedPaperId && item.kind !== "study");
-    if (!paper?.sha256 || entry.papersPending) return;
+  async function linkPaper(operation = null) {
+    if (!operation) {
+      const owner = currentDocument();
+      if (!owner || isPersonal(owner)) return;
+      const entry = entryFor(owner.id);
+      const paper = adapter.getDocuments().find((item) => item.id === entry.selectedPaperId && item.kind !== "study");
+      if (!paper?.sha256 || entry.papersPending) return;
+      operation = { owner, entry, paperId: paper.id, sha256: paper.sha256 };
+      entry.paperOperation = operation;
+    }
+    const { owner, entry, paperId, sha256 } = operation;
+    if (entry.paperOperation !== operation || entry.papersPending || isPersonal(owner) || isPersonal() || currentDocument()?.id !== owner.id) return;
     entry.papersPending = true;
     entry.papersStatus = { key: "linkingPaper", kind: "info" };
     renderPapers();
@@ -672,35 +700,44 @@ export function createStudy(adapter) {
       const linked = await adapter.api(`/api/v1/studies/${encodeURIComponent(owner.id)}/papers`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ document_id: paper.id, sha256: paper.sha256 })
+        body: JSON.stringify({ document_id: paperId, sha256 })
       });
+      if (linked?.id !== paperId || linked?.sha256 !== sha256) {
+        const error = new Error("request_failed");
+        error.code = "request_failed";
+        throw error;
+      }
       entry.papers = [linked, ...entry.papers.filter((item) => item.id !== linked.id)];
       entry.papersLoaded = true;
-      entry.selectedPaperId = "";
+      if (entry.selectedPaperId === paperId) entry.selectedPaperId = "";
+      entry.paperOperation = null;
       entry.papersStatus = { key: "linkedPaper", kind: "success" };
     } catch (error) {
-      entry.papersStatus = { key: errorKey(error), kind: "error", retry: linkPaper };
+      entry.papersStatus = { key: errorKey(error), kind: "error", retry: () => linkPaper(operation) };
     } finally {
       entry.papersPending = false;
-      if (currentId === owner.id) renderPapers();
+      if (currentId === owner.id && !isPersonal()) renderPapers();
     }
   }
 
   async function unlinkPaper(owner, paper) {
+    const paperId = paper?.id;
+    const sha256 = paper?.sha256;
+    if (!owner || isPersonal(owner) || isPersonal() || currentDocument()?.id !== owner.id) return;
     const entry = entryFor(owner.id);
-    if (entry.papersPending || !paper.sha256) return;
+    if (entry.papersPending || !paperId || !sha256) return;
     entry.papersPending = true;
     entry.papersStatus = { key: "unlinkingPaper", kind: "info" };
     if (currentId === owner.id) renderPapers();
     try {
-      await adapter.api(`/api/v1/studies/${encodeURIComponent(owner.id)}/papers/${encodeURIComponent(paper.id)}?sha256=${encodeURIComponent(paper.sha256)}`, { method: "DELETE" });
-      entry.papers = entry.papers.filter((item) => item.id !== paper.id);
+      await adapter.api(`/api/v1/studies/${encodeURIComponent(owner.id)}/papers/${encodeURIComponent(paperId)}?sha256=${encodeURIComponent(sha256)}`, { method: "DELETE" });
+      entry.papers = entry.papers.filter((item) => item.id !== paperId);
       entry.papersStatus = { key: "unlinkedPaper", kind: "success" };
     } catch (error) {
-      entry.papersStatus = { key: errorKey(error), kind: "error", retry: () => unlinkPaper(owner, paper) };
+      entry.papersStatus = { key: errorKey(error), kind: "error", retry: () => unlinkPaper(owner, { id: paperId, sha256 }) };
     } finally {
       entry.papersPending = false;
-      if (currentId === owner.id) renderPapers();
+      if (currentId === owner.id && !isPersonal()) renderPapers();
     }
   }
 
@@ -799,6 +836,7 @@ export function createStudy(adapter) {
       if (entry.draft?.operation === operation) entry.draft = null;
       setNoteStatus(entry, { key: "saved", kind: "success" });
     } catch (error) {
+      if (currentId === owner.id) byId("note-editor-group").open = true;
       if (entry.draft?.operation === operation) entry.draft.saveFailed = true;
       setNoteStatus(entry, { key: error?.code === "network" ? "saveFailed" : errorKey(error), kind: "error", retry: () => submitNote(new Event("submit")) });
     } finally {
@@ -814,6 +852,7 @@ export function createStudy(adapter) {
     const entry = entryFor(owner.id);
     const noteState = adapter.getNoteStates().find((item) => item.id === note.id);
     if (!noteState || entry.notePending || entry.mutations.size || entry.edit) return;
+    byId("note-editor-group").open = true;
     captureCurrentDraft();
     entry.edit = {
       noteId: note.id,
@@ -954,6 +993,7 @@ export function createStudy(adapter) {
       if (operation.action === "edit" && entry.edit?.operation === operation) entry.edit = null;
       setNoteStatus(entry, { key: operation.successStatus, kind: "success" });
     } catch (error) {
+      if (operation.action === "edit" && currentId === owner.id) byId("note-editor-group").open = true;
       if (operation.action === "edit" && entry.edit?.operation === operation) entry.edit.saveFailed = true;
       else entry.failedMutations.set(noteId, operation);
       setNoteStatus(entry, {
@@ -976,6 +1016,7 @@ export function createStudy(adapter) {
     if (!owner) return false;
     const entry = entryFor(owner.id);
     if (entry.notePending || entry.mutations.size || entry.edit) return false;
+    byId("note-editor-group").open = true;
     const summary = kind === "analysis" && Array.isArray(item?.outputs)
       ? item.outputs.find((output) => output?.name === "summary.json")
       : null;
@@ -1003,6 +1044,7 @@ export function createStudy(adapter) {
     const navigationSequence = ++noteNavigationSequence;
     const owner = currentDocument();
     if (!owner) return;
+    byId("saved-notes-group").open = true;
     const note = adapter.getNotes().find((item) => item.id === noteId);
     if (note) {
       navigateNoteSource(owner, note);
@@ -1067,7 +1109,7 @@ export function createStudy(adapter) {
     const entry = entryFor(currentId);
     if (entry) entry.selectedPaperId = elements.paperSelect.value;
   });
-  elements.paperLink.addEventListener("click", linkPaper);
+  elements.paperLink.addEventListener("click", () => linkPaper());
   elements.noteText.addEventListener("input", () => {
     const owner = currentDocument();
     if (!owner) return;

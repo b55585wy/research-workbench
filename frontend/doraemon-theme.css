@@ -259,14 +259,6 @@ html[data-theme="doraemon-blue"] :where(.documents-panel, .notes-panel) {
   background: #fbfeff;
 }
 
-html[data-theme="doraemon-blue"] .documents-panel {
-  box-shadow: 4px 0 18px rgb(0 111 159 / 5%);
-}
-
-html[data-theme="doraemon-blue"] .notes-panel {
-  box-shadow: -4px 0 18px rgb(0 111 159 / 5%);
-}
-
 html[data-theme="doraemon-blue"] :where(
   .documents-panel > .panel-heading,
   .notes-panel > .panel-heading,
@@ -290,7 +282,15 @@ html[data-theme="doraemon-blue"] .library-search {
   background: #f8fdff;
 }
 
-html[data-theme="doraemon-blue"] .document-item,
+html[data-theme="doraemon-blue"] .document-item {
+  margin: 0;
+  border: 0;
+  border-bottom: 1px solid var(--ui-border);
+  border-radius: 0;
+  background: transparent;
+  overflow: visible;
+}
+
 html[data-theme="doraemon-blue"] .search-result-item {
   margin: 7px 10px;
   border: 1px solid var(--ui-border);
@@ -304,14 +304,15 @@ html[data-theme="doraemon-blue"] :where(.document-open, .search-result-open) {
   border-radius: inherit;
 }
 
-html[data-theme="doraemon-blue"] .document-item[data-active="true"] {
-  border-color: var(--doraemon-blue);
-  box-shadow: 0 3px 0 rgb(244 197 66 / 70%);
-}
-
 html[data-theme="doraemon-blue"] .document-item[data-active="true"] .document-open {
   background: var(--ui-selected);
-  box-shadow: inset 4px 0 0 var(--ui-primary);
+  box-shadow: inset 3px 0 0 var(--ui-primary);
+}
+
+@media (max-width: 820px) {
+  html[data-theme="doraemon-blue"] .document-item {
+    border-right: 1px solid var(--ui-border);
+  }
 }
 
 html[data-theme="doraemon-blue"] .reader-toolbar {

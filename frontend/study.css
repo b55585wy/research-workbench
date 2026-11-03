@@ -111,18 +111,18 @@
   -webkit-line-clamp: 2;
 }
 
-.workspace[data-owner-kind="study"] #documents-empty,
-.workspace[data-owner-kind="study"] .reader-heading-row,
-.workspace[data-owner-kind="study"] #metadata-panel,
-.workspace[data-owner-kind="study"] .reader-toolbar,
-.workspace[data-owner-kind="study"] #reader-stage,
-.workspace[data-owner-kind="study"] #image-library,
-.workspace[data-owner-kind="study"] #note-form,
-.workspace[data-owner-kind="study"] > .notes-panel > .saved-notes-heading:not(#study-notes-heading),
-.workspace[data-owner-kind="study"] > .notes-panel > .review-explainer:not(#study-review-explainer),
-.workspace[data-owner-kind="study"] > .notes-panel > #notes-empty,
-.workspace[data-owner-kind="study"] > .notes-panel > #notes-list,
-.workspace[data-owner-kind="study"] > .notes-panel > #deleted-notes {
+.workspace:is([data-owner-kind="study"], [data-owner-kind="personal"]) #documents-empty,
+.workspace:is([data-owner-kind="study"], [data-owner-kind="personal"]) .reader-heading-row,
+.workspace:is([data-owner-kind="study"], [data-owner-kind="personal"]) #metadata-panel,
+.workspace:is([data-owner-kind="study"], [data-owner-kind="personal"]) .reader-toolbar,
+.workspace:is([data-owner-kind="study"], [data-owner-kind="personal"]) #reader-stage,
+.workspace:is([data-owner-kind="study"], [data-owner-kind="personal"]) #image-library,
+.workspace:is([data-owner-kind="study"], [data-owner-kind="personal"]) #note-form,
+.workspace:is([data-owner-kind="study"], [data-owner-kind="personal"]) #saved-notes-group .saved-notes-heading:not(#study-notes-heading),
+.workspace:is([data-owner-kind="study"], [data-owner-kind="personal"]) #saved-notes-group .review-explainer:not(#study-review-explainer),
+.workspace:is([data-owner-kind="study"], [data-owner-kind="personal"]) #saved-notes-group #notes-empty,
+.workspace:is([data-owner-kind="study"], [data-owner-kind="personal"]) #saved-notes-group #notes-list,
+.workspace:is([data-owner-kind="study"], [data-owner-kind="personal"]) #notes-panel #deleted-notes {
   display: none !important;
 }
 

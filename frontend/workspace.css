@@ -2,6 +2,7 @@
   min-height: 54px;
   padding: 8px 24px;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
@@ -17,6 +18,14 @@
   border: 1px solid var(--ui-border);
   border-radius: 5px;
   background: var(--ui-surface-subtle);
+}
+
+.workspace-sidebar-controls {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 .workspace-mode-button,
@@ -46,12 +55,28 @@
   grid-template-columns: minmax(200px, 240px) minmax(360px, 1fr) minmax(280px, 340px);
 }
 
+.workspace[data-workspace-mode="reading"][data-library-visible="false"] {
+  grid-template-columns: minmax(360px, 1fr);
+}
+
+.workspace[data-workspace-mode="reading"][data-library-visible="false"][data-notes-visible="true"] {
+  grid-template-columns: minmax(360px, 1fr) minmax(280px, 340px);
+}
+
 .workspace[data-workspace-mode="data"] {
   grid-template-columns: minmax(200px, 240px) minmax(0, 1fr);
 }
 
 .workspace[data-workspace-mode="data"][data-notes-visible="true"] {
   grid-template-columns: minmax(200px, 240px) minmax(0, 1fr) minmax(280px, 340px);
+}
+
+.workspace[data-workspace-mode="data"][data-library-visible="false"] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.workspace[data-workspace-mode="data"][data-library-visible="false"][data-notes-visible="true"] {
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
 }
 
 .data-workspace {
@@ -107,18 +132,35 @@
 
 .analysis-layout {
   display: grid;
-  grid-template-columns: minmax(280px, 0.85fr) minmax(360px, 1.35fr);
-  gap: 16px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
   align-items: start;
 }
 
-.analysis-overview {
-  grid-column: 1 / -1;
+.analysis-overview,
+.analysis-settings,
+.analysis-results {
   min-width: 0;
-  padding: 16px;
-  border: 1px solid var(--ui-border);
-  border-radius: 5px;
-  background: var(--ui-surface);
+  padding: 16px 0;
+  border: 0;
+  border-bottom: 1px solid var(--ui-border);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.analysis-overview {
+  padding-top: 0;
+}
+
+.analysis-results {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.analysis-section-heading {
+  margin-bottom: 12px;
+  font-size: 15px;
 }
 
 .analysis-overview .analysis-upload-row {
@@ -130,8 +172,6 @@
   overflow: auto;
 }
 
-.analysis-settings,
-.analysis-results,
 .charts-builder,
 .charts-output {
   min-width: 0;
@@ -141,13 +181,22 @@
   background: var(--ui-surface);
 }
 
+.analysis-settings > summary {
+  min-height: 40px;
+  padding: 8px 0;
+  color: var(--ui-text-soft);
+  font-weight: 650;
+  line-height: 1.5;
+  cursor: pointer;
+}
+
+.analysis-settings-body {
+  padding-top: 16px;
+}
+
 .analysis-settings .analysis-label:first-child,
 .charts-builder .chart-field:first-child {
   margin-top: 0;
-}
-
-.analysis-results:empty {
-  display: none;
 }
 
 .analysis-results .analyses-list {
@@ -171,22 +220,43 @@
   min-height: 420px;
 }
 
-.data-imports {
+.data-workspace > .study-materials {
   margin: 0 0 16px;
-  padding: 14px 16px;
-  border: 1px solid var(--ui-border);
-  border-radius: 5px;
-  background: var(--ui-surface);
+  border: 0;
+  border-bottom: 1px solid var(--ui-border);
+  border-radius: 0;
+  background: transparent;
 }
 
-.data-import-history {
-  margin-top: 8px;
-  border-top: 1px solid var(--ui-border);
+.study-materials > summary {
+  padding: 12px 0;
+  color: var(--ui-text-soft);
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.study-materials > .study-view {
+  padding: 0 0 16px;
+}
+
+.study-materials .study-view-header,
+.study-materials .study-papers-section,
+.study-materials .study-resources-section {
+  max-width: none;
+}
+
+.data-imports {
+  margin: 0 0 16px;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid var(--ui-border);
+  border-radius: 0;
+  background: transparent;
 }
 
 .data-import-history > summary {
-  min-height: 38px;
-  padding: 10px 0 4px;
+  min-height: 40px;
+  padding: 8px 0;
   color: var(--ui-text-soft);
   font-size: 12px;
   font-weight: 650;
@@ -250,15 +320,32 @@
     grid-template-columns: 200px minmax(320px, 1fr) 280px;
   }
 
+  .workspace[data-workspace-mode="reading"][data-library-visible="false"] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .workspace[data-workspace-mode="reading"][data-library-visible="false"][data-notes-visible="true"] {
+    grid-template-columns: minmax(0, 1fr) 280px;
+  }
+
   .workspace[data-workspace-mode="data"],
   .workspace[data-workspace-mode="data"][data-notes-visible="true"] {
     grid-template-columns: 200px minmax(0, 1fr);
+  }
+
+  .workspace[data-workspace-mode="data"][data-library-visible="false"],
+  .workspace[data-workspace-mode="data"][data-library-visible="false"][data-notes-visible="true"] {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .workspace[data-workspace-mode="data"][data-notes-visible="true"] .notes-panel {
     grid-column: 2;
     border-top: 1px solid var(--ui-border);
     border-left: 0;
+  }
+
+  .workspace[data-workspace-mode="data"][data-library-visible="false"][data-notes-visible="true"] .notes-panel {
+    grid-column: 1;
   }
 
   .analysis-layout {
@@ -308,6 +395,7 @@
     padding-inline: 10px;
   }
 
+  #workspace-library-toggle,
   #workspace-notes-toggle {
     padding-inline: 8px;
   }
@@ -316,9 +404,6 @@
     padding: 12px;
   }
 
-  .analysis-overview,
-  .analysis-settings,
-  .analysis-results,
   .charts-builder,
   .charts-output,
   .data-imports-review {
@@ -390,8 +475,67 @@
   font-weight: 400;
 }
 
+.paper-library,
+.notes-section-group,
+.data-catalog-group {
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.paper-library-summary,
+.notes-section-summary,
+.data-catalog-group-summary {
+  min-height: 40px;
+  color: var(--ui-text-soft);
+  font-weight: 650;
+  line-height: 1.5;
+  cursor: pointer;
+}
+
+.paper-library-summary {
+  padding: 12px 16px;
+}
+
+.paper-library-summary h2,
 .data-catalog-group-heading {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-size: 15px;
+}
+
+.paper-library-actions {
+  min-height: 0;
+  padding-top: 0;
+}
+
+.notes-section-summary {
+  padding: 12px 16px;
+}
+
+#note-editor-group > .note-editor {
+  border-bottom: 0;
+}
+
+.saved-notes-summary {
+  padding: 0;
+}
+
+.saved-notes-summary .saved-notes-heading {
+  flex: 1;
+  min-width: 0;
+  padding: 12px 16px;
+}
+
+.saved-notes-summary h3 {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.data-catalog-group-summary {
   padding: 12px 16px 6px;
+}
+
+.data-catalog-group-heading {
+  padding: 0;
   color: var(--ui-text-soft);
 }
 

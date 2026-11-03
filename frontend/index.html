@@ -53,11 +53,14 @@
       <button id="workspace-mode-reading" class="workspace-mode-button" type="button" aria-pressed="true">阅读</button>
       <button id="workspace-mode-data" class="workspace-mode-button" type="button" aria-pressed="false">数据分析</button>
     </div>
-    <button id="workspace-notes-toggle" class="button button-quiet" type="button" aria-controls="notes-panel" aria-pressed="true">隐藏笔记</button>
+    <div class="workspace-sidebar-controls">
+      <button id="workspace-library-toggle" class="button button-quiet" type="button" aria-controls="documents-panel" aria-expanded="true" aria-pressed="true" aria-label="收起资料栏" title="收起资料栏">收起资料栏</button>
+      <button id="workspace-notes-toggle" class="button button-quiet" type="button" aria-controls="notes-panel" aria-expanded="true" aria-pressed="true" aria-label="收起笔记栏" title="收起笔记栏">收起笔记栏</button>
+    </div>
   </nav>
 
   <main class="workspace">
-    <aside class="documents-panel" aria-labelledby="documents-heading">
+    <aside id="documents-panel" class="documents-panel" aria-labelledby="documents-heading">
       <div id="reading-sidebar">
         <form id="library-search-form" class="library-search" role="search">
           <label for="library-search-input" class="library-search-label" data-i18n="searchLabel">搜索研究、文献和笔记</label>
@@ -72,16 +75,20 @@
           <button id="library-search-retry" class="status-retry" type="button" data-i18n="retry" hidden>重试</button>
         </div>
         <div id="library-search-results" class="library-search-results" data-testid="library-search-results" aria-label="搜索结果" hidden></div>
-        <div class="panel-heading">
-          <h2 id="documents-heading" data-i18n="documents">文献</h2>
-          <button id="upload-button" class="button button-primary upload-button" type="button" data-i18n="upload">上传 PDF</button>
-          <input id="upload-input" data-testid="upload-input" type="file" accept="application/pdf,.pdf" hidden>
-        </div>
-        <div id="documents-empty" class="empty-state">
-          <p data-i18n="emptyDocuments">还没有文献。上传 PDF，或打开两页示例开始阅读。</p>
-          <button id="sample-open" class="button button-secondary" type="button" data-testid="sample-open" data-i18n="sample">试读示例</button>
-        </div>
-        <ul id="documents-list" class="documents-list" data-testid="documents-list" aria-label="已保存文献"></ul>
+        <details id="paper-library" class="paper-library" open>
+          <summary class="paper-library-summary">
+            <h2 id="documents-heading" data-i18n="documents">文献</h2>
+          </summary>
+          <div class="panel-heading paper-library-actions">
+            <button id="upload-button" class="button button-primary upload-button" type="button" data-i18n="upload">上传 PDF</button>
+            <input id="upload-input" data-testid="upload-input" type="file" accept="application/pdf,.pdf" hidden>
+          </div>
+          <div id="documents-empty" class="empty-state">
+            <p data-i18n="emptyDocuments">还没有文献。上传 PDF，或打开两页示例开始阅读。</p>
+            <button id="sample-open" class="button button-secondary" type="button" data-testid="sample-open" data-i18n="sample">试读示例</button>
+          </div>
+          <ul id="documents-list" class="documents-list" data-testid="documents-list" aria-label="已保存文献"></ul>
+        </details>
         <details id="library-trash" class="library-trash">
           <summary><span data-i18n="libraryTrash">文献回收站</span><span id="library-trash-count" class="notes-count"></span></summary>
           <p class="library-trash-help" data-i18n="libraryTrashHelp">回收站中的文献可恢复。彻底删除会清理原文及关联资料，无法撤销。</p>
@@ -121,41 +128,44 @@
         <span id="page-count" class="page-count"></span>
       </div>
 
-      <section id="study-view" class="study-view" aria-labelledby="study-view-title" hidden>
-        <header class="study-view-header">
-          <p class="study-view-kicker">研究</p>
-          <h2 id="study-view-title"></h2>
-          <p id="study-view-question" class="study-view-question"></p>
-        </header>
-        <details id="study-papers-details" class="study-papers-section" aria-labelledby="study-papers-heading">
-          <summary class="study-papers-summary">
-            <span id="study-papers-heading" role="heading" aria-level="3">关联论文</span>
-            <span id="study-papers-count" class="notes-count">0</span>
-          </summary>
-          <p id="study-papers-help" class="study-papers-help">关联只用于汇集论文，不会移动研究数据或笔记，也不会自动向助手提供论文内容。</p>
-          <div class="study-paper-link-row">
-            <label class="sr-only" for="study-paper-select">选择要关联的论文</label>
-            <select id="study-paper-select"></select>
-            <button id="study-paper-link" class="button button-secondary" type="button" disabled>关联论文</button>
-          </div>
-          <div id="study-papers-status" class="study-status" role="status" aria-live="polite"></div>
-          <ul id="study-papers" class="study-papers" aria-label="已关联论文"></ul>
-        </details>
-        <details id="study-resources-details" class="study-resources-section" aria-labelledby="study-resources-heading">
-          <summary class="study-resources-summary">
-            <span id="study-resources-heading" role="heading" aria-level="3">关联数据与结果</span>
-            <span id="study-resources-count" class="notes-count">0</span>
-          </summary>
-          <p id="study-resources-help" class="study-resources-help">仅保存指向原数据、已完成分析和图表的关联；不会复制、移动或自动运行，也不会向助手共享内容。</p>
-          <div class="study-resource-toolbar">
-            <button id="study-resource-add" class="button button-secondary" type="button" aria-haspopup="dialog" aria-controls="study-resource-picker">添加现有资料</button>
-            <button id="study-resource-refresh" class="button button-quiet" type="button">刷新</button>
-          </div>
-          <div id="study-resources-status" class="study-status" role="status" aria-live="polite"></div>
-          <div id="study-resources-write-status" class="study-status" role="status" aria-live="polite"></div>
-          <ul id="study-resources" class="study-resources" aria-label="关联数据与结果"></ul>
-        </details>
-      </section>
+      <details id="study-materials" class="study-materials" aria-labelledby="study-materials-summary" hidden>
+        <summary id="study-materials-summary">项目资料</summary>
+        <section id="study-view" class="study-view" aria-labelledby="study-view-title" hidden>
+          <header class="study-view-header">
+            <p class="study-view-kicker">研究</p>
+            <h2 id="study-view-title"></h2>
+            <p id="study-view-question" class="study-view-question"></p>
+          </header>
+          <details id="study-papers-details" class="study-papers-section" aria-labelledby="study-papers-heading">
+            <summary class="study-papers-summary">
+              <span id="study-papers-heading" role="heading" aria-level="3">关联论文</span>
+              <span id="study-papers-count" class="notes-count">0</span>
+            </summary>
+            <p id="study-papers-help" class="study-papers-help">关联只用于汇集论文，不会移动研究数据或笔记，也不会自动向助手提供论文内容。</p>
+            <div class="study-paper-link-row">
+              <label class="sr-only" for="study-paper-select">选择要关联的论文</label>
+              <select id="study-paper-select"></select>
+              <button id="study-paper-link" class="button button-secondary" type="button" disabled>关联论文</button>
+            </div>
+            <div id="study-papers-status" class="study-status" role="status" aria-live="polite"></div>
+            <ul id="study-papers" class="study-papers" aria-label="已关联论文"></ul>
+          </details>
+          <details id="study-resources-details" class="study-resources-section" aria-labelledby="study-resources-heading">
+            <summary class="study-resources-summary">
+              <span id="study-resources-heading" role="heading" aria-level="3">关联数据与结果</span>
+              <span id="study-resources-count" class="notes-count">0</span>
+            </summary>
+            <p id="study-resources-help" class="study-resources-help">仅保存指向原数据、已完成分析和图表的关联；不会复制、移动或自动运行，也不会向助手共享内容。</p>
+            <div class="study-resource-toolbar">
+              <button id="study-resource-add" class="button button-secondary" type="button" aria-haspopup="dialog" aria-controls="study-resource-picker">添加现有资料</button>
+              <button id="study-resource-refresh" class="button button-quiet" type="button">刷新</button>
+            </div>
+            <div id="study-resources-status" class="study-status" role="status" aria-live="polite"></div>
+            <div id="study-resources-write-status" class="study-status" role="status" aria-live="polite"></div>
+            <ul id="study-resources" class="study-resources" aria-label="关联数据与结果"></ul>
+          </details>
+        </section>
+      </details>
 
       <details id="metadata-panel" class="metadata-panel">
         <summary data-testid="metadata-toggle"><span data-i18n="bibliography">书目信息</span></summary>
@@ -395,32 +405,43 @@
         <h2 id="notes-heading" data-i18n="notes">笔记</h2>
       </div>
 
-      <form id="study-note-form" class="note-editor study-note-editor" hidden>
-        <p id="study-note-edit-label" class="edit-mode-label" hidden>编辑已保存笔记 · 来源保持不变</p>
-        <label for="study-note-source" class="note-label">笔记来源</label>
-        <select id="study-note-source"></select>
-        <details id="study-note-source-details" class="study-note-source-details">
-          <summary id="study-note-source-details-summary">来源标识</summary>
-          <p id="study-note-source-detail" class="study-note-source-detail"></p>
-        </details>
-        <label for="study-note-text" class="note-label">笔记内容</label>
-        <textarea id="study-note-text" rows="7" maxlength="10000" placeholder="记录研究问题、数据或结果…"></textarea>
-        <div class="note-editor-footer">
-          <span id="study-note-character-count" class="character-count">0 / 10000</span>
-          <div class="note-save-actions">
-            <button id="study-note-edit-cancel" class="button button-quiet" type="button" hidden>取消编辑</button>
-            <button id="study-note-save" class="button button-primary" type="submit" disabled>保存笔记</button>
+      <details id="note-editor-group" class="notes-section-group" open>
+        <summary id="note-editor-summary" class="notes-section-summary">编辑笔记</summary>
+        <form id="study-note-form" class="note-editor study-note-editor" hidden>
+          <p id="study-note-edit-label" class="edit-mode-label" hidden>编辑已保存笔记 · 来源保持不变</p>
+          <label for="study-note-source" class="note-label">笔记来源</label>
+          <select id="study-note-source"></select>
+          <details id="study-note-source-details" class="study-note-source-details">
+            <summary id="study-note-source-details-summary">来源标识</summary>
+            <p id="study-note-source-detail" class="study-note-source-detail"></p>
+          </details>
+          <label for="study-note-text" class="note-label">笔记内容</label>
+          <textarea id="study-note-text" rows="7" maxlength="10000" placeholder="记录研究问题、数据或结果…"></textarea>
+          <div class="note-editor-footer">
+            <span id="study-note-character-count" class="character-count">0 / 10000</span>
+            <div class="note-save-actions">
+              <button id="study-note-edit-cancel" class="button button-quiet" type="button" hidden>取消编辑</button>
+              <button id="study-note-save" class="button button-primary" type="submit" disabled>保存笔记</button>
+            </div>
           </div>
-        </div>
-        <div id="study-note-status" class="study-status" role="status" aria-live="polite"></div>
-      </form>
-      <div id="study-notes-heading" class="saved-notes-heading" hidden>
-        <h3>已保存笔记</h3>
-        <span id="study-notes-count" class="notes-count"></span>
-      </div>
-      <p id="study-review-explainer" class="review-explainer" hidden>“已核对来源”仅表示你检查了来源，不代表身份认证或科学验证。</p>
-      <p id="study-notes-empty" class="notes-empty" hidden>这项研究还没有笔记。</p>
-      <ul id="study-notes-list" class="notes-list" aria-label="已保存研究笔记" hidden></ul>
+          <div id="study-note-status" class="study-status" role="status" aria-live="polite"></div>
+        </form>
+      </details>
+      <details id="saved-notes-group" class="notes-section-group" open>
+        <summary class="notes-section-summary saved-notes-summary">
+          <div id="study-notes-heading" class="saved-notes-heading" hidden>
+            <h3>已保存笔记</h3>
+            <span id="study-notes-count" class="notes-count"></span>
+          </div>
+          <div class="saved-notes-heading">
+            <h3 data-i18n="savedNotes">已保存笔记</h3>
+            <span id="notes-count" class="notes-count"></span>
+          </div>
+        </summary>
+        <p id="study-review-explainer" class="review-explainer" hidden>“已核对来源”仅表示你检查了来源，不代表身份认证或科学验证。</p>
+        <p id="study-notes-empty" class="notes-empty" hidden>这项研究还没有笔记。</p>
+        <ul id="study-notes-list" class="notes-list" aria-label="已保存研究笔记" hidden></ul>
+      </details>
       <details id="study-deleted-notes" class="deleted-notes" hidden>
         <summary><span>已删除笔记</span><span id="study-deleted-notes-count" class="notes-count"></span></summary>
         <p class="deleted-notes-help">已删除笔记可恢复到原来的来源。</p>
@@ -487,7 +508,7 @@
             </form>
           </details>
           <section id="data-imports" class="data-imports" aria-labelledby="data-imports-heading">
-            <h3 id="data-imports-heading">数据导入记录</h3>
+            <h3 id="data-imports-heading" class="sr-only">数据导入记录</h3>
             <p id="data-imports-help" class="data-imports-help">SAV/ZSAV 原始文件和核对记录保留在此处。打开记录不会更改当前数据或运行设置。</p>
             <div id="spss-import-status" class="analysis-status data-imports-status" role="status" aria-live="polite"></div>
             <label id="spss-import-select-label" class="analysis-label" for="spss-import-select">导入记录</label>
@@ -738,10 +759,6 @@
         </div>
       </form>
 
-      <div class="saved-notes-heading">
-        <h3 data-i18n="savedNotes">已保存笔记</h3>
-        <span id="notes-count" class="notes-count"></span>
-      </div>
       <section id="notes-filter-panel" class="notes-filter-panel" aria-label="筛选和选择笔记" hidden>
         <div class="notes-filter-grid">
           <label for="notes-filter-query"><span data-i18n="notesFilterText">筛选笔记</span>

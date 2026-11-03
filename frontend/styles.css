@@ -295,7 +295,8 @@ h3 {
   flex: 1;
   min-width: 0;
   width: 100%;
-  padding: 16px;
+  min-height: 36px;
+  padding: 8px 12px;
   border: 0;
   border-left: 3px solid transparent;
   background: transparent;
