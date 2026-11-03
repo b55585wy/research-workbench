@@ -1,3 +1,12 @@
+# v0.44 local guest / first React view slice
+
+No business API, schema, authentication, grant or ownership changes. The local guest
+badge identifies existing unverified single-machine use; no account/token/user_id
+endpoint or credential is introduced. React receives catalogue snapshots and host
+callbacks; actual selection uses the existing guarded document navigation. Native
+PDF/note/Agent/analysis controllers and source routes remain. See REACT-GUEST.md.
+Full-app embedding/API base-path adaptation is not claimed by this first view slice.
+
 # v0.43 safe answer rendering and image-region preview
 
 No API, schema, grants, source identities or analysis changes. Local browser rendering uses

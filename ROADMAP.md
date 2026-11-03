@@ -1,3 +1,7 @@
+v0.44 已交付本地游客标识与首个 React 头部/文献目录切片，沿用原数据和阅读/
+笔记/助手/分析控制器；尚未完成全站 React 或多账号。见 [REACT-GUEST.md](REACT-GUEST.md)。
+必要生产构建与源码/资源核对完成，未运行测试或浏览器/模型验证。
+
 2026-11-03 新增 React 迁移切片与明确的 Agent 编排、RAG 文献问答、Python/R 扩展方向，见 [架构决定](ARCHITECTURE.md) 和 [总任务表](TASK-PLAN.md)。近期按 React 阅读入口、双栏翻译、覆盖/手机重排推进，多账号服务端数据隔离列为上线条件，详见 [近期任务计划](NEAR-TERM-PLAN.md)。这是目标决定；线上仍为 v0.43，尚未开始 React 迁移。
 
 2026-11-03 当前总排序以 [TASK-PLAN.md](TASK-PLAN.md) 为准。v0.43 完成阅读/聊天

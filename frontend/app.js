@@ -19,6 +19,7 @@ import { createAnnotationHistory } from "/reader-annotation-history.js";
 import { createReaderNavigation } from "/reader-navigation.js";
 import { createReaderObjectMenu } from "/reader-object-menu.js";
 import { createReaderShapes, shapeBounds } from "/reader-shapes.js";
+import { createWorkspaceShellBridge } from "/workspace-shell-bridge.js";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = "/vendor/pdfjs/build/pdf.worker.mjs";
 
@@ -868,6 +869,7 @@ const $ = (id) => document.getElementById(id);
 const elements = {
   language: $("language-toggle"),
   theme: $("theme-select"),
+  identity: $("workspace-identity"),
   status: $("app-status"),
   statusText: $("status-text"),
   statusRetry: $("status-retry"),
@@ -1119,6 +1121,15 @@ let lastDataDocumentId = null;
 let lastDataSelection = { datasetId: null, analysisId: null, chartId: null };
 let workspaceModeIntent = 0;
 let workspaceModePending = false;
+
+const workspaceShell = createWorkspaceShellBridge({
+  identityContainer: elements.identity,
+  documentsContainer: elements.documentsList,
+  getModel: workspaceShellModel,
+  onMounted: rebindDocumentMenuReturnFocus,
+  onOpenDocument: (documentId) => openDocument(documentId, { workspace: "reading" }),
+  onDocumentMenu: (documentId, anchor, point) => openDocumentMenu(documentId, anchor, point)
+});
 
 function isStudy(document = state.document) {
   return document?.kind === "study";
@@ -1412,18 +1423,38 @@ function highlightDraft(documentId, page, rect) {
   drawHighlight();
 }
 
+function workspaceShellModel() {
+  return {
+    language: state.language,
+    documents: state.documents,
+    activeDocumentId: state.document?.id || null,
+    openMenuDocumentId: state.documentMenu?.documentId || null
+  };
+}
+
 function closeDocumentMenu(restoreFocus = false) {
   const menu = state.documentMenu;
   elements.documentMenu.hidden = true;
-  elements.documentsList.querySelectorAll('[data-action="document-menu"]').forEach((button) => button.setAttribute("aria-expanded", "false"));
   state.documentMenu = null;
+  if (!workspaceShell.update(workspaceShellModel())) {
+    elements.documentsList.querySelectorAll('[data-action="document-menu"]').forEach((button) => button.setAttribute("aria-expanded", "false"));
+  }
   if (restoreFocus && menu?.returnFocus?.isConnected) menu.returnFocus.focus();
+}
+
+function rebindDocumentMenuReturnFocus() {
+  const menu = state.documentMenu;
+  if (!menu) return;
+  const item = Array.from(elements.documentsList.querySelectorAll("[data-document-id]"))
+    .find((candidate) => candidate.dataset.documentId === menu.documentId);
+  const button = item?.querySelector('[data-action="document-menu"]');
+  if (button) menu.returnFocus = button;
 }
 
 function openDocumentMenu(documentId, anchor, point = null) {
   closeDocumentMenu();
   state.documentMenu = { documentId, returnFocus: anchor };
-  anchor.setAttribute("aria-expanded", "true");
+  if (!workspaceShell.update(workspaceShellModel())) anchor.setAttribute("aria-expanded", "true");
   elements.documentMenu.hidden = false;
   elements.documentMenu.style.left = "0px";
   elements.documentMenu.style.top = "0px";
@@ -1438,10 +1469,21 @@ function openDocumentMenu(documentId, anchor, point = null) {
   elements.documentMenu.querySelector("button")?.focus();
 }
 
-function renderDocuments() {
-  closeDocumentMenu();
+function renderLegacyIdentity() {
+  const brand = window.document.createElement("span");
+  brand.className = "brand-name";
+  brand.textContent = "research workspace";
+  const guest = window.document.createElement("span");
+  guest.className = "local-guest";
+  guest.textContent = state.language === "zh" ? "本地游客" : "Local guest";
+  guest.title = state.language === "zh"
+    ? "无需登录；数据保存在运行此工作台的电脑上。"
+    : "No login required; data is saved on the computer running this workspace.";
+  elements.identity.replaceChildren(brand, guest);
+}
+
+function renderLegacyDocuments() {
   elements.documentsList.replaceChildren();
-  elements.documentsEmpty.hidden = state.documents.length > 0;
   for (const document of state.documents) {
     const item = window.document.createElement("li");
     item.className = "document-item";
@@ -1469,7 +1511,7 @@ function renderDocuments() {
     menuButton.title = t("documentMenu");
     menuButton.setAttribute("aria-label", `${t("documentMenu")}: ${name.textContent}`);
     menuButton.setAttribute("aria-haspopup", "menu");
-    menuButton.setAttribute("aria-expanded", "false");
+    menuButton.setAttribute("aria-expanded", String(state.documentMenu?.documentId === document.id));
     menuButton.addEventListener("click", (event) => {
       event.stopPropagation();
       openDocumentMenu(document.id, menuButton);
@@ -1481,6 +1523,14 @@ function renderDocuments() {
     item.append(button, menuButton);
     elements.documentsList.append(item);
   }
+}
+
+function renderDocuments() {
+  closeDocumentMenu();
+  elements.documentsEmpty.hidden = state.documents.length > 0;
+  if (workspaceShell.update(workspaceShellModel())) return;
+  renderLegacyIdentity();
+  renderLegacyDocuments();
 }
 
 async function refreshActiveLibrary() {
@@ -7390,4 +7440,5 @@ readerNavigation = createReaderNavigation({
 
 applyTheme();
 applyLanguage();
+void workspaceShell.load();
 loadDocuments();

@@ -14,6 +14,8 @@
 
 ## 当前与目标
 
+v0.44 已交付 React 的本地游客/品牌头部与真实文献目录；其余原生控制器保留。当前源码和组件边界见 [REACT-GUEST.md](REACT-GUEST.md)；下表 v0.43 一栏保留迁移前起点，不代表整站已改为 React。
+
 | 层 | v0.43 当前实现 | 已确定的目标 |
 | --- | --- | --- |
 | 前端 | 原生 JavaScript ES modules，PDF.js、富文本、图表等本地组件 | React + TypeScript + Vite；渐进迁移为可组合视图，现有 API 与资料继续使用 |
