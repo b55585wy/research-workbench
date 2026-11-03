@@ -1,4 +1,16 @@
-Personal server deployment and current status: [SERVER-DEPLOYMENT.md](SERVER-DEPLOYMENT.md).
+Server deployment and current status: [SERVER-DEPLOYMENT.md](SERVER-DEPLOYMENT.md).
+
+# research workspace · v0.51.0
+
+新增免注册服务器游客空间：每位访客独立保存论文、笔记、聊天、数据与模型设置，
+可保存恢复码后在其他浏览器找回；以后再显式绑定注册账号。原个人服务及本地模式
+保留。见 [GUEST-SPACES.md](GUEST-SPACES.md)。
+
+新增手机单窗格和底部资料／阅读／笔记／助手入口，平板双栏与笔记抽屉，桌面继续
+使用多栏。触控按钮、键盘视口和局部横向滚动适配见 [MOBILE-LAYOUT.md](MOBILE-LAYOUT.md)。
+本轮只做有界隔离、生命周期和布局冒烟，不进行实际模型推理或统计任务。
+
+以下保留历史发布记录。
 
 # research workspace · v0.50.0
 

@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="color-scheme" content="light">
   <title>文献与笔记 · research workspace</title>
   <link rel="stylesheet" href="/theme-tokens.css">
@@ -26,12 +26,13 @@
   <link rel="stylesheet" href="/task-client.css">
   <link rel="stylesheet" href="/rich-text.css">
   <link rel="stylesheet" href="/doraemon-theme.css">
+  <link rel="stylesheet" href="/mobile-layout.css">
 </head>
 <body>
   <header class="app-header">
     <div id="workspace-identity" class="brand" aria-label="research workspace">
       <span class="brand-name">research workspace</span>
-      <span class="local-guest" title="无需登录；数据保存在运行此工作台的电脑上。">本地游客</span>
+      <span class="local-guest" title="正在打开空间…">正在打开空间…</span>
     </div>
     <h1 data-i18n="pageTitle">文献与笔记</h1>
     <div class="header-controls">
@@ -122,7 +123,7 @@
       </details>
     </aside>
 
-    <section class="reader-panel" aria-labelledby="reader-heading">
+    <section id="reader-panel" class="reader-panel" aria-labelledby="reader-heading">
       <div class="reader-heading-row">
         <div class="reader-title-wrap">
           <h2 id="reader-heading" data-i18n="reader">阅读器</h2>
@@ -821,6 +822,13 @@
     </aside>
   </main>
 
+  <nav id="mobile-primary-navigation" class="mobile-primary-navigation" aria-label="主要工作区">
+    <button class="mobile-primary-button" type="button" data-mobile-pane="library" aria-controls="documents-panel" aria-pressed="false">资料</button>
+    <button class="mobile-primary-button" type="button" data-mobile-pane="reader" aria-controls="reader-panel" aria-pressed="false">阅读</button>
+    <button class="mobile-primary-button" type="button" data-mobile-pane="notes" aria-controls="notes-panel" aria-pressed="false">笔记</button>
+    <button class="mobile-primary-button" type="button" data-mobile-pane="assistant" aria-controls="assistant-panel" aria-pressed="false">助手</button>
+  </nav>
+
   <button id="assistant-toggle" class="assistant-toggle button button-primary" type="button" aria-controls="assistant-panel" aria-expanded="false">研究助手</button>
   <aside id="assistant-panel" class="assistant-panel" aria-labelledby="assistant-heading" hidden>
     <div class="assistant-header" role="group" tabindex="0" aria-label="移动助手窗口" aria-describedby="assistant-window-help" aria-keyshortcuts="ArrowLeft ArrowRight ArrowUp ArrowDown" title="拖动标题栏移动；聚焦后使用方向键移动。">
@@ -1078,5 +1086,6 @@
   <script src="/vendor/assistant-markdown/texmath.js"></script>
   <script src="/vendor/assistant-markdown/purify.min.js"></script>
   <script type="module" src="/app.js"></script>
+  <script type="module" src="/mobile-layout.js"></script>
 </body>
 </html>
