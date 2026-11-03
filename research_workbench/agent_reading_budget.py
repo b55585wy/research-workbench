@@ -57,11 +57,17 @@ class ReadingBudget:
         english = self.turn['context']['language'] == 'en'
         groups = {}
         for item in self.pages():
-            group = groups.setdefault(item['document_id'], {'pages': set(), 'empty': [], 'truncated': []})
+            group = groups.setdefault(item['document_id'],
+                                      {'pages': set(), 'empty': [], 'truncated': [], 'excerpt': set()})
             group['pages'].add(item['page'])
             if not item.get('text', '').strip():
                 group['empty'].append(item['page'])
-            if item.get('truncated'):
+            if item.get('evidence_excerpt'):
+                # A retrieved fragment is not a whole-page read, so it is not
+                # reported as truncated page text.  Repeated hits on one page
+                # are shown once.
+                group['excerpt'].add(item['page'])
+            elif item.get('truncated'):
                 group['truncated'].append(item['page'])
         pieces = []
         for identifier, group in groups.items():
@@ -83,11 +89,18 @@ class ReadingBudget:
                 detail += ('; no extracted text: ' if english else '；未提取文字：') + ', '.join(map(str, group['empty']))
             if group['truncated']:
                 detail += ('; truncated text: ' if english else '；文字截断：') + ', '.join(map(str, group['truncated']))
+            if group['excerpt']:
+                detail += ('; short evidence excerpts: pages ' if english else '；检索摘录：第 ') \
+                          + ', '.join(map(str, sorted(group['excerpt']))) + ('' if english else ' 页')
             pieces.append(detail)
         if not pieces:
             return 'No PDF page text was read in this turn.' if english else '本次未读取 PDF 页面文字。'
         prefix = 'Reading scope — ' if english else '读取范围：'
-        suffix = '. Page-text extraction does not establish that the whole document or its images were reviewed.' if english else '。页面文字提取不代表已通读全文或查看了其中的图片。'
+        suffix = ('. Page-text extraction does not establish that the whole document or its images were reviewed.'
+                  if english else '。页面文字提取不代表已通读全文或查看了其中的图片。')
+        if any(group['excerpt'] for group in groups.values()):
+            suffix += (' Short evidence excerpts are retrieved fragments, not whole-page reads.' if english
+                       else '检索摘录只是短片段，不代表已阅读整页。')
         return prefix + '；'.join(pieces) + suffix
 
     def instruction(self):

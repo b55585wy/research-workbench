@@ -597,3 +597,35 @@ read-only, at most the newest matching row per requested page; saved translation
 are never rewritten. Cache GET never writes and remains available without parser/model
 readiness. No authentication, ownership, original-file or tFUS contract changes.
 See FLOW-READING.md for the explicit unverified interaction scope.
+
+
+# v0.48 cached-source evidence tool
+
+No new HTTP route, schema, dependency or permission grant. ReadingTools registers
+`search_paper_evidence(query,document_ids?,limit=4)`; query is1..200 trimmed searchable
+characters, document_ids is an optional unique1..9 UUID subset of server-captured
+current PDF plus explicit pinned paper refs, and strict limit is1..6. Default scope
+is pinned papers when any resource refs exist, otherwise the bound PDF; study or
+dataset-only empty scopes do not search other owners. Metadata/project links do not
+expand this tool's scope. Maximum three executions per turn; returned unique hit
+pages count against existing reading budgets.
+
+The read-only result is `{items,coverage,scope,notice}`. Items carry existing R source
+refs, original snippets up to1200 chars, document/hash/page/block, stable chunk IDs,
+source offsets, optional normalized block rectangles, scores and excerpt:true.
+Current sources use pdf_page and pinned sources reference_pdf_page with truncated:true
+and evidence_excerpt:true. Existing publication verification and history masking apply.
+Coverage describes prepared/searched/unsearched/unavailable/partial/skipped pages,
+bounded page-number lists and explicit counts/limits. When more than three matching
+translation jobs exist, prepared_history_limited is true and unprepared_page_count
+is null; pages_without_selected_cache_count describes only this bounded source view.
+An excerpt is not a complete page or full-document review. This first tool is exposed
+to ordinary reading chat; the separate ongoing research-task whitelist is unchanged.
+
+Reads are bounded to20 prepared pages per document,60 total with round-robin selection,
+at most three recent matching translation jobs as source fallback,256KiB JSON and240
+blocks per loaded page,24000 original characters/32 chunks considered per page.
+There is no automatic preparation, pixel read, persistent index, vector search or model
+request by this tool. No lexical match cannot support a negative scientific finding.
+See EVIDENCE-SEARCH.md and the actual backend report for limitations; interactions
+and retrieval quality have not been functionally tested.
