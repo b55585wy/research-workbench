@@ -9,13 +9,25 @@ The search is lexical only: Unicode-normalized term matching over prepared
 text/title/caption blocks.  It is not semantic or cross-language retrieval, does
 not analyze figures, tables, formulas or pixels, and is not scientific
 verification.
+
+An explicit ``page_scopes`` mapping selects exact page numbers per document
+before any page is scheduled, so a recently prepared page is never crowded out
+by lower prepared pages.  Scope descriptors come from ``reading_pages`` first and
+then from at most one exact-page translation lookup per still-missing page.  The
+scoped phase reads through one owned, genuinely read-only SQLite connection
+(``mode=ro`` file URI) with a cooperative work budget, leaving the shared Store
+connection defaults untouched and never creating a missing database file.
 """
 from __future__ import annotations
 
+from contextlib import contextmanager
 import hashlib
 import json
 import math
+from pathlib import Path
 import re
+import sqlite3
+import time
 import unicodedata
 
 from .reading_pages import (
@@ -45,6 +57,19 @@ MAX_PREPARED_PAGES = 200
 MAX_REUSE_JOBS = 3
 MAX_JOB_PAGES = 5
 MAX_LISTED_PAGES = 20
+
+MAX_SCOPE_PAGES_PER_DOCUMENT = 20
+MAX_SCOPE_PAGES_TOTAL = 60
+MAX_SCOPE_PAGE_NUMBER = 200
+# Cooperative SQLite work budget for one explicit-scope source selection and
+# search.  This bounds checked VM steps and lock waits on the owned connection,
+# never file I/O or another connection.
+SCOPE_BUDGET_SECONDS = 5.0
+SCOPE_PROGRESS_STEPS = 2000
+SCOPE_BUSY_TIMEOUT = 1.0
+# Genuine SQLite primary result code for an interrupted statement ("interrupted").
+# The fallback keeps older drivers without the constant usable.
+SQLITE_INTERRUPT = getattr(sqlite3, 'SQLITE_INTERRUPT', 9)
 
 READABLE_KINDS = ('text', 'title', 'caption')
 PAGE_STATUSES = ('completed', 'partial', 'unavailable')
@@ -86,6 +111,84 @@ EMPTY_NOTICE = (
     'has no PDF paper or no pinned paper reference, and a dataset-only selection does '
     'not grant paper search. Ask the user to add a paper with Add references (添加资料), '
     'then search again. No other paper was searched and no library-wide search ran.')
+PAGE_SCOPE_EXPLICIT = (
+    'Only the page numbers explicitly requested for this paper were considered. Prepared, '
+    'searched and unsearched page numbers describe that selected page scope only, never '
+    'the whole document. For each requested page the matching reading_pages row wins; '
+    'otherwise the newest matching eligible translation page for that exact page was '
+    'checked. A requested page without either is reported as missing selected-page cache '
+    'for this parser and source, which is not the same as an unprepared page. Pages '
+    'outside the requested scope were not inspected, so whole-document prepared and '
+    'unprepared counts are unknown and reported as null. full_document_searched is false.')
+SCOPE_NOTICE_EXPLICIT = (
+    'Bounded lexical search over ONLY the page numbers explicitly requested for each '
+    'selected paper. Only text, title and caption blocks were searched; figures, tables, '
+    'formulas, pixels and OCR were not analyzed. At most 240 blocks, 24000 source '
+    'characters and 32 chunks were considered per page, and at most 20 pages per paper '
+    'and 60 pages in total were scheduled. Each excerpt is at most 1200 original '
+    'characters; source_start/source_end are offsets inside that block, and the block '
+    'rectangle is a region, not exact word bounds. A requested page without a matching '
+    'reading_pages row was checked once against the newest matching translation page for '
+    'that exact page; a page still without a cache entry is reported as missing '
+    'selected-page cache, not as unprepared, unavailable or as a negative finding, and '
+    'no other page of that paper was inspected. Prepared, searched and unsearched page '
+    'lists describe only the requested pages; whole-document prepared and unprepared '
+    'counts are null because they are unknown. Missing, unavailable, partial, oversized '
+    'and empty pages are reported separately, and full_document_searched is false: a '
+    'short excerpt is not a full-page or full-paper read, and no lexical match does not '
+    'mean the paper does not report it. This is not semantic or cross-language retrieval '
+    'and not scientific verification. Use read_page for the current paper or '
+    'read_reference_paper for a pinned paper when more context is needed.')
+
+
+class EvidenceScopeTimeout(RuntimeError):
+    """The owned explicit-scope SQLite work budget was exhausted.
+
+    Raised only for a genuine SQLite interruption or an elapsed budget, so the
+    tool boundary can report a safe timeout instead of empty or partial results.
+    """
+
+
+class ScopedReadBudget:
+    """Cooperative 5-second SQLite work budget for one explicit-scope search.
+
+    The deadline is shared by descriptor selection and the scoped page search of
+    a single request.  ``tick`` is the SQLite progress handler (non-zero aborts
+    the running statement); ``check`` aborts at explicit descriptor and page
+    boundaries.  This is cooperative: it bounds checked VM steps and statements
+    that actually run, never blocked file I/O or another connection, and it is
+    not a promised hard wall-clock bound.
+    """
+
+    def __init__(self, seconds=SCOPE_BUDGET_SECONDS):
+        self.seconds = seconds
+        self.deadline = time.monotonic() + seconds
+        self.exhausted = False
+
+    def tick(self):
+        if time.monotonic() >= self.deadline:
+            self.exhausted = True
+            return 1
+        return 0
+
+    def check(self):
+        if time.monotonic() >= self.deadline:
+            self.exhausted = True
+            raise EvidenceScopeTimeout('explicit page-scope read budget exhausted')
+
+
+def interrupted(error):
+    """True only for SQLite's own statement interruption, never other errors.
+
+    Uses the genuine ``SQLITE_INTERRUPT`` primary result code.  Only when the
+    driver exposes no code at all is SQLite's own exact ``interrupted`` message
+    accepted, and never as a substring: an error such as ``no such table:
+    interrupted_cache`` is an unrelated SQL error.
+    """
+    code = getattr(error, 'sqlite_errorcode', None)
+    if isinstance(code, int) and not isinstance(code, bool):
+        return (code & 0xFF) == SQLITE_INTERRUPT
+    return str(error or '').strip().casefold() == 'interrupted'
 
 
 def query_terms(query):
@@ -313,8 +416,123 @@ class EvidenceService:
         pages = [prepared[number] for number in sorted(prepared) if number <= total]
         return pages, history_limited
 
+    # -------------------------------------------------------- explicit scopes
+    def scoped_prepared(self, document_id, source_sha256_value, requested,
+                        connection, budget=None):
+        """Descriptors for exactly the requested pages of one document.
+
+        No unscoped body is inspected: one bounded ``reading_pages`` metadata
+        query covers the requested page set, then each still-missing requested
+        page gets at most one parameterized metadata-only exact-page translation
+        lookup (newest eligible job first).  A requested page with no matching
+        row stays missing; this never falls back to another page or job and
+        never fetches historical job/page bodies here.
+
+        When ``budget`` is given, the shared deadline is checked at the explicit
+        descriptor boundaries of this document: on entry, around its cache
+        query and before every exact-page translation lookup, so a tiny query
+        cannot slip past the deadline before the progress handler interval.
+        """
+        pages = {}
+        wanted = []
+        for number in requested:
+            if type(number) is not int or number in wanted:
+                continue
+            if not 1 <= number <= MAX_SCOPE_PAGE_NUMBER:
+                continue
+            wanted.append(number)
+        if not wanted:
+            return pages
+        if budget is not None:
+            budget.check()
+        guards = (str(document_id), source_sha256_value, PARSER_ID, PARSER_VERSION,
+                  RESULT_SCHEMA_VERSION)
+        # The placeholder list is built from the validated page count only; every
+        # page value stays a bound parameter.
+        placeholders = ','.join('?' * len(wanted))
+        rows = connection.execute(
+            'SELECT page,status,length(blocks_json) AS json_chars,'
+            'length(CAST(blocks_json AS BLOB)) AS json_bytes FROM reading_pages '
+            'WHERE document_id=? AND source_sha256=? AND parser_id=? AND parser_version=? '
+            'AND result_schema_version=? AND page IN (' + placeholders + ')',
+            (*guards, *wanted)).fetchall()
+        if budget is not None:
+            budget.check()
+        for row in rows:
+            if row['status'] not in PAGE_STATUSES:
+                continue
+            if row['page'] not in wanted:
+                continue
+            # A matching reading_pages row wins, including partial, unavailable
+            # and oversized rows; their explicit status is reported later.
+            pages[row['page']] = {'page': row['page'], 'origin': 'reading',
+                                  'job_id': None, 'status': row['status'],
+                                  'json_chars': row['json_chars'] or 0,
+                                  'json_bytes': row['json_bytes'] or 0}
+        for number in wanted:
+            if number in pages:
+                continue
+            if budget is not None:
+                budget.check()
+            row = connection.execute(
+                "SELECT p.job_id,p.page,p.status,length(p.blocks_json) AS json_chars,"
+                "length(CAST(p.blocks_json AS BLOB)) AS json_bytes "
+                "FROM translation_pages p JOIN translation_jobs j ON j.id=p.job_id "
+                "WHERE j.document_id=? AND j.source_sha256=? AND j.parser_id=? "
+                "AND j.parser_version=? AND j.result_schema_version=? AND p.page=? "
+                "AND p.status IN (?,?) "
+                "ORDER BY j.updated_at DESC,j.created_at DESC,j.id DESC LIMIT 1",
+                (*guards, number, *REUSE_STATUSES)).fetchone()
+            if row is None:
+                continue
+            pages[number] = {'page': number, 'origin': 'translation',
+                             'job_id': row['job_id'], 'status': row['status'],
+                             'json_chars': row['json_chars'] or 0,
+                             'json_bytes': row['json_bytes'] or 0}
+        return pages
+
+    @contextmanager
+    def scoped_connection(self, budget):
+        """Owned, genuinely read-only connection with a short busy timeout.
+
+        ``Store.database`` is an absolute path, so it is opened through a
+        correctly encoded ``file:`` URI with ``mode=ro``: this connection can
+        never write and can never create a missing database file.  A read
+        transaction is started explicitly so descriptor metadata, each head row
+        and each body row are read from one consistent snapshot.
+
+        The progress handler and busy timeout belong to this connection only, so
+        shared Store defaults, other connections and unscoped searches are
+        unchanged.  The handler is always removed and the connection always
+        closed.  Only a genuine SQLite interruption of this connection's own
+        statement becomes ``EvidenceScopeTimeout``; every other SQL or
+        programming error keeps propagating untouched, including errors that
+        happen after the budget deadline was reached.
+        """
+        uri = Path(self.store.database).resolve().as_uri() + '?mode=ro'
+        connection = sqlite3.connect(uri, uri=True, timeout=SCOPE_BUSY_TIMEOUT)
+        connection.row_factory = sqlite3.Row
+        try:
+            connection.set_progress_handler(budget.tick, SCOPE_PROGRESS_STEPS)
+            try:
+                # Deferred read transaction: a stable snapshot for all metadata,
+                # head and body reads of this scoped request.
+                connection.execute('BEGIN')
+                yield connection
+            except sqlite3.OperationalError as error:
+                if interrupted(error):
+                    raise EvidenceScopeTimeout(
+                        'explicit page-scope read budget exhausted') from None
+                raise
+        finally:
+            try:
+                connection.set_progress_handler(None, 0)
+            finally:
+                connection.close()
+
     # ---------------------------------------------------------------- loading
-    def load(self, document_id, source_sha256_value, number, descriptor):
+    def load(self, document_id, source_sha256_value, number, descriptor,
+             connection=None):
         """Load exactly the selected row under matching source guards.
 
         The head row is inspected first (status plus both character and UTF-8
@@ -323,59 +541,68 @@ class EvidenceService:
         bound as defense in depth.  A changed status or a vanished row is
         reported instead of silently switching to another page or job.
         """
+        if connection is not None:
+            return self.bounded_load(connection, document_id, source_sha256_value,
+                                     number, descriptor)
+        with self.store.connection() as store_connection:
+            if not store_connection.in_transaction:
+                store_connection.execute('BEGIN')
+            return self.bounded_load(store_connection, document_id,
+                                     source_sha256_value, number, descriptor)
+
+    def bounded_load(self, connection, document_id, source_sha256_value, number,
+                     descriptor):
+        """Existing load guards over a caller-provided connection."""
         guards = (str(document_id), source_sha256_value, PARSER_ID, PARSER_VERSION,
                   RESULT_SCHEMA_VERSION)
-        with self.store.connection() as connection:
-            if not connection.in_transaction:
-                connection.execute('BEGIN')
-            if descriptor['origin'] == 'reading':
-                head = connection.execute(
-                    'SELECT status,length(blocks_json) AS json_chars,'
-                    'length(CAST(blocks_json AS BLOB)) AS json_bytes FROM reading_pages '
-                    'WHERE document_id=? AND source_sha256=? AND parser_id=? AND parser_version=? '
-                    'AND result_schema_version=? AND page=?',
-                    (*guards, number)).fetchone()
-            else:
-                head = connection.execute(
-                    "SELECT p.status,length(p.blocks_json) AS json_chars,"
-                    "length(CAST(p.blocks_json AS BLOB)) AS json_bytes "
-                    "FROM translation_pages p "
-                    "JOIN translation_jobs j ON j.id=p.job_id "
-                    "WHERE p.job_id=? AND p.page=? AND p.status IN ('completed','unavailable') "
-                    "AND j.document_id=? AND j.source_sha256=? AND j.parser_id=? "
-                    "AND j.parser_version=? AND j.result_schema_version=?",
-                    (descriptor['job_id'], number, *guards)).fetchone()
-            if head is None:
-                return {'state': 'changed'}
-            if head['status'] != descriptor['status'] or head['status'] not in PAGE_STATUSES:
-                return {'state': 'changed'}
-            if head['status'] == 'unavailable':
-                # An unavailable page is never evidence, even when a stale row
-                # still carries text blocks from an older preparation attempt.
-                return {'state': 'unavailable'}
-            if ((head['json_bytes'] or 0) > MAX_PAGE_JSON_BYTES
-                    or (head['json_chars'] or 0) > MAX_PAGE_JSON_CHARS):
-                return {'state': 'oversized'}
-            if descriptor['origin'] == 'reading':
-                body = connection.execute(
-                    'SELECT blocks_json FROM reading_pages WHERE document_id=? '
-                    'AND source_sha256=? AND parser_id=? AND parser_version=? '
-                    'AND result_schema_version=? AND page=? AND status=? '
-                    'AND COALESCE(length(CAST(blocks_json AS BLOB)),0)<=? '
-                    'AND COALESCE(length(blocks_json),0)<=?',
-                    (*guards, number, head['status'], MAX_PAGE_JSON_BYTES,
-                     MAX_PAGE_JSON_CHARS)).fetchone()
-            else:
-                body = connection.execute(
-                    "SELECT p.blocks_json FROM translation_pages p "
-                    "JOIN translation_jobs j ON j.id=p.job_id "
-                    "WHERE p.job_id=? AND p.page=? AND p.status=? AND j.document_id=? "
-                    "AND j.source_sha256=? AND j.parser_id=? AND j.parser_version=? "
-                    "AND j.result_schema_version=? "
-                    "AND COALESCE(length(CAST(p.blocks_json AS BLOB)),0)<=? "
-                    "AND COALESCE(length(p.blocks_json),0)<=?",
-                    (descriptor['job_id'], number, head['status'], *guards,
-                     MAX_PAGE_JSON_BYTES, MAX_PAGE_JSON_CHARS)).fetchone()
+        if descriptor['origin'] == 'reading':
+            head = connection.execute(
+                'SELECT status,length(blocks_json) AS json_chars,'
+                'length(CAST(blocks_json AS BLOB)) AS json_bytes FROM reading_pages '
+                'WHERE document_id=? AND source_sha256=? AND parser_id=? AND parser_version=? '
+                'AND result_schema_version=? AND page=?',
+                (*guards, number)).fetchone()
+        else:
+            head = connection.execute(
+                "SELECT p.status,length(p.blocks_json) AS json_chars,"
+                "length(CAST(p.blocks_json AS BLOB)) AS json_bytes "
+                "FROM translation_pages p "
+                "JOIN translation_jobs j ON j.id=p.job_id "
+                "WHERE p.job_id=? AND p.page=? AND p.status IN ('completed','unavailable') "
+                "AND j.document_id=? AND j.source_sha256=? AND j.parser_id=? "
+                "AND j.parser_version=? AND j.result_schema_version=?",
+                (descriptor['job_id'], number, *guards)).fetchone()
+        if head is None:
+            return {'state': 'changed'}
+        if head['status'] != descriptor['status'] or head['status'] not in PAGE_STATUSES:
+            return {'state': 'changed'}
+        if head['status'] == 'unavailable':
+            # An unavailable page is never evidence, even when a stale row
+            # still carries text blocks from an older preparation attempt.
+            return {'state': 'unavailable'}
+        if ((head['json_bytes'] or 0) > MAX_PAGE_JSON_BYTES
+                or (head['json_chars'] or 0) > MAX_PAGE_JSON_CHARS):
+            return {'state': 'oversized'}
+        if descriptor['origin'] == 'reading':
+            body = connection.execute(
+                'SELECT blocks_json FROM reading_pages WHERE document_id=? '
+                'AND source_sha256=? AND parser_id=? AND parser_version=? '
+                'AND result_schema_version=? AND page=? AND status=? '
+                'AND COALESCE(length(CAST(blocks_json AS BLOB)),0)<=? '
+                'AND COALESCE(length(blocks_json),0)<=?',
+                (*guards, number, head['status'], MAX_PAGE_JSON_BYTES,
+                 MAX_PAGE_JSON_CHARS)).fetchone()
+        else:
+            body = connection.execute(
+                "SELECT p.blocks_json FROM translation_pages p "
+                "JOIN translation_jobs j ON j.id=p.job_id "
+                "WHERE p.job_id=? AND p.page=? AND p.status=? AND j.document_id=? "
+                "AND j.source_sha256=? AND j.parser_id=? AND j.parser_version=? "
+                "AND j.result_schema_version=? "
+                "AND COALESCE(length(CAST(p.blocks_json AS BLOB)),0)<=? "
+                "AND COALESCE(length(p.blocks_json),0)<=?",
+                (descriptor['job_id'], number, head['status'], *guards,
+                 MAX_PAGE_JSON_BYTES, MAX_PAGE_JSON_CHARS)).fetchone()
         if body is None:
             return {'state': 'changed'}
         raw = body['blocks_json']
@@ -387,19 +614,79 @@ class EvidenceService:
         return {'state': 'ok', 'status': head['status'], 'blocks': blocks}
 
     # ---------------------------------------------------------------- search
-    def search(self, documents, terms, limit):
+    def search(self, documents, terms, limit, page_scopes=None):
+        """Search cached pages, optionally restricted to explicit page scopes.
+
+        ``page_scopes`` is a mapping ``document_id -> sorted page numbers``
+        already validated by the tool boundary.  ``None`` keeps the previous
+        unscoped behavior unchanged; otherwise only those exact pages are
+        scheduled, so an explicit page can never be crowded out by lower
+        prepared pages.
+        """
         for index, document in enumerate(documents):
             document.setdefault('document_index', index)
+        if page_scopes is None:
+            return self.default_search(documents, terms, limit)
+        return self.scoped_search(documents, terms, limit, page_scopes)
+
+    def default_search(self, documents, terms, limit):
+        """Unscoped v0.48 selection: reading pages plus the newest three jobs."""
         orders, histories = [], []
         for document in documents:
             pages, history_limited = self.page_order(document)
             orders.append(pages)
             histories.append(history_limited)
         plan = round_robin(orders)
+        hits, states = self.run_plan(plan, documents, terms, limit)
+        coverage = [self.coverage_entry(document, pages, state, history_limited)
+                    for document, pages, state, history_limited
+                    in zip(documents, orders, states, histories)]
+        return {'items': hits, 'coverage': coverage, 'scanned': len(plan),
+                'page_scope_mode': 'default'}
+
+    def scoped_search(self, documents, terms, limit, page_scopes):
+        """Exact requested pages only, under one owned budgeted connection."""
+        scopes = {}
+        for key, pages in page_scopes.items():
+            scopes[str(key)] = sorted({page for page in pages if type(page) is int})
+        budget = ScopedReadBudget()
+        orders, requested_pages = [], []
+        with self.scoped_connection(budget) as connection:
+            for document in documents:
+                # One explicit boundary per document, before its descriptor
+                # selection starts, so no document is begun after the deadline.
+                budget.check()
+                requested = scopes.get(str(document['document_id']), [])
+                requested_pages.append(list(requested))
+                descriptors = self.scoped_prepared(document['document_id'],
+                                                   document['source_sha256'],
+                                                   requested, connection,
+                                                   budget=budget)
+                orders.append([descriptors[number] for number in requested
+                               if number in descriptors])
+            plan = round_robin(orders)
+            hits, states = self.run_plan(plan, documents, terms, limit,
+                                        connection=connection, budget=budget)
+        # Unconditional final checkpoint: an empty plan, no descriptors or no
+        # hits must not be reported as scoped success after the deadline.
+        budget.check()
+        coverage = [self.coverage_entry(document, pages, state, False, requested)
+                    for document, pages, state, requested
+                    in zip(documents, orders, states, requested_pages)]
+        return {'items': hits, 'coverage': coverage, 'scanned': len(plan),
+                'page_scope_mode': 'explicit'}
+
+    def run_plan(self, plan, documents, terms, limit, connection=None, budget=None):
+        """Execute the bounded round-robin page plan and rank retained hits."""
         states = [{'searched_pages': [], 'skipped': [], 'empty': [], 'truncated': [],
                    'unavailable': []} for _ in documents]
         retained = []
         for document_index, descriptor in plan:
+            if budget is not None:
+                # Cooperative budget boundary between pages: file I/O is not
+                # hard-bounded, but the scoped phase cannot silently continue
+                # past the deadline and return partial evidence as success.
+                budget.check()
             document = documents[document_index]
             state = states[document_index]
             if descriptor['status'] == 'unavailable':
@@ -414,7 +701,7 @@ class EvidenceService:
                 state['skipped'].append({'page': descriptor['page'], 'reason': 'oversized'})
                 continue
             loaded = self.load(document['document_id'], document['source_sha256'],
-                               descriptor['page'], descriptor)
+                               descriptor['page'], descriptor, connection=connection)
             if loaded['state'] != 'ok':
                 if loaded['state'] == 'unavailable':
                     state['unavailable'].append(descriptor['page'])
@@ -434,11 +721,7 @@ class EvidenceService:
                 # pages; a hit outside it can never enter the final top slots.
                 retained.sort(key=hit_key)
                 del retained[MAX_RETAINED_HITS:]
-        hits = sorted(retained, key=hit_key)[:limit]
-        coverage = [self.coverage_entry(document, pages, state, history_limited)
-                    for document, pages, state, history_limited
-                    in zip(documents, orders, states, histories)]
-        return {'items': hits, 'coverage': coverage, 'scanned': len(plan)}
+        return sorted(retained, key=hit_key)[:limit], states
 
     @staticmethod
     def page_hits(document, page, blocks, terms):
@@ -496,7 +779,8 @@ class EvidenceService:
         return hits, empty, truncated
 
     @staticmethod
-    def coverage_entry(document, pages, state, history_limited):
+    def coverage_entry(document, pages, state, history_limited, requested=None):
+        """Per-document coverage; ``requested`` marks an explicit page scope."""
         prepared_numbers = [page['page'] for page in pages]
         searched_numbers = sorted(set(state['searched_pages']))
         searched_set = set(searched_numbers)
@@ -518,6 +802,31 @@ class EvidenceService:
         empty_list, empty_count, empty_more = listed(empty)
         truncated_list, truncated_count, truncated_more = listed(truncated)
         skipped_list, skipped_count, skipped_more = listed(skipped)
+        if requested is None:
+            # Unscoped v0.48 behavior: whole-document counts stay exactly as
+            # before, and the latest-three history notice is unchanged.
+            mode = 'default'
+            requested_numbers = []
+            missing_numbers = []
+            unprepared = None if history_limited else max(0, total - prepared_count)
+            without_cache = max(0, total - prepared_count)
+            prepared_history_limited = history_limited
+            prepared_scope = (PREPARED_SCOPE_LIMITED if history_limited
+                              else PREPARED_SCOPE_COMPLETE)
+        else:
+            # Explicit scope: only the requested pages were inspected, so a
+            # whole-document unprepared count cannot be known or claimed.
+            mode = 'explicit'
+            requested_numbers = sorted({number for number in requested})
+            prepared_set = set(prepared_numbers)
+            missing_numbers = [number for number in requested_numbers
+                               if number not in prepared_set]
+            unprepared = None
+            without_cache = None
+            prepared_history_limited = False
+            prepared_scope = PAGE_SCOPE_EXPLICIT
+        requested_list, requested_count, requested_more = listed(requested_numbers)
+        missing_list, missing_count, missing_more = listed(missing_numbers)
         return {
             'document_id': document['document_id'], 'title': document['title'],
             'role': document['role'], 'total_pages': total,
@@ -532,12 +841,17 @@ class EvidenceService:
             'unsearched_prepared_page_numbers': unsearched_list,
             'unsearched_prepared_page_numbers_count': unsearched_count,
             'unsearched_prepared_page_numbers_truncated': unsearched_more,
-            'unprepared_page_count': (None if history_limited
-                                      else max(0, total - prepared_count)),
-            'pages_without_selected_cache_count': max(0, total - prepared_count),
-            'prepared_history_limited': history_limited,
-            'prepared_scope': (PREPARED_SCOPE_LIMITED if history_limited
-                               else PREPARED_SCOPE_COMPLETE),
+            'page_scope_mode': mode,
+            'requested_page_numbers': requested_list,
+            'requested_page_numbers_count': requested_count,
+            'requested_page_numbers_truncated': requested_more,
+            'missing_requested_cache_page_numbers': missing_list,
+            'missing_requested_cache_page_numbers_count': missing_count,
+            'missing_requested_cache_page_numbers_truncated': missing_more,
+            'unprepared_page_count': unprepared,
+            'pages_without_selected_cache_count': without_cache,
+            'prepared_history_limited': prepared_history_limited,
+            'prepared_scope': prepared_scope,
             'partial_pages': partial_list, 'partial_page_count': partial_count,
             'partial_pages_truncated': partial_more,
             'unavailable_pages': unavailable_list,

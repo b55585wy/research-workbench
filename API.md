@@ -647,3 +647,34 @@ cannot update another chat. Cached page states can survive a missing-page error.
 No automatic message send, translation, whole-document prefetch or POST retry occurs.
 The source cache and retrieval/page-read budgets remain unchanged. See
 ASSISTANT-PAGE-PREPARATION.md for current workflow and unverified interactions.
+
+
+# v0.50 explicit per-paper evidence page scopes
+
+`search_paper_evidence` adds optional
+`page_scopes:[{document_id:<UUID>,pages:[35,36,37,38]}]`. Omission/None retains existing
+default selection. An explicit scope is nonempty, has1..9 distinct paper IDs,1..20
+unique strict1-based integer pages per paper within its captured/live page count,
+and at most60 pages total. Its paper ID set must exactly match the selected documents
+resolved by the existing document_ids/default rules. It cannot add another owner,
+source version or grant; invalid scopes fail before cache-body reads.
+
+Explicit scopes filter descriptors before scheduling, preserving existing20/paper,
+60total,3calls,reading/snippet/source-verification limits. Matching reading cache has
+precedence. For a requested missing-cache page, one metadata-only newest matching
+translation page can be selected beyond the default three-job window, with LIMIT1;
+bounded bodies are loaded only for the chosen requested pages. Explicit SQLite read
+work has a cooperative5-second execution budget on owned connections, with handler
+cleanup and a short local busy timeout. Genuine budget failures return
+evidence_search_timeout409, not partial evidence or a negative finding. Unrelated SQL
+errors are not disguised. No automatic retry/parse/model call or business write.
+
+Scope/coverage add page_scope_mode, requested page numbers/counts and missing requested
+cache page numbers/counts. In explicit mode prepared/searched/unsearched page lists
+refer only to those requested pages; whole-document unprepared_page_count and
+pages_without_selected_cache_count are null, and full_document_searched remains false.
+Existing result items, source kinds, chunk identities and final/history checks remain.
+
+No new HTTP endpoint, context/submission field, frontend, schema or dependency.
+This remains literal keyword retrieval, not full-text/semantic/OCR verification.
+Functional, browser, HTTP, PDF and model checks were not run at the user's request.
