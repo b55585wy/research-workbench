@@ -196,7 +196,11 @@ class DatasetSelections:
             try:
                 with tempfile.NamedTemporaryFile(dir=self.root, delete=False) as out:
                     pending = Path(out.name); out.write(relation['data_bytes'])
-                pending.replace(target)
+                from .library import read_metadata
+                with self.store.connection() as db:
+                    db.execute('BEGIN IMMEDIATE')
+                    read_metadata(db, row['document_id'])
+                    pending.replace(target)
             finally:
                 if pending is not None: pending.unlink(missing_ok=True)
         return target

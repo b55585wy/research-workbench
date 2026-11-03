@@ -36,6 +36,10 @@ class PdfAnnotationWorker:
             raise WorkspaceError('pdf_export_failed', '批注 PDF 未正确生成，请重试。') from error
         if isinstance(value, dict) and value.get('error') == 'pdf_export_too_large':
             raise WorkspaceError('pdf_export_too_large', '批注 PDF 过大，请减少批注后重试。', 413)
+        if isinstance(value, dict) and value.get('error') == 'textbox_font_unavailable':
+            raise WorkspaceError('textbox_font_unavailable', '服务器缺少可用的中文字体，暂时无法生成文本框。', 503)
+        if isinstance(value, dict) and value.get('error') == 'textbox_overflow':
+            raise WorkspaceError('textbox_overflow', '有文本框内容超出范围，请调整文本框大小或字号后重试。', 422)
         if result.returncode != 0 or not isinstance(value, dict) or value.get('status') != 'ok':
             raise WorkspaceError('pdf_export_failed', '批注 PDF 未正确生成，请重试。')
         return value

@@ -60,6 +60,8 @@ class StudyNotes:
         db.execute('INSERT INTO study_note_sources VALUES (?,?)',(note_id,canonical(source)))
         if payload.rich_content is not None:
             content=canonical(payload.rich_content);db.execute('INSERT INTO note_rich_content VALUES (?,?,?)',(note_id,content,content))
+            from .rich_images import sync_note_images
+            sync_note_images(self.store,db,identifier,note_id,None,payload.rich_content)
         return base_note(read_state(db,identifier,note_id)),True
 
     def export(self,document_id):
@@ -76,8 +78,9 @@ class StudyNotes:
         body='<!doctype html><meta charset="utf-8"><title>研究笔记</title><h1>'+escape(owner['title'])+'</h1><p>'+escape(owner['question'])+'</p>'
         for note in notes:
             body+='<section><h2>'+escape(note['source']['label'])+'</h2><p>来源 / Source: '+escape(note['source']['kind'])+' · '+escape(note['source']['id'])+'</p>'
-            body+=render_html(note['rich_content']) if note.get('rich_content') else '<p>'+escape(note['text']).replace('\n','<br>')+'</p>'
-            body+=''.join(markup(image) for image in note.get('attachments',[]))
+            from .image_export import note_rich_html,attachment_only
+            body+=note_rich_html(note) if note.get('rich_content') else '<p>'+escape(note['text']).replace('\n','<br>')+'</p>'
+            body+=''.join(markup(image) for image in attachment_only(note))
             body+='<p>'+escape(note['review_status'])+'</p></section>'
         if groups:
             annotation_payload,annotation_html,_=image_annotation_export.documents(groups)

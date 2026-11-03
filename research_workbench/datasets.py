@@ -100,6 +100,7 @@ class Datasets:
             raise WorkspaceError('idempotency_conflict','上传编号已用于其他数据，请检查原请求。',409)
 
     def upload(self,document_id,identifier,upload):
+        from .library import read_metadata
         self.store.get_document(document_id)
         name=re.split(r'[/\\]',upload.filename or '')[-1]
         name=''.join(c for c in name if ord(c)>=32 and ord(c)!=127)[:180]
@@ -125,6 +126,7 @@ class Datasets:
             temporary.replace(target)
             with self.store.connection() as connection:
                 connection.execute('BEGIN IMMEDIATE')
+                read_metadata(connection,document_id)
                 old=connection.execute('SELECT * FROM datasets WHERE id=?',(identifier,)).fetchone()
                 if old is not None:
                     self.same(old,document_id,name,checksum,size);self.checked(old)

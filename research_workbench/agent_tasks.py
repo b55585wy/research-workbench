@@ -9,10 +9,10 @@ from .studies import verify_owner as verify_source
 from .models import WorkspaceError
 
 ACTIVE=('running','waiting_confirmation','waiting_analysis')
-WRITES={'analysis':('run_analysis','run_t_test','run_paired_t_test'),'chart':('create_chart',),'note':('create_note',)}
-WRITE_TOOLS={'analysis':{'propose_analysis','propose_t_test','propose_paired_t_test'},'chart':{'propose_chart'},'note':{'propose_note'}}
+WRITES={'analysis':('run_analysis','run_t_test','run_paired_t_test','run_correlation'),'chart':('create_chart',),'note':('create_note',)}
+WRITE_TOOLS={'analysis':{'propose_analysis','propose_t_test','propose_paired_t_test','propose_correlation'},'chart':{'propose_chart'},'note':{'propose_note'}}
 READ_TOOLS={'read_context','read_page','read_dataset','analysis_methods','analysis_status','list_analyses',
-            'read_analysis','read_t_test_groups','preview_t_test','chart_capabilities','list_charts',
+            'read_analysis','read_t_test_groups','preview_t_test','preview_correlation','chart_capabilities','list_charts',
             'read_chart','preview_chart','list_notes','read_note','complete_task'}
 STAGE_MESSAGES={
     'analysis':'继续原始研究目标，提出所需的已安装分析方案；等待具体确认，不直接运行。',
@@ -81,6 +81,9 @@ class AgentTasks:
         row.update(fields)
 
     def start(self,document_id,payload,captured):
+        if payload.context.resource_refs:
+            raise WorkspaceError('agent_reference_task_unsupported',
+                '接续任务只处理当前资料，暂不支持参考资料；请关闭“接续任务”后再阅读参考资料。',422)
         if not captured.get('dataset'):
             raise WorkspaceError('agent_task_dataset_required','先选择并明确共享本任务的数据。',422)
         if not payload.message.strip():raise WorkspaceError('agent_task_goal_required','请写明本次研究目标。',422)
@@ -139,7 +142,7 @@ class AgentTasks:
         return ('This is an explicitly authorized THREE-STAGE research task: analysis, then chart, then a source note. '
                 'User confirms EVERY write. Current stage is '+phase+'. Explain the overall plan briefly, then propose only this stage. '
                 'When the stage is feasible, you MUST call its installed proposal tool ('+
-                {'analysis':'propose_analysis, propose_t_test or propose_paired_t_test','chart':'propose_chart','note':'propose_note'}[phase]+
+                {'analysis':'propose_analysis, propose_t_test, propose_paired_t_test or propose_correlation','chart':'propose_chart','note':'propose_note'}[phase]+
                 ') to create the concrete pending UI proposal. The user confirms that UI proposal; do NOT ask for preliminary '
                 'permission in prose or end with only a plan. A proposal call itself does NOT execute or save the business operation. '
                 'Do not repeat completed work or treat queued analysis as success. Read actual saved owned records before deriving a chart/note. '
@@ -196,6 +199,9 @@ class AgentTasks:
             raise WorkspaceError('agent_task_sources_required','结果笔记需引用本任务已保存的分析或图表来源。',409)
 
     def control(self,document_id,identifier,payload):
+        if payload.action=='resume' and payload.context is not None and payload.context.resource_refs:
+            raise WorkspaceError('agent_reference_task_unsupported',
+                '接续任务只处理当前资料，暂不支持参考资料；请关闭“接续任务”后再阅读参考资料。',422)
         fingerprint=digest({'document_id':document_id,'task_id':identifier,'payload':payload.model_dump(mode='json')})
         with self.store.connection() as connection:
             connection.execute('BEGIN IMMEDIATE')

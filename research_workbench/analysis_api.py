@@ -39,6 +39,12 @@ def statistics_preview(document_id:UUID,payload:AnalysisCreate,request:Request):
     return preview(request.app.state.analysis,str(document_id),payload)
 
 
+@router.post('/documents/{document_id}/analyses/correlation/preview')
+def correlation_preview(document_id:UUID,payload:AnalysisCreate,request:Request):
+    from .correlation_statistics import preview
+    return preview(request.app.state.analysis,str(document_id),payload)
+
+
 @router.get('/documents/{document_id}/datasets')
 def datasets(document_id:UUID,request:Request):return {'items':request.app.state.datasets.list(str(document_id))}
 

@@ -1,0 +1,11 @@
+/* Shared layer rotation rules from PDF.js 6.4.299 web/pdf_viewer.css.
+ * Copyright 2014 Mozilla Foundation, Apache License 2.0. */
+[data-main-rotation="90"] {
+  transform: rotate(90deg) translateY(-100%);
+}
+[data-main-rotation="180"] {
+  transform: rotate(180deg) translate(-100%, -100%);
+}
+[data-main-rotation="270"] {
+  transform: rotate(270deg) translateX(-100%);
+}

@@ -148,11 +148,13 @@ class ImageLibrary:
         return self.get(identifier,row['id'])
 
     def commit_upload(self,record,raw,preview):
+        from .library import read_metadata
         key=record['storage_key']
         targets=[self.files/(key+'.original'),self.files/(key+'.preview')]
         try:
             with self.store.connection() as connection:
                 connection.execute('BEGIN IMMEDIATE')
+                read_metadata(connection,record['document_id'])
                 previous=connection.execute('SELECT * FROM image_assets WHERE id=?',(record['id'],)).fetchone()
                 if previous is not None:
                     return self.repeat(previous,record['document_id'],record['sha256'],record['original_filename']),False
@@ -194,6 +196,6 @@ class ImageLibrary:
             raise WorkspaceError('idempotency_conflict','这个笔记请求编号已被使用。',409)
         for image_id in payload.image_ids:self.row(connection,identifier,str(image_id))
         note,created=self.store.save_note_in(connection,identifier,payload)
-        connection.executemany('INSERT INTO note_images VALUES (?,?)',[(identifier_note,str(i)) for i in payload.image_ids])
+        connection.executemany('INSERT OR IGNORE INTO note_images VALUES (?,?)',[(identifier_note,str(i)) for i in payload.image_ids])
         connection.execute('INSERT INTO image_note_requests VALUES (?,?,?)',(identifier_note,identifier,digest))
         return note,created

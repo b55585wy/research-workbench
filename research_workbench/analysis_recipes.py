@@ -46,6 +46,11 @@ def clean_environment(directory):
 
 def recipe(engine,method='describe'):
     if engine not in ('python','r'):raise WorkspaceError('invalid_engine','请选择 Python 或 R。',422)
+    if method=='correlation':
+        if engine!='r':raise WorkspaceError('invalid_engine','相关分析需要已验证的 R 统计环境。',422)
+        from .correlation_data import preparation_hash
+        code='# Input preparation SHA-256: '+preparation_hash()+'\n'+Path(__file__).with_name('correlation_adapter.R').read_bytes().decode('utf-8')
+        return {'engine':'r','id':'correlation-rstats-v1','version':1,'code':code,'sha256':hashlib.sha256(code.encode()).hexdigest()}
     if method=='ttest_paired':
         if engine!='r':raise WorkspaceError('invalid_engine','配对 t 检验需要已验证的 R 统计环境。',422)
         from .paired_ttest_data import preparation_hash

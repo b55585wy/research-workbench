@@ -40,3 +40,18 @@ export function writeReaderProgress(document, page, centerFraction) {
     return false;
   }
 }
+
+export function clearReaderProgress(documentId) {
+  const prefix = `${KEY_PREFIX}${documentId}:`;
+  try {
+    const keys = [];
+    for (let index = 0; index < localStorage.length; index += 1) {
+      const key = localStorage.key(index);
+      if (key?.startsWith(prefix)) keys.push(key);
+    }
+    for (const key of keys) localStorage.removeItem(key);
+    return true;
+  } catch {
+    return false;
+  }
+}

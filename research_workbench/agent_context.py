@@ -12,6 +12,7 @@ from .images import image_record
 from .library import read_metadata
 from .models import WorkspaceError
 from .note_lifecycle import ensure_active,read_state
+from .shape_annotations import agent_record as shape_agent_record
 from .image_sources import checked_bytes
 
 PROBE=Path(__file__).with_name('page_text_probe.py')
@@ -61,22 +62,30 @@ class ReadingWorkspace:
             if document.get('kind')!='study' and (context.page is None or context.page>document['page_count']):
                 raise WorkspaceError('invalid_page','当前页码超出论文范围。')
             active_note=None
+            source_verified=False
             if context.active_note_id:
                 active_note=ensure_active(read_state(connection,identifier,str(context.active_note_id)))
                 active_note.pop('rich_html',None)
+                source_verified=self.verify_shape_source(document,active_note,source_verified)
+                if active_note.get('shape_annotation'):
+                    active_note['shape_annotation']=shape_agent_record(active_note['shape_annotation'])
             pinned_notes=[]
             budget=0
-            source_verified=False
             for ref in context.note_refs:
                 note=ensure_active(read_state(connection,identifier,str(ref.note_id)))
                 if note['revision'] != ref.revision:
                     raise WorkspaceError('note_reference_changed','加入的笔记或批注已变化，请移除后重新加入。',409)
                 note.pop('rich_html',None)
                 note.pop('rich_content',None)
+                source_verified=self.verify_shape_source(document,note,source_verified)
+                if note.get('shape_annotation'):
+                    note['shape_annotation']=shape_agent_record(note['shape_annotation'])
                 body=note['text']
                 note['text']=body[:4000]
                 note['text_truncated']=len(body)>4000
                 budget+=len(note['text'])
+                if note.get('shape_annotation'):
+                    budget+=len(json.dumps(note['shape_annotation'],ensure_ascii=False))
                 annotation=note.get('annotation')
                 if annotation:
                     if annotation['source_sha256']!=document.get('sha256'):
@@ -125,6 +134,10 @@ class ReadingWorkspace:
                 if dataset is None or selected['dataset_id']!=dataset['id']:
                     raise WorkspaceError('agent_chart_not_shared','请明确共享这张图表对应的数据后再发送。',409)
                 active_chart,_=service.data_in(connection,identifier,str(context.active_chart_id))
+            resource_refs=[]
+            if context.resource_refs:
+                from .agent_references import capture_references
+                resource_refs=capture_references(self.store,self.analysis,connection,context.resource_refs)
         result={'document':document,'page':context.page,'rect':list(context.rect) if context.rect else None,
                 'active_note_id':str(context.active_note_id) if context.active_note_id else None,
                 'active_note':active_note,'image_ids':[r['id'] for r in images],'images':images,
@@ -136,7 +149,20 @@ class ReadingWorkspace:
         if active_chart is not None:result.update(active_chart_id=active_chart['id'],active_chart=active_chart)
         if pinned_notes:
             result['pinned_notes']=pinned_notes
+        if resource_refs:
+            result['resource_refs']=resource_refs
+        if document.get('kind')=='study':
+            from .agent_paper_tools import associated_papers
+            result['associated_papers']=associated_papers(self.store,identifier)
         return result
+
+    def verify_shape_source(self,document,note,verified):
+        shape=note.get('shape_annotation')
+        if not shape:return verified
+        if shape['source_sha256']!=document.get('sha256'):
+            raise WorkspaceError('shape_annotation_changed','形状批注对应的原文版本已变化，请重新绘制后再分享。',409)
+        if not verified:verify_source(self.store,document)
+        return True
 
     def page(self,document_id,number):
         document=self.store.get_document(document_id)
@@ -192,11 +218,26 @@ class Sources:
 
     def note(self,value):
         annotation=value.get('annotation')
+        shape=value.get('shape_annotation')
         extra={}
         if annotation:
             quote=annotation['quote']
             extra={'annotation':{**annotation,'quote':quote[:4000],'quote_truncated':bool(annotation.get('quote_truncated')) or len(quote)>4000},'notice':'Manual PDF text annotation; original quotation is separate from editable note text, not scientific validation.'}
-        return self.add('note',f"第 {value['page']} 页文字批注" if annotation else f"第 {value['page']} 页笔记" if value['page'] else '研究笔记',document_id=value['document_id'],page=value['page'],
+        if shape:
+            if shape['kind'] == 'textbox':
+                extra['shape_annotation']={**shape,'notice':'Manual saved PDF text box; the note body is the text, and its appearance is human-authored, not interpreted pixels or measured evidence.'}
+            elif shape['kind'] in ('line', 'ellipse'):
+                extra['shape_annotation']={**shape,'notice':'Manual saved PDF line/ellipse drawing; geometry and style are human-authored, not interpreted pixels or measured evidence.'}
+            elif shape['kind'] == 'ink':
+                extra['shape_annotation']={**shape,'notice':'Manual saved PDF freehand stroke; one hand-drawn path recorded by the user, not an inferred measurement or interpreted pixels.'}
+            else:
+                extra['shape_annotation']={**shape,'notice':'Manual saved rectangle/arrow annotation; geometry and style are human-authored, not interpreted pixels or measured evidence.'}
+        label=(f"第 {value['page']} 页文字批注" if annotation else
+               f"第 {value['page']} 页文本框" if shape and shape['kind']=='textbox' else
+               f"第 {value['page']} 页绘图标注" if shape and shape['kind'] in ('line','ellipse','ink') else
+               f"第 {value['page']} 页形状批注" if shape else
+               f"第 {value['page']} 页笔记" if value['page'] else '研究笔记')
+        return self.add('note',label,document_id=value['document_id'],page=value['page'],
             rect=value['rect'],note_id=value['id'],revision=value['revision'],text=value['text'][:4000],
             truncated=bool(value.get('text_truncated')) or len(value['text'])>4000,url=f"/?{'study' if value['page'] is None else 'document'}={value['document_id']}&note={value['id']}",
             source_sha256=self.context['document']['sha256'] if value['document_id']==self.document_id else None,
@@ -221,6 +262,22 @@ class Sources:
             analysis_id=job['id'],dataset_id=job['dataset_id'],dataset_sha256=job['dataset_sha256'],
             result_sha256=summary['sha256'],source_sha256=self.context['document']['sha256'],
             text=json.dumps(job['result'],ensure_ascii=False),url=f"/?document={self.document_id}&analysis={job['id']}")
+
+    def reference_paper(self,value):
+        page=value['page']
+        suffix=f'第 {page} 页' if self.context['language']=='zh' else f'page {page}'
+        return self.add('reference_pdf_page',value['title']+' · '+suffix,
+            document_id=value['document_id'],page=page,rect=None,title=value['title'],
+            source_sha256=value['source_sha256'],text=value['text'],truncated=value['truncated'],
+            url=f"/?document={value['document_id']}&page={page}")
+
+    def reference_dataset(self,value):
+        return self.add('reference_dataset_sample',value['title'],page=None,rect=None,
+            document_id=value['document_id'],dataset_id=value['dataset_id'],
+            dataset_sha256=value['dataset_sha256'],source_sha256=value['source_sha256'],
+            title=value['title'],owner_title=value['owner_title'],
+            text=json.dumps(value['sample'],ensure_ascii=False),
+            url=f"/?document={value['document_id']}&dataset={value['dataset_id']}")
 
     def get(self,ref):
         result=next((r for r in self.items if r['ref']==ref),None)

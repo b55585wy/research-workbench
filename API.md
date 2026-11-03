@@ -1,3 +1,101 @@
+# v0.39 explicit cross-project Agent references
+
+ReadingContext.resource_refs is optional, at most8 unique closed references:
+paper {kind:"paper",document_id,sha256}; dataset {kind:"dataset",document_id,dataset_id,sha256}.
+IDs are UUIDs and hashes lowercase SHA256. Empty lists are omitted during compatible serialization,
+preserving old submission fingerprints. Server captures actual owner and source identity; stale,
+deleted, trashed, forged or changed references fail rather than retargeting.
+GET /api/v1/agent/reference-catalog accepts kind=paper|dataset, q<=200, limit1..50(default20),
+cursor<=2048; returns {items,next_cursor}. Metadata only, with real owner ID, title and hash.
+The four read tools search_reference_materials, list_references, read_reference_paper and
+read_reference_dataset discover metadata or read only captured references. PDF reads share the
+existing page budget. Dataset sample is bounded to5 rows/20 columns and reports truncation.
+The actual serialized sample text is capped at12000 characters per sample and24000 across a turn;
+repeated reads of the same document/dataset/hash reuse one captured source and sample.
+New source kinds reference_pdf_page and reference_dataset_sample use original owner URLs.
+Foreign reads do not expand current-owner write/proposal authority. Cross-reference contexts
+cannot start/resume continuous tasks in this increment. No new schema/table or arbitrary execution.
+See AGENT-REFERENCES.md. No tests or model calls were run.
+
+# v0.38 independent workspace entrances
+
+GET /api/v1/data-workspace/personal -> {owner:null|record}, read-only.
+POST /api/v1/data-workspace/personal accepts exact {}; creates singleton201 or returns same owner200.
+Owner remains kind=study with workspace_role=personal_analysis; old owners have no added role field.
+Schema20 adds personal_analysis_owner singleton marker only. Startup does not create an owner.
+The personal owner is excluded from project lists/search/quota and cannot link/unlink papers.
+GET /api/v1/data-workspace/catalog?kind=dataset|analysis|chart&limit=1..100&q=...&cursor=...
+returns metadata items and next_cursor. Active real owners, dataset hashes/job status/chart revision,
+stable newest-first pagination and query-bound cursors; no profiles/results/files or supervisors.
+Existing source identities, URLs, owner-bound datasets/jobs/charts, local boundary and proposals remain.
+See WORKSPACE-ENTRIES.md. No functional tests were run.
+
+# v0.37 line, ellipse and freehand PDF annotations
+
+shape_annotation additionally accepts exact input keys kind, color, line_width,
+points. New kind is line, ellipse or ink; colors and strict integer line widths
+1–4 reuse the existing shape palette. Line/ellipse require exactly 2 normalized
+finite points; ink requires 2–512 points with at least two distinct positions.
+Line permits horizontal/vertical geometry; ellipse has positive width and height.
+Closed ink strokes are valid. Bounds for ink use every point; degenerate path axes
+are padded only for the projected source rectangle. Paths are never reordered.
+Existing kinds, request routes, source hashes, receipts and immutable creation
+records remain unchanged. schema19 is a compatibility marker, with no new table.
+PDF export emits Line, Circle and Ink annotations with explicit vector appearances;
+the existing export budgets additionally limit total shape points to 16384.
+New shapes support the same saved-state screenshot references and note lifecycle.
+No functional or visual tests were run. See READER-DRAWING.md.
+
+# v0.36 PDF textbox annotations
+
+The existing shape_annotation input additionally accepts the closed textbox type:
+`{kind:"textbox",color:"black"|"blue"|"green"|"red",font_size:8..48,points:[[x1,y1],[x2,y2]]}`.
+Font size is a strict integer in PDF user-space units. No line_width, source SHA
+or second text field is accepted. note.text remains the sole body (nonblank, at
+most 2000 Unicode codepoints for textbox; existing note types unchanged). Geometry
+is a positive-area normalized display rectangle; normal note routes, request
+receipts, revisions, source guards, undo and purge remain unchanged. Old shape
+models and serialized payloads retain their prior field sets.
+Schema18 is a compatibility version marker without new tables or destructive
+migration. Text/font size/geometry changes reset source review.
+Annotated PDF uses FreeText with full Unicode Contents and a bounded RGB raster
+appearance from an installed CJK font. textbox_font_unavailable and textbox_overflow
+are explicit export failures; normal PDF resource limits also apply. Browser and
+server font measurements can differ across platforms. See READER-TEXTBOX.md.
+No functional or visual tests were run in this increment.
+
+# v0.35 PDF shape annotations
+
+Additive schema17 adds `note_shape_annotations` with immutable original and mutable
+current JSON. Existing POST notes and PATCH `/api/v1/documents/{doc}/notes/{note}`
+accept optional `shape_annotation` (GET `/state` remains read-only):
+`{kind:"rectangle"|"arrow",color:"yellow"|"green"|"blue"|"pink",line_width:1|2|3|4,points:[[x1,y1],[x2,y2]]}`.
+Exactly two finite normalized display coordinates; rectangle needs positive area,
+arrow keeps endpoint order and accepts horizontal/vertical lines. Degenerate arrow
+bounds are padded by 0.0005 per side and clipped to the page. Create derives null
+rect or checks supplied bounds; PDF page and text required, study source/text
+annotation cannot coexist. PATCH preserves kind; explicit null is rejected.
+Detailed state adds server-owned source_sha256 and projects current rect. Stored
+notes.rect remains the immutable creation bounds; request receipts/revisions stay
+unchanged. Omitted shape fields preserve legacy serialized request hashes.
+Shape notes cannot use legacy note-linked excerpts: `shape_annotation_excerpt_unsupported`.
+Sharing creates a separate frozen annotated PNG; source link records document,
+page, crop, source hash, shape note and captured revision. Existing draft/send and
+rich-note save boundaries apply. Annotated PDF and reading exports include saved
+shape geometry/style. See [READER-SHAPES.md](READER-SHAPES.md).
+This increment received static source review only; no functional tests were run.
+
+# v0.34 read-only PDF table regions
+
+`GET /api/v1/documents/{identifier}/pages/{page}/regions` returns
+`{document_id,page,source_sha256,coordinate_space:"display-normalized",items,limited_to:"ruled-tables"}`.
+Each item is `{id:"table-N",kind:"table",rect:[left,top,right,bottom]}` relative to
+the displayed PDF crop at intrinsic rotation, with finite 0..1 coordinates.
+Empty results are valid; unsupported geometry may include `unavailable_reason`.
+This local read-only endpoint adds no schema or model calls. Busy/timeout/unavailable
+and parse failures use the existing error envelope. See [READER-OBJECTS.md](READER-OBJECTS.md).
+Functional validation for this increment was skipped at the user's explicit request.
+
 # Reader and source-linked notes: original contract preserved through v0.12
 
 Reviewed .sav/.zsav imports and additive schema10 are documented in [DATA-IMPORTS.md](DATA-IMPORTS.md).
@@ -270,3 +368,83 @@ No server API or schema changes (schema15). Browser-local version1 preferences a
 GET `/api/v1/documents/{id}/export/annotated.pdf` -> application/pdf attachment, no-store. Server resolves active saved notes in one read transaction; no request body or research-record write. Highlight/underline retain quads/colors/quote/comment, region notes are Square annotations, page notes are Text comments. Original PDF/old ZIP are preserved.
 
 One concurrent generator,20-second timeout,512MiB child memory limit; source<=20MiB/200pages,<=1000notes/16384rectangles,<=8MiB UTF8 snapshot, output<=64MiB. Codes: pdf_export_empty409; pdf_export_invalid409; pdf_export_too_large413; pdf_export_busy429; pdf_export_timeout422; pdf_export_failed422; pdf_export_unavailable503. Existing file_missing/source_changed/document_trashed/not_found/source_has_no_pdf and structured storage errors remain. No partial output; request-owned temporary files removed after response/disconnect/failure. Schema15/31tables unchanged. Health version0.25.0. See [ANNOTATED-PDF.md](ANNOTATED-PDF.md).
+
+
+## v0.26 generic study-paper reading and table messages
+
+No new HTTP endpoints, outgoing request fields or schema changes. A study turn captures associated_papers metadata (up to20 existing links). list_study_papers returns that directory; read_study_paper(document_id,page,page_count) reads1–4 actual associated PDF pages,<=4000chars/page, checking the captured SHA and current association before/after. Associated page refs have kind=associated_pdf_page and their actual document_id/page/source_sha256. Historical paper sources are reused only while still associated/version-valid and bounded to8pages/24000chars; old turn-local R refs are remapped before model context reuse. Cross-paper refs do not become study-note write anchors. Existing confirmation/sharing/request hashes remain. Health version0.26.0; schema15/31tables. See [AGENT-READING.md](AGENT-READING.md).
+
+
+## v0.27 correlation in existing analysis jobs
+
+AnalysisCreate accepts additive method=correlation with engine=r, exactly2numeric columns, correlation={kind:pearson|spearman,alternative,confidence,missing:complete_pairs,independent_pairs_confirmed:true}, and verified library_sha256. Pearson requires confidence0.5–0.999; Spearman requires null and uses asymptotic p. POST .../analyses/correlation/preview returns complete-pair counts/stats/ties and code/library without a job or p value. Original .../analyses performs approved execution; recipe id=correlation-rstats-v1. Result.test has actual estimate/r-or-rho/statistic/explicit infinity/df/p/available CI and p method; null is not0. Correlation results verify all artifacts on read. Old describe/ttest payloads/recipe hashes unchanged; schema15/31tables. Health0.27.0. See [CORRELATION.md](CORRELATION.md).
+
+
+## v0.28 · online metadata and source-reference notes
+
+No new HTTP routes or submission fields; schema15 / 31tables. Health version0.28.0.
+Agent tools:
+- find_online_datasets(kind:paper_doi|dataset_identifier|keywords,query:1..180chars,source_ref:Rn).
+  Anchor must be a current paper page, still-associated paper page, or study context. Returns
+  saved:false,status:found|not_found|partial|unavailable,query,items,providers,files_downloaded:false.
+  Each retained Dataset has actual metadata identity, canonical landing_url, authors/year/version/
+  licenses, access with explicitly unknown fields, association basis/relation_types, metadata_url,
+  retrieval time and raw-record metadata_sha256; source_ref resolves to kind=online_dataset.
+  Sources are appended to the existing turn.sources; no dataset file is created. Three distinct
+  queries per turn, <=3 results/provider, repeat query/anchor reuses its captured response.
+- propose_data_reference(source_ref:Rn). Only current online_dataset refs; server constructs text/
+  rich_content, adds online_reference snapshot to existing create_note payload and retains the
+  original owner paper/study source_ref. Existing proposal hash/approval/idempotency applies.
+  Confirmation revalidates original source/association and canonical note content without
+  network access. Study notes retain a study anchor plus persistent paper/page provenance in text.
+
+Unsupported identifiers/invalid input are422; invented/stale refs, source/association changes and
+query cap are409. Public-provider failures are per-provider typed status, not fake empty success;
+404/not_dataset and actual successful empty results stay distinct. No arbitrary endpoint, auth,
+redirect or file access; only fixed GET metadata queries. Historical online citation numbers are
+masked before model history reuse. See [full limits](ONLINE-DATA.md).
+
+
+## v0.28.1 · readonly bibliography lookup
+
+POST /api/v1/documents/{id}/metadata/lookup with {doi:string|null}, extra fields forbidden.
+null/omitted uses saved DOI then PDF discovery; empty string requests PDF discovery.
+Ready returns saved:false,status:ready,fields (known valid title/authors/year/doi only),
+metadata_revision,source_sha256,source:{provider,url,retrieved_at,metadata_sha256,record_type},warnings.
+Multiple PDF DOI candidates return status:choose_doi,candidates; empty embedded metadata yields
+status:not_found,fields:{}. No writes or model call. Existing PATCH metadata/save receipt and
+revision conflicts remain. DOI identity/field limits/source hash are checked; fixed public HTTPS
+GET metadata only, no redirects or file uploads. Health0.28.1; schema15 / 31tables unchanged.
+Reading note visibility reflows the grid; fit/custom scale semantics remain. See BIBLIOGRAPHY-AND-LAYOUT.md.
+
+
+## v0.30 · confirmed permanent paper deletion
+
+GET /api/v1/documents/{id}/purge-preview is readonly, trash-only, idle/unlinked-only;
+returns id,title,expected_revision,preview_sha256,counts and excluded. POST .../purge
+accepts request_id,expected_revision,preview_sha256; checks the exact snapshot in a
+write transaction, erases only owned rows, then cleans registered primary files.
+Success is {id,purged:true,files_removed:true}; repeat exact payload after uncertainty.
+503 document_purge_pending is NOT success: GET /documents/trash includes a body-free
+pending row with purge_request for explicit retry; startup also resumes cleanup.
+Stale snapshots/revisions, active jobs/study links and foreign references reject atomically.
+Purged document access/restore returns410. Schema16 adds document_purges without changing
+the old31 table fields. Original APIs and note purge remain. No secure-wipe/export-copy/
+backup deletion claim. Health0.30.0. See [full contract](PAPER-PURGE.md).
+
+
+## v0.31 · inline images and bounded ordinary reading
+
+No new HTTP routes/submission fields or schema changes; schema16/32tables. rich_content v1
+is unchanged; v2 allows insert:{research_image:{document_id,image_id,sha256,alt}} among text
+ops, max8unique assets within existing512ops/64KiB/10000chars. Plaintext uses [Image: ALT].
+Server checks same-owner immutable original/preview, syncs note_images atomically and exports
+local offline images in order. Agent pixels still require explicit context.image_ids; embeds
+alone share no pixels. Save/approval/revision/idempotency semantics remain.
+
+Ordinary reading uses at most8 new page-read attempts,110s soft reading budget and a reserved
+tools-free final response within the existing round cap. Overview seed/actual coverage is
+server-bound. agent_reading_budget is an embedded tool error stopping expansion. A failed turn
+may now retain nonempty answer excerpts with error.code=agent_answer_incomplete; it remains
+failed, not a completed overview. Existing task_id analysis flows retain their confirmation
+state machine. Health0.31.0. See READING-EXPERIENCE.md.

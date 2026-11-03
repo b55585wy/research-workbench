@@ -12,13 +12,14 @@ const messages = {
     list: "已上传图片",
     chat: "提供给助手",
     note: "加入新笔记",
-    source: "用户上传 · 非 PDF 截取",
+    source: "用户提供图片",
     download: "下载原图",
     view: "查看 / 批注",
     dimensions: "{width} × {height} 像素",
     invalidType: "请选择 PNG、JPEG 或 WebP 图片。",
     file_too_large: "图片不能超过 8 MiB。",
     image_limit: "图片尺寸或总存储量超出限制。",
+    imageChatLimit: "助手最多选择 4 张图片；原有选择未更改。",
     idempotency_conflict: "上传请求发生冲突，请重新选择图片。",
     validation_error: "图片或上传请求无效。",
     network: "无法连接本地服务，上传内容已保留。请重试。",
@@ -37,13 +38,14 @@ const messages = {
     list: "Uploaded images",
     chat: "Provide to assistant",
     note: "Add to new note",
-    source: "User upload · not a PDF crop",
+    source: "Provided image",
     download: "Download original",
     view: "View / annotate",
     dimensions: "{width} × {height} pixels",
     invalidType: "Choose a PNG, JPEG, or WebP image.",
     file_too_large: "Images must be no larger than 8 MiB.",
     image_limit: "The image dimensions or total storage limit was exceeded.",
+    imageChatLimit: "Select at most 4 images for the assistant. Existing selections were not changed.",
     idempotency_conflict: "The upload request conflicted. Choose the image again.",
     validation_error: "The image or upload request is invalid.",
     network: "Cannot connect to the local service. The upload is retained; try again.",
@@ -175,6 +177,12 @@ export function createImageLibrary(adapter) {
         checkbox.dataset.imageId = image.id;
         checkbox.checked = selection.has(image.id);
         checkbox.addEventListener("change", () => {
+          if (action === "select-chat-image" && checkbox.checked && selection.size >= 4) {
+            checkbox.checked = false;
+            entry.status = { key: "imageChatLimit", kind: "error" };
+            render();
+            return;
+          }
           if (checkbox.checked) selection.add(image.id);
           else selection.delete(image.id);
           if (action === "select-note-image") adapter.invalidateDraftRequest(paper.id);
@@ -242,6 +250,47 @@ export function createImageLibrary(adapter) {
     if ((!file.type && !allowedExtension) || (file.type && !allowedType && !allowedExtension)) return "invalidType";
     if (file.size > MAX_IMAGE_BYTES) return "file_too_large";
     return null;
+  }
+
+  async function uploadAsset(documentId, file, requestId) {
+    const invalid = validate(file);
+    if (invalid || !requestId) {
+      const error = new Error(invalid || "validation_error");
+      error.code = invalid || "validation_error";
+      throw error;
+    }
+    const form = new FormData();
+    form.append("file", file, file.name);
+    form.append("request_id", requestId);
+    const response = await adapter.checkedFetch(`/api/v1/documents/${encodeURIComponent(documentId)}/images`, { method: "POST", body: form });
+    if (![200, 201].includes(response.status)) {
+      const error = new Error("request_failed");
+      error.code = "request_failed";
+      throw error;
+    }
+    const image = await response.json();
+    if (!image?.id || image.document_id !== documentId || !/^[0-9a-f]{64}$/.test(image.sha256 || "")) {
+      const error = new Error("validation_error");
+      error.code = "validation_error";
+      throw error;
+    }
+    const entry = entryFor(documentId);
+    entry.items = [image, ...entry.items.filter((item) => item.id !== image.id)];
+    entry.loaded = true;
+    render();
+    adapter.notesChanged();
+    adapter.contextChanged();
+    return image;
+  }
+
+  async function uploadCanvas(documentId, canvas, { requestId, filename }) {
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+    if (!blob) {
+      const error = new Error("request_failed");
+      error.code = "request_failed";
+      throw error;
+    }
+    return uploadAsset(documentId, new File([blob], filename, { type: "image/png" }), requestId);
   }
 
   async function upload(documentId) {
@@ -313,11 +362,28 @@ export function createImageLibrary(adapter) {
     reload(documentId) {
       return load(documentId);
     },
+    uploadCanvas,
     getNoteSelection(documentId) {
       return [...entryFor(documentId).note];
     },
     getChatSelection(documentId) {
       return [...entryFor(documentId).chat];
+    },
+    selectChatImage(documentId, imageId) {
+      const entry = entryFor(documentId);
+      if (entry.chat.has(imageId)) return true;
+      if (entry.chat.size >= 4 || !entry.items.some((image) => image.id === imageId && image.document_id === documentId)) return false;
+      entry.chat.add(imageId);
+      render();
+      adapter.contextChanged();
+      return true;
+    },
+    deselectChatImage(documentId, imageId) {
+      const entry = entryFor(documentId);
+      if (!entry.chat.delete(imageId)) return false;
+      render();
+      adapter.contextChanged();
+      return true;
     },
     getChatImages(documentId) {
       const entry = entryFor(documentId);
@@ -333,10 +399,11 @@ export function createImageLibrary(adapter) {
       render();
       adapter.contextChanged();
     },
-    appendNoteImages(container, note) {
+    appendNoteImages(container, note, noteState) {
       const paper = adapter.getDocument();
       if (!paper || paper.id !== note.document_id) return;
-      const linked = entryFor(paper.id).items.filter((image) => Array.isArray(image.note_ids) && image.note_ids.includes(note.id));
+      const inlineIds = new Set((noteState?.rich_content?.ops || note.rich_content?.ops || []).map((op) => op.insert?.research_image?.image_id).filter(Boolean));
+      const linked = entryFor(paper.id).items.filter((image) => !inlineIds.has(image.id) && Array.isArray(image.note_ids) && image.note_ids.includes(note.id));
       if (!linked.length) return;
       const group = document.createElement("div");
       group.className = "note-uploaded-images";

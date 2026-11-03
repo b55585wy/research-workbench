@@ -21,15 +21,15 @@ class Analyses:
 
     def record(self,row):
         payload=json.loads(row['payload_json'])
-        method=payload.get('method','describe');statistical=method in ('ttest_independent','ttest_paired')
-        method_fields=('method','paired','library_sha256') if method=='ttest_paired' else ('method','ttest','library_sha256')
+        method=payload.get('method','describe');statistical=method in ('ttest_independent','ttest_paired','correlation')
+        method_fields=('method','correlation','library_sha256') if method=='correlation' else ('method','paired','library_sha256') if method=='ttest_paired' else ('method','ttest','library_sha256')
         prefix=f"/api/v1/documents/{row['document_id']}/analyses/{row['id']}"
         outputs=json.loads(row['outputs_json']) if row['status']=='succeeded' else []
         outputs=[{**r,'url':prefix+'/files/'+r['name']} for r in outputs]
         return {'id':row['id'],'document_id':row['document_id'],'dataset_id':row['dataset_id'],
             'dataset_name':row['dataset_name'],'dataset_sha256':payload['dataset_sha256'],
             'engine':payload['engine'],'columns':payload['columns'],
-            'recipe':{'id':{'ttest_independent':'ttest-independent-rstats-v1','ttest_paired':'ttest-paired-rstats-v1'}.get(method,'describe-v1'),
+            'recipe':{'id':{'ttest_independent':'ttest-independent-rstats-v1','ttest_paired':'ttest-paired-rstats-v1','correlation':'correlation-rstats-v1'}.get(method,'describe-v1'),
                       'version':1,'sha256':payload['recipe_sha256'],
                       'code_url':'/api/v1/analysis/recipes/'+payload['engine']+('?method='+method if statistical else '')},
             **({k:payload[k] for k in method_fields} if statistical else {}),
@@ -75,6 +75,10 @@ class Analyses:
             self.catalog.statistics.require(payload.library_sha256)
             from .paired_statistics import probe
             if probe_data:probe(self,row,{'columns':payload.columns,'paired':payload.paired.model_dump(mode='json')})
+        if payload.method=='correlation':
+            self.catalog.statistics.require(payload.library_sha256)
+            from .correlation_statistics import probe
+            if probe_data:probe(self,row,{'columns':payload.columns,'correlation':payload.correlation.model_dump(mode='json')})
         return row,info
 
     def create_in(self,connection,document_id,payload):
@@ -170,7 +174,7 @@ class Analyses:
         path,_=self.file(document_id,identifier,'summary.json')
         value=json.loads(path.read_text(encoding='utf-8'))
         if value!=job['result']:raise WorkspaceError('analysis_output_changed','分析记录与结果不一致。',409)
-        if job.get('method')=='ttest_paired':
+        if job.get('method') in ('ttest_paired','correlation'):
             for item in job['outputs']:self.file(document_id,identifier,item['name'])
         self.datasets.path(document_id,job['dataset_id'])
         return job

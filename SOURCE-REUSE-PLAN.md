@@ -126,3 +126,17 @@ plot engine or RSpace business model. R stats::t.test and datasets::ToothGrowth
 are reused for an isolated public-data workflow verification; no new R package,
 inferential method or arbitrary-code runtime is added. The independent mpmath
 numeric reference is test-only and is not an application dependency.
+
+
+## v0.27 相关计算部件
+
+新增直接复用已有 R stats::cor.test 的 Pearson/Spearman 内核；输入规范、明确确认、独立执行和产物追溯属于本应用。没有部署上层统计平台或新引入R依赖。见 [方法边界](CORRELATION.md)及 STATISTICS-SOURCES.md。
+
+
+## v0.28 · public metadata adapters
+
+Reuse existing Python standard-library HTTPS/JSON handling, source registry, approved note writes,
+rich-text validation and exports. DataCite relatedIdentifier and Zenodo record APIs supply actual
+public metadata; no whole research platform, API client dependency or file mirror was introduced.
+Provider-reported relationship/license/access remain separate from verified underlying data.
+Official API references and actual supported scope: [ONLINE-DATA.md](ONLINE-DATA.md).

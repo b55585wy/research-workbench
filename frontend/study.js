@@ -5,7 +5,10 @@ const HEX_64 = /^[0-9a-f]{64}$/i;
 
 const messages = {
   zh: {
-    studies: "研究",
+    studies: "项目",
+    personalData: "我的数据",
+    sourcePersonal: "我的数据",
+    emptyPersonalNotes: "“我的数据”还没有笔记。",
     newStudy: "新建研究",
     hideCreate: "收起新建研究",
     name: "研究名称",
@@ -101,7 +104,10 @@ const messages = {
     not_found: "请求的内容不存在或已被删除。"
   },
   en: {
-    studies: "Research",
+    studies: "Projects",
+    personalData: "My data",
+    sourcePersonal: "My data",
+    emptyPersonalNotes: "My data has no notes yet.",
     newStudy: "New research",
     hideCreate: "Close new research",
     name: "Research name",
@@ -276,6 +282,10 @@ export function createStudy(adapter) {
     return owner?.kind === "study" ? owner : null;
   }
 
+  function isPersonal(owner = currentDocument()) {
+    return owner?.kind === "study" && owner?.workspace_role === "personal_analysis";
+  }
+
   function entryFor(studyId) {
     if (!entries.has(studyId)) {
       entries.set(studyId, {
@@ -392,6 +402,7 @@ export function createStudy(adapter) {
   }
 
   function sourceName(source) {
+    if (source?.kind === "study" && isPersonal()) return t("sourcePersonal");
     return t(source?.kind === "dataset" ? "sourceDataset" : source?.kind === "analysis" ? "sourceAnalysis" : source?.kind === "chart" ? "sourceChart" : source?.kind === "study" ? "sourceStudy" : "sourceUnavailable");
   }
 
@@ -402,7 +413,7 @@ export function createStudy(adapter) {
   function renderSourceOptions(owner, draft) {
     const selected = draft.source?.kind || "study";
     const options = [];
-    if (validSource(defaultSource(owner))) options.push({ value: "study", label: t("sourceStudy"), source: defaultSource(owner) });
+    if (validSource(defaultSource(owner))) options.push({ value: "study", label: sourceName(defaultSource(owner)), source: defaultSource(owner) });
     const dataset = adapter.getSelectedDataset?.();
     if (draft.source?.kind === "dataset" && validSource(draft.source)) {
       options.push({ value: "dataset", label: t("sourceDataset"), source: draft.source });
@@ -550,7 +561,7 @@ export function createStudy(adapter) {
     elements.notesHeading.querySelector("h3").textContent = t("savedNotes");
     elements.notesCount.textContent = notes.length ? String(notes.length) : "";
     elements.reviewExplainer.textContent = t("reviewExplainer");
-    elements.notesEmpty.textContent = t("emptyNotes");
+    elements.notesEmpty.textContent = t(isPersonal(owner) ? "emptyPersonalNotes" : "emptyNotes");
     elements.notesEmpty.hidden = notes.length > 0;
     elements.notesList.replaceChildren();
     for (const note of notes) elements.notesList.append(renderNoteItem(note, owner, entry));
@@ -610,9 +621,10 @@ export function createStudy(adapter) {
 
   function renderDocument() {
     const owner = currentDocument();
-    elements.main.dataset.ownerKind = owner ? "study" : adapter.getDocument() ? "paper" : "none";
-    elements.view.hidden = !owner;
-    if (owner) {
+    const personal = isPersonal(owner);
+    elements.main.dataset.ownerKind = personal ? "personal" : owner ? "study" : adapter.getDocument() ? "paper" : "none";
+    elements.view.hidden = !owner || personal;
+    if (owner && !personal) {
       elements.viewTitle.textContent = owner.name || owner.title || t("untitled");
       elements.viewQuestion.textContent = owner.question || "";
     } else {
@@ -622,7 +634,7 @@ export function createStudy(adapter) {
     renderList();
     renderDraft();
     renderNotes();
-    if (owner) renderPapers();
+    if (owner && !personal) renderPapers();
   }
 
   async function loadPapers(owner) {
@@ -1114,7 +1126,7 @@ export function createStudy(adapter) {
       renderDocument();
     },
     setStudies(items) {
-      studies = Array.isArray(items) ? items.filter((item) => item?.kind === "study") : [];
+      studies = Array.isArray(items) ? items.filter((item) => item?.kind === "study" && item.workspace_role !== "personal_analysis") : [];
       renderList();
     },
     getStudies() {
@@ -1125,7 +1137,7 @@ export function createStudy(adapter) {
       sequence += 1;
       noteNavigationSequence += 1;
       renderDocument();
-      if (currentId) loadPapers(document);
+      if (currentId && !isPersonal(document)) loadPapers(document);
     },
     captureCurrentDraft,
     renderDocument,

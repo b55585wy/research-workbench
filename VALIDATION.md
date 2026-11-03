@@ -722,3 +722,85 @@ Evidence: E:/research-workbench-pilot-20261030/annotated-pdf-v1/SCENARIOS.md, py
 An isolated copy of the current10-page paper also exported its saved PDF note with original text/source hash intact and zero model calls. The probe's SQLite backup connections were explicitly closed after a Windows file-lock cleanup error. Automatic approval rejected removal of the old private probe directory (blocked by policy); validation copies are retained privately. Production export temporary-file cleanup is a separate path and passed its tests.
 
 Guarded backup/activation, read-only live UI/download smoke and post-smoke source/table/file/boundary checks are recorded externally before Git completion. Original PDFs and all31tables remain unchanged. Full reading records continue to carry attachments, rich formatting and independent image annotations. See [ANNOTATED-PDF.md](ANNOTATED-PDF.md).
+
+## Agent floating window · 2026-11-02 · scoped smoke only
+
+Frontend-only draggable/resizable/full-page assistant. Actual Kimi owns frontend edits; Codex owns review and acceptance. The 8 scoped smoke groups passed in installed Chrome: pointer movement/resize/bounds, release, full-page rectangle restoration and Escape, close/reopen and draft preservation, keyboard control, desktop/mobile and bilingual blue theme, and locally scrollable synthetic wide content. Zero page errors, API writes, or external requests were observed. Desktop/mobile screenshots were visually checked. No full regression or model call was performed. Playwright's default browser executable was absent on initial startup; the existing installed Chrome was used for the successful run. No packages were installed. Evidence: E:/research-workbench-pilot-20261030/assistant-window-v1. See [AGENT-WINDOW.md](AGENT-WINDOW.md).
+
+
+## v0.26 generic Agent paper reading and table messages · 2026-11-02
+
+12 scoped backend smoke checks passed for actual two-paper text extraction, ordinary chat/follow-up, directory-only metadata, scope/bounds/unlink/byte drift, blank/truncated coverage, historical R-ref remapping and revocation, unchanged study-note write scope, and schema15/31tables. 11 scoped browser checks passed for ordinary table replies, actual-source new tabs, add-column chat, CSV/clipboard Unicode/provenance/formula protection, persistent history, safe literal/unknown/malformed/oversized rendering, clipboard denial, local wide-table scrolling, full-page restoration, mobile bilingual blue/default layout and drafts. Rendering/copy/export caused no extra API writes, external requests or page errors. Screenshots visually checked. No full regression suite was run.
+
+The configured real provider completed two synthetic-only turns with3model calls: actual reads of both two-page PDFs, then a complete cited table and a follow-up additional column. No user paper/model-data transfer. The first model pilot returned prose through complete_task.summary; clarifying final-format instructions corrected it and the two-turn pilot passed. The first browser wide-table fixture fit in the full viewport; the corrected20-column fixture demonstrated real local overflow. Failed attempts remain separate evidence. One pre-existing Starlette/httpx deprecation warning remains. Actual Kimi owns frontend edits, Codex owns backend/integration/acceptance. No dependency/schema/dedicated table model added. Evidence: E:/research-workbench-pilot-20261030/agent-reading-v1. See [AGENT-READING.md](AGENT-READING.md).
+
+
+## v0.27 Pearson/Spearman correlation · 2026-11-02
+
+15 scoped backend smoke groups passed with actual R stats::cor.test. Independent Python standard-library correlation/rank calculations, df4 analytic Student-t tails and Fisher intervals checked numeric output. Coverage includes complete-pair exclusions and descriptive basis, Spearman ties/one-sided asymptotic p/no CI, negative/perfect correlations with explicit infinite statistic, n=3 Pearson with absent CI, small/constant/nonnumeric/invalid parameters, data/code/library hash drift, preview without execution, exact retries, actual Notebook/ZIP/row-map/raw R output, full artifact tamper rejection, unshared-data denial and schema15/31tables. All3 legacy payload shapes and4 recipe hashes remained unchanged. One existing Starlette/httpx deprecation warning remains.
+
+10 scoped browser groups passed for declaration/distinct-column gates, preview/code/counts without execution, actual R confirmation/results, stale-parameter invalidation, Spearman null-confidence/approximation, read-only Notebook/ZIP, Agent card/confirmation with integer tie counts, malformed-metadata rejection, mobile English/blue/default layout, and zero frontend page errors/external requests. Configured real-provider synthetic-only continuous task passed with8model calls and3separate approvals: actual correlation→saved scatter→source-linked study note;6used/3excluded pairs. No user material was supplied to the model; no full regression was run.
+
+Pre-release review corrected frontend boolean-vs-integer tie-count handling. Harness corrections avoided treating a p_value symbol in reviewable source code as an executed result and awaited intercepted preview completion before removing a route. Source contracts, raw results and artifacts remain explicit; R computation is not duplicated in production. Actual Kimi owns frontend edits; Codex owns backend/integration/acceptance. Evidence: E:/research-workbench-pilot-20261030/correlation-v1. See [CORRELATION.md](CORRELATION.md).
+
+
+## v0.28 · 2026-11-02 · online data references — scoped smoke
+
+15 backend requirement groups passed: actual metadata identity/type semantics, exact relationship
+checks versus keyword candidates, missing/invalid/malformed/oversized records, fixed GET hosts/no
+redirect/file fetch, bounded retry and failures/partial/empty distinctions, per-turn query cache,
+pending/confirm/reject/cancel/storage-failure retry/idempotency/reopen, forged/historical refs,
+changed PDF/study association, source-note rich links and exports, schema15 / 31tables.
+8 actual browser groups passed: readonly lookup, table/inline/list links and safe new-tab opening,
+unsafe URL rejection, concrete confirmation, reload/export, invalid source fallback rejection,
+English/blue mobile layout and no frontend page errors or render-time external requests.
+3 real public API groups passed using DataCite Dataset metadata, exact paper DOI relationship
+and a public Zenodo record. An actual configured model completed public record lookup -> pending
+reference note in2 calls; only explicit confirmation saved the note. Source PDFs/data were
+synthetic, public metadata was requested without downloading data files; no user research was sent.
+All45 preexisting tool schemas and5 fixed Python/R recipe hashes matched v0.27. No full regression
+suite was run. Evidence: E:/research-workbench-pilot-20261030/online-data-v1. Browser startup/syntax
+and transport diagnostics are retained separately; only final passing results count as acceptance.
+User requested opening the preview; the isolated loopback demonstration is retained for viewing.
+
+
+
+## v0.28.1 · 2026-11-02 · authorized bibliography and reading layout
+
+8 backend requirement groups passed with synthetic files and real child extraction, including
+readonly31table snapshots, Crossref/DataCite identity, missing/oversized/invalid metadata, DOI
+discovery choices, failures/source drift, old explicit save/idempotency/revision behavior.
+9 main browser +3 edge groups passed: unsaved/cancel/save/reload, source/candidates/failures,
+notes reflow/fit/manual scale/draft preservation, white margins and genuine black figure through
+rapid zoom, fractional DPR/single page, delayed input and document switch, mobile bilingual/blue,
+no frontend errors or render-time external requests. Public Crossref DOI lookup passed without
+files/model calls. Diagnostics are separate from final passing acceptance. No full regression.
+Evidence: E:/research-workbench-pilot-20261030/bibliography-layout-v1.
+
+
+## v0.30 · scoped paper purge verification
+
+Synthetic-only backend and browser smoke covers full primary-file/owned-record deletion,
+unchanged unrelated paper/export, stale confirmations, busy jobs/Agent/study links, foreign-key
+rollback, exact retries, missing files, occupied-file pending state and restart, unsafe storage
+keys/Windows junctions, late upload/cache publication, cancellation/lost response/reload,
+bilingual/mobile/keyboard and unsaved-draft preservation. Final counts and activation hashes
+are recorded under E:/research-workbench-pilot-20261030/paper-purge-v1. No full regression.
+No purge mutation is sent to the formal3150 service. See PAPER-PURGE.md.
+
+Final candidate result: 18 backend cases and 11 browser groups passed. Syntax and whitespace checks passed.
+Browser edge checks cover exact capacity units, targeted progress removal, and superseded restore responses.
+
+
+## v0.31 · focused reading experience verification
+
+Requirement scenarios/results live at E:/research-workbench-pilot-20261030/reader-experience-v2.
+Backend covers v1 golden compatibility, typed local images and explicit sharing/approval,
+bounded ordinary reading and final-response paths. UI smoke uses real PDF text/canvas pixels,
+async edits, Undo/Redo, save/reopen, prepared sources, side resizing and collapsed evidence.
+Two destructive draft-edit cases were found during acceptance and are required to pass before
+activation. Actual configured model overview uses only a77page synthetic booklet. No full
+regression or real-document test mutation. Deployment/post-verify records are authoritative.
+
+Final candidate: 34 backend/flow checks and 21 browser groups passed; actual-model synthetic overview passed.
+Both reproduced draft-loss cases passed after correction. No full regression.

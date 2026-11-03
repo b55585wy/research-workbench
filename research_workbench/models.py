@@ -1,9 +1,11 @@
 import math
 from uuid import UUID
-from typing import Literal
+from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator, model_serializer
 from .rich_content import validate_content,plaintext
+from .shape_annotations import (MAX_TEXTBOX_BODY, ShapeAnnotation, ShapeAnnotationInput,
+                                TextboxAnnotation, TextboxRecord)
 from .text_annotations import AnnotationCreate, AnnotationStyle
 
 MAX_FILE_BYTES = 20 * 1024 * 1024
@@ -32,12 +34,15 @@ class NoteCreate(BaseModel):
     text: str = Field(min_length=1, max_length=10_000)
     rich_content: dict | None = None
     annotation: AnnotationCreate | None = None
+    shape_annotation: Optional[ShapeAnnotationInput] = None
 
     @model_serializer(mode='wrap')
     def compatible_serialization(self, handler):
         value = handler(self)
         if value.get('annotation') is None:
             value.pop('annotation', None)
+        if value.get('shape_annotation') is None:
+            value.pop('shape_annotation', None)
         return value
 
     @field_validator('rich_content')
@@ -54,6 +59,18 @@ class NoteCreate(BaseModel):
                 raise ValueError('A text annotation requires its selected quote and PDF page anchor')
             if any(abs(a-b) > 1e-6 for a, b in zip(self.annotation.bounds(), self.rect)):
                 raise ValueError('Annotation union must match the legacy note rectangle')
+        if self.shape_annotation is not None:
+            if self.page is None or self.source is not None:
+                raise ValueError('A shape annotation requires a PDF page anchor')
+            if self.annotation is not None:
+                raise ValueError('A shape annotation cannot share a text annotation')
+            if self.shape_annotation.kind == 'textbox' and len(self.text) > MAX_TEXTBOX_BODY:
+                raise ValueError(f'A text box body cannot exceed {MAX_TEXTBOX_BODY} characters')
+            bounds = self.shape_annotation.bounds()
+            if self.rect is None:
+                self.rect = tuple(bounds)
+            elif any(abs(a-b) > 1e-6 for a, b in zip(bounds, self.rect)):
+                raise ValueError('Shape bounds must match the legacy note rectangle')
         return self
 
     @field_validator('text')
@@ -122,6 +139,7 @@ class NoteUpdate(NoteMutation):
     review_status: Literal['unreviewed', 'source_checked'] | None = None
     rich_content: dict | None = None
     annotation_style: AnnotationStyle | None = None
+    shape_annotation: Optional[ShapeAnnotationInput] = None
 
     @field_validator('rich_content')
     @classmethod
@@ -137,14 +155,20 @@ class NoteUpdate(NoteMutation):
 
     @model_validator(mode='after')
     def has_change(self):
-        if not ({'text', 'review_status', 'annotation_style'} & self.model_fields_set):
+        if not ({'text', 'review_status', 'annotation_style', 'shape_annotation'} & self.model_fields_set):
             raise ValueError('No change supplied')
         if 'annotation_style' in self.model_fields_set and self.annotation_style is None:
             raise ValueError('Annotation style cannot be null')
+        if 'shape_annotation' in self.model_fields_set and self.shape_annotation is None:
+            raise ValueError('Shape annotation cannot be null')
         if 'review_status' in self.model_fields_set and self.review_status is None:
             raise ValueError('Review status cannot be null')
         if 'rich_content' in self.model_fields_set and 'text' not in self.model_fields_set:
             raise ValueError('Rich edits require matching text')
         if self.rich_content is not None and plaintext(self.rich_content)!=self.text:
             raise ValueError('Rich and plain text must match')
+        if (self.shape_annotation is not None and self.shape_annotation.kind == 'textbox'
+                and 'text' in self.model_fields_set and self.text is not None
+                and len(self.text) > MAX_TEXTBOX_BODY):
+            raise ValueError(f'A text box body cannot exceed {MAX_TEXTBOX_BODY} characters')
         return self

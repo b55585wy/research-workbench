@@ -71,3 +71,8 @@ GPL 及传递依赖义务；独立进程本身不构成免除许可义务的结�
 真实 SPSS 参考输出，就只称为“该统计方法支持”，不称为“与 SPSS 全面兼容”。
 
 这些验证完成前，新方法不出现在用户可执行列表，也不允许 Agent 宣称已安装。
+
+
+## v0.27：R stats::cor.test
+
+直接调用已锁定 stats4.6.2 的 cor.test，复用现有 R4.6.2 运行时/统计库清单，不复制上层 ELN/统计软件工程，不新增R包。Pearson 与 Spearman 的计算语义依据 [R官方文档](https://stat.ethz.ch/R-manual/R-devel/library/stats/html/cor.test.html)和本机冻结组件；Spearman明确使用 exact=FALSE,continuity=FALSE，置信区间只保留组件实际返回值。适配器仅负责规范输入、参数及结果/来源契约，原运行时许可保持原样。

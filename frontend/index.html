@@ -6,6 +6,9 @@
   <meta name="color-scheme" content="light">
   <title>文献与笔记 · Synrise Neuro</title>
   <link rel="stylesheet" href="/theme-tokens.css">
+  <link rel="stylesheet" href="/pdf-text-layer.css">
+  <link rel="stylesheet" href="/pdf-annotation-layer.css">
+  <link rel="stylesheet" href="/pdf-layer-rotation.css">
   <link rel="stylesheet" href="/styles.css">
   <link rel="stylesheet" href="/workspace.css">
   <link rel="stylesheet" href="/image-library.css">
@@ -55,22 +58,41 @@
 
   <main class="workspace">
     <aside class="documents-panel" aria-labelledby="documents-heading">
-      <form id="library-search-form" class="library-search" role="search">
-        <label for="library-search-input" class="library-search-label" data-i18n="searchLabel">搜索研究、文献和笔记</label>
-        <div class="library-search-row">
-          <input id="library-search-input" data-testid="library-search-input" type="search" maxlength="200" autocomplete="off" data-i18n-placeholder="searchPlaceholder" placeholder="搜索研究、标题、作者、DOI 或笔记">
-          <button id="library-search-submit" class="button button-secondary" type="submit" data-testid="library-search-submit" data-i18n="searchSubmit">搜索</button>
-          <button id="library-search-clear" class="button button-quiet" type="button" data-testid="library-search-clear" data-i18n="searchClear" disabled>清除</button>
+      <div id="reading-sidebar">
+        <form id="library-search-form" class="library-search" role="search">
+          <label for="library-search-input" class="library-search-label" data-i18n="searchLabel">搜索研究、文献和笔记</label>
+          <div class="library-search-row">
+            <input id="library-search-input" data-testid="library-search-input" type="search" maxlength="200" autocomplete="off" data-i18n-placeholder="searchPlaceholder" placeholder="搜索研究、标题、作者、DOI 或笔记">
+            <button id="library-search-submit" class="button button-secondary" type="submit" data-testid="library-search-submit" data-i18n="searchSubmit">搜索</button>
+            <button id="library-search-clear" class="button button-quiet" type="button" data-testid="library-search-clear" data-i18n="searchClear" disabled>清除</button>
+          </div>
+        </form>
+        <div id="library-search-status" class="library-search-status" data-testid="library-search-status" role="status" aria-live="polite" hidden>
+          <span id="library-search-status-text"></span>
+          <button id="library-search-retry" class="status-retry" type="button" data-i18n="retry" hidden>重试</button>
         </div>
-      </form>
-      <div id="library-search-status" class="library-search-status" data-testid="library-search-status" role="status" aria-live="polite" hidden>
-        <span id="library-search-status-text"></span>
-        <button id="library-search-retry" class="status-retry" type="button" data-i18n="retry" hidden>重试</button>
+        <div id="library-search-results" class="library-search-results" data-testid="library-search-results" aria-label="搜索结果" hidden></div>
+        <div class="panel-heading">
+          <h2 id="documents-heading" data-i18n="documents">文献</h2>
+          <button id="upload-button" class="button button-primary upload-button" type="button" data-i18n="upload">上传 PDF</button>
+          <input id="upload-input" data-testid="upload-input" type="file" accept="application/pdf,.pdf" hidden>
+        </div>
+        <div id="documents-empty" class="empty-state">
+          <p data-i18n="emptyDocuments">还没有文献。上传 PDF，或打开两页示例开始阅读。</p>
+          <button id="sample-open" class="button button-secondary" type="button" data-testid="sample-open" data-i18n="sample">试读示例</button>
+        </div>
+        <ul id="documents-list" class="documents-list" data-testid="documents-list" aria-label="已保存文献"></ul>
+        <details id="library-trash" class="library-trash">
+          <summary><span data-i18n="libraryTrash">文献回收站</span><span id="library-trash-count" class="notes-count"></span></summary>
+          <p class="library-trash-help" data-i18n="libraryTrashHelp">回收站中的文献可恢复。彻底删除会清理原文及关联资料，无法撤销。</p>
+          <div id="library-trash-status" class="library-trash-status" role="status" aria-live="polite"></div>
+          <ul id="library-trash-list" class="documents-list" aria-label="回收站中的文献"></ul>
+        </details>
       </div>
-      <div id="library-search-results" class="library-search-results" data-testid="library-search-results" aria-label="搜索结果" hidden></div>
-      <section class="study-library" aria-labelledby="study-library-heading">
+      <section id="data-navigation" class="data-navigation" aria-labelledby="data-navigation-heading" hidden></section>
+      <details id="project-library" class="study-library" aria-labelledby="study-library-heading">
+        <summary class="study-library-summary"><span id="study-library-heading" role="heading" aria-level="2">项目</span></summary>
         <div class="panel-heading study-library-heading">
-          <h2 id="study-library-heading">研究</h2>
           <button id="study-new" class="button button-secondary" type="button" aria-controls="study-create-form" aria-expanded="false">新建研究</button>
         </div>
         <form id="study-create-form" class="study-create-form" hidden>
@@ -87,22 +109,6 @@
         </form>
         <p id="study-list-empty" class="study-list-empty" hidden>还没有研究。</p>
         <ul id="study-list" class="documents-list study-list" aria-label="研究列表"></ul>
-      </section>
-      <div class="panel-heading">
-        <h2 id="documents-heading" data-i18n="documents">文献</h2>
-        <button id="upload-button" class="button button-primary upload-button" type="button" data-i18n="upload">上传 PDF</button>
-        <input id="upload-input" data-testid="upload-input" type="file" accept="application/pdf,.pdf" hidden>
-      </div>
-      <div id="documents-empty" class="empty-state">
-        <p data-i18n="emptyDocuments">还没有文献。上传 PDF，或打开两页示例开始阅读。</p>
-        <button id="sample-open" class="button button-secondary" type="button" data-testid="sample-open" data-i18n="sample">试读示例</button>
-      </div>
-      <ul id="documents-list" class="documents-list" data-testid="documents-list" aria-label="已保存文献"></ul>
-      <details id="library-trash" class="library-trash">
-        <summary><span data-i18n="libraryTrash">文献回收站</span><span id="library-trash-count" class="notes-count"></span></summary>
-        <p class="library-trash-help" data-i18n="libraryTrashHelp">回收站中的文献可恢复；原文、笔记和图片都会保留。</p>
-        <div id="library-trash-status" class="library-trash-status" role="status" aria-live="polite"></div>
-        <ul id="library-trash-list" class="documents-list" aria-label="回收站中的文献"></ul>
       </details>
     </aside>
 
@@ -158,6 +164,11 @@
               <input id="metadata-doi" data-testid="metadata-doi" type="text" maxlength="255" readonly disabled>
             </label>
           </div>
+          <label id="metadata-doi-candidates-label" class="metadata-field metadata-doi-candidates" for="metadata-doi-candidates" hidden>
+            <span data-i18n="metadataDoiCandidates">选择查找到的 DOI</span>
+            <select id="metadata-doi-candidates" data-testid="metadata-doi-candidates"></select>
+          </label>
+          <div id="metadata-lookup-source" class="metadata-lookup-source" hidden></div>
           <div id="metadata-latest" class="metadata-latest" hidden></div>
           <div class="metadata-footer">
             <div id="metadata-status" class="metadata-status" data-testid="metadata-status" role="status" aria-live="polite"></div>
@@ -165,6 +176,7 @@
               <button id="metadata-view-latest" class="button button-quiet" type="button" data-i18n="viewLatest" hidden>查看最新</button>
               <button id="metadata-retry" class="button button-quiet" type="button" data-testid="metadata-retry" data-i18n="retry" hidden>重试</button>
               <button id="metadata-cancel" class="button button-quiet" type="button" data-testid="metadata-cancel" data-i18n="metadataCancel" hidden>取消</button>
+              <button id="metadata-lookup" class="button button-secondary" type="button" data-testid="metadata-lookup" data-i18n="metadataLookup" disabled>自动更新条目</button>
               <button id="metadata-edit" class="button button-secondary" type="button" data-testid="metadata-edit" data-i18n="metadataEdit" disabled>编辑书目</button>
               <button id="metadata-save" class="button button-primary" type="submit" data-testid="metadata-save" data-i18n="metadataSave" hidden>保存书目</button>
             </div>
@@ -173,19 +185,24 @@
       </details>
 
       <div class="reader-toolbar" aria-label="阅读器控制">
-        <div class="page-controls">
+        <div class="page-controls" role="group" aria-label="页面导航">
+          <button id="page-first" class="button button-icon" type="button" data-i18n-aria="firstPage" aria-label="第一页" disabled>⇤</button>
           <button id="page-prev" class="button button-icon" type="button" aria-label="上一页" disabled>←</button>
           <label class="page-label">
             <span class="sr-only" data-i18n="page">页码</span>
             <input id="page-input" data-testid="page-input" type="number" min="1" step="1" inputmode="numeric" aria-label="页码" disabled>
           </label>
           <button id="page-next" class="button button-icon" type="button" aria-label="下一页" disabled>→</button>
+          <button id="page-last" class="button button-icon" type="button" data-i18n-aria="lastPage" aria-label="最后一页" disabled>⇥</button>
+          <button id="reader-navigation-toggle" class="button button-quiet" type="button" aria-controls="reader-navigation-panel" aria-expanded="false" data-i18n="navigationPanel" disabled>目录 / 缩略图</button>
         </div>
-        <div class="zoom-controls">
+        <div class="zoom-controls" role="group" aria-label="视图工具">
           <button id="zoom-out" class="button button-icon" type="button" data-testid="zoom-out" aria-label="缩小" disabled>−</button>
           <output id="zoom-label" aria-live="polite">100%</output>
           <button id="zoom-in" class="button button-icon" type="button" data-testid="zoom-in" aria-label="放大" disabled>+</button>
           <button id="zoom-fit" class="button button-quiet fit-button" type="button" data-i18n="fitWidth" disabled>适应宽度</button>
+          <button id="zoom-fit-page" class="button button-quiet fit-button" type="button" data-i18n="fitPage" disabled>适应整页</button>
+          <button id="reader-fullscreen" class="button button-quiet" type="button" data-i18n="readerFullscreen" disabled>阅读器全屏</button>
         </div>
         <div class="reader-reading-controls">
           <label class="reader-view-label" for="reader-view-mode"><span data-i18n="viewMode">阅读模式</span>
@@ -194,11 +211,21 @@
               <option value="single" data-i18n="viewSingle">单页</option>
             </select>
           </label>
-          <button id="reader-find-toggle" class="button button-quiet" type="button" aria-controls="reader-find-panel" aria-expanded="false" data-i18n="findInPdf" disabled>查找正文</button>
+          <button id="reader-find-toggle" class="button button-quiet reader-find-toggle" type="button" aria-controls="reader-find-panel" aria-expanded="false" disabled>
+            <svg class="reader-find-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true" focusable="false">
+              <circle cx="8.5" cy="8.5" r="5.25" stroke="currentColor" stroke-width="1.5"></circle>
+              <path d="m12.5 12.5 4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path>
+            </svg>
+            <span data-i18n="findInPdf">查找正文</span>
+          </button>
+          <button id="annotation-undo" class="button button-quiet" type="button" data-i18n="annotationUndo" disabled>撤销批注</button>
+          <button id="annotation-redo" class="button button-quiet" type="button" data-i18n="annotationRedo" disabled>重做批注</button>
         </div>
-        <div class="reader-source-controls" aria-label="原文摘录">
-          <button id="text-selection-note" class="button button-secondary" type="button" data-i18n="textSelectionNote" disabled>选中文字加入笔记</button>
-          <div id="text-annotation-toolbar" class="text-annotation-toolbar" role="group" aria-label="保存文字标注">
+        <div class="reader-source-controls" aria-label="原文操作">
+          <div id="text-annotation-toolbar" class="text-annotation-toolbar" role="group" aria-label="选中文字操作">
+            <button id="text-selection-note" class="button button-secondary" type="button" data-i18n="textSelectionNote" disabled>加入笔记</button>
+            <button id="text-selection-ask" class="button button-secondary" type="button" data-i18n="askSelection" disabled>提问</button>
+            <button id="text-selection-translate" class="button button-secondary" type="button" data-i18n="translateSelection" disabled>翻译</button>
             <button id="text-annotation-highlight" class="button button-secondary" type="button" data-action="annotation-kind" data-kind="highlight" data-i18n="annotationHighlight" disabled>保存高亮</button>
             <button id="text-annotation-underline" class="button button-secondary" type="button" data-action="annotation-kind" data-kind="underline" data-i18n="annotationUnderline" disabled>保存下划线</button>
             <fieldset class="text-annotation-colors">
@@ -209,12 +236,37 @@
               <label><input type="radio" name="annotation-color" value="pink" data-annotation-color="pink"><span data-i18n="colorPink">粉色</span></label>
             </fieldset>
           </div>
-          <button id="reader-region-mode" class="button button-secondary" type="button" data-i18n="regionMode" disabled>框选原文位置</button>
+          <div class="reader-shape-tools" role="group" aria-label="图形批注">
+            <button id="reader-shape-rectangle" class="button button-secondary" type="button" aria-pressed="false" disabled>
+              <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" focusable="false"><rect x="3" y="4" width="14" height="12" stroke="currentColor" stroke-width="1.5"></rect></svg>
+              <span data-i18n="shapeRectangle">矩形</span>
+            </button>
+            <button id="reader-shape-arrow" class="button button-secondary" type="button" aria-pressed="false" disabled>
+              <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" focusable="false"><path d="M3 16 16 4m-6 0h6v6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+              <span data-i18n="shapeArrow">箭头</span>
+            </button>
+            <button id="reader-shape-line" class="button button-secondary" type="button" aria-pressed="false" disabled>
+              <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" focusable="false"><path d="M3 16 17 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg>
+              <span data-i18n="shapeLine">直线</span>
+            </button>
+            <button id="reader-shape-ellipse" class="button button-secondary" type="button" data-i18n-aria="shapeEllipseHint" aria-label="拖动绘制椭圆；按住 Shift 绘制正圆。" title="拖动绘制椭圆；按住 Shift 绘制正圆。" aria-pressed="false" disabled>
+              <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" focusable="false"><ellipse cx="10" cy="10" rx="7" ry="5" stroke="currentColor" stroke-width="1.5"></ellipse></svg>
+              <span data-i18n="shapeEllipse">圆形</span>
+            </button>
+            <button id="reader-shape-ink" class="button button-secondary" type="button" aria-pressed="false" disabled>
+              <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" focusable="false"><path d="M3 14c2-5 3-8 5-8s1 6 3 6 2-5 4-5c1 0 1 2 2 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+              <span data-i18n="shapeInk">手绘</span>
+            </button>
+            <button id="reader-shape-textbox" class="button button-secondary" type="button" aria-pressed="false" disabled>
+              <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" focusable="false"><rect x="3" y="4" width="14" height="12" stroke="currentColor" stroke-width="1.5"></rect><path d="M6 8h8M6 12h5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg>
+              <span data-i18n="shapeTextbox">文本框</span>
+            </button>
+          </div>
+          <button id="reader-region-mode" class="button button-secondary" type="button" data-i18n="regionMode" disabled>截取图片</button>
         </div>
         <button id="export-reading-record" class="button button-secondary export-reading-record" type="button" data-testid="export-reading-record" data-i18n="exportReadingRecord" disabled>导出阅读记录</button>
         <div class="annotated-pdf-export">
-          <button id="export-annotated-pdf" class="button button-quiet" type="button" data-testid="export-annotated-pdf" data-i18n="exportAnnotatedPdf" aria-describedby="annotated-pdf-help" disabled>下载批注 PDF</button>
-          <span id="annotated-pdf-help" class="annotated-pdf-help" data-i18n="annotatedPdfHelp">仅导出已保存的 PDF 笔记和标注；附件、富文本格式和独立图片批注仍保留在完整阅读记录中。原 PDF 保持不变，下载的是批注副本。</span>
+          <button id="export-annotated-pdf" class="button button-quiet" type="button" data-testid="export-annotated-pdf" data-i18n="exportAnnotatedPdf" disabled>下载批注 PDF</button>
         </div>
       </div>
       <section id="reader-find-panel" class="reader-find-panel" aria-label="查找 PDF 正文" hidden>
@@ -233,6 +285,28 @@
       <p id="reader-progress-status" class="reader-progress-status" role="status" aria-live="polite" hidden></p>
 
       <div id="reader-stage" class="reader-stage">
+        <section id="reader-navigation-panel" class="reader-navigation-panel" aria-label="PDF 导航" hidden>
+          <div class="reader-navigation-heading">
+            <div class="reader-navigation-tabs" role="tablist" aria-label="PDF 导航">
+              <button id="reader-outline-tab" type="button" role="tab" aria-controls="reader-outline" aria-selected="true" data-i18n="pdfOutline">PDF 目录</button>
+              <button id="reader-thumbnails-tab" type="button" role="tab" aria-controls="reader-thumbnails-panel" aria-selected="false" data-i18n="pageThumbnails">页面缩略图</button>
+            </div>
+            <button id="reader-navigation-close" class="button button-icon" type="button" data-i18n-aria="close" aria-label="关闭">×</button>
+          </div>
+          <div id="reader-outline" role="tabpanel" aria-labelledby="reader-outline-tab">
+            <p id="reader-outline-status" class="reader-navigation-status" role="status"></p>
+            <button id="reader-outline-retry" class="button button-quiet" type="button" data-i18n="retry" hidden>重试</button>
+            <div id="reader-outline-list" class="reader-outline-list"></div>
+          </div>
+          <div id="reader-thumbnails-panel" role="tabpanel" aria-labelledby="reader-thumbnails-tab" hidden>
+            <div id="reader-thumbnails" class="reader-thumbnails"></div>
+            <div class="reader-thumbnail-pages">
+              <button id="reader-thumbnails-prev" class="button button-quiet" type="button" data-i18n="previousPage">上一页</button>
+              <output id="reader-thumbnails-range"></output>
+              <button id="reader-thumbnails-next" class="button button-quiet" type="button" data-i18n="nextPage">下一页</button>
+            </div>
+          </div>
+        </section>
         <div id="reader-empty" class="reader-empty">
           <p data-i18n="emptyReader">从左侧选择一篇文献开始阅读。</p>
         </div>
@@ -245,12 +319,50 @@
           </div>
         </div>
       </div>
+      <div id="selected-annotation-toolbar" class="selected-annotation-toolbar" role="group" aria-label="已选批注操作" hidden>
+        <button id="selected-annotation-copy" class="button button-secondary" type="button" data-i18n="copyQuote">复制引文</button>
+        <button id="selected-annotation-note" class="button button-secondary" type="button" data-i18n="textSelectionNote">加入笔记</button>
+        <button id="selected-annotation-agent" class="button button-secondary" type="button" data-i18n="addToAssistant">加入助手</button>
+        <button id="selected-annotation-edit" class="button button-quiet" type="button" data-i18n="editNote">编辑</button>
+        <label><span class="sr-only" data-i18n="annotationKind">标注类型</span><select id="selected-annotation-kind" data-i18n-aria="annotationKind" aria-label="标注类型"><option value="highlight" data-i18n="annotationKindHighlight">高亮</option><option value="underline" data-i18n="annotationKindUnderline">下划线</option></select></label>
+        <label><span class="sr-only" data-i18n="annotationColor">标注颜色</span><select id="selected-annotation-color" data-i18n-aria="annotationColor" aria-label="标注颜色"><option value="yellow" data-i18n="colorYellow">黄色</option><option value="green" data-i18n="colorGreen">绿色</option><option value="blue" data-i18n="colorBlue">蓝色</option><option value="pink" data-i18n="colorPink">粉色</option></select></label>
+        <button id="selected-annotation-delete" class="button button-quiet" type="button" data-i18n="deleteNote">删除</button>
+      </div>
+      <section id="reader-shape-editor" class="reader-shape-editor" aria-label="图形批注" hidden>
+        <label for="reader-shape-description"><span id="reader-shape-description-label" data-i18n="shapeDescription">批注说明</span>
+          <textarea id="reader-shape-description" rows="2" maxlength="10000"></textarea>
+        </label>
+        <div class="reader-shape-style-row">
+          <label><span class="sr-only" data-i18n="annotationColor">标注颜色</span>
+            <select id="reader-shape-color" data-i18n-aria="annotationColor" aria-label="标注颜色">
+              <option value="yellow" data-i18n="colorYellow">黄色</option><option value="green" data-i18n="colorGreen">绿色</option><option value="blue" data-i18n="colorBlue">蓝色</option><option value="pink" data-i18n="colorPink">粉色</option>
+            </select>
+          </label>
+          <label id="reader-shape-width-field" for="reader-shape-width"><span data-i18n="shapeLineWidth">线宽</span>
+            <select id="reader-shape-width"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option></select>
+          </label>
+          <label id="reader-shape-font-size-field" for="reader-shape-font-size" hidden><span data-i18n="shapeTextboxFontSize">字号</span>
+            <input id="reader-shape-font-size" type="number" min="8" max="48" step="1" value="14" inputmode="numeric">
+          </label>
+        </div>
+        <p id="reader-shape-overflow" role="status" data-i18n="shapeTextboxOverflow" hidden>文本超出文本框，请调整文本框大小或字号。</p>
+        <div class="reader-shape-editor-actions">
+          <button id="reader-shape-save" class="button button-primary" type="button" data-i18n="shapeSave">保存批注</button>
+          <button id="reader-shape-cancel" class="button button-quiet" type="button" data-i18n="shapeCancel">取消</button>
+          <button id="reader-shape-delete" class="button button-quiet" type="button" data-i18n="deleteNote" hidden>删除</button>
+        </div>
+        <div class="reader-shape-editor-actions">
+          <button id="reader-shape-note" class="button button-secondary" type="button" data-i18n="captureAddNote" hidden>加入笔记</button>
+          <button id="reader-shape-agent" class="button button-secondary" type="button" data-i18n="captureAddAgent" hidden>加入助手</button>
+        </div>
+      </section>
     </section>
 
     <section id="data-workspace" class="data-workspace" aria-labelledby="data-workspace-title" hidden>
       <header class="data-workspace-header">
         <div>
           <h2 id="data-workspace-title">数据工作区</h2>
+          <p id="data-owner-context" class="data-owner-context"></p>
           <p id="data-workspace-help" class="data-workspace-help">数据、设置、结果和图表均属于当前文献。预览仅显示前 5 行，运行分析前仍需核对并明确确认。</p>
         </div>
         <div class="data-workspace-actions">
@@ -398,6 +510,7 @@
             <option value="describe">描述统计</option>
             <option value="ttest_independent">独立样本 t 检验</option>
             <option value="ttest_paired">配对 t 检验</option>
+            <option value="correlation">相关分析</option>
           </select>
           <div id="analysis-method-status" class="analysis-status" role="status" aria-live="polite"></div>
           <fieldset id="analysis-columns-fieldset" class="analysis-columns-fieldset" disabled>
@@ -469,6 +582,33 @@
             </label>
             <p class="ttest-assumptions">此工具不会推断配对设计、差值正态性、不同单位之间的独立性或科学有效性；运行前请自行核对这些设计与前提。</p>
             <button id="analysis-paired-preview" class="button button-secondary" type="button" disabled>预览完整数据与固定代码</button>
+          </section>
+          <section id="analysis-correlation-fields" class="ttest-options" aria-label="相关分析设置" hidden>
+            <label class="analysis-label" for="analysis-correlation-first">第 1 个数值列（X）</label>
+            <select id="analysis-correlation-first" disabled></select>
+            <label class="analysis-label" for="analysis-correlation-second">第 2 个数值列（Y）</label>
+            <select id="analysis-correlation-second" disabled></select>
+            <p id="analysis-correlation-direction" class="ttest-direction">每一行的 X/Y 必须来自同一观察对象；仅使用两列均完整的配对行。</p>
+            <label class="analysis-label" for="analysis-correlation-kind">相关系数</label>
+            <select id="analysis-correlation-kind" disabled>
+              <option value="pearson">Pearson（线性相关）</option>
+              <option value="spearman">Spearman（秩相关）</option>
+            </select>
+            <label class="analysis-label" for="analysis-correlation-alternative">备择方向</label>
+            <select id="analysis-correlation-alternative" disabled>
+              <option value="two_sided">双侧（相关系数不为零）</option>
+              <option value="greater">正相关（相关系数大于零）</option>
+              <option value="less">负相关（相关系数小于零）</option>
+            </select>
+            <label id="analysis-correlation-confidence-label" class="analysis-label" for="analysis-correlation-confidence">置信水平</label>
+            <input id="analysis-correlation-confidence" type="number" min="0.5" max="0.999" step="0.01" value="0.95" inputmode="decimal" disabled>
+            <p id="analysis-correlation-spearman-note" class="ttest-assumptions" hidden>Spearman 使用渐近近似 p 值，不提供置信区间。</p>
+            <label class="ttest-independent" for="analysis-correlation-confirmed">
+              <input id="analysis-correlation-confirmed" type="checkbox" disabled>
+              <span>我确认每一行的 X/Y 来自同一观察对象，且各观测行相互独立；此声明不是根据列名推断的。</span>
+            </label>
+            <p class="ttest-assumptions">请核对同一观察对象测量、观测独立性、异常值和所选方法的前提；相关不表示因果。</p>
+            <button id="analysis-correlation-preview" class="button button-secondary" type="button" disabled>预览完整数据与固定代码</button>
           </section>
           <div class="analysis-runtime" role="status"></div>
           <button id="analysis-prepare" class="button button-secondary" type="button" disabled>查看并准备运行</button>
@@ -550,30 +690,35 @@
         <div class="source-heading">
           <span id="active-source" class="active-source" data-i18n="noSource">尚未选择原文位置</span>
         </div>
-        <div class="anchor-actions">
-          <button id="region-mode" class="button button-secondary" type="button" data-testid="region-mode" data-i18n="regionMode" aria-pressed="false" disabled>框选原文位置</button>
-          <button id="page-note" class="button button-quiet" type="button" data-i18n="wholePage" disabled>引用整页</button>
-        </div>
-        <p id="anchor-help" class="anchor-help" data-i18n="anchorHelp">框选页面区域，或引用当前整页。保存前可继续修改笔记。</p>
-        <section id="region-draft" class="region-draft" aria-label="未保存图片摘录" hidden>
+        <details class="source-options">
+          <summary data-i18n="sourceOptions">来源选项</summary>
+          <div class="anchor-actions">
+            <button id="page-note" class="button button-quiet" type="button" data-i18n="wholePage" disabled>引用当前整页</button>
+          </div>
+          <p id="anchor-help" class="anchor-help" data-i18n="anchorHelp">新笔记默认关联当前页；也可明确引用整页。截图需另行选择加入笔记或助手。</p>
+        </details>
+        <section id="region-draft" class="region-draft" aria-label="未保存图片截取" hidden>
           <div id="region-draft-preview" class="region-draft-preview"></div>
+          <p id="region-draft-status" data-i18n="regionDraftUnsaved" role="status">已截取所选区域，尚未加入笔记或助手。</p>
           <div class="region-draft-footer">
-            <p id="region-draft-status" data-i18n="regionDraftUnsaved">未保存，点击保存图片摘录</p>
-            <button id="region-draft-cancel" class="button button-quiet" type="button" data-i18n="regionDraftCancel">取消图片摘录</button>
+            <button id="region-add-note" class="button button-secondary" type="button" data-i18n="captureAddNote">加入笔记</button>
+            <button id="region-add-agent" class="button button-secondary" type="button" data-i18n="captureAddAgent">加入助手</button>
+            <button id="region-draft-cancel" class="button button-quiet" type="button" data-i18n="regionDraftCancel">取消截图</button>
           </div>
         </section>
         <label for="note-text" class="note-label" data-i18n="noteLabel">笔记内容</label>
         <textarea id="note-text" data-testid="note-text" rows="7" maxlength="10000" data-i18n-placeholder="notePlaceholder" placeholder="记录你的想法…" disabled></textarea>
+        <div id="rich-text-editor"></div>
+        <p id="rich-text-status" role="status" aria-live="polite"></p>
         <div class="rich-text-draft-actions">
-          <button id="rich-text-open" class="button button-quiet" type="button" disabled>格式编辑</button>
           <button id="rich-text-plain" class="button button-quiet" type="button" hidden>转为纯文本</button>
         </div>
-        <p id="rich-text-draft-status" class="rich-text-draft-help" hidden>此草稿包含格式。文本为只读；可继续格式编辑，或明确转为纯文本。</p>
+        <p id="rich-text-draft-status" class="rich-text-draft-help">可直接在侧栏编辑。原文文字或截图会插入上次光标位置，保存后才会写入。</p>
         <div class="note-editor-footer">
           <span id="character-count" class="character-count">0 / 10000</span>
           <div class="note-save-actions">
             <button id="edit-cancel" class="button button-quiet" type="button" data-testid="edit-cancel" data-i18n="editCancel" hidden>取消编辑</button>
-            <button id="excerpt-save" class="button button-secondary" type="button" data-testid="excerpt-save" data-i18n="saveImageExcerpt" disabled>保存图片摘录</button>
+            <button id="excerpt-save" class="button button-secondary" type="button" data-testid="excerpt-save" data-i18n="saveImageExcerpt" hidden disabled>保存图片摘录</button>
             <button id="note-save" class="button button-primary" type="submit" data-testid="note-save" data-i18n="saveNote" disabled>保存笔记</button>
           </div>
         </div>
@@ -595,6 +740,8 @@
               <option value="green" data-i18n="colorGreen">绿色</option>
               <option value="blue" data-i18n="colorBlue">蓝色</option>
               <option value="pink" data-i18n="colorPink">粉色</option>
+              <option value="black" data-i18n="colorBlack">黑色</option>
+              <option value="red" data-i18n="colorRed">红色</option>
             </select>
           </label>
           <label for="notes-filter-kind"><span data-i18n="annotationKind">标注类型</span>
@@ -602,6 +749,12 @@
               <option value="all" data-i18n="filterAll">全部</option>
               <option value="highlight" data-i18n="annotationKindHighlight">高亮</option>
               <option value="underline" data-i18n="annotationKindUnderline">下划线</option>
+              <option value="rectangle" data-i18n="shapeRectangle">矩形</option>
+              <option value="arrow" data-i18n="shapeArrow">箭头</option>
+              <option value="line" data-i18n="shapeLine">直线</option>
+              <option value="ellipse" data-i18n="shapeEllipse">圆形</option>
+              <option value="ink" data-i18n="shapeInk">手绘</option>
+              <option value="textbox" data-i18n="shapeTextbox">文本框</option>
             </select>
           </label>
         </div>
@@ -626,10 +779,14 @@
 
   <button id="assistant-toggle" class="assistant-toggle button button-primary" type="button" aria-controls="assistant-panel" aria-expanded="false">研究助手</button>
   <aside id="assistant-panel" class="assistant-panel" aria-labelledby="assistant-heading" hidden>
-    <div class="assistant-header">
+    <div class="assistant-header" role="group" tabindex="0" aria-label="移动助手窗口" aria-describedby="assistant-window-help" aria-keyshortcuts="ArrowLeft ArrowRight ArrowUp ArrowDown" title="拖动标题栏移动；聚焦后使用方向键移动。">
       <h2 id="assistant-heading">研究助手</h2>
-      <button id="assistant-close" class="button button-quiet" type="button" aria-label="关闭研究助手">×</button>
+      <div class="assistant-header-actions">
+        <button id="assistant-full-page" class="button button-quiet" type="button" aria-label="全屏" aria-pressed="false" title="全屏">全屏</button>
+        <button id="assistant-close" class="button button-quiet" type="button" aria-label="关闭研究助手">×</button>
+      </div>
     </div>
+    <p id="assistant-window-help" class="sr-only">拖动标题栏空白区域移动窗口。聚焦标题栏后使用方向键移动，按住 Shift 加速。聚焦右下角调整大小手柄后，使用方向键调整宽度和高度。全屏或窄屏时不能手动移动或调整大小。</p>
     <div class="assistant-toolbar">
       <label class="sr-only" for="assistant-history">对话记录</label>
       <select id="assistant-history" aria-label="对话记录"></select>
@@ -642,8 +799,8 @@
       </section>
       <div id="assistant-messages" class="assistant-messages" aria-live="polite"></div>
       <section class="assistant-results" aria-label="助手结果">
-        <div id="assistant-sources" class="assistant-sources"></div>
         <div id="assistant-proposals" class="assistant-proposals"></div>
+        <div id="assistant-sources" class="assistant-sources"></div>
       </section>
       <div id="assistant-status" class="assistant-status" role="status" aria-live="polite"></div>
     </div>
@@ -653,7 +810,13 @@
         <span>连续完成分析、图表和笔记</span>
       </label>
       <p id="assistant-continue-task-help" class="assistant-task-option-help">默认关闭。开启后仍须逐一确认每次分析、图表和笔记写入。</p>
+      <div class="assistant-reference-add-row">
+        <button id="assistant-add-references" class="button button-secondary" type="button" aria-haspopup="dialog" aria-controls="assistant-reference-picker">添加资料</button>
+      </div>
+      <p id="assistant-resource-reference-help" class="assistant-resource-reference-help" hidden>固定的资料会在发送时提供给助手；论文按页读取，数据仅提供字段和少量样本行。</p>
+      <div id="assistant-resource-references" class="assistant-resource-references" aria-label="已加入的资料" aria-live="polite"></div>
       <div id="assistant-note-references" aria-label="已加入的笔记来源" aria-live="polite"></div>
+      <div id="assistant-reader-actions" class="assistant-reader-actions" aria-label="已加入的原文操作" aria-live="polite"></div>
       <label class="sr-only" for="assistant-message">给研究助手的消息</label>
       <textarea id="assistant-message" rows="4" maxlength="8000" placeholder="询问当前页面或已选图片…"></textarea>
       <div class="assistant-send-row">
@@ -679,7 +842,35 @@
         <button id="assistant-provider-save" class="button button-secondary" type="submit">保存模型设置</button>
       </form>
     </details>
+    <button id="assistant-resize-left" class="assistant-resize-edge assistant-resize-left" type="button" aria-label="从左侧调整助手窗口宽度" aria-describedby="assistant-window-help" aria-keyshortcuts="ArrowLeft ArrowRight" title="拖动或使用左右方向键调整宽度；保持右边缘不动"><span aria-hidden="true"></span></button>
+    <button id="assistant-resize-right" class="assistant-resize-edge assistant-resize-right" type="button" aria-label="从右侧调整助手窗口宽度" aria-describedby="assistant-window-help" aria-keyshortcuts="ArrowLeft ArrowRight" title="拖动或使用左右方向键调整宽度；保持左边缘不动"><span aria-hidden="true"></span></button>
+    <button id="assistant-resize" class="assistant-resize" type="button" aria-label="调整助手窗口大小" aria-describedby="assistant-window-help" aria-keyshortcuts="ArrowLeft ArrowRight ArrowUp ArrowDown" title="拖动或使用方向键调整窗口大小"><span aria-hidden="true">◢</span></button>
   </aside>
+
+  <dialog id="assistant-reference-picker" class="assistant-reference-picker" aria-labelledby="assistant-reference-picker-heading" aria-describedby="assistant-reference-picker-scope assistant-reference-picker-status">
+    <div class="assistant-reference-picker-layout">
+      <header class="assistant-reference-picker-header">
+        <h2 id="assistant-reference-picker-heading">添加资料</h2>
+        <button id="assistant-reference-picker-close" class="button button-quiet" type="button" aria-label="关闭资料选择">关闭</button>
+      </header>
+      <p id="assistant-reference-picker-scope" class="assistant-reference-picker-scope">仅在明确添加后共享。论文按页读取；数据仅提供字段和最多 5 行样本，不提供完整数据统计。</p>
+      <form id="assistant-reference-search-form" class="assistant-reference-search" role="search">
+        <label class="sr-only" for="assistant-reference-search"><span id="assistant-reference-search-label">搜索资料</span></label>
+        <input id="assistant-reference-search" type="search" maxlength="200" autocomplete="off" placeholder="搜索标题、作者、DOI 或所属项目">
+        <button id="assistant-reference-search-submit" class="button button-secondary" type="submit">搜索</button>
+      </form>
+      <div class="assistant-reference-tabs" role="tablist" aria-label="资料类型">
+        <button id="assistant-reference-tab-paper" type="button" role="tab" aria-selected="true" aria-controls="assistant-reference-results">论文</button>
+        <button id="assistant-reference-tab-dataset" type="button" role="tab" aria-selected="false" aria-controls="assistant-reference-results" tabindex="-1">数据</button>
+      </div>
+      <div id="assistant-reference-picker-status" class="assistant-reference-picker-status" role="status" aria-live="polite"></div>
+      <ul id="assistant-reference-results" class="assistant-reference-results" role="tabpanel" aria-label="资料搜索结果"></ul>
+      <div class="assistant-reference-pagination">
+        <button id="assistant-reference-previous" class="button button-quiet" type="button" disabled>上一页</button>
+        <button id="assistant-reference-next" class="button button-quiet" type="button" disabled>下一页</button>
+      </div>
+    </div>
+  </dialog>
 
   <dialog id="research-record-dialog" class="research-record-dialog" aria-labelledby="research-record-title" aria-describedby="research-record-help research-record-status">
     <div class="research-record-layout">
@@ -714,18 +905,6 @@
         <button id="research-record-download" class="button button-primary" type="button" disabled>下载研究记录</button>
       </footer>
     </div>
-  </dialog>
-
-  <dialog id="rich-text-dialog" class="rich-text-dialog" aria-labelledby="rich-text-title" aria-describedby="rich-text-status">
-    <header class="rich-text-dialog-header">
-      <h2 id="rich-text-title">格式编辑</h2>
-    </header>
-    <div id="rich-text-editor"></div>
-    <p id="rich-text-status" role="status" aria-live="polite"></p>
-    <footer class="rich-text-dialog-actions">
-      <button id="rich-text-cancel" class="button button-quiet" type="button">取消</button>
-      <button id="rich-text-apply" class="button button-primary" type="button" disabled>应用到草稿</button>
-    </footer>
   </dialog>
 
   <dialog id="analysis-notebook-dialog" class="analysis-notebook-dialog" aria-labelledby="analysis-notebook-title" aria-describedby="analysis-notebook-notice">

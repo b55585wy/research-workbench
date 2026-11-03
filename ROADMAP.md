@@ -1,7 +1,16 @@
 # 研究工作台：轻量路线图
 
+2026-11-03 产品定位已确认：阅读、数据分析可独立使用；项目是按需关联论文、数据、
+结果和笔记的整理功能。v0.38 已接入独立入口和“我的数据”；跨归属项目整理仍待实现。
+定义与现状边界见 [产品规划](PRODUCT-PLAN.md#已确认的产品定位独立使用按需组织)。
+
 本页记录版本交付与需求背景。整体产品画像、近期优先级与每轮完成标准见
 [PRODUCT-PLAN.md](PRODUCT-PLAN.md)；后续按实际任务验收，不按功能清单一次性铺开。
+
+当前版本 v0.39.0：当前助手对话可引用跨项目论文与数据，见 [AGENT-REFERENCES.md](AGENT-REFERENCES.md)。
+v0.38 入口改版见 [WORKSPACE-ENTRIES.md](WORKSPACE-ENTRIES.md)；阅读体验历史见 [EXPERIENCE-PLAN.md](EXPERIENCE-PLAN.md)。
+下方版本条目保留历史背景，不能将历史待办重新当作当前缺口。近期优先用已上传论文
+和明确问题形成一份有出处的阅读成果，再据实际缺口安排下一轮开发。
 
 v0.12：复用 pyreadstat/ReadStat 读取 .sav/.zsav，保留原文件和字段字典；核对编码、
 标签与缺失规则后，确认生成独立分析表，接入已有 Python/R、图表和 Agent 路径。
@@ -36,7 +45,8 @@ v0.13：默认关闭的三步接续任务已交付。一个明确目标可在逐
 已用公开表2和实际模型验证一次目标闭环；真实实验表验证仍待选定材料。
 接口、迁移及恢复约束见 [AGENT-TASKS.md](AGENT-TASKS.md)。
 
-后续按真实任务逐项验证，以下均未实现，也不承诺按编号全部开发：
+以下为 v0.13 时记录的后续候选，不承诺按编号全部开发。第1项的助手跨论文读取与表格
+已在 v0.26 交付；第2项的在线元数据发现与引用已在 v0.28 交付，文件下载仍未实现：
 
 1. 围绕研究问题整理、比较两三篇论文的证据；每个判断可回到原文。
 2. 在线资料与引用：逐项接入公开数据库、文献接口或用户指定链接，记录来源 URL/标识、获取时间、版本、原始文件及校验值；引用能对应实际取得的资料。
@@ -46,7 +56,7 @@ v0.13：默认关闭的三步接续任务已交付。一个明确目标可在逐
 
 继续采用可嵌入的成熟开源库或经依赖/许可核对的源码部件，不以整套科研平台部署为产品目标。先完成一条真实流程，再确定对象模型与共享代码。
 
-在线数据发现与空间控制（用户补充需求，尚未实现）：从数据可用性声明、DOI 关联元数据、数据库登录号或用户链接寻找候选数据；区分直接可下载、需申请与仅描述性引用。候选需确认，识别到引用不等于拥有数据。默认仅保存来源与引用信息，不自动镜像整库。下载前显示可获得的文件大小与存储位置，提供下载到本机和按需保存到独立分析存储两条路径；后者设置配额、内容去重、可见保留策略与明确清理入口。引用保留版本、获取时间、许可信息与校验值，不把临时缓存当成永久研究资料。
+在线数据发现与空间控制（元数据发现/引用已交付，下载与配额管理尚未实现）：从数据可用性声明、DOI 关联元数据、数据库登录号或用户链接寻找候选数据；区分直接可下载、需申请与仅描述性引用。候选需确认，识别到引用不等于拥有数据。默认仅保存来源与引用信息，不自动镜像整库。下载前显示可获得的文件大小与存储位置，提供下载到本机和按需保存到独立分析存储两条路径；后者设置配额、内容去重、可见保留策略与明确清理入口。引用保留版本、获取时间、许可信息与校验值，不把临时缓存当成永久研究资料。
 
 数据关联接口可参考 [DataCite 关联标识说明](https://support.datacite.org/docs/connecting-to-works)；关联信息不保证对应数据公开可下载。
 
@@ -162,3 +172,46 @@ schema14仅增加两个生命周期表，旧数据原样保留。见[说明](REA
 ## v0.25 · 阅读成果带出工作台
 
 现有导出区域新增带原生高亮/下划线、区域/整页说明的 PDF 副本，按服务端已保存有效状态生成。使用已安装 pypdf/PDFium，在固定受限子进程中处理；原文、旧 ZIP、数据库与模型授权不变。完整附件、富文本及独立图片批注继续使用阅读记录。见 [说明](ANNOTATED-PDF.md)。
+
+
+## v0.26 · 2026-11-02 · generic Agent reading and table replies
+
+Use the existing research/Agent conversation to read associated PDF pages, compare with real source refs, ask follow-up columns and display/copy/download ordinary tables. No dedicated comparison page/configuration/data model. Historical evidence stays version/association-bound; old messages remain chat history. Scope and limits: [AGENT-READING.md](AGENT-READING.md). Verification is scoped smoke only.
+
+
+## v0.27 · 2026-11-02 · correlation through existing Agent/analysis UI
+
+Pearson/Spearman via the existing verified R stats library, explicit two-column complete observations and design declaration, preview→confirmation→independent execution→results/Notebook/export. Existing Agent continuous tasks can confirm correlation, scatter and source-note stages. No new page/dependency/schema or arbitrary-script surface. Scope and statistical limits: [CORRELATION.md](CORRELATION.md); validation is scoped smoke only.
+
+
+## v0.28 · 2026-11-02 · online data-source references through the existing Agent
+
+Bounded public DataCite/Zenodo metadata lookup/search, exact returned identifier/relationship checks,
+access/unknown-state disclosure and safe new-tab source links. Server-generated reference notes use
+the existing concrete create_note approval, lifecycle and export; removed paper associations and
+source drift block stale proposals. No file downloads, new panel, dependency, database migration,
+authentication or tFUS surface. See [scope and use](ONLINE-DATA.md). Verification is scoped smoke.
+
+
+## v0.28.1 · 2026-11-02 · bibliography draft and reader layout
+
+User-authorized automatic bibliography lookup enters the existing unsaved editor with explicit
+source, preserving missing/manual fields and existing save/revision/cancel. Reading-mode notes
+visibility now releases/restores actual space; fit-width adapts while custom zoom stays fixed.
+Opaque backing canvases initialize fully white before render. No left-navigation redesign;
+that question remains discussion only. See [delivery](BIBLIOGRAPHY-AND-LAYOUT.md) and
+[remaining experience requirements](EXPERIENCE-PLAN.md).
+
+
+## v0.30 · 文献生命周期补齐
+
+交付 L1：文献回收站的预览、确认、彻底删除、失败重试与重启清理。保留原恢复入口，
+不拆出新面板。schema16只新增删除凭据表。下一批体验需求仍见 EXPERIENCE-PLAN.md；
+reader-actions-v1 仍是未交付候选，未混入本轮。
+
+
+## v0.31 · 用户指定的五组体验目标
+
+N1/N2/N3/A1/A2/A3/A4 统一接回当前产品，逐项合成冒烟后部署；不把旧隔离候选
+当成已完成。阅读/分析分栏与导航仍只讨论。实际验收与使用见 READING-EXPERIENCE.md。
+reader-actions-v1 仅保留历史，不得覆盖本版本。

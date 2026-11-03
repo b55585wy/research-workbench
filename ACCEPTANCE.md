@@ -262,3 +262,58 @@ P01 continuous page/within-page restore after reload/reopen, no bootstrap overwr
 ## v0.25 portable native PDF annotations
 
 A01 real file/pages/text/original integrity; A02 multiline gaps/four colors/revised comment/immutable quote/Unicode/existing annotations; A03 all rotations/crops/nonzero origins/inherited rotation/UserUnit/short and last pages; A04 active saved lifecycle and old ZIP; A05 empty/missing/trashed/study/corrupt record/source; A06 strict note/rectangle/payload/input/output/protocol limits; A07 busy/timeout/crash/spawn/storage/disconnect cleanup and continued reading; A08 fixed snapshot under concurrent edits and rechecked source; A09 actual browser download/draft/pending/owner identity; A10 visible retry/keyboard/mobile/themes/bilingual; A11 reading/find/filters/references/progress/analysis/tasks compatibility; A12 guarded backup and complete live table/file/source/tFUS preservation. See [ANNOTATED-PDF.md](ANNOTATED-PDF.md).
+
+
+## v0.26 generic Agent reading and table replies — scoped smoke
+
+Follow the user's smoke-only instruction. Verify ordinary chat over two associated synthetic PDFs, follow-up columns, actual source/page bindings and historical-ref remapping; reject unrelated/unlinked/changed papers and preserve note-write scope; mark empty/truncated pages. Verify inline table rendering, source links/new tabs, history reload, copy/CSV provenance and formula handling, failed clipboard, literal hostile HTML/unknown refs/malformed/oversized tables, local overflow, existing window controls and bilingual/mobile themes. Actual-provider pilot uses only labelled synthetic sources. No dedicated comparison UI/schema. Scenario/result evidence: E:/research-workbench-pilot-20261030/agent-reading-v1.
+
+
+## v0.27 correlation — scoped smoke only
+
+Requirement scenarios at E:/research-workbench-pilot-20261030/correlation-v1/SCENARIOS.md. Verify actual Pearson/Spearman R output with independent numeric references, complete-pair exclusions/ties, negative/perfect/small-n behavior, invalid/constant/unconfirmed/stale data, preview-vs-run and exact retry, full artifact integrity/Notebook/export, old payload/recipe fingerprints, explicit Agent sharing/approval and continuous analysis→scatter→note. Existing panel/Agent card, invalid metadata rejection and mobile bilingual themes receive scoped browser checks; no full regression suite.
+
+
+## v0.28 · online data references — scoped smoke
+
+D01 metadata identity/provenance/access; D02 exact relationship evidence versus keyword candidates;
+D03 invalid/missing/non-dataset/malformed/oversized responses; D04 fixed GET hosts/no redirects or
+files/bounded retry and query cache; D05 provider failures/partial/empty distinction; D06 pending/
+confirm/reject/retry/reopen; D07 forged/historical refs, cancellation and changed source/association;
+D08 safe citation/list new-tab links without render-time external traffic; D09 rich note/export/
+bilingual/mobile preservation; D10 configured-model public metadata -> explicit note confirmation;
+D11 schema/materials/tFUS boundary preservation. Scenarios and evidence are at
+E:/research-workbench-pilot-20261030/online-data-v1. No full regression suite.
+
+
+## v0.28.1 · scoped bibliography/layout smoke
+
+B01/B02 verified DOI or bounded local PDF metadata -> unsaved fields -> explicit existing Save;
+B03 fixed public transport/invalid IDs/provider/worker/source failures with no writes; B04 manual
+edits, async field/document changes and revision/exact retry protection. R01 actual pane widths,
+fit/custom scale, page/drafts/mobile; R02 white canvas margins through rapid zoom, fractional DPR
+and single/continuous views, preserving real black content. C01 schema/material/legacy/tFUS
+boundary checks. 8 backend +9 main browser +3 edge groups and public metadata smoke passed.
+No full regression. Evidence: E:/research-workbench-pilot-20261030/bibliography-layout-v1.
+
+
+## v0.30 · paper purge scoped smoke
+
+P01 readonly preview/cancel; P02 complete owned paper/notes/assets/data/results/Agent erasure;
+P03 revision/content/restore/busy/link/foreign-reference atomic rejection; P04 stable idempotent
+retry and410 access; P05 occupied-file pending rows/reload/restart recovery; P06 missing files,
+unsafe keys and Windows junction isolation; P07 late upload/cache publication; P08 browser
+confirmation, lost committed response, bilingual/keyboard/mobile and unrelated draft preservation;
+P09 schema15→16 old31table/material/tFUS preservation. Synthetic-only deletion. No full regression.
+See E:/research-workbench-pilot-20261030/paper-purge-v1/SCENARIOS.md and PAPER-PURGE.md.
+
+
+## v0.31 · five-group scoped acceptance
+
+N01–N04 actual selection/crop/inline caret/save/reopen/export and async/Undo/Redo/fallback;
+A01 frozen/removable Agent draft refs, manual edits/images, limits, explicit sharing and send;
+W01 anchored left/right pointer/keyboard/viewport/cancel/fullpage/compact;
+S01–S03 bounded overview, actual coverage, empty/failed/provider/cancel/source integrity and
+unchanged task approvals; V01 meaningful collapsed history, lazy cited/uncited evidence,
+tables/proposals/partial errors/language/polling; C01 v0.30 compatibility, schema/material/tFUS.
+Synthetic-only; no full regression. Evidence: E:/research-workbench-pilot-20261030/reader-experience-v2.

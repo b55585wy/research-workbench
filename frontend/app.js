@@ -6,12 +6,19 @@ import { createDatasetSelection } from "/dataset-selection.js";
 import { createDataImports } from "/data-imports.js";
 import { createCharts } from "/charts.js";
 import { createWorkspace } from "/workspace.js";
+import { createDataNavigation } from "/data-navigation.js";
 import { createAssistant } from "/assistant.js";
 import { createRichText, renderRichHtml } from "/rich-text.js";
 import { createResearchRecord } from "/research-record.js";
 import { createStudy } from "/study.js";
 import { createReaderFind } from "/reader-find.js";
-import { readReaderProgress, writeReaderProgress } from "/reader-progress.js";
+import { clearReaderProgress, readReaderProgress, writeReaderProgress } from "/reader-progress.js";
+import { pdfSelectionGeometry } from "/pdf-selection-geometry.js";
+import { createPdfReaderLinks } from "/pdf-reader-links.js";
+import { createAnnotationHistory } from "/reader-annotation-history.js";
+import { createReaderNavigation } from "/reader-navigation.js";
+import { createReaderObjectMenu } from "/reader-object-menu.js";
+import { createReaderShapes, shapeBounds } from "/reader-shapes.js";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = "/vendor/pdfjs/build/pdf.worker.mjs";
 
@@ -37,11 +44,12 @@ const messages = {
     fitWidth: "适应宽度",
     page: "页码",
     notes: "笔记",
-    noSource: "尚未选择原文位置",
-    regionMode: "框选原文位置",
-    cancelRegion: "取消框选",
-    wholePage: "引用整页",
-    anchorHelp: "框选页面区域，或引用当前整页。保存前可继续修改笔记。",
+    noSource: "输入后默认关联当前页",
+    regionMode: "截取图片",
+    cancelRegion: "取消截图",
+    wholePage: "引用当前整页",
+    sourceOptions: "来源选项",
+    anchorHelp: "新笔记默认关联当前页；也可明确引用整页。截图需另行选择加入笔记或助手。",
     noteLabel: "笔记内容",
     notePlaceholder: "记录你的想法…",
     saveNote: "保存笔记",
@@ -58,7 +66,6 @@ const messages = {
     exportAnnotatedPdf: "下载批注 PDF",
     exportingAnnotatedPdf: "正在生成批注 PDF…",
     exportedAnnotatedPdf: "批注 PDF 已下载。",
-    annotatedPdfHelp: "仅导出已保存的 PDF 笔记和标注；附件、富文本格式和独立图片批注仍保留在完整阅读记录中。原 PDF 保持不变，下载的是批注副本。",
     annotatedPdf: "批注 PDF",
     readingRecord: "阅读记录",
     savedNotes: "已保存笔记",
@@ -132,6 +139,8 @@ const messages = {
     pdf_export_timeout: "批注 PDF 生成超时，请重试。",
     pdf_export_failed: "批注 PDF 生成失败，请重试。",
     pdf_export_unavailable: "批注 PDF 导出暂时不可用，请稍后重试。",
+    textbox_font_unavailable: "文本框字体不可用，无法生成批注 PDF。",
+    textbox_overflow: "文本框内容超出边界，无法生成批注 PDF。请调整文本框大小或字号后重试。",
     request_failed: "操作未完成，请重试。",
     invalidFileType: "请选择 PDF 文件。",
     unknownNote: "这条笔记不存在或已被删除。",
@@ -203,22 +212,50 @@ const messages = {
     metadataLatestHeading: "最新保存内容",
     metadataLatestLoaded: "已显示最新保存内容；你的草稿仍保留在上方。",
     metadataValidation: "请填写标题；年份须为 1 至 9999 的整数或留空。",
+    metadataLookup: "自动更新条目",
+    metadataLookupLoading: "正在查找书目…",
+    metadataLookupReady: "已将查找到的字段填入未保存草稿；不会自动保存，请核对后点击保存。",
+    metadataLookupNotFound: "未找到书目信息。请填写 DOI 后重试，或手动编辑书目；现有内容已保留。",
+    metadataLookupChooseDoi: "找到多个 DOI。请选择或输入一个 DOI，然后再次点击“自动更新条目”；未自动选择。",
+    metadataDoiCandidates: "选择查找到的 DOI",
+    metadataDoiCandidatePlaceholder: "请选择 DOI",
+    metadataLookupSource: "来源：{provider}",
+    metadataLookupSourceLink: "查看来源",
+    bibliography_invalid_doi: "DOI 格式无效，请检查后重试。",
+    bibliography_unavailable: "书目服务暂时不可用，请稍后重试；草稿已保留。",
+    bibliography_probe_failed: "无法读取原文中的书目信息，请填写 DOI 或手动编辑。",
+    bibliography_probe_timeout: "书目查找超时，请重试或手动编辑；草稿已保留。",
+    bibliography_scope: "当前文献不支持书目查找。",
     research_record_source_mismatch: "请先返回该来源的文献和所选数据，再查看导出范围；当前工作区未切换。",
     research_record_invalid_source: "这条导出范围来源不完整，无法打开。",
-    textSelectionNote: "选中文字加入笔记",
-    selectTextFirst: "请先在当前页选中文字。若页面没有可选择文字，请使用“框选原文位置”保存图片摘录。",
+    textSelectionNote: "加入笔记",
+    askSelection: "提问",
+    translateSelection: "翻译",
+    selectTextFirst: "请先在当前页选中文字。若页面没有可选择文字，请使用“截取图片”。",
     textSelectionTooLong: "选中文字超过 10000 字，请缩小选择范围。",
-    noTextLayer: "此页没有可选择的文字。可框选原文位置并保存图片摘录。",
-    textLayerUnavailable: "此页文字暂时无法选择。可重试，或框选原文位置保存图片摘录。",
-    textDraftReady: "选中文字已加入未保存笔记，不会自动保存或发送。",
+    noTextLayer: "此页没有可选择的文字。可改用“截取图片”。",
+    textLayerUnavailable: "此页文字暂时无法选择。可重试，或改用“截取图片”。",
+    textDraftReady: "选中文字已插入未保存笔记的光标位置，不会自动保存或发送。",
     replaceDraftConfirm: "当前有未保存或正在编辑的笔记。用新的原文选择替换当前草稿吗？此操作不会自动保存。",
     draftPending: "当前笔记操作尚未完成，请完成后再选择新的原文。",
-    regionDraftUnsaved: "未保存，点击保存图片摘录",
-    regionDraftCancel: "取消图片摘录",
-    regionDraftCancelConfirm: "取消此图片摘录的原文位置和预览？笔记文字会保留。",
-    regionCaption: "第 {page} 页图片摘录",
+    regionDraftUnsaved: "已截取所选区域的 PDF 画面，尚未加入笔记或助手。",
+    regionDraftCancel: "取消截图",
+    regionDraftCancelConfirm: "取消此截图和预览？笔记文字会保留。",
+    regionCaption: "第 {page} 页区域截图",
+    captureAddNote: "加入笔记",
+    captureAddAgent: "加入助手",
+    captureUploading: "正在上传截图…",
+    captureNoteReady: "截图已插入未保存笔记，不会自动保存。",
+    captureInsertFailed: "截图未插入；目标笔记或编辑器状态已变化。",
+    readerActionReady: "已加入助手草稿和固定来源，尚未发送。",
+    readerActionLimit: "加入后会超过 8000 字，未更改助手草稿。",
+    readerActionImageLimit: "助手最多选择 4 张图片；未更改原有选择。",
+    readerActionOwner: "原文操作未加入，请确认仍位于同一篇文献。",
+    readerActionPending: "上一条助手消息仍在提交，请完成后重试；原文选择和助手草稿已保留。",
+    readerActionUnavailable: "助手尚未就绪，请稍后重试；原文选择和助手草稿已保留。",
+    readerActionInvalid: "原文选择无效或已失效，请重新选择；助手草稿未更改。",
     libraryTrash: "文献回收站",
-    libraryTrashHelp: "回收站中的文献可恢复；原文、笔记和图片都会保留。",
+    libraryTrashHelp: "回收站中的文献可恢复。彻底删除会清理原文及关联资料，无法撤销。",
     libraryTrashEmpty: "回收站为空。",
     libraryTrashLoading: "正在加载回收站…",
     libraryTrashLoadFailed: "无法加载文献回收站，请重试。",
@@ -226,6 +263,19 @@ const messages = {
     renameDocument: "重命名",
     trashDocument: "移入回收站",
     restoreDocument: "恢复文献",
+    purgeDocument: "彻底删除",
+    documentPurgePreviewLoading: "正在准备彻底删除预览…",
+    documentPurgePreviewFailed: "无法加载彻底删除预览，尚未删除任何内容。请重试。",
+    documentPurgeConfirm: "彻底删除“{title}”？\n\n将删除：{counts}。\n存储空间：{size}。\n\n此操作无法撤销。此前下载的导出副本和备份不会删除。",
+    documentPurgeCounts: "笔记 {notes} 条、图片 {images} 个、数据集 {datasets} 个、分析 {analyses} 项、图表 {charts} 个、导入 {imports} 项、对话 {conversations} 个、文件 {files} 个、缺失文件 {missing_files} 个",
+    documentPurging: "正在彻底删除文献并清理文件…",
+    documentPurged: "文献已彻底删除，文件清理完成。",
+    documentPurgeRetry: "删除结果尚未确认，请重试；无需再次确认。",
+    documentPurgeCleanupRetry: "文献已移除，文件清理尚未完成，请重试。",
+    documentPurgePendingTitle: "文件清理待完成",
+    documentPurgePendingMeta: "文件清理待完成；不可恢复。",
+    documentPurgeChanged: "文献或删除预览已变化。已取消本次删除并刷新回收站；请重新预览并确认。",
+    documentPurgeConflict: "彻底删除与另一项操作冲突。已取消本次操作，请重新预览并确认。",
     documentRenameLoading: "正在读取文献标题…",
     documentRenameSaving: "正在保存新标题…",
     documentRenamed: "文献标题已保存，原 PDF 和文件名未改变。",
@@ -238,10 +288,16 @@ const messages = {
     documentRestored: "文献已恢复到文库，可重新打开。",
     documentTrashedLink: "这篇文献已在回收站中。恢复后可重新打开原文、笔记和图片。",
     viewTrash: "查看回收站",
-    document_in_use: "这篇文献已关联研究，请先取消关联后再移入回收站。",
+    document_in_use: "这篇文献已关联研究，请先取消关联后再试。",
     document_busy: "这篇文献仍有正在进行的任务或助手操作，请完成或停止后再试。",
     document_revision_conflict: "文献已在其他地方更新。请刷新后重试。",
     document_trashed: "这篇文献已在回收站中，请先恢复。",
+    document_not_deleted: "只有回收站中的文献才能彻底删除。",
+    document_purge_changed: "文献或删除预览已变化，请重新预览并确认。",
+    document_purged: "这篇文献已彻底删除。",
+    document_purge_pending: "文献已移除，文件清理尚未完成，请重试。",
+    document_purge_unsafe: "无法安全彻底删除这篇文献。请刷新回收站后重试。",
+    document_purge_too_large: "这篇文献的内容过大，暂时无法彻底删除。",
     purgeNote: "彻底删除",
     purgeConfirm: "彻底删除正文和图片摘录，无法恢复；已导出文件、备份和历史对话不受影响。",
     purging: "正在彻底删除笔记…",
@@ -260,14 +316,58 @@ const messages = {
     colorGreen: "绿色",
     colorBlue: "蓝色",
     colorPink: "粉色",
+    colorBlack: "黑色",
+    colorRed: "红色",
     annotationSaving: "正在保存文字标注…",
     annotationSaved: "文字标注和笔记已保存。",
     annotationSaveFailed: "文字标注的保存结果尚未确认。请按原请求重试，不会重复创建。",
-    annotationTooManyRects: "选中文字的行数过多，请缩小选择范围。",
+    annotationTooManyRects: "选中文字的几何区域过于复杂，请缩小选择范围。",
     annotationRetryRequired: "请先重试尚未确认的文字标注保存请求。",
     annotationKind: "标注类型",
     annotationStyleSaving: "正在保存标注样式…",
     annotationStyleSaved: "标注样式已保存。",
+    shapeRectangle: "矩形",
+    shapeArrow: "箭头",
+    shapeLine: "直线",
+    shapeEllipse: "圆形",
+    shapeInk: "手绘",
+    shapeEllipseHint: "拖动绘制椭圆；按住 Shift 绘制正圆。",
+    shapeTextbox: "文本框",
+    shapeTextboxBody: "文本框内容",
+    shapeTextboxFontSize: "字号",
+    shapeTextboxPlaceholder: "输入文本框内容…",
+    shapeTextboxOverflow: "文本超出文本框，请调整文本框大小或字号。",
+    shapeTextboxTooLong: "文本框内容不能超过 2000 个字符。",
+    shapeTextboxEmpty: "请输入文本框内容。",
+    textboxColorBlack: "黑色",
+    textboxColorBlue: "蓝色",
+    textboxColorGreen: "绿色",
+    textboxColorRed: "红色",
+    shapeLayer: "PDF 图形批注层",
+    shapeSelect: "选择图形批注",
+    shapeEndpoint: "箭头端点，可用方向键微调",
+    shapeCorner: "矩形角点，可用方向键微调",
+    shapeNewLabel: "新图形批注",
+    shapeEditLabel: "编辑图形批注",
+    shapeDescription: "批注说明",
+    shapeLineWidth: "线宽（PDF 单位）",
+    shapeSave: "保存批注",
+    shapeCancel: "取消",
+    shapeDefaultRectangle: "矩形批注",
+    shapeDefaultArrow: "箭头批注",
+    shapeDefaultLine: "直线批注",
+    shapeDefaultEllipse: "圆形批注",
+    shapeDefaultInk: "手绘批注",
+    shapeSaving: "正在保存图形批注…",
+    shapeSaved: "图形批注已保存。",
+    shapeSaveFailed: "图形批注的保存结果尚未确认。请按原请求重试，不会重复创建。",
+    shapeInkLimit: "已达到 512 点上限，本笔已结束。请保存后继续绘制下一笔。",
+    shapeTooSmall: "请拖出有效的图形。",
+    shapeStale: "页面或批注已变化，未保存本地修改。",
+    shapeCaptureAlt: "第 {page} 页图形批注截图",
+    shapeRegionDraftUnsaved: "已冻结所选图形和 PDF 画面，尚未加入笔记或助手。",
+    notePageShape: "第 {page} 页 · {kind}批注",
+    shape_annotation_excerpt_unsupported: "图形批注请使用独立截图分享，不能生成笔记图片摘录。",
     addToAssistant: "加入助手",
     notePageAnnotation: "第 {page} 页 · 文字标注",
     viewMode: "阅读模式",
@@ -303,6 +403,43 @@ const messages = {
     notesBatchInvalid: "所选笔记已变化或不可用，未加入任何引用。请刷新选择。",
     readerProgressRestored: "已恢复上次阅读位置。",
     readerProgressStorageUnavailable: "无法读取或保存浏览器中的阅读进度；阅读不受影响。",
+    firstPage: "第一页",
+    lastPage: "最后一页",
+    close: "关闭",
+    navigationPanel: "目录 / 缩略图",
+    pdfOutline: "PDF 目录",
+    pageThumbnails: "页面缩略图",
+    outlineLoading: "正在加载目录…",
+    outlineEmpty: "此 PDF 没有目录。",
+    outlineFailed: "目录加载失败。",
+    fitPage: "适应整页",
+    readerFullscreen: "阅读器全屏",
+    exitFullscreen: "退出全屏",
+    fullscreenFailed: "无法进入阅读器全屏。",
+    annotationUndo: "撤销批注",
+    annotationRedo: "重做批注",
+    annotationHistoryStale: "批注已变化，相关历史已失效。",
+    copyQuote: "复制引文",
+    quoteCopied: "引文已复制。",
+    copyFailed: "复制失败，请重试。",
+    selectedAnnotationActions: "已选批注操作",
+    annotationAction: "批注操作",
+    objectActions: "PDF 对象操作",
+    objectLoading: "正在识别此页表格…",
+    objectNone: "此处未识别到图片或表格，可手动截取。",
+    objectReadFailed: "无法读取此页表格，请重试或手动截取。",
+    objectManualCapture: "手动截取区域",
+    objectCopy: "复制图片",
+    objectCopied: "图片已复制。",
+    objectCopyFailed: "复制图片失败，请重试或手动截取。",
+    objectCapturePending: "请先完成或取消当前截图，再添加其他对象。",
+    objectStale: "页面已变化，请重新右键选择对象。",
+    regions_busy: "表格识别正忙，请稍后重试。",
+    regions_timeout: "表格识别超时，请重试或手动截取。",
+    regions_unavailable: "表格识别暂时不可用，请手动截取。",
+    regions_failed: "表格识别失败，请重试或手动截取。",
+    navigationSaveOrCancel: "有未保存的批注、截图或正在保存的修改。请先保存或取消，再切换工作区。",
+    personalOpenFailed: "无法打开“我的数据”。请重试；现有工作区未更改。",
     untitled: "未命名文献"
   },
   en: {
@@ -319,11 +456,12 @@ const messages = {
     fitWidth: "Fit width",
     page: "Page",
     notes: "Notes",
-    noSource: "No source selected",
-    regionMode: "Select source region",
-    cancelRegion: "Cancel selection",
-    wholePage: "Reference whole page",
-    anchorHelp: "Select a region or reference the current whole page. You can edit the note before saving.",
+    noSource: "Typing anchors this note to the current page",
+    regionMode: "Capture image",
+    cancelRegion: "Cancel capture",
+    wholePage: "Anchor to current whole page",
+    sourceOptions: "Source options",
+    anchorHelp: "New notes default to the current page; you can explicitly anchor the whole page. Choose where each capture goes separately.",
     noteLabel: "Note",
     notePlaceholder: "Write your thoughts…",
     saveNote: "Save note",
@@ -340,7 +478,6 @@ const messages = {
     exportAnnotatedPdf: "Download annotated PDF",
     exportingAnnotatedPdf: "Generating annotated PDF…",
     exportedAnnotatedPdf: "Annotated PDF downloaded.",
-    annotatedPdfHelp: "Exports only saved PDF notes and marks. Attachments, rich formatting, and independent image annotations remain in the full reading record. The original PDF is preserved; this download is an annotated copy.",
     annotatedPdf: "Annotated PDF",
     readingRecord: "Reading record",
     savedNotes: "Saved notes",
@@ -414,6 +551,8 @@ const messages = {
     pdf_export_timeout: "Annotated PDF generation timed out. Try again.",
     pdf_export_failed: "The annotated PDF could not be generated. Try again.",
     pdf_export_unavailable: "Annotated PDF export is temporarily unavailable. Try again shortly.",
+    textbox_font_unavailable: "The text box font is unavailable, so the annotated PDF cannot be generated.",
+    textbox_overflow: "Text box content exceeds its bounds. Resize the text box or reduce the font size before exporting the annotated PDF.",
     request_failed: "The action could not be completed. Try again.",
     invalidFileType: "Choose a PDF file.",
     unknownNote: "This note does not exist or was deleted.",
@@ -485,22 +624,50 @@ const messages = {
     metadataLatestHeading: "Latest saved values",
     metadataLatestLoaded: "Latest saved values are shown below; your draft is still preserved above.",
     metadataValidation: "Enter a title. Year must be a whole number from 1 to 9999, or empty.",
+    metadataLookup: "Update bibliography",
+    metadataLookupLoading: "Looking up bibliography…",
+    metadataLookupReady: "Lookup fields were added to the UNSAVED draft. Nothing was saved automatically; review and click Save.",
+    metadataLookupNotFound: "No bibliography was found. Enter a DOI and retry, or edit manually; existing values were preserved.",
+    metadataLookupChooseDoi: "Multiple DOIs were found. Choose or enter a DOI, then click Update bibliography again. Nothing was selected automatically.",
+    metadataDoiCandidates: "Choose a discovered DOI",
+    metadataDoiCandidatePlaceholder: "Choose a DOI",
+    metadataLookupSource: "Source: {provider}",
+    metadataLookupSourceLink: "View source",
+    bibliography_invalid_doi: "The DOI is invalid. Check it and try again.",
+    bibliography_unavailable: "The bibliography service is temporarily unavailable. Try again later; your draft is preserved.",
+    bibliography_probe_failed: "Bibliography could not be read from the PDF. Enter a DOI or edit manually.",
+    bibliography_probe_timeout: "Bibliography lookup timed out. Retry or edit manually; your draft is preserved.",
+    bibliography_scope: "Bibliography lookup is not available for this paper.",
     research_record_source_mismatch: "Return to the source paper and selected data to review this export scope. The current workspace was not changed.",
     research_record_invalid_source: "This export-scope source is incomplete and cannot be opened.",
-    textSelectionNote: "Add selected text to note",
-    selectTextFirst: "Select text on the current page first. If the page has no selectable text, use “Select source region” to save an image excerpt.",
+    textSelectionNote: "Add to note",
+    askSelection: "Ask",
+    translateSelection: "Translate",
+    selectTextFirst: "Select text on the current page first. If the page has no selectable text, use “Capture image”.",
     textSelectionTooLong: "The selected text exceeds 10,000 characters. Select a smaller passage.",
-    noTextLayer: "This page has no selectable text. Select a source region to save an image excerpt instead.",
-    textLayerUnavailable: "Text is temporarily unavailable on this page. Retry, or select a source region for an image excerpt.",
-    textDraftReady: "The selected text is in an unsaved note. Nothing was saved or sent automatically.",
+    noTextLayer: "This page has no selectable text. Use “Capture image” instead.",
+    textLayerUnavailable: "Text is temporarily unavailable on this page. Retry, or use “Capture image”.",
+    textDraftReady: "The selected text was inserted at the note caret. Nothing was saved or sent automatically.",
     replaceDraftConfirm: "There is an unsaved or edited note. Replace the current draft with the new source selection? Nothing will be saved automatically.",
     draftPending: "A note operation is still in progress. Finish it before choosing another source.",
-    regionDraftUnsaved: "Unsaved — click Save image excerpt",
-    regionDraftCancel: "Cancel image excerpt",
-    regionDraftCancelConfirm: "Clear this image excerpt’s source and preview? Your note text will be kept.",
-    regionCaption: "Page {page} image excerpt",
+    regionDraftUnsaved: "Captured pixels from the selected PDF region. Not added to a note or the assistant yet.",
+    regionDraftCancel: "Cancel capture",
+    regionDraftCancelConfirm: "Clear this capture and preview? Your note text will be kept.",
+    regionCaption: "Page {page} region capture",
+    captureAddNote: "Add to note",
+    captureAddAgent: "Add to Agent",
+    captureUploading: "Uploading capture…",
+    captureNoteReady: "Capture inserted into the unsaved note. Nothing was saved automatically.",
+    captureInsertFailed: "The capture was not inserted because the target note or editor state changed.",
+    readerActionReady: "Added to the Agent draft with a frozen source. Nothing was sent.",
+    readerActionLimit: "The addition would exceed 8,000 characters. The Agent draft was not changed.",
+    readerActionImageLimit: "The Agent can select at most 4 images. Existing selections were not changed.",
+    readerActionOwner: "The reader action was not added. Confirm that the same paper is still open.",
+    readerActionPending: "The previous Agent message is still being submitted. Retry when it finishes; the source selection and Agent draft were preserved.",
+    readerActionUnavailable: "The Agent is not ready. Retry shortly; the source selection and Agent draft were preserved.",
+    readerActionInvalid: "The source selection is invalid or stale. Select it again; the Agent draft was not changed.",
     libraryTrash: "Paper trash",
-    libraryTrashHelp: "Papers in trash can be restored with their original PDF, notes, and images.",
+    libraryTrashHelp: "Papers in trash can be restored. Permanent deletion removes the PDF and related records and cannot be undone.",
     libraryTrashEmpty: "Trash is empty.",
     libraryTrashLoading: "Loading paper trash…",
     libraryTrashLoadFailed: "Paper trash could not be loaded. Try again.",
@@ -508,6 +675,19 @@ const messages = {
     renameDocument: "Rename",
     trashDocument: "Move to trash",
     restoreDocument: "Restore paper",
+    purgeDocument: "Permanently delete",
+    documentPurgePreviewLoading: "Preparing the permanent-deletion preview…",
+    documentPurgePreviewFailed: "The permanent-deletion preview could not be loaded. Nothing was deleted. Try again.",
+    documentPurgeConfirm: "Permanently delete “{title}”?\n\nThis will delete {counts}.\nStorage: {size}.\n\nThis cannot be undone. Previously downloaded exports and backups are not deleted.",
+    documentPurgeCounts: "{notes} notes, {images} images, {datasets} datasets, {analyses} analyses, {charts} charts, {imports} imports, {conversations} conversations, {files} files, and {missing_files} missing files",
+    documentPurging: "Permanently deleting the paper and cleaning up files…",
+    documentPurged: "The paper was permanently deleted and file cleanup is complete.",
+    documentPurgeRetry: "The deletion outcome is unconfirmed. Retry; no new confirmation is needed.",
+    documentPurgeCleanupRetry: "The paper is removed, but file cleanup is incomplete. Retry cleanup.",
+    documentPurgePendingTitle: "File cleanup pending",
+    documentPurgePendingMeta: "File cleanup pending; restore is unavailable.",
+    documentPurgeChanged: "The paper or deletion preview changed. This deletion was cancelled and trash was refreshed; review a new preview and confirm again.",
+    documentPurgeConflict: "Permanent deletion conflicted with another operation. This operation was cancelled; review a new preview and confirm again.",
     documentRenameLoading: "Loading the paper title…",
     documentRenameSaving: "Saving the new title…",
     documentRenamed: "Paper title saved. The original PDF and filename are unchanged.",
@@ -520,10 +700,16 @@ const messages = {
     documentRestored: "Paper restored to the library. You can open it again.",
     documentTrashedLink: "This paper is in trash. Restore it to reopen its PDF, notes, and images.",
     viewTrash: "View trash",
-    document_in_use: "This paper is associated with research. Remove the association before moving it to trash.",
+    document_in_use: "This paper is associated with research. Remove the association before retrying.",
     document_busy: "This paper still has an active job or assistant operation. Finish or stop it before retrying.",
     document_revision_conflict: "The paper changed elsewhere. Refresh and retry.",
     document_trashed: "This paper is in trash. Restore it first.",
+    document_not_deleted: "Only a paper in trash can be permanently deleted.",
+    document_purge_changed: "The paper or deletion preview changed. Review a new preview and confirm again.",
+    document_purged: "This paper was already permanently deleted.",
+    document_purge_pending: "The paper is removed, but file cleanup is incomplete. Retry cleanup.",
+    document_purge_unsafe: "This paper cannot be permanently deleted safely. Refresh trash before retrying.",
+    document_purge_too_large: "This paper’s contents are too large to permanently delete right now.",
     purgeNote: "Delete permanently",
     purgeConfirm: "Permanently delete the note body and image excerpt; this cannot be undone. Exported files, backups, and past conversations are not affected.",
     purging: "Permanently deleting note…",
@@ -542,14 +728,58 @@ const messages = {
     colorGreen: "Green",
     colorBlue: "Blue",
     colorPink: "Pink",
+    colorBlack: "Black",
+    colorRed: "Red",
     annotationSaving: "Saving text annotation…",
     annotationSaved: "Text annotation and note saved.",
     annotationSaveFailed: "The text annotation save is unconfirmed. Retry the exact request; it will not create a duplicate.",
-    annotationTooManyRects: "The selection spans too many text lines. Select a smaller passage.",
+    annotationTooManyRects: "The selection geometry is too complex. Select a smaller passage.",
     annotationRetryRequired: "Retry the unconfirmed text annotation save before creating another one.",
     annotationKind: "Annotation type",
     annotationStyleSaving: "Saving annotation style…",
     annotationStyleSaved: "Annotation style saved.",
+    shapeRectangle: "Rectangle",
+    shapeArrow: "Arrow",
+    shapeLine: "Line",
+    shapeEllipse: "Ellipse",
+    shapeInk: "Freehand",
+    shapeEllipseHint: "Drag to draw an ellipse; hold Shift for a perfect circle.",
+    shapeTextbox: "Text box",
+    shapeTextboxBody: "Text box content",
+    shapeTextboxFontSize: "Font size",
+    shapeTextboxPlaceholder: "Enter text box content…",
+    shapeTextboxOverflow: "The text does not fit. Resize the text box or reduce the font size.",
+    shapeTextboxTooLong: "Text box content cannot exceed 2,000 characters.",
+    shapeTextboxEmpty: "Enter text box content.",
+    textboxColorBlack: "Black",
+    textboxColorBlue: "Blue",
+    textboxColorGreen: "Green",
+    textboxColorRed: "Red",
+    shapeLayer: "PDF shape annotation layer",
+    shapeSelect: "select shape annotation",
+    shapeEndpoint: "Arrow endpoint; use arrow keys to nudge",
+    shapeCorner: "Rectangle corner; use arrow keys to nudge",
+    shapeNewLabel: "New shape annotation",
+    shapeEditLabel: "Edit shape annotation",
+    shapeDescription: "Annotation description",
+    shapeLineWidth: "Line width (PDF units)",
+    shapeSave: "Save annotation",
+    shapeCancel: "Cancel",
+    shapeDefaultRectangle: "Rectangle annotation",
+    shapeDefaultArrow: "Arrow annotation",
+    shapeDefaultLine: "Line annotation",
+    shapeDefaultEllipse: "Ellipse annotation",
+    shapeDefaultInk: "Freehand annotation",
+    shapeSaving: "Saving shape annotation…",
+    shapeSaved: "Shape annotation saved.",
+    shapeSaveFailed: "The shape save is unconfirmed. Retry the exact request; it will not create a duplicate.",
+    shapeInkLimit: "This stroke reached the 512-point limit and has ended. Save it, then start the next stroke.",
+    shapeTooSmall: "Drag to create a valid shape.",
+    shapeStale: "The page or annotation changed. Local edits were not saved.",
+    shapeCaptureAlt: "Shape annotation capture from page {page}",
+    shapeRegionDraftUnsaved: "Frozen PDF pixels with the selected shape. Not added to a note or the assistant yet.",
+    notePageShape: "Page {page} · {kind} annotation",
+    shape_annotation_excerpt_unsupported: "Share shape annotations with an independent capture; note-linked image excerpts are unavailable.",
     addToAssistant: "Add to assistant",
     notePageAnnotation: "Page {page} · text annotation",
     viewMode: "Reading mode",
@@ -585,6 +815,43 @@ const messages = {
     notesBatchInvalid: "Selected notes changed or are unavailable. No references were added; refresh your selection.",
     readerProgressRestored: "Restored your last reading position.",
     readerProgressStorageUnavailable: "Browser reading progress cannot be read or saved; reading is unaffected.",
+    firstPage: "First page",
+    lastPage: "Last page",
+    close: "Close",
+    navigationPanel: "Outline / thumbnails",
+    pdfOutline: "PDF outline",
+    pageThumbnails: "Page thumbnails",
+    outlineLoading: "Loading outline…",
+    outlineEmpty: "This PDF has no outline.",
+    outlineFailed: "The outline could not be loaded.",
+    fitPage: "Fit whole page",
+    readerFullscreen: "Reader fullscreen",
+    exitFullscreen: "Exit fullscreen",
+    fullscreenFailed: "Reader fullscreen could not be opened.",
+    annotationUndo: "Annotation undo",
+    annotationRedo: "Annotation redo",
+    annotationHistoryStale: "The annotation changed; its conflicting history was discarded.",
+    copyQuote: "Copy quote",
+    quoteCopied: "Quote copied.",
+    copyFailed: "Copy failed. Try again.",
+    selectedAnnotationActions: "Selected annotation actions",
+    annotationAction: "Annotation actions",
+    objectActions: "PDF object actions",
+    objectLoading: "Recognizing tables on this page…",
+    objectNone: "No image or table was recognized here. You can capture a region manually.",
+    objectReadFailed: "Tables on this page could not be read. Retry or capture manually.",
+    objectManualCapture: "Capture region manually",
+    objectCopy: "Copy image",
+    objectCopied: "Image copied.",
+    objectCopyFailed: "The image could not be copied. Retry or capture it manually.",
+    objectCapturePending: "Finish or cancel the current capture before adding another object.",
+    objectStale: "The page changed. Right-click the object again.",
+    regions_busy: "Table recognition is busy. Try again shortly.",
+    regions_timeout: "Table recognition timed out. Retry or capture manually.",
+    regions_unavailable: "Table recognition is unavailable. Capture the region manually.",
+    regions_failed: "Table recognition failed. Retry or capture manually.",
+    navigationSaveOrCancel: "Unsaved annotations, a capture, or a pending save must be saved or cancelled before changing workspaces.",
+    personalOpenFailed: "My data could not be opened. Retry; the existing workspace was not changed.",
     untitled: "Untitled paper"
   }
 };
@@ -611,12 +878,40 @@ const elements = {
   searchResults: $("library-search-results"),
   documentTitle: $("document-title"),
   pageCount: $("page-count"),
+  pageFirst: $("page-first"),
   pagePrev: $("page-prev"),
   pageNext: $("page-next"),
+  pageLast: $("page-last"),
   pageInput: $("page-input"),
   zoomIn: $("zoom-in"),
   zoomOut: $("zoom-out"),
   zoomFit: $("zoom-fit"),
+  zoomFitPage: $("zoom-fit-page"),
+  readerFullscreen: $("reader-fullscreen"),
+  annotationUndo: $("annotation-undo"),
+  annotationRedo: $("annotation-redo"),
+  navigationToggle: $("reader-navigation-toggle"),
+  navigationPanel: $("reader-navigation-panel"),
+  navigationClose: $("reader-navigation-close"),
+  outlineTab: $("reader-outline-tab"),
+  thumbnailsTab: $("reader-thumbnails-tab"),
+  outline: $("reader-outline"),
+  outlineList: $("reader-outline-list"),
+  outlineStatus: $("reader-outline-status"),
+  outlineRetry: $("reader-outline-retry"),
+  thumbnailsPanel: $("reader-thumbnails-panel"),
+  thumbnails: $("reader-thumbnails"),
+  thumbnailsPrev: $("reader-thumbnails-prev"),
+  thumbnailsNext: $("reader-thumbnails-next"),
+  thumbnailsRange: $("reader-thumbnails-range"),
+  selectedAnnotationToolbar: $("selected-annotation-toolbar"),
+  selectedAnnotationCopy: $("selected-annotation-copy"),
+  selectedAnnotationNote: $("selected-annotation-note"),
+  selectedAnnotationAgent: $("selected-annotation-agent"),
+  selectedAnnotationEdit: $("selected-annotation-edit"),
+  selectedAnnotationKind: $("selected-annotation-kind"),
+  selectedAnnotationColor: $("selected-annotation-color"),
+  selectedAnnotationDelete: $("selected-annotation-delete"),
   zoomLabel: $("zoom-label"),
   viewMode: $("reader-view-mode"),
   findToggle: $("reader-find-toggle"),
@@ -628,8 +923,12 @@ const elements = {
   metadataAuthors: $("metadata-authors"),
   metadataYear: $("metadata-year"),
   metadataDoi: $("metadata-doi"),
+  metadataDoiCandidatesLabel: $("metadata-doi-candidates-label"),
+  metadataDoiCandidates: $("metadata-doi-candidates"),
+  metadataLookupSource: $("metadata-lookup-source"),
   metadataLatest: $("metadata-latest"),
   metadataStatus: $("metadata-status"),
+  metadataLookup: $("metadata-lookup"),
   metadataEdit: $("metadata-edit"),
   metadataSave: $("metadata-save"),
   metadataCancel: $("metadata-cancel"),
@@ -644,6 +943,8 @@ const elements = {
   textStatus: $("reader-text-status"),
   readerProgressStatus: $("reader-progress-status"),
   textSelectionNote: $("text-selection-note"),
+  textSelectionAsk: $("text-selection-ask"),
+  textSelectionTranslate: $("text-selection-translate"),
   textAnnotationToolbar: $("text-annotation-toolbar"),
   textAnnotationHighlight: $("text-annotation-highlight"),
   textAnnotationUnderline: $("text-annotation-underline"),
@@ -652,17 +953,19 @@ const elements = {
   activeSelection: $("active-selection"),
   noteForm: $("note-form"),
   noteText: $("note-text"),
-  richTextOpen: $("rich-text-open"),
   richTextPlain: $("rich-text-plain"),
   richTextDraftStatus: $("rich-text-draft-status"),
   noteSave: $("note-save"),
   excerptSave: $("excerpt-save"),
-  regionMode: $("region-mode"),
+  regionMode: $("reader-region-mode"),
   pageNote: $("page-note"),
   activeSource: $("active-source"),
   anchorHelp: $("anchor-help"),
   regionDraft: $("region-draft"),
   regionPreview: $("region-draft-preview"),
+  regionDraftStatus: $("region-draft-status"),
+  regionAddNote: $("region-add-note"),
+  regionAddAgent: $("region-add-agent"),
   regionDraftCancel: $("region-draft-cancel"),
   characterCount: $("character-count"),
   notesPanel: $("notes-panel"),
@@ -768,7 +1071,9 @@ const state = {
     pending: false,
     status: null,
     sequence: 0,
-    operations: new Map()
+    operations: new Map(),
+    purgeOperations: new Map(),
+    purgedIds: new Set()
   },
   documentMenu: null,
   rename: null,
@@ -776,11 +1081,15 @@ const state = {
   highlight: null,
   highlightRevealId: null,
   regionActive: false,
+  regionCapture: null,
   selection: null,
+  selectedAnnotationId: null,
   status: null,
   resizeFrame: null
 };
 
+const annotationHistory = createAnnotationHistory();
+let readerNavigation = null;
 let imageLibrary = null;
 let imageViewer = null;
 let analysis = null;
@@ -788,15 +1097,27 @@ let datasetSelection = null;
 let dataImports = null;
 let charts = null;
 let workspace = null;
+let dataNavigation = null;
 let readerWorkspaceVisible = false;
 let assistant = null;
 let richText = null;
 let researchRecord = null;
 let study = null;
 let readerFind = null;
+let readerObjects = null;
+let readerShapes = null;
+let lastReadingDocumentId = null;
+let lastDataDocumentId = null;
+let lastDataSelection = { datasetId: null, analysisId: null, chartId: null };
+let workspaceModeIntent = 0;
+let workspaceModePending = false;
 
 function isStudy(document = state.document) {
   return document?.kind === "study";
+}
+
+function isPersonalOwner(document = state.document) {
+  return document?.kind === "study" && document?.workspace_role === "personal_analysis";
 }
 
 function readLanguage() {
@@ -860,6 +1181,7 @@ function renderStatus() {
 }
 
 function applyLanguage() {
+  readerObjects?.close();
   document.documentElement.lang = state.language === "zh" ? "zh-CN" : "en";
   document.title = `${t("pageTitle")} · Synrise Neuro`;
   document.querySelectorAll("[data-i18n]").forEach((node) => {
@@ -868,6 +1190,11 @@ function applyLanguage() {
   document.querySelectorAll("[data-i18n-placeholder]").forEach((node) => {
     node.placeholder = t(node.dataset.i18nPlaceholder);
   });
+  document.querySelectorAll("[data-i18n-aria]").forEach((node) => {
+    node.setAttribute("aria-label", t(node.dataset.i18nAria));
+    node.title = t(node.dataset.i18nAria);
+  });
+  elements.selectedAnnotationToolbar.setAttribute("aria-label", t("selectedAnnotationActions"));
   elements.language.textContent = state.language === "zh" ? "EN" : "中";
   elements.language.setAttribute("aria-label", state.language === "zh" ? "Switch to English" : "切换为中文");
   elements.pagePrev.setAttribute("aria-label", t("previousPage"));
@@ -903,11 +1230,13 @@ function applyLanguage() {
   dataImports?.applyLanguage(state.language);
   charts?.applyLanguage(state.language);
   workspace?.applyLanguage(state.language);
+  dataNavigation?.applyLanguage(state.language);
   assistant?.applyLanguage(state.language);
   richText?.applyLanguage(state.language);
   researchRecord?.applyLanguage(state.language);
   study?.applyLanguage(state.language);
   readerFind?.applyLanguage();
+  readerShapes?.applyLanguage();
 }
 
 class ApiError extends Error {
@@ -1013,6 +1342,7 @@ function clearImageInUrl(documentId) {
 }
 
 async function openImageViewer(documentId, kind, sourceId, options = {}) {
+  invalidateWorkspaceModeIntent();
   cancelReaderProgressRestore();
   if (state.document?.id !== documentId) await openDocument(documentId, { explicitIntent: true });
   if (state.document?.id !== documentId) return;
@@ -1040,7 +1370,7 @@ function ensureDraft(documentId) {
 }
 
 function captureCurrentDraft() {
-  if (!state.document) return;
+  if (!state.document || richText?.isEditorActive()) return;
   if (isStudy()) {
     study?.captureCurrentDraft();
     return;
@@ -1061,21 +1391,6 @@ function invalidateRequestId(draft) {
   draft.imageRequestIds = null;
   draft.saveFailed = false;
   draft.imageFailed = false;
-}
-
-function prepareDraftReplacement(documentId) {
-  if (state.pendingSaves > 0 || state.pendingMutations.size > 0 || state.pendingExcerpts.size > 0) {
-    setStatus("draftPending", "error");
-    return false;
-  }
-  const draft = ensureDraft(documentId);
-  const editDraft = state.editDrafts.get(documentId);
-  const hasDraft = Boolean(editDraft || draft.text.trim() || draft.richContent || draft.page !== null || draft.rect);
-  if (hasDraft && !window.confirm(t("replaceDraftConfirm"))) return false;
-  richText?.close({ restoreFocus: false });
-  state.editDrafts.delete(documentId);
-  state.drafts.set(documentId, makeEmptyDraft());
-  return true;
 }
 
 function highlightDraft(documentId, page, rect) {
@@ -1128,7 +1443,7 @@ function renderDocuments() {
     const button = window.document.createElement("button");
     button.type = "button";
     button.className = "document-open";
-    button.addEventListener("click", () => openDocument(document.id));
+    button.addEventListener("click", () => openDocument(document.id, { workspace: "reading" }));
 
     const name = window.document.createElement("span");
     name.className = "document-name";
@@ -1165,7 +1480,7 @@ async function refreshActiveLibrary() {
     const [body, studyBody] = await Promise.all([api("/api/v1/documents"), api("/api/v1/studies")]);
     if (sequence !== state.librarySequence) return;
     state.documents = Array.isArray(body.items) ? body.items : [];
-    state.studies = Array.isArray(studyBody.items) ? studyBody.items : [];
+    state.studies = Array.isArray(studyBody.items) ? studyBody.items.filter((item) => !isPersonalOwner(item)) : [];
     study?.setStudies(state.studies);
     renderDocuments();
     if (state.search.query) void performSearch(state.search.query);
@@ -1208,19 +1523,33 @@ function renderLibraryTrash() {
     item.dataset.documentId = document.id;
     const name = window.document.createElement("span");
     name.className = "document-name";
-    name.textContent = document.title || document.original_filename || t("untitled");
+    name.textContent = document.purge_pending ? t("documentPurgePendingTitle") : document.title || document.original_filename || t("untitled");
     const meta = window.document.createElement("span");
     meta.className = "document-meta";
-    meta.textContent = document.deleted_at || "";
-    const restore = window.document.createElement("button");
-    restore.type = "button";
-    restore.className = "button button-quiet";
-    restore.dataset.action = "restore-document";
-    const operation = trash.operations.get(document.id);
-    restore.disabled = Boolean(operation?.pending);
-    restore.textContent = t(operation?.pending ? "documentRestoring" : operation ? "retry" : "restoreDocument");
-    restore.addEventListener("click", () => restoreDocument(document.id));
-    item.append(name, meta, restore);
+    meta.textContent = document.purge_pending ? [document.deleted_at, t("documentPurgePendingMeta")].filter(Boolean).join(" · ") : document.deleted_at || "";
+    const restoreOperation = trash.operations.get(document.id);
+    const purgeOperation = trash.purgeOperations.get(document.id);
+    const actions = window.document.createElement("div");
+    actions.className = "library-trash-actions";
+    if (!document.purge_pending) {
+      const restore = window.document.createElement("button");
+      restore.type = "button";
+      restore.className = "button button-quiet";
+      restore.dataset.action = "restore-document";
+      restore.disabled = Boolean(restoreOperation?.pending || purgeOperation);
+      restore.textContent = t(restoreOperation?.pending ? "documentRestoring" : restoreOperation ? "retry" : "restoreDocument");
+      restore.addEventListener("click", () => restoreDocument(document.id));
+      actions.append(restore);
+    }
+    const purge = window.document.createElement("button");
+    purge.type = "button";
+    purge.className = "button button-quiet";
+    purge.dataset.action = "purge-document";
+    purge.disabled = Boolean(restoreOperation || purgeOperation?.pending || document.purge_pending && !purgeOperation);
+    purge.textContent = t(purgeOperation?.pending ? purgeOperation.phase === "preview" ? "documentPurgePreviewLoading" : "documentPurging" : purgeOperation ? "retry" : "purgeDocument");
+    purge.addEventListener("click", () => purgeDocument(document.id));
+    actions.append(purge);
+    item.append(name, meta, actions);
     elements.libraryTrashList.append(item);
   }
 }
@@ -1235,7 +1564,26 @@ async function loadLibraryTrash() {
   try {
     const body = await api("/api/v1/documents/trash");
     if (sequence !== trash.sequence) return;
-    trash.items = Array.isArray(body.items) ? body.items : [];
+    trash.items = (Array.isArray(body.items) ? body.items : []).filter((item) => !trash.purgedIds.has(item.id));
+    for (const [documentId, operation] of trash.operations) {
+      if (operation.action === "restore" && operation.conflicted && !operation.pending) trash.operations.delete(documentId);
+    }
+    for (const document of trash.items) {
+      if (!document.purge_pending) continue;
+      const payload = documentPurgePayload(document.purge_request);
+      if (!payload) continue;
+      trash.operations.delete(document.id);
+      if (trash.purgeOperations.get(document.id)?.pending) continue;
+      trash.purgeOperations.set(document.id, {
+        documentId: document.id,
+        action: "purge",
+        phase: "delete",
+        payload,
+        preview: null,
+        pending: false,
+        cleanupPending: true
+      });
+    }
     trash.loaded = true;
     trash.status = null;
   } catch (error) {
@@ -1276,6 +1624,7 @@ async function runDocumentOperation(operation) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(operation.payload)
     });
+    if (operations.get(operation.documentId) !== operation) return result;
     operations.delete(operation.documentId);
     if (operation.action === "restore") {
       state.libraryTrash.items = state.libraryTrash.items.filter((item) => item.id !== operation.documentId);
@@ -1296,6 +1645,7 @@ async function runDocumentOperation(operation) {
     void refreshActiveLibrary();
     return result;
   } catch (error) {
+    if (operations.get(operation.documentId) !== operation) return null;
     operation.conflicted = error.code === "revision_conflict";
     documentOperationError(operation, error);
     return null;
@@ -1340,13 +1690,15 @@ async function trashDocument(documentId) {
 }
 
 async function restoreDocument(documentId) {
-  const existing = state.libraryTrash.operations.get(documentId);
+  const trash = state.libraryTrash;
+  const document = trash.items.find((item) => item.id === documentId);
+  if (document?.purge_pending || trash.purgeOperations.has(documentId)) return;
+  const existing = trash.operations.get(documentId);
   if (existing && !existing.conflicted) {
     await runDocumentOperation(existing);
     return;
   }
-  if (existing) state.libraryTrash.operations.delete(documentId);
-  const document = state.libraryTrash.items.find((item) => item.id === documentId);
+  if (existing) trash.operations.delete(documentId);
   if (!document || !Number.isInteger(document.revision)) return;
   const requestId = crypto.randomUUID();
   await runDocumentOperation({
@@ -1357,6 +1709,220 @@ async function restoreDocument(documentId) {
     payload: { request_id: requestId, expected_revision: document.revision },
     pending: false
   });
+}
+
+function documentPurgePayload(value) {
+  if (!value || typeof value.request_id !== "string" || !value.request_id || !Number.isInteger(value.expected_revision) || typeof value.preview_sha256 !== "string" || !/^[a-f0-9]{64}$/i.test(value.preview_sha256)) return null;
+  return {
+    request_id: value.request_id,
+    expected_revision: value.expected_revision,
+    preview_sha256: value.preview_sha256
+  };
+}
+
+function formatDocumentPurgeSize(value) {
+  const bytes = Number.isFinite(value) && value >= 0 ? Math.floor(value) : 0;
+  if (bytes < 1024) return `${bytes} B`;
+  const units = ["KiB", "MiB", "GiB", "TiB"];
+  let size = bytes;
+  let unitIndex = -1;
+  while (size >= 1024 && unitIndex < units.length - 1) {
+    size /= 1024;
+    unitIndex += 1;
+  }
+  const rounded = new Intl.NumberFormat(state.language === "zh" ? "zh-CN" : "en", { maximumFractionDigits: 1 }).format(size);
+  return `${rounded} ${units[unitIndex]}`;
+}
+
+function documentPurgeConfirmation(preview) {
+  const counts = preview.counts && typeof preview.counts === "object" ? preview.counts : {};
+  const values = {};
+  for (const field of ["notes", "images", "datasets", "analyses", "charts", "imports", "conversations", "files", "missing_files"]) {
+    values[field] = Number.isInteger(counts[field]) && counts[field] >= 0 ? counts[field] : 0;
+  }
+  return t("documentPurgeConfirm", {
+    title: preview.title || t("untitled"),
+    counts: t("documentPurgeCounts", values),
+    size: formatDocumentPurgeSize(counts.bytes)
+  });
+}
+
+function setDocumentPurgeStatus(operation, key, kind = "error") {
+  state.libraryTrash.status = { key, kind, retry: () => purgeDocument(operation.documentId) };
+  renderLibraryTrash();
+}
+
+function markDocumentPurgePending(operation) {
+  operation.cleanupPending = true;
+  const document = state.libraryTrash.items.find((item) => item.id === operation.documentId);
+  if (!document) return;
+  document.purge_pending = true;
+  document.purge_request = { ...operation.payload };
+  if (operation.preview?.counts) document.counts = operation.preview.counts;
+}
+
+async function clearDocumentPurgeAndRefresh(operation, key) {
+  const trash = state.libraryTrash;
+  if (trash.purgeOperations.get(operation.documentId) === operation) trash.purgeOperations.delete(operation.documentId);
+  await loadLibraryTrash();
+  if (!trash.status) trash.status = { key, kind: "error" };
+  renderLibraryTrash();
+}
+
+function applyDocumentPurge(operation) {
+  const trash = state.libraryTrash;
+  const documentId = operation.documentId;
+  annotationHistory.invalidate(documentId);
+  trash.purgedIds.add(documentId);
+  if (trash.purgeOperations.get(documentId) === operation) trash.purgeOperations.delete(documentId);
+  trash.items = trash.items.filter((item) => item.id !== documentId);
+  trash.status = { key: "documentPurged", kind: "success" };
+  state.documents = state.documents.filter((item) => item.id !== documentId);
+  state.search.documents = state.search.documents.filter((item) => item.id !== documentId);
+  state.search.notes = state.search.notes.filter((item) => item.document_id !== documentId);
+  if (["searchResultCount", "searchEmpty"].includes(state.search.status?.key)) {
+    const values = { studies: state.search.studies.length, documents: state.search.documents.length, notes: state.search.notes.length };
+    state.search.status = {
+      key: values.studies || values.documents || values.notes ? "searchResultCount" : "searchEmpty",
+      kind: "info",
+      values
+    };
+  }
+  const wasOpen = state.document?.id === documentId;
+  if (wasOpen) {
+    showMissingDocument();
+    updateUrl(null, null, true, "reading");
+  }
+  state.metadata.get(documentId)?.lookup?.controller.abort();
+  state.metadata.delete(documentId);
+  state.documentOperations.delete(documentId);
+  trash.operations.delete(documentId);
+  state.drafts.delete(documentId);
+  state.editDrafts.delete(documentId);
+  state.noteTools.delete(documentId);
+  clearReaderProgress(documentId);
+  renderDocuments();
+  renderSearch();
+  renderLibraryTrash();
+  if (!wasOpen) setStatus("documentPurged", "success");
+}
+
+async function runDocumentPurge(operation) {
+  const trash = state.libraryTrash;
+  if (operation.pending || !operation.payload || trash.operations.has(operation.documentId)) return null;
+  operation.pending = true;
+  operation.phase = "delete";
+  trash.purgeOperations.set(operation.documentId, operation);
+  trash.status = { key: "documentPurging", kind: "info" };
+  renderLibraryTrash();
+  try {
+    const result = await api(`/api/v1/documents/${encodeURIComponent(operation.documentId)}/purge`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(operation.payload)
+    });
+    if (result?.id === operation.documentId && result.purged === true && result.files_removed === true) {
+      applyDocumentPurge(operation);
+      return result;
+    }
+    if (result?.id === operation.documentId && result.purged === true) {
+      markDocumentPurgePending(operation);
+      setDocumentPurgeStatus(operation, "documentPurgeCleanupRetry");
+      return null;
+    }
+    throw new ApiError("request_failed");
+  } catch (error) {
+    if (["revision_conflict", "document_revision_conflict", "document_purge_changed"].includes(error.code)) {
+      await clearDocumentPurgeAndRefresh(operation, "documentPurgeChanged");
+      return null;
+    }
+    if (["document_not_deleted", "document_purged", "document_purge_unsafe", "document_purge_too_large", "idempotency_conflict", "not_found", "validation_error"].includes(error.code)) {
+      const key = error.code === "idempotency_conflict" ? "documentPurgeConflict" : error.code;
+      await clearDocumentPurgeAndRefresh(operation, key);
+      return null;
+    }
+    if (error.code === "document_purge_pending") {
+      markDocumentPurgePending(operation);
+      setDocumentPurgeStatus(operation, "documentPurgeCleanupRetry");
+    } else {
+      const key = ["network", "request_failed", "storage_unavailable", "storage_failure"].includes(error.code) ? "documentPurgeRetry" : error.code || "documentPurgeRetry";
+      setDocumentPurgeStatus(operation, key);
+    }
+    return null;
+  } finally {
+    operation.pending = false;
+    renderLibraryTrash();
+  }
+}
+
+async function previewDocumentPurge(operation) {
+  const trash = state.libraryTrash;
+  if (operation.pending || trash.operations.has(operation.documentId)) return;
+  operation.pending = true;
+  operation.phase = "preview";
+  trash.status = { key: "documentPurgePreviewLoading", kind: "info" };
+  renderLibraryTrash();
+  try {
+    const preview = await api(`/api/v1/documents/${encodeURIComponent(operation.documentId)}/purge-preview`);
+    if (trash.purgeOperations.get(operation.documentId) !== operation) return;
+    const payload = documentPurgePayload({ ...preview, request_id: "preview" });
+    if (preview?.id !== operation.documentId || !payload) throw new ApiError("request_failed");
+    operation.preview = preview;
+    operation.pending = false;
+    trash.status = null;
+    renderLibraryTrash();
+    if (!window.confirm(documentPurgeConfirmation(preview))) {
+      trash.purgeOperations.delete(operation.documentId);
+      renderLibraryTrash();
+      return;
+    }
+    operation.payload = {
+      request_id: crypto.randomUUID(),
+      expected_revision: preview.expected_revision,
+      preview_sha256: preview.preview_sha256
+    };
+    operation.phase = "delete";
+    await runDocumentPurge(operation);
+  } catch (error) {
+    if (trash.purgeOperations.get(operation.documentId) !== operation) return;
+    if (["revision_conflict", "document_revision_conflict", "document_purge_changed"].includes(error.code)) {
+      await clearDocumentPurgeAndRefresh(operation, "documentPurgeChanged");
+      return;
+    }
+    if (["document_not_deleted", "document_purged", "document_purge_pending", "document_purge_unsafe", "document_purge_too_large", "not_found", "validation_error"].includes(error.code)) {
+      await clearDocumentPurgeAndRefresh(operation, error.code);
+      return;
+    }
+    const key = ["network", "request_failed"].includes(error.code) ? "documentPurgePreviewFailed" : error.code || "documentPurgePreviewFailed";
+    setDocumentPurgeStatus(operation, key);
+  } finally {
+    operation.pending = false;
+    renderLibraryTrash();
+  }
+}
+
+async function purgeDocument(documentId) {
+  const trash = state.libraryTrash;
+  const existing = trash.purgeOperations.get(documentId);
+  if (existing) {
+    if (existing.pending || trash.operations.has(documentId)) return;
+    if (existing.phase === "delete" && existing.payload) await runDocumentPurge(existing);
+    else await previewDocumentPurge(existing);
+    return;
+  }
+  const document = trash.items.find((item) => item.id === documentId);
+  if (!document || document.purge_pending || trash.operations.has(documentId)) return;
+  const operation = {
+    documentId,
+    action: "purge",
+    phase: "preview",
+    payload: null,
+    preview: null,
+    pending: false,
+    cleanupPending: false
+  };
+  trash.purgeOperations.set(documentId, operation);
+  await previewDocumentPurge(operation);
 }
 
 function renderRenameDialog() {
@@ -1643,6 +2209,9 @@ function ensureMetadata(documentId) {
       snapshot: null,
       draft: null,
       loading: false,
+      lookup: null,
+      candidates: [],
+      lookupSource: null,
       status: null,
       latestVisible: false
     });
@@ -1658,6 +2227,77 @@ function captureCurrentMetadataDraft() {
   entry.draft.authors = elements.metadataAuthors.value;
   entry.draft.year = elements.metadataYear.value;
   entry.draft.doi = elements.metadataDoi.value;
+}
+
+function metadataSnapshotValue(snapshot, field) {
+  const value = snapshot?.[field];
+  return value === null || value === undefined ? "" : String(value);
+}
+
+function metadataLookupValue(field, value) {
+  if (field === "year") {
+    const year = typeof value === "number" ? value : typeof value === "string" && value.trim() ? Number(value) : NaN;
+    return Number.isInteger(year) && year >= 1 && year <= 9999 ? String(year) : null;
+  }
+  const limits = { title: 180, authors: 2000, doi: 255 };
+  if (typeof value !== "string" || !value.trim() || value.length > limits[field]) return null;
+  return value;
+}
+
+function safeMetadataSourceUrl(value, documentId) {
+  if (typeof value !== "string" || !value || !documentId) return null;
+  try {
+    const url = new URL(value, window.location.origin);
+    const canonicalDoi = url.protocol === "https:" && url.hostname === "doi.org" && url.pathname.length > 1;
+    const currentPdf = url.origin === window.location.origin && url.pathname === `/api/v1/documents/${encodeURIComponent(documentId)}/file`;
+    return canonicalDoi || currentPdf ? url.href : null;
+  } catch {
+    return null;
+  }
+}
+
+function renderMetadataCandidates(entry) {
+  const candidates = entry?.candidates || [];
+  elements.metadataDoiCandidates.replaceChildren();
+  elements.metadataDoiCandidatesLabel.hidden = !candidates.length;
+  elements.metadataDoiCandidates.disabled = !candidates.length || Boolean(entry?.lookup);
+  if (!candidates.length) return;
+  const placeholder = window.document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = t("metadataDoiCandidatePlaceholder");
+  elements.metadataDoiCandidates.append(placeholder);
+  for (const doi of candidates) {
+    const option = window.document.createElement("option");
+    option.value = doi;
+    option.textContent = doi;
+    elements.metadataDoiCandidates.append(option);
+  }
+}
+
+function renderMetadataSource(entry) {
+  elements.metadataLookupSource.replaceChildren();
+  const source = entry?.lookupSource;
+  elements.metadataLookupSource.hidden = !source;
+  if (!source) return;
+  const provider = window.document.createElement("span");
+  provider.textContent = t("metadataLookupSource", { provider: String(source.provider || "") });
+  elements.metadataLookupSource.append(provider);
+  const href = safeMetadataSourceUrl(source.url, state.document?.id);
+  if (href) {
+    const link = window.document.createElement("a");
+    link.href = href;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    link.textContent = t("metadataLookupSourceLink");
+    elements.metadataLookupSource.append(link);
+  }
+  const warnings = Array.isArray(source.warnings) ? source.warnings.filter((warning) => typeof warning === "string" && warning) : [];
+  if (warnings.length) {
+    const warningText = window.document.createElement("span");
+    warningText.className = "metadata-lookup-warnings";
+    warningText.textContent = warnings.join(" ");
+    elements.metadataLookupSource.append(warningText);
+  }
 }
 
 function renderMetadataLatest(entry) {
@@ -1707,21 +2347,104 @@ function renderMetadata() {
     input.readOnly = !draft || pending || Boolean(draft?.conflicted);
   }
 
+  elements.metadataLookup.disabled = !document || !entry?.snapshot || entry.loading || Boolean(entry?.lookup) || pending || Boolean(draft?.conflicted);
+  elements.metadataLookup.textContent = t(entry?.lookup ? "metadataLookupLoading" : "metadataLookup");
   elements.metadataEdit.hidden = Boolean(draft);
-  elements.metadataEdit.disabled = !document || !entry?.snapshot || entry.loading || pending;
+  elements.metadataEdit.disabled = !document || !entry?.snapshot || entry.loading || Boolean(entry?.lookup) || pending;
   elements.metadataSave.hidden = !draft;
-  elements.metadataSave.disabled = !draft || pending || draft.conflicted;
+  elements.metadataSave.disabled = !draft || Boolean(entry?.lookup) || pending || draft.conflicted;
   elements.metadataSave.textContent = t(draft?.saveFailed ? "retrySave" : "metadataSave");
   elements.metadataCancel.hidden = !draft;
   elements.metadataCancel.disabled = pending;
   elements.metadataViewLatest.hidden = !draft?.conflicted;
   elements.metadataViewLatest.disabled = entry?.loading || pending;
-  elements.metadataRetry.hidden = !entry?.status?.retry || pending;
+  elements.metadataRetry.hidden = !entry?.status?.retry || Boolean(entry?.lookup) || pending;
   elements.metadataStatus.textContent = entry?.status ? t(entry.status.key, entry.status.values || {}) : "";
   if (entry?.status?.kind) elements.metadataStatus.dataset.kind = entry.status.kind;
   else delete elements.metadataStatus.dataset.kind;
   elements.metadataLatest.hidden = !draft?.conflicted || !entry.latestVisible;
+  renderMetadataCandidates(entry);
+  renderMetadataSource(entry);
   renderMetadataLatest(entry);
+}
+
+async function lookupMetadata(documentId) {
+  const entry = ensureMetadata(documentId);
+  if (entry.lookup || state.pendingMetadata.has(documentId)) return;
+  if (state.document?.id === documentId && !entry.draft) startMetadataEdit();
+  const draft = entry.draft;
+  if (!draft || draft.conflicted || !entry.snapshot) return;
+  if (state.document?.id === documentId) captureCurrentMetadataDraft();
+  const values = Object.fromEntries(["title", "authors", "year", "doi"].map((field) => [field, draft[field]]));
+  const protectedFields = new Set(["title", "authors", "year"].filter((field) => values[field] !== metadataSnapshotValue(entry.snapshot, field)));
+  const operation = {
+    documentId,
+    draft,
+    values,
+    protectedFields,
+    controller: new AbortController()
+  };
+  let focusDoi = false;
+  entry.lookup = operation;
+  entry.candidates = [];
+  entry.lookupSource = null;
+  entry.status = { key: "metadataLookupLoading", kind: "info" };
+  renderDocumentDetails();
+  renderMetadata();
+
+  try {
+    const body = await api(`/api/v1/documents/${encodeURIComponent(documentId)}/metadata/lookup`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ doi: values.doi.trim() }),
+      signal: operation.controller.signal
+    });
+    if (entry.lookup !== operation || entry.draft !== draft) return;
+    if (body.saved !== false) throw new ApiError("request_failed");
+    if (body.metadata_revision !== draft.expectedRevision || entry.snapshot?.revision !== draft.expectedRevision) {
+      draft.conflicted = true;
+      entry.status = { key: "metadataConflict", kind: "error" };
+      return;
+    }
+    if (body.source_sha256 !== entry.snapshot?.sha256) {
+      entry.status = { key: "source_changed", kind: "error", retry: "lookup" };
+      return;
+    }
+    if (body.status === "choose_doi") {
+      entry.candidates = [...new Set((Array.isArray(body.candidates) ? body.candidates : []).filter((doi) => typeof doi === "string" && doi && doi.length <= 255))];
+      entry.status = { key: "metadataLookupChooseDoi", kind: "info" };
+      focusDoi = true;
+    } else if (body.status === "not_found") {
+      entry.status = { key: "metadataLookupNotFound", kind: "info" };
+    } else if (body.status === "ready") {
+      if (state.document?.id === documentId) captureCurrentMetadataDraft();
+      for (const field of ["title", "authors", "year", "doi"]) {
+        const value = metadataLookupValue(field, body.fields?.[field]);
+        if (value === null || draft[field] !== values[field]) continue;
+        if (field !== "doi" && protectedFields.has(field)) continue;
+        draft[field] = value;
+      }
+      draft.operation = null;
+      draft.saveFailed = false;
+      entry.lookupSource = body.source && typeof body.source === "object" ? { ...body.source, warnings: body.warnings } : null;
+      entry.status = { key: "metadataLookupReady", kind: "info" };
+    } else {
+      throw new ApiError("request_failed");
+    }
+  } catch (error) {
+    if (error?.name === "AbortError" || entry.lookup !== operation || entry.draft !== draft) return;
+    draft.conflicted = error.code === "revision_conflict";
+    entry.status = draft.conflicted
+      ? { key: "metadataConflict", kind: "error" }
+      : { key: error.code || "request_failed", kind: "error", retry: "lookup" };
+  } finally {
+    if (entry.lookup === operation) entry.lookup = null;
+    if (state.document?.id === documentId) {
+      renderDocumentDetails();
+      renderMetadata();
+    }
+  }
+  if (focusDoi && state.document?.id === documentId && entry.draft === draft) elements.metadataDoi.focus();
 }
 
 function applyMetadataSnapshot(documentId, metadata) {
@@ -1798,7 +2521,7 @@ function startMetadataEdit() {
     title: snapshot.title,
     authors: snapshot.authors,
     year: snapshot.year === null ? "" : String(snapshot.year),
-    doi: snapshot.doi,
+    doi: snapshot.doi || "",
     expectedRevision: snapshot.revision,
     operation: null,
     saveFailed: false,
@@ -1815,7 +2538,11 @@ function cancelMetadataEdit() {
   if (!state.document || state.pendingMetadata.has(state.document.id)) return;
   const entry = ensureMetadata(state.document.id);
   if (!entry.draft) return;
+  entry.lookup?.controller.abort();
+  entry.lookup = null;
   entry.draft = null;
+  entry.candidates = [];
+  entry.lookupSource = null;
   entry.status = null;
   entry.latestVisible = false;
   renderDocumentDetails();
@@ -1826,7 +2553,7 @@ function cancelMetadataEdit() {
 async function submitMetadataSave(documentId) {
   const entry = ensureMetadata(documentId);
   const draft = entry.draft;
-  if (!draft || state.pendingMetadata.has(documentId)) return;
+  if (!draft || entry.lookup || state.pendingMetadata.has(documentId)) return;
   if (draft.conflicted) {
     entry.status = { key: "metadataConflict", kind: "error" };
     renderMetadata();
@@ -1875,6 +2602,8 @@ async function submitMetadataSave(documentId) {
     });
     applyMetadataSnapshot(documentId, saved);
     if (entry.draft?.operation === operation) entry.draft = null;
+    entry.candidates = [];
+    entry.lookupSource = null;
     entry.latestVisible = false;
     entry.status = { key: "metadataSaved", kind: "success" };
   } catch (error) {
@@ -1909,13 +2638,28 @@ function renderDocumentDetails() {
   if (!document) elements.pageSurface.hidden = true;
   const hasPdf = Boolean(state.pdf && document);
   elements.pageInput.disabled = !hasPdf;
+  elements.pageFirst.disabled = !hasPdf || state.page <= 1;
   elements.pagePrev.disabled = !hasPdf || state.page <= 1;
   elements.pageNext.disabled = !hasPdf || state.page >= (document?.page_count || 1);
+  elements.pageLast.disabled = !hasPdf || state.page >= (document?.page_count || 1);
+  elements.navigationToggle.disabled = !hasPdf;
   elements.zoomIn.disabled = !hasPdf || state.effectiveScale >= ZOOM_MAX;
   elements.zoomOut.disabled = !hasPdf || state.effectiveScale <= ZOOM_MIN;
   elements.zoomFit.disabled = !hasPdf;
+  elements.zoomFitPage.disabled = !hasPdf;
+  elements.readerFullscreen.disabled = !hasPdf;
   const annotationDisabled = !hasPdf || state.pendingSaves > 0 || state.pendingMutations.size > 0;
+  const shapeUnsaved = Boolean(readerShapes?.hasUnsavedChanges?.());
+  const historyCounts = document ? annotationHistory.counts(document.id) : { undo: 0, redo: 0 };
+  elements.annotationUndo.disabled = !hasPdf || !historyCounts.undo || annotationDisabled || shapeUnsaved;
+  elements.annotationRedo.disabled = !hasPdf || !historyCounts.redo || annotationDisabled || shapeUnsaved;
+  readerNavigation?.update();
+  renderSelectedAnnotationToolbar();
+  readerShapes?.updateControls();
+  readerShapes?.positionEditor();
   elements.textSelectionNote.disabled = annotationDisabled;
+  elements.textSelectionAsk.disabled = annotationDisabled;
+  elements.textSelectionTranslate.disabled = annotationDisabled;
   elements.textAnnotationHighlight.disabled = annotationDisabled;
   elements.textAnnotationUnderline.disabled = annotationDisabled;
   elements.textAnnotationToolbar.querySelectorAll("[data-annotation-color]").forEach((input) => {
@@ -1929,9 +2673,9 @@ function renderDocumentDetails() {
   elements.sample.disabled = state.pendingUpload;
   elements.uploadButton.disabled = state.pendingUpload;
   elements.uploadInput.disabled = state.pendingUpload;
-  elements.exportReadingRecord.disabled = !document || isStudy(document) || richText?.isOpen() || state.pendingSaves > 0 || state.pendingExcerpts.size > 0 || state.pendingExports.size > 0 || state.pendingMutations.size > 0 || state.pendingMetadata.size > 0 || state.editDrafts.has(document.id) || Boolean(document && !isStudy(document) && ensureMetadata(document.id).draft);
+  elements.exportReadingRecord.disabled = !document || isStudy(document) || state.pendingSaves > 0 || state.pendingExcerpts.size > 0 || state.pendingExports.size > 0 || state.pendingMutations.size > 0 || state.pendingMetadata.size > 0 || state.editDrafts.has(document.id) || Boolean(document && !isStudy(document) && ensureMetadata(document.id).draft);
   elements.exportReadingRecord.textContent = t(state.pendingExports.size > 0 ? "exporting" : "exportReadingRecord");
-  elements.exportAnnotatedPdf.disabled = !hasActiveSavedPdfNotes(document) || richText?.isOpen() || state.pendingSaves > 0 || state.pendingExcerpts.size > 0 || state.pendingExports.size > 0 || state.pendingMutations.size > 0 || state.pendingMetadata.size > 0 || state.editDrafts.has(document.id) || Boolean(document && !isStudy(document) && ensureMetadata(document.id).draft);
+  elements.exportAnnotatedPdf.disabled = !hasActiveSavedPdfNotes(document) || state.pendingSaves > 0 || state.pendingExcerpts.size > 0 || state.pendingExports.size > 0 || state.pendingMutations.size > 0 || state.pendingMetadata.size > 0 || state.editDrafts.has(document.id) || Boolean(document && !isStudy(document) && ensureMetadata(document.id).draft);
   elements.exportAnnotatedPdf.textContent = t(document && state.pendingExports.has(`annotated-pdf:${document.id}`) ? "exportingAnnotatedPdf" : "exportAnnotatedPdf");
   elements.viewMode.disabled = !hasPdf;
   elements.viewMode.value = state.viewMode || "continuous";
@@ -1939,10 +2683,24 @@ function renderDocumentDetails() {
   assistant?.contextChanged();
 }
 
+function renderRegionCapture() {
+  const capture = state.regionCapture?.documentId === state.document?.id ? state.regionCapture : null;
+  elements.regionDraft.hidden = !capture;
+  if (!capture) return;
+  if (elements.regionPreview.firstChild !== capture.previewCanvas) elements.regionPreview.replaceChildren(capture.previewCanvas);
+  elements.regionDraftStatus.dataset.kind = capture.error ? "error" : "info";
+  elements.regionDraftStatus.textContent = t(capture.pending ? "captureUploading" : capture.error || (capture.shape ? "shapeRegionDraftUnsaved" : "regionDraftUnsaved"));
+  const disabled = capture.pending || state.pendingSaves > 0 || state.pendingMutations.size > 0;
+  elements.regionAddNote.disabled = disabled;
+  elements.regionAddAgent.disabled = disabled;
+  elements.regionDraftCancel.disabled = disabled;
+}
+
 function renderDraft() {
   if (isStudy()) {
     elements.regionDraft.hidden = true;
     elements.readerRegionMode.disabled = true;
+    richText?.close({ restoreFocus: false });
     study?.renderDocument();
     return;
   }
@@ -1950,22 +2708,21 @@ function renderDraft() {
     elements.noteForm.dataset.mode = "create";
     elements.editModeLabel.hidden = true;
     elements.editCancel.hidden = true;
-    elements.excerptSave.hidden = false;
+    elements.excerptSave.hidden = true;
     elements.regionDraft.hidden = true;
     elements.noteText.value = "";
     elements.noteText.disabled = true;
     elements.noteText.readOnly = false;
-    elements.richTextOpen.disabled = true;
     elements.richTextPlain.disabled = true;
     elements.richTextPlain.hidden = true;
     elements.richTextDraftStatus.hidden = true;
     elements.noteSave.disabled = true;
     elements.excerptSave.disabled = true;
-    elements.regionMode.disabled = true;
     elements.readerRegionMode.disabled = true;
     elements.pageNote.disabled = true;
     elements.activeSource.textContent = t("noSource");
     elements.characterCount.textContent = "0 / 10000";
+    richText?.sync();
     return;
   }
 
@@ -1976,49 +2733,44 @@ function renderDraft() {
   elements.characterCount.textContent = `${draft.text.length} / 10000`;
   elements.noteText.readOnly = formatted;
   elements.richTextPlain.hidden = !formatted;
-  elements.richTextDraftStatus.hidden = !formatted;
+  elements.richTextDraftStatus.hidden = false;
   elements.noteForm.dataset.mode = editDraft ? "edit" : "create";
   elements.editModeLabel.hidden = !editDraft;
   elements.editCancel.hidden = !editDraft;
-  elements.excerptSave.hidden = Boolean(editDraft);
-  elements.regionDraft.hidden = Boolean(editDraft) || !draft.previewCanvas;
+  elements.excerptSave.hidden = true;
+  renderRegionCapture();
 
   if (editDraft) {
     const note = state.notes.find((item) => item.id === editDraft.noteId) || editDraft.note;
     const pending = state.pendingMutations.has(mutationKey(state.document.id, editDraft.noteId));
     elements.activeSource.textContent = t(note.rect ? "pageRegion" : "pageWhole", { page: note.page });
     elements.noteText.disabled = pending;
-    elements.richTextOpen.disabled = pending;
     elements.richTextPlain.disabled = pending;
-    elements.regionMode.disabled = true;
-    elements.readerRegionMode.disabled = true;
+    elements.readerRegionMode.disabled = !state.pdf || pending;
     elements.pageNote.disabled = true;
     elements.noteSave.disabled = pending || !editDraft.text.trim();
     elements.excerptSave.disabled = true;
     elements.editCancel.disabled = pending;
     elements.noteSave.textContent = t(editDraft.saveFailed ? "retryEdit" : "saveEdit");
     elements.anchorHelp.textContent = t("editMode");
+    richText?.sync();
     return;
   }
 
-  if (draft.previewCanvas && elements.regionPreview.firstChild !== draft.previewCanvas) elements.regionPreview.replaceChildren(draft.previewCanvas);
   if (draft.page === null) elements.activeSource.textContent = t("noSource");
   else elements.activeSource.textContent = t(draft.rect ? "pageRegion" : "pageWhole", { page: draft.page });
   const pending = state.pendingSaves > 0;
   const mutationPending = state.pendingMutations.size > 0;
   const ready = Boolean(state.pdf);
   elements.noteText.disabled = pending;
-  elements.richTextOpen.disabled = pending || mutationPending;
   elements.richTextPlain.disabled = pending || mutationPending;
-  elements.regionMode.disabled = !ready || pending || mutationPending;
   elements.readerRegionMode.disabled = !ready || pending || mutationPending;
   elements.pageNote.disabled = !ready || pending || mutationPending;
-  elements.regionDraftCancel.disabled = pending || mutationPending;
   elements.noteSave.disabled = pending || mutationPending || !ready || draft.page === null || !draft.text.trim();
-  elements.excerptSave.disabled = pending || mutationPending || !ready || !draft.rect || !draft.text.trim();
+  elements.excerptSave.disabled = true;
   elements.noteSave.textContent = t(draft.saveFailed ? "retrySave" : "saveNote");
-  elements.excerptSave.textContent = t(draft.imageFailed ? "retryImageExcerpt" : "saveImageExcerpt");
   elements.anchorHelp.textContent = state.regionActive ? t("regionInstructions") : t("anchorHelp");
+  richText?.sync();
 }
 
 function excerptPendingKey(documentId, noteId) {
@@ -2086,10 +2838,11 @@ function filteredPaperNotes(document) {
     const noteState = noteStateFor(note.id);
     if (noteState?.deleted_at || noteState?.purged || noteState?.document_id && noteState.document_id !== document.id) return false;
     const annotation = noteState?.annotation || note.annotation || null;
-    if (tools.color !== "all" && annotation?.color !== tools.color) return false;
-    if (tools.kind !== "all" && annotation?.kind !== tools.kind) return false;
+    const shape = noteState?.shape_annotation || null;
+    if (tools.color !== "all" && (shape?.color || annotation?.color) !== tools.color) return false;
+    if (tools.kind !== "all" && (shape?.kind || annotation?.kind) !== tools.kind) return false;
     if (!query) return true;
-    return `${note.text || ""}\n${annotation?.quote || ""}`.toLocaleLowerCase().includes(query);
+    return `${note.text || ""}\n${annotation?.quote || ""}\n${shape?.kind || ""}`.toLocaleLowerCase().includes(query);
   });
 }
 
@@ -2139,14 +2892,15 @@ function renderNotes() {
   for (const note of visibleNotes) {
     const noteState = noteStateFor(note.id);
     const annotation = noteState?.annotation || note.annotation || null;
+    const shape = noteState?.shape_annotation || null;
     const reviewStatus = noteState?.review_status || "unreviewed";
     const item = window.document.createElement("li");
     item.className = "note-item";
     item.dataset.noteId = note.id;
     item.dataset.reviewStatus = reviewStatus;
-    if (annotation) {
-      item.dataset.annotationKind = annotation.kind;
-      item.dataset.annotationColor = annotation.color;
+    if (annotation || shape) {
+      item.dataset.annotationKind = shape?.kind || annotation.kind;
+      item.dataset.annotationColor = shape?.color || annotation.color;
     }
     const button = window.document.createElement("button");
     button.type = "button";
@@ -2154,7 +2908,9 @@ function renderNotes() {
     button.addEventListener("click", () => openNote(note.id));
     const source = window.document.createElement("span");
     source.className = "note-source";
-    source.textContent = t(annotation ? "notePageAnnotation" : note.rect ? "notePageRegion" : "notePageWhole", { page: note.page });
+    source.textContent = shape
+      ? t("notePageShape", { page: note.page, kind: shapeKindLabel(shape.kind) })
+      : t(annotation ? "notePageAnnotation" : note.rect ? "notePageRegion" : "notePageWhole", { page: note.page });
     button.append(source);
     if (annotation?.quote && annotation.quote.trim() !== note.text.trim()) {
       const quote = window.document.createElement("span");
@@ -2186,7 +2942,7 @@ function renderNotes() {
       text.textContent = note.text;
       button.append(text);
     }
-    imageLibrary?.appendNoteImages(item, note);
+    imageLibrary?.appendNoteImages(item, note, noteState);
 
     const reviewRow = window.document.createElement("div");
     reviewRow.className = "note-review-row";
@@ -2198,7 +2954,7 @@ function renderNotes() {
     item.append(reviewRow);
 
     const excerpt = state.excerpts.find((item) => item.note_id === note.id);
-    if (note.rect && excerpt) {
+    if (!shape && note.rect && excerpt) {
       const preview = window.document.createElement("button");
       preview.type = "button";
       preview.className = "excerpt-preview";
@@ -2227,7 +2983,7 @@ function renderNotes() {
       view.addEventListener("click", () => openImageViewer(document.id, "pdf_excerpt", note.id));
       excerptActions.append(view, download);
       item.append(preview, excerptActions);
-    } else if (note.rect) {
+    } else if (!shape && note.rect) {
       const create = window.document.createElement("button");
       create.type = "button";
       create.className = "button button-quiet";
@@ -2250,9 +3006,10 @@ function renderNotes() {
     }
     const actions = window.document.createElement("div");
     actions.className = "note-actions";
+    if (annotation || shape) actions.append(makeNoteAction("annotation-actions", t("annotationAction"), () => showAnnotationFromNote(document, note), actionsLocked || !noteState));
     actions.append(
-      makeNoteAction("annotation-agent", t("addToAssistant"), () => assistant?.addNoteReference(document.id, noteState), actionsLocked || !noteState),
-      makeNoteAction("edit-note", t("editNote"), () => startEditNote(document, note), actionsLocked || !noteState),
+      makeNoteAction("annotation-agent", t("addToAssistant"), () => shape ? shareShapeFromNote(document, noteState, "agent") : assistant?.addNoteReference(document.id, noteState), actionsLocked || !noteState),
+      makeNoteAction("edit-note", t("editNote"), () => shape ? showAnnotationFromNote(document, note) : startEditNote(document, note), actionsLocked || !noteState),
       makeNoteAction("review-note", t(reviewStatus === "source_checked" ? "markUnchecked" : "markChecked"), () => reviewNote(document, note), actionsLocked || !noteState),
       makeNoteAction("delete-note", t("deleteNote"), () => deleteNote(document, note), actionsLocked || !noteState)
     );
@@ -2306,7 +3063,7 @@ async function loadDocuments() {
   try {
     const [body, studyBody] = await Promise.all([api("/api/v1/documents"), api("/api/v1/studies")]);
     state.documents = Array.isArray(body.items) ? body.items : [];
-    state.studies = Array.isArray(studyBody.items) ? studyBody.items : [];
+    state.studies = Array.isArray(studyBody.items) ? studyBody.items.filter((item) => !isPersonalOwner(item)) : [];
     study?.setStudies(state.studies);
     renderDocuments();
     const params = new URLSearchParams(window.location.search);
@@ -2496,6 +3253,10 @@ async function restorePendingReaderProgress() {
 }
 
 function cancelDocumentWork() {
+  readerObjects?.reset();
+  readerShapes?.documentChanged();
+  closeSelectedAnnotation();
+  readerNavigation?.setDocument(null);
   flushReaderProgress();
   cancelReaderProgressRestore();
   state.readerProgress.last = null;
@@ -2507,6 +3268,7 @@ function cancelDocumentWork() {
   state.loadSequence += 1;
   state.noteNavigationSequence += 1;
   state.renderSequence += 1;
+  for (const entry of state.metadata.values()) entry.lookup?.controller.abort();
   cancelTextLayer();
   state.loadController?.abort();
   state.loadController = null;
@@ -2519,6 +3281,8 @@ function cancelDocumentWork() {
     state.renderTask = null;
   }
   state.pointerDragPage = null;
+  state.pdfLinks?.destroy();
+  state.pdfLinks = null;
   destroyReaderPages();
   if (state.pdfTask) {
     state.pdfTask.destroy().catch(() => {});
@@ -2533,7 +3297,228 @@ function cancelDocumentWork() {
   clearHighlights();
 }
 
+function prepareContextNavigation() {
+  captureCurrentDraft();
+  captureCurrentMetadataDraft();
+  const documentId = state.document?.id;
+  const blocked = Boolean(
+    readerShapes?.hasUnsavedChanges?.() ||
+    state.regionCapture ||
+    state.selection ||
+    richText?.isEditorActive?.() ||
+    state.pendingSaves > 0 ||
+    state.pendingMutations.size > 0 ||
+    state.pendingMetadata.size > 0 ||
+    state.pendingExcerpts.size > 0 ||
+    documentId && study?.hasPending(documentId) ||
+    documentId && analysis?.hasPending?.(documentId) ||
+    dataImports?.isImportPending?.()
+  );
+  if (!blocked) return true;
+  setStatus("navigationSaveOrCancel", "error");
+  return false;
+}
+
+function invalidateWorkspaceModeIntent(intent = null) {
+  if (intent !== null && intent === workspaceModeIntent) return;
+  workspaceModeIntent += 1;
+  workspaceModePending = false;
+  workspace?.setModePending(false);
+}
+
+function beginWorkspaceModeIntent() {
+  if (workspaceModePending || !prepareContextNavigation()) return null;
+  const intent = ++workspaceModeIntent;
+  workspaceModePending = true;
+  workspace?.setModePending(true);
+  return intent;
+}
+
+function finishWorkspaceModeIntent(intent) {
+  if (intent !== workspaceModeIntent) return;
+  workspaceModePending = false;
+  workspace?.setModePending(false);
+}
+
+function readDataSelection() {
+  const params = new URLSearchParams(window.location.search);
+  return {
+    datasetId: params.get("dataset") || null,
+    analysisId: params.get("analysis") || null,
+    chartId: params.get("chart") || null
+  };
+}
+
+function rememberCurrentWorkspaceOwner() {
+  if (!state.document) return;
+  if (workspace?.getMode() === "reading" && !isStudy()) lastReadingDocumentId = state.document.id;
+  if (workspace?.getMode() === "data") {
+    lastDataDocumentId = state.document.id;
+    lastDataSelection = readDataSelection();
+  }
+}
+
+function clearActiveDocument(mode = "reading") {
+  cancelDocumentWork();
+  state.document = null;
+  state.pdf = null;
+  state.notes = [];
+  state.noteStates = [];
+  state.noteStatesLoaded = false;
+  state.excerpts = [];
+  state.highlight = null;
+  elements.pageSurface.hidden = true;
+  elements.readerEmpty.hidden = false;
+  study?.documentChanged(null);
+  renderDocuments();
+  renderDocumentDetails();
+  renderMetadata();
+  renderDraft();
+  renderNotes();
+  imageLibrary?.documentChanged(null);
+  analysis?.reload(null);
+  dataImports?.reload(null);
+  charts?.reload(null);
+  assistant?.documentChanged(null);
+  workspace?.documentChanged();
+  updateUrl(null, null, true, mode);
+  clearStatus();
+}
+
+async function ensurePersonalOwner() {
+  let body = await api("/api/v1/data-workspace/personal");
+  let owner = body?.owner || null;
+  if (!owner) {
+    body = await api("/api/v1/data-workspace/personal", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{}"
+    });
+    owner = body?.owner || null;
+  }
+  if (!isPersonalOwner(owner) || !owner.id) throw new ApiError("personalOpenFailed");
+  return owner;
+}
+
+async function openPersonalWithIntent(intent) {
+  try {
+    const owner = await ensurePersonalOwner();
+    if (intent !== workspaceModeIntent) return;
+    await openDocument(owner.id, {
+      ownerKind: "study",
+      workspace: "data",
+      explicitIntent: true,
+      modeIntent: intent
+    });
+  } catch (error) {
+    if (intent === workspaceModeIntent) setStatus(error.code || "personalOpenFailed", "error", {}, openPersonalData);
+  } finally {
+    finishWorkspaceModeIntent(intent);
+  }
+}
+
+async function openPersonalData() {
+  const intent = beginWorkspaceModeIntent();
+  if (intent === null) return;
+  rememberCurrentWorkspaceOwner();
+  workspace?.reveal("data", { tool: "analysis" });
+  await openPersonalWithIntent(intent);
+}
+
+async function openDataWorkspace() {
+  const intent = beginWorkspaceModeIntent();
+  if (intent === null) return;
+  rememberCurrentWorkspaceOwner();
+  workspace?.reveal("data", { tool: lastDataSelection.chartId ? "charts" : "analysis" });
+  const targetId = lastDataDocumentId || (isStudy() ? state.document?.id : null);
+  if (!targetId) {
+    await openPersonalWithIntent(intent);
+    return;
+  }
+  try {
+    const selection = targetId === lastDataDocumentId ? lastDataSelection : { datasetId: null, analysisId: null, chartId: null };
+    await openDocument(targetId, {
+      workspace: "data",
+      ...selection,
+      tool: selection.chartId ? "charts" : "analysis",
+      explicitIntent: true,
+      passiveRestore: true,
+      modeIntent: intent
+    });
+  } finally {
+    finishWorkspaceModeIntent(intent);
+  }
+}
+
+async function openReadingWorkspace() {
+  const intent = beginWorkspaceModeIntent();
+  if (intent === null) return;
+  rememberCurrentWorkspaceOwner();
+  workspace?.reveal("reading");
+  try {
+    const targetId = state.documents.some((item) => item.id === lastReadingDocumentId) ? lastReadingDocumentId : state.documents[0]?.id || null;
+    if (targetId) await openDocument(targetId, { workspace: "reading", explicitIntent: true, modeIntent: intent });
+    else clearActiveDocument("reading");
+  } finally {
+    finishWorkspaceModeIntent(intent);
+  }
+}
+
+function openCatalogItem(item) {
+  if (!item?.document_id || !item.id) return;
+  const selection = item.kind === "dataset" ? { datasetId: item.id } : item.kind === "analysis" ? { analysisId: item.id } : { chartId: item.id };
+  return openDocument(item.document_id, {
+    workspace: "data",
+    ...selection,
+    tool: item.kind === "chart" ? "charts" : "analysis",
+    explicitIntent: true
+  });
+}
+
+function restorePassiveDataSelection(documentId, options) {
+  if (!options.passiveRestore) return false;
+  const datasetId = options.datasetId || null;
+  const analysisId = options.analysisId || null;
+  const chartId = options.chartId || null;
+  if (chartId && charts?.getActiveChartId(documentId) === chartId) {
+    showChartInUrl(documentId, chartId);
+    return true;
+  }
+  if (analysisId && analysis?.getActiveAnalysisId() === analysisId) {
+    showAnalysisInUrl(documentId, analysisId);
+    return true;
+  }
+  if (datasetId && analysis?.getSelectedDatasetId() === datasetId) {
+    showDatasetInUrl(documentId, datasetId);
+    return true;
+  }
+  if (datasetId || analysisId || chartId) return false;
+  const activeChartId = charts?.getActiveChartId(documentId);
+  if (activeChartId) {
+    showChartInUrl(documentId, activeChartId);
+    return true;
+  }
+  const activeAnalysisId = analysis?.getActiveAnalysisId();
+  if (activeAnalysisId) {
+    showAnalysisInUrl(documentId, activeAnalysisId);
+    return true;
+  }
+  const selectedDatasetId = analysis?.getSelectedDatasetId();
+  if (selectedDatasetId) {
+    showDatasetInUrl(documentId, selectedDatasetId);
+    return true;
+  }
+  return false;
+}
+
 async function openDocument(documentId, options = {}) {
+  if (options.modeIntent != null && options.modeIntent !== workspaceModeIntent) return false;
+  invalidateWorkspaceModeIntent(options.modeIntent ?? null);
+  const navigationIntent = workspaceModeIntent;
+  const knownTarget = state.documents.find((item) => item.id === documentId) || state.studies.find((item) => item.id === documentId);
+  const requestedMode = options.workspace || (options.noteId || options.imageLink ? "reading" : options.analysisId || options.datasetId || options.chartId || knownTarget?.kind === "study" ? "data" : null);
+  const contextChanging = Boolean(state.document && (state.document.id !== documentId || requestedMode && requestedMode !== workspace?.getMode()));
+  if (contextChanging && !prepareContextNavigation()) return false;
   const explicitIntent = Boolean(options.explicitIntent || options.noteId || options.imageLink || options.analysisId || options.datasetId || options.chartId);
   if (explicitIntent || state.document && state.document.id !== documentId) cancelReaderProgressRestore();
   let document = state.documents.find((item) => item.id === documentId) || state.studies.find((item) => item.id === documentId);
@@ -2547,11 +3532,15 @@ async function openDocument(documentId, options = {}) {
       resolveError = error;
       document = null;
     }
-    if (resolveSequence !== state.loadSequence) return;
+    if (resolveSequence !== state.loadSequence || navigationIntent !== workspaceModeIntent) return false;
     if (!document && !["not_found", "document_trashed"].includes(resolveError?.code)) {
       setStatus(resolveError?.code || "documentOpenFailed", "error", {}, () => openDocument(documentId, options));
       return;
     }
+    const resolvedMode = options.workspace || (options.noteId || options.imageLink ? "reading" : options.analysisId || options.datasetId || options.chartId || document?.kind === "study" ? "data" : null);
+    const resolveContextChanging = Boolean(state.document && (state.document.id !== documentId || resolvedMode && resolvedMode !== workspace?.getMode()));
+    if (resolveContextChanging && !prepareContextNavigation()) return false;
+    if (navigationIntent !== workspaceModeIntent) return false;
     if (!document) {
       showMissingDocument();
       if (resolveError?.code === "document_trashed") {
@@ -2564,8 +3553,10 @@ async function openDocument(documentId, options = {}) {
       return;
     }
     if (isStudy(document)) {
-      state.studies = [document, ...state.studies.filter((item) => item.id !== document.id)];
-      study?.setStudies(state.studies);
+      if (!isPersonalOwner(document)) {
+        state.studies = [document, ...state.studies.filter((item) => item.id !== document.id)];
+        study?.setStudies(state.studies);
+      }
     } else {
       state.documents = [document, ...state.documents.filter((item) => item.id !== document.id)];
     }
@@ -2575,20 +3566,36 @@ async function openDocument(documentId, options = {}) {
   const explicitNavigation = Boolean(options.explicitIntent || options.noteId || options.imageLink || explicitPage || options.analysisId || options.datasetId || options.chartId);
   const mode = options.workspace || (options.noteId || options.imageLink ? "reading" : options.analysisId || options.datasetId || options.chartId ? "data" : studyOwner ? "data" : workspace?.getMode() || "reading");
   const tool = options.chartId || options.tool === "charts" ? "charts" : "analysis";
-  workspace?.reveal(mode, { tool, showNotes: Boolean(options.noteId || options.imageLink) });
+  if (mode === "reading" && !studyOwner) lastReadingDocumentId = documentId;
+  if (mode === "data") {
+    lastDataDocumentId = documentId;
+    lastDataSelection = {
+      datasetId: options.datasetId || null,
+      analysisId: options.analysisId || null,
+      chartId: options.chartId || null
+    };
+  }
   if (state.document?.id === documentId && (studyOwner ? state.noteStatesLoaded : state.pdf) && !options.force) {
+    workspace?.reveal(mode, { tool, showNotes: Boolean(options.noteId || options.imageLink) });
+    if (!options.preserveUrl && !options.imageLink && !options.noteId && !explicitPage) updateUrl(documentId, null, Boolean(options.replaceUrl), mode, tool);
     if (options.imageLink && !studyOwner) await openImageViewer(documentId, options.imageLink.kind, options.imageLink.sourceId, { annotationId: options.imageLink.annotationId });
     else if (options.noteId) await openNote(options.noteId, { preserveUrl: options.preserveUrl });
     else if (explicitPage) {
       if (!options.preserveUrl) updateUrl(documentId, null, Boolean(options.replaceUrl), mode, tool, explicitPage);
       await goToPage(explicitPage, { preserveUrl: true });
     }
-    if (options.datasetId) analysis?.openDataset(options.datasetId, { preserveUrl: options.preserveUrl });
-    if (options.analysisId) analysis?.openJob(options.analysisId, { preserveUrl: options.preserveUrl });
-    if (options.chartId) charts?.openChart(documentId, options.chartId, { preserveUrl: options.preserveUrl });
+    const restoredSelection = restorePassiveDataSelection(documentId, options);
+    if (options.datasetId && !restoredSelection) await analysis?.openDataset(options.datasetId, { preserveUrl: options.preserveUrl });
+    if (options.analysisId && !restoredSelection) await analysis?.openJob(options.analysisId, { preserveUrl: options.preserveUrl });
+    if (options.chartId && !restoredSelection) await charts?.openChart(documentId, options.chartId, { preserveUrl: options.preserveUrl });
     return;
   }
 
+  if (navigationIntent !== workspaceModeIntent) return false;
+  const navigationContextChanging = Boolean(state.document && (state.document.id !== documentId || mode !== workspace?.getMode()));
+  if (navigationContextChanging && !prepareContextNavigation()) return false;
+  if (navigationIntent !== workspaceModeIntent) return false;
+  workspace?.reveal(mode, { tool, showNotes: Boolean(options.noteId || options.imageLink) });
   captureCurrentDraft();
   captureCurrentMetadataDraft();
   cancelDocumentWork();
@@ -2618,9 +3625,10 @@ async function openDocument(documentId, options = {}) {
   analysis?.reload(documentId);
   dataImports?.reload(documentId);
   charts?.reload(documentId);
-  if (options.datasetId) analysis?.openDataset(options.datasetId, { preserveUrl: options.preserveUrl });
-  if (options.analysisId) analysis?.openJob(options.analysisId, { preserveUrl: options.preserveUrl });
-  if (options.chartId) charts?.openChart(documentId, options.chartId, { preserveUrl: options.preserveUrl });
+  const restoredSelection = restorePassiveDataSelection(documentId, options);
+  if (options.datasetId && !restoredSelection) analysis?.openDataset(options.datasetId, { preserveUrl: options.preserveUrl });
+  if (options.analysisId && !restoredSelection) analysis?.openJob(options.analysisId, { preserveUrl: options.preserveUrl });
+  if (options.chartId && !restoredSelection) charts?.openChart(documentId, options.chartId, { preserveUrl: options.preserveUrl });
   assistant?.documentChanged(document);
   workspace?.documentChanged();
   setStatus("loadingDocument");
@@ -2645,6 +3653,17 @@ async function openDocument(documentId, options = {}) {
   }
 
   state.pdf = pdfResult.value;
+  readerNavigation?.setDocument(state.pdf);
+  if (state.pdf) {
+    const pdf = state.pdf;
+    state.pdfLinks = createPdfReaderLinks({
+      pdfjsLib,
+      pdf,
+      currentPage: () => state.page,
+      isCurrent: (record) => sequence === state.loadSequence && state.pdf === pdf && state.readerPages.get(record.pageNumber) === record,
+      navigate: navigatePdfLink
+    });
+  }
   if (!studyOwner && !explicitNavigation) prepareReaderProgressRestore(document, sequence);
   let noteLinkStatus = null;
   if (options.noteId && studyOwner) {
@@ -2750,6 +3769,7 @@ async function loadNoteStates(document, sequence, signal) {
   renderDocumentDetails();
   renderNotes();
   renderTextAnnotations();
+  readerShapes?.render();
 }
 
 async function loadExcerpts(document, sequence, signal) {
@@ -2782,7 +3802,7 @@ function setPageEstimate(record) {
   record.surface.style.width = `${width}px`;
   record.surface.style.height = `${height}px`;
   record.surface.style.setProperty("--scale-factor", String(scale));
-  record.surface.style.setProperty("--total-scale-factor", String(scale));
+  record.surface.style.setProperty("--total-scale-factor", String(scale * (record.page?.userUnit || 1)));
   record.surface.style.setProperty("--scale-round-x", "1px");
   record.surface.style.setProperty("--scale-round-y", "1px");
   record.scale = scale;
@@ -2821,6 +3841,15 @@ function createReaderPage(pageNumber, useLegacy = false) {
     surface.append(canvas, textLayer, textAnnotationsLayer, overlay);
     nodes = { surface, canvas, textLayer, textAnnotationsLayer, overlay, activeSelection };
   }
+  const imageLayer = window.document.createElement("div");
+  imageLayer.className = "reader-image-layer";
+  imageLayer.setAttribute("aria-hidden", "true");
+  nodes.surface.insertBefore(imageLayer, nodes.textAnnotationsLayer);
+  nodes.imageLayer = imageLayer;
+  const linkLayer = window.document.createElement("div");
+  linkLayer.className = "reader-link-layer annotationLayer";
+  nodes.surface.insertBefore(linkLayer, nodes.overlay);
+  nodes.linkLayer = linkLayer;
   const status = window.document.createElement("div");
   status.className = "reader-page-status";
   status.hidden = true;
@@ -2852,6 +3881,7 @@ function createReaderPage(pageNumber, useLegacy = false) {
   nodes.textLayer.dataset.page = String(pageNumber);
   nodes.canvas.dataset.page = String(pageNumber);
   setPageEstimate(record);
+  readerShapes?.attach(record);
   return record;
 }
 
@@ -2902,6 +3932,7 @@ function removeReaderPage(record) {
   }
   record.canvas.width = 1;
   record.canvas.height = 1;
+  readerShapes?.detach(record);
   record.surface.remove();
 }
 
@@ -2960,6 +3991,8 @@ function destroyReaderPages() {
     } catch {
       // Document teardown also destroys the PDF loading task.
     }
+    record.imageLayer.replaceChildren();
+    readerShapes?.detach(record);
     if (record !== state.activePageRecord) record.surface.remove();
   }
   if (state.activePageRecord?.surface) elements.readerStage.append(state.activePageRecord.surface);
@@ -2971,6 +4004,7 @@ function destroyReaderPages() {
 
 function releaseReaderPage(record) {
   if (state.activePageRecord === record) return;
+  readerShapes?.detach(record);
   try {
     record.renderTask?.cancel();
     record.textTask?.cancel();
@@ -2986,6 +4020,10 @@ function releaseReaderPage(record) {
   record.canvas.width = 1;
   record.canvas.height = 1;
   record.textLayer.replaceChildren();
+  record.imageLayer.replaceChildren();
+  record.linkAnnotationLayer?.destroy();
+  record.linkAnnotationLayer = null;
+  record.linkLayer.replaceChildren();
   record.textAnnotationsLayer.replaceChildren();
   record.overlay.querySelectorAll(".source-highlight").forEach((node) => node.remove());
   record.surface.querySelector(".reader-find-layer")?.replaceChildren();
@@ -3050,6 +4088,7 @@ function desiredContinuousPages() {
     selected.push({ record });
   };
   include(state.activePageRecord);
+  include(readerShapes?.getInteractingRecord());
   include(state.selection?.record || state.readerPages.get(state.pointerDragPage));
   return selected.map((item) => item.record);
 }
@@ -3110,6 +4149,7 @@ async function renderReaderTextLayer(record, sequence, documentId) {
     // A replaced task is still bounded by its render promise.
   }
   record.textLayer.replaceChildren();
+  record.imageLayer.replaceChildren();
   record.textReady = false;
   if (previousPromise) {
     try {
@@ -3119,6 +4159,13 @@ async function renderReaderTextLayer(record, sequence, documentId) {
     }
     if (record.textLayerSequence !== textLayerSequence || sequence !== state.renderSequence || state.document?.id !== documentId || state.readerPages.get(record.pageNumber) !== record || state.viewMode === "continuous" && !record.desired) return;
     record.textLayer.replaceChildren();
+    record.imageLayer.replaceChildren();
+  }
+  if (record.page.imageCoordinates?.length) {
+    const images = new pdfjsLib.TextLayerImages(0, record.page.imageCoordinates, {
+      rawDims: { pageWidth: record.viewport.width, pageHeight: record.viewport.height }
+    }, () => record.canvas);
+    record.imageLayer.append(images.render());
   }
   const task = new pdfjsLib.TextLayer({
     textContentSource: record.page.streamTextContent(),
@@ -3149,6 +4196,7 @@ async function renderReaderTextLayer(record, sequence, documentId) {
     record.textTask = null;
     record.textTaskPromise = null;
     record.textLayer.replaceChildren();
+    record.imageLayer.replaceChildren();
     if (["AbortException", "AbortError", "RenderingCancelledException"].includes(error?.name) || sequence !== state.renderSequence) return;
     if (state.activePageRecord === record) {
       elements.textStatus.hidden = false;
@@ -3191,12 +4239,16 @@ async function renderReaderPage(record, sequence) {
     record.surface.style.width = `${cssWidth}px`;
     record.surface.style.height = `${cssHeight}px`;
     record.surface.style.setProperty("--scale-factor", String(scale));
-    record.surface.style.setProperty("--total-scale-factor", String(scale));
+    record.surface.style.setProperty("--total-scale-factor", String(scale * (record.page?.userUnit || 1)));
     record.surface.hidden = false;
     elements.readerEmpty.hidden = true;
     if (state.activePageRecord === record) renderDocumentDetails();
     const context = record.canvas.getContext("2d", { alpha: false });
-    record.renderTask = record.page.render({ canvasContext: context, viewport: outputViewport });
+    context.save();
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, record.canvas.width, record.canvas.height);
+    context.restore();
+    record.renderTask = record.page.render({ canvas: record.canvas, canvasContext: context, viewport: outputViewport, background: "#ffffff", recordImages: true });
     if (state.activePageRecord === record) state.renderTask = record.renderTask;
     await record.renderTask.promise;
     record.renderTask = null;
@@ -3207,9 +4259,13 @@ async function renderReaderPage(record, sequence) {
     elements.readerStage.dataset.documentId = documentId;
     await renderReaderTextLayer(record, sequence, documentId);
     if (sequence !== state.renderSequence || state.readerPages.get(record.pageNumber) !== record || state.viewMode === "continuous" && !record.desired) return;
+    await state.pdfLinks?.render(record);
+    if (sequence !== state.renderSequence || state.readerPages.get(record.pageNumber) !== record || state.viewMode === "continuous" && !record.desired) return;
     record.rendered = true;
     record.sequence = sequence;
     renderTextAnnotations();
+    readerShapes?.attach(record);
+    readerShapes?.render();
     const highlight = drawHighlight();
     if (highlight && state.highlightRevealId === highlight.dataset.noteId) {
       state.highlightRevealId = null;
@@ -3254,16 +4310,39 @@ function handleContinuousScroll() {
   });
 }
 
+async function navigatePdfLink({ pageNumber, destArray }) {
+  const pdf = state.pdf;
+  const documentId = state.document?.id;
+  const loadSequence = state.loadSequence;
+  await goToPage(pageNumber);
+  if (state.pdf !== pdf || state.document?.id !== documentId || state.loadSequence !== loadSequence) return;
+  const record = state.readerPages.get(pageNumber);
+  if (!record?.viewport) return;
+  if (destArray?.[1]?.name === "XYZ" && Number.isFinite(destArray[2]) && Number.isFinite(destArray[3])) {
+    const [x, y] = record.viewport.convertToViewportPoint(destArray[2], destArray[3]);
+    const stageBounds = elements.readerStage.getBoundingClientRect();
+    const surfaceBounds = record.surface.getBoundingClientRect();
+    const surfaceTop = surfaceBounds.top - stageBounds.top + elements.readerStage.scrollTop;
+    const surfaceLeft = surfaceBounds.left - stageBounds.left + elements.readerStage.scrollLeft;
+    elements.readerStage.scrollTop = Math.max(0, surfaceTop + y - elements.readerStage.clientHeight * 0.25);
+    elements.readerStage.scrollLeft = Math.max(0, surfaceLeft + x - elements.readerStage.clientWidth * 0.25);
+  }
+  state.pdfLinks?.rendered(record);
+}
+
 async function goToPage(page, options = {}) {
   if (!state.pdf || !state.document) return;
+  readerObjects?.close();
+  readerShapes?.cancel();
   if (!options.restoreProgress) cancelReaderProgressRestore();
   const nextPage = Math.max(1, Math.min(state.document.page_count, Math.trunc(Number(page) || 1)));
+  const revealNoteId = options.preserveHighlight ? state.highlightRevealId : null;
+  state.highlightRevealId = null;
   const layoutSequence = beginReaderLayout();
   try {
     state.page = nextPage;
     if (!options.preserveHighlight) {
       state.highlight = null;
-      state.highlightRevealId = null;
       if (!options.preserveUrl) updateUrl(state.document.id);
     }
     setRegionMode(false);
@@ -3275,13 +4354,12 @@ async function goToPage(page, options = {}) {
       await renderVisibleContinuous();
       if (layoutSequence !== state.readerLayoutSequence) return;
       restoreReaderAnchor({ page: nextPage, ratio: 0 });
-      const highlight = drawHighlight();
-      if (highlight && state.highlightRevealId === highlight.dataset.noteId) {
-        state.highlightRevealId = null;
-        highlight.scrollIntoView({ block: "nearest", inline: "nearest" });
-      }
     } else {
       await requestRender();
+    }
+    const highlight = drawHighlight();
+    if (revealNoteId && state.highlight?.id === revealNoteId && highlight) {
+      highlight.scrollIntoView({ block: "nearest", inline: "nearest" });
     }
   } finally {
     finishReaderLayout(layoutSequence);
@@ -3302,7 +4380,12 @@ function cancelTextLayer() {
     }
     record.textTask = null;
     record.textLayer.replaceChildren();
+    record.imageLayer.replaceChildren();
+    record.linkAnnotationLayer?.destroy();
+    record.linkAnnotationLayer = null;
+    record.linkLayer.replaceChildren();
     record.textAnnotationsLayer.replaceChildren();
+    record.shapeLayer?.replaceChildren();
   }
   elements.textStatus.hidden = true;
 }
@@ -3327,37 +4410,9 @@ function readPdfTextSelection() {
   if (state.activePageRecord !== record) activateReaderPage(record);
   const text = selection.toString().trim();
   if (!text) return null;
-  const bounds = textLayer.getBoundingClientRect();
-  if (!bounds.width || !bounds.height) return null;
-  const clientRects = [];
-  for (let index = 0; index < selection.rangeCount; index += 1) {
-    const range = selection.getRangeAt(index);
-    if (!textLayer.contains(range.commonAncestorContainer)) return null;
-    clientRects.push(...range.getClientRects());
-  }
-  const rects = [];
-  const seen = new Set();
-  const clippedClientRects = [];
-  for (const clientRect of clientRects) {
-    const left = Math.max(bounds.left, clientRect.left);
-    const top = Math.max(bounds.top, clientRect.top);
-    const right = Math.min(bounds.right, clientRect.right);
-    const bottom = Math.min(bounds.bottom, clientRect.bottom);
-    if (![left, top, right, bottom].every(Number.isFinite) || right <= left || bottom <= top) continue;
-    const rect = [
-      (left - bounds.left) / bounds.width,
-      (top - bounds.top) / bounds.height,
-      (right - bounds.left) / bounds.width,
-      (bottom - bounds.top) / bounds.height
-    ].map((value) => Math.max(0, Math.min(1, value)));
-    if (rect[2] <= rect[0] || rect[3] <= rect[1]) continue;
-    const key = rect.map((value) => value.toFixed(6)).join(":");
-    if (seen.has(key)) continue;
-    seen.add(key);
-    rects.push(rect);
-    clippedClientRects.push({ left, top, right, bottom });
-  }
-  if (!rects.length) return null;
+  const geometry = pdfSelectionGeometry(selection, textLayer);
+  if (!geometry) return null;
+  const { rects, clientRects: clippedClientRects } = geometry;
   const union = [
     Math.min(...rects.map((rect) => rect[0])),
     Math.min(...rects.map((rect) => rect[1])),
@@ -3394,7 +4449,13 @@ function resetTextAnnotationToolbar() {
 }
 
 function updateTextAnnotationToolbar() {
+  if (readerShapes?.isInteracting()) {
+    state.capturedTextSelection = null;
+    resetTextAnnotationToolbar();
+    return;
+  }
   const selected = readPdfTextSelection();
+  if (selected) closeSelectedAnnotation();
   state.capturedTextSelection = selected;
   if (!selected || state.pendingSaves > 0 || state.pendingMutations.size > 0) {
     resetTextAnnotationToolbar();
@@ -3413,6 +4474,81 @@ function updateTextAnnotationToolbar() {
   toolbar.style.top = `${top}px`;
 }
 
+function readerSourceUrl(documentId, page) {
+  const url = new URL("/", window.location.origin);
+  url.searchParams.set("document", documentId);
+  url.searchParams.set("page", String(page));
+  url.searchParams.set("workspace", "reading");
+  return url.href;
+}
+
+function readerSourceProvenance(source) {
+  return {
+    label: source.sourceLabel || (state.language === "zh" ? `来源：第 ${source.page} 页 · 选定区域` : `Source: page ${source.page} · selected region`),
+    url: source.sourceUrl || readerSourceUrl(source.documentId, source.page)
+  };
+}
+
+function shapeKindLabel(kind) {
+  const keys = {
+    rectangle: "shapeRectangle",
+    arrow: "shapeArrow",
+    line: "shapeLine",
+    ellipse: "shapeEllipse",
+    ink: "shapeInk",
+    textbox: "shapeTextbox"
+  };
+  return t(keys[kind] || "shapeRectangle");
+}
+
+function shapeMutationPayload(shape) {
+  const points = shape.points.map((point) => [point[0], point[1]]);
+  if (shape.kind === "textbox") {
+    return {
+      kind: shape.kind,
+      color: shape.color,
+      font_size: shape.font_size,
+      points
+    };
+  }
+  return {
+    kind: shape.kind,
+    color: shape.color,
+    line_width: shape.line_width,
+    points
+  };
+}
+
+function shapeSourceProvenance(capture) {
+  const url = new URL(readerSourceUrl(capture.documentId, capture.page));
+  url.searchParams.set("rect", capture.rect.map((value) => String(value)).join(","));
+  url.searchParams.set("source_sha256", capture.sourceSha);
+  url.searchParams.set("shape_note", capture.shapeNoteId);
+  url.searchParams.set("shape_revision", String(capture.shapeRevision));
+  url.searchParams.set("shape_kind", capture.shapeKind);
+  const kind = shapeKindLabel(capture.shapeKind);
+  const sourceLabel = (state.language === "zh"
+    ? `来源：第 ${capture.page} 页 · ${kind}批注 · 修订 ${capture.shapeRevision}`
+    : `Source: page ${capture.page} · ${kind} annotation · revision ${capture.shapeRevision}`).replace(/\s+/g, " ").trim();
+  if (!sourceLabel || sourceLabel.length > 200 || url.href.length > 2048) return null;
+  return { sourceUrl: url.href, sourceLabel };
+}
+
+function clearPdfTextSelection() {
+  state.capturedTextSelection = null;
+  window.getSelection()?.removeAllRanges();
+  resetTextAnnotationToolbar();
+}
+
+function anchorNewDraftAfterInsertion(documentId, source, shouldAnchor) {
+  if (!shouldAnchor || state.document?.id !== documentId || state.editDrafts.has(documentId)) return;
+  const draft = ensureDraft(documentId);
+  if (draft.page !== null) return;
+  draft.page = source.page;
+  draft.rect = source.rect ? [...source.rect] : null;
+  draft.includeExcerpt = false;
+}
+
 function addTextSelectionToNote() {
   if (!state.document || !state.pdf || state.pendingSaves > 0 || state.pendingMutations.size > 0) return;
   const selected = currentPdfTextSelection();
@@ -3424,22 +4560,74 @@ function addTextSelectionToNote() {
     setStatus("textSelectionTooLong", "error");
     return;
   }
-  if (!prepareDraftReplacement(state.document.id)) return;
-  const draft = ensureDraft(state.document.id);
-  draft.text = selected.text;
-  draft.page = selected.page;
-  draft.rect = [...selected.rect];
-  draft.includeExcerpt = false;
-  invalidateRequestId(draft);
-  highlightDraft(state.document.id, selected.page, selected.rect);
-  state.capturedTextSelection = null;
-  window.getSelection()?.removeAllRanges();
-  resetTextAnnotationToolbar();
+  const draft = state.editDrafts.get(state.document.id) || ensureDraft(state.document.id);
+  const shouldAnchor = !state.editDrafts.has(state.document.id) && !draft.text.trim() && draft.page === null;
+  const insertion = `“${selected.text}”\n`;
+  captureCurrentDraft();
   workspace?.showNotes();
+  const bookmark = richText?.getBookmark();
+  if (shouldAnchor) {
+    draft.page = selected.page;
+    draft.rect = [...selected.rect];
+  }
+  if (!richText?.insertText(bookmark, insertion, readerSourceProvenance(selected))) {
+    if (shouldAnchor) {
+      draft.page = null;
+      draft.rect = null;
+      renderDraft();
+    }
+    setStatus("readerActionUnavailable", "error");
+    return;
+  }
+  anchorNewDraftAfterInsertion(state.document.id, selected, shouldAnchor);
+  highlightDraft(state.document.id, selected.page, selected.rect);
+  clearPdfTextSelection();
   renderDraft();
   setStatus("textDraftReady", "success");
   assistant?.contextChanged();
-  elements.noteText.focus();
+  richText?.focus();
+}
+
+function readerActionFailureStatus(result) {
+  return {
+    limit: "readerActionLimit",
+    imageLimit: "readerActionImageLimit",
+    owner: "readerActionOwner",
+    pending: "readerActionPending",
+    unavailable: "readerActionUnavailable"
+  }[result] || "readerActionInvalid";
+}
+
+function prepareTextReaderAction(kind) {
+  if (!state.document || !state.pdf) {
+    setStatus("readerActionInvalid", "error");
+    return;
+  }
+  if (state.pendingSaves > 0 || state.pendingMutations.size > 0) {
+    setStatus("readerActionPending", "error");
+    return;
+  }
+  const selected = currentPdfTextSelection();
+  if (!selected) {
+    setStatus("selectTextFirst", "error");
+    return;
+  }
+  if (!assistant?.prepareReaderAction) {
+    setStatus("readerActionUnavailable", "error");
+    return;
+  }
+  const result = assistant.prepareReaderAction(selected.documentId, {
+    kind,
+    page: selected.page,
+    rect: [...selected.rect],
+    quote: selected.text
+  });
+  if (result !== "added") {
+    setStatus(readerActionFailureStatus(result), "error");
+    return;
+  }
+  clearPdfTextSelection();
+  setStatus("readerActionReady", "success");
 }
 
 function renderTextAnnotations() {
@@ -3466,23 +4654,222 @@ function renderTextAnnotations() {
   }
 }
 
+function selectedAnnotation() {
+  const note = noteStateFor(state.selectedAnnotationId);
+  return note?.annotation && !note.deleted_at && !note.purged && note.document_id === state.document?.id ? note : null;
+}
+
+function closeSelectedAnnotation() {
+  state.selectedAnnotationId = null;
+  elements.selectedAnnotationToolbar.hidden = true;
+}
+
+function renderSelectedAnnotationToolbar() {
+  const note = selectedAnnotation();
+  const record = note ? state.readerPages.get(note.page) : null;
+  const stageBounds = elements.readerStage.getBoundingClientRect();
+  if (!note || !record?.rendered || !record.surface.isConnected || stageBounds.width <= 0) {
+    elements.selectedAnnotationToolbar.hidden = true;
+    return;
+  }
+  const toolbar = elements.selectedAnnotationToolbar;
+  const locked = state.pendingSaves > 0 || state.pendingMutations.size > 0 || state.editDrafts.has(state.document.id);
+  toolbar.hidden = false;
+  for (const control of toolbar.querySelectorAll("button, select")) control.disabled = locked;
+  elements.selectedAnnotationKind.value = note.annotation.kind;
+  elements.selectedAnnotationColor.value = note.annotation.color;
+  const rect = note.rect || [0, 0, 1, 1];
+  const surface = record.surface.getBoundingClientRect();
+  const anchor = { left: surface.left + rect[0] * surface.width, right: surface.left + rect[2] * surface.width, top: surface.top + rect[1] * surface.height, bottom: surface.top + rect[3] * surface.height };
+  toolbar.style.left = "8px";
+  toolbar.style.top = "8px";
+  const width = toolbar.offsetWidth;
+  const height = toolbar.offsetHeight;
+  const left = Math.max(stageBounds.left + 4, Math.min(stageBounds.right - width - 4, anchor.left));
+  const above = anchor.top - height - 6;
+  const below = anchor.bottom + 6;
+  const top = above >= stageBounds.top + 4 ? above : Math.max(stageBounds.top + 4, Math.min(stageBounds.bottom - height - 4, below));
+  toolbar.style.left = `${Math.max(4, left)}px`;
+  toolbar.style.top = `${Math.max(4, top)}px`;
+}
+
+function selectTextAnnotation(note, options = {}) {
+  readerShapes?.cancel();
+  state.highlight = note;
+  state.highlightRevealId = null;
+  state.selectedAnnotationId = note.id;
+  state.capturedTextSelection = null;
+  resetTextAnnotationToolbar();
+  drawHighlight();
+  renderSelectedAnnotationToolbar();
+  if (options.focus) elements.selectedAnnotationCopy.focus({ preventScroll: true });
+}
+
+async function copySelectedAnnotation() {
+  const note = selectedAnnotation();
+  if (!note) return;
+  try {
+    await navigator.clipboard.writeText(note.annotation.quote);
+    setStatus("quoteCopied", "success");
+  } catch {
+    setStatus("copyFailed", "error");
+  }
+}
+
+function addSelectedAnnotationToNote() {
+  const note = selectedAnnotation();
+  if (!note || state.pendingSaves > 0 || state.pendingMutations.size > 0) return;
+  const documentId = note.document_id;
+  const draft = state.editDrafts.get(documentId) || ensureDraft(documentId);
+  const shouldAnchor = !state.editDrafts.has(documentId) && !draft.text.trim() && draft.page === null;
+  const source = { documentId, page: note.page, rect: note.rect };
+  captureCurrentDraft();
+  workspace?.showNotes();
+  const bookmark = richText?.getBookmark();
+  if (shouldAnchor) {
+    draft.page = note.page;
+    draft.rect = note.rect ? [...note.rect] : null;
+  }
+  if (!richText?.insertText(bookmark, `“${note.annotation.quote}”\n`, readerSourceProvenance(source))) {
+    if (shouldAnchor) { draft.page = null; draft.rect = null; }
+    renderDraft();
+    setStatus("readerActionUnavailable", "error");
+    return;
+  }
+  anchorNewDraftAfterInsertion(documentId, source, shouldAnchor);
+  renderDraft();
+  setStatus("textDraftReady", "success");
+  assistant?.contextChanged();
+}
+
+async function showAnnotationFromNote(document, note) {
+  const noteState = noteStateFor(note.id);
+  if ((!noteState?.annotation && !noteState?.shape_annotation) || noteState.deleted_at) return;
+  if (state.page !== note.page || !state.readerPages.get(note.page)?.rendered) await goToPage(note.page, { preserveHighlight: true });
+  if (state.document?.id !== document.id) return;
+  closeSelectedAnnotation();
+  clearPdfTextSelection();
+  if (noteState.shape_annotation) readerShapes?.select(noteState.id, { focus: true });
+  else selectTextAnnotation(noteStateFor(note.id), { focus: true });
+}
+
 function openTextAnnotationAtPoint(event) {
-  const surface = event.target.closest(".page-surface");
-  if (state.regionActive || event.target.closest(".region-overlay") || !window.getSelection()?.isCollapsed || !state.document || !surface) return;
+  const target = event.target;
+  const surface = target.closest(".page-surface");
+  if (readerShapes?.isInteracting() || state.regionActive || target.closest(".region-overlay") || event.detail > 1 || !state.document || !surface) return;
+  const documentId = state.document.id;
   const pageNumber = Number(surface.dataset.readerPage);
   const bounds = surface.getBoundingClientRect();
   if (!bounds.width || !bounds.height) return;
   const x = (event.clientX - bounds.left) / bounds.width;
   const y = (event.clientY - bounds.top) / bounds.height;
   if (x < 0 || x > 1 || y < 0 || y > 1) return;
-  for (const note of state.noteStates) {
-    const annotation = note.annotation;
-    if (note.deleted_at || note.purged || note.document_id !== state.document.id || note.page !== pageNumber || !Array.isArray(annotation?.rects)) continue;
-    if (annotation.rects.some((rect) => Array.isArray(rect) && rect.length === 4 && x >= rect[0] && x <= rect[2] && y >= rect[1] - 0.004 && y <= rect[3] + 0.004)) {
-      void openNote(note.id);
-      return;
+  requestAnimationFrame(() => {
+    const record = state.readerPages.get(pageNumber);
+    if (state.regionActive || !window.getSelection()?.isCollapsed || state.document?.id !== documentId || !target.isConnected || !surface.isConnected || !surface.contains(target) || record?.surface !== surface || !record.rendered) return;
+    for (const note of state.noteStates) {
+      const annotation = note.annotation;
+      if (note.deleted_at || note.purged || note.document_id !== documentId || note.page !== pageNumber || !Array.isArray(annotation?.rects)) continue;
+      if (annotation.rects.some((rect) => Array.isArray(rect) && rect.length === 4 && x >= rect[0] && x <= rect[2] && y >= rect[1] - 0.004 && y <= rect[3] + 0.004)) {
+        selectTextAnnotation(note);
+        return;
+      }
     }
+  });
+}
+
+function annotationSnapshot(note) {
+  return {
+    text: note.text,
+    annotation: note.annotation ? JSON.parse(JSON.stringify(note.annotation)) : null,
+    shape_annotation: note.shape_annotation ? JSON.parse(JSON.stringify(note.shape_annotation)) : null,
+    deleted_at: note.deleted_at || null
+  };
+}
+
+async function runShapeCreate(interaction) {
+  const operation = interaction.operation;
+  if (!operation || operation.pending) return null;
+  const documentId = operation.documentId;
+  operation.pending = true;
+  state.pendingSaves += 1;
+  renderDocumentDetails();
+  renderNotes();
+  setStatus("shapeSaving");
+  try {
+    const note = await api(`/api/v1/documents/${encodeURIComponent(documentId)}/notes`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(operation.payload)
+    });
+    const savedState = await api(`/api/v1/documents/${encodeURIComponent(documentId)}/notes/${encodeURIComponent(note.id)}/state`);
+    if (savedState.id !== note.id || savedState.document_id !== documentId || !savedState.shape_annotation) throw new ApiError("request_failed");
+    if (state.document?.id === documentId) {
+      state.noteStates = [savedState, ...state.noteStates.filter((item) => item.id !== savedState.id)];
+      state.notes = [savedState, ...state.notes.filter((item) => item.id !== savedState.id)];
+      renderNotes();
+      renderTextAnnotations();
+      readerShapes?.render();
+    }
+    annotationHistory.record(documentId, {
+      kind: "create", noteId: savedState.id, beforeRevision: null, afterRevision: savedState.revision,
+      beforeStyle: null, afterStyle: { kind: savedState.shape_annotation.kind, color: savedState.shape_annotation.color },
+      beforeDeleted: false, afterDeleted: false,
+      beforeSnapshot: null, afterSnapshot: annotationSnapshot(savedState)
+    });
+    setStatus("shapeSaved", "success");
+    readerShapes?.saved(interaction);
+    return savedState;
+  } catch (error) {
+    operation.pending = false;
+    setStatus("shapeSaveFailed", "error", {}, () => retryShapeSave(interaction));
+    return null;
+  } finally {
+    state.pendingSaves -= 1;
+    renderDocumentDetails();
+    renderDraft();
+    renderNotes();
   }
+}
+
+async function retryShapeSave(interaction) {
+  if (!interaction) return null;
+  if (state.document?.id !== interaction.documentId) await openDocument(interaction.documentId, { force: true });
+  return saveShape(interaction);
+}
+
+async function saveShape(interaction) {
+  if (!interaction || state.document?.id !== interaction.documentId || state.document.sha256 !== interaction.sourceSha) return null;
+  if (!interaction.noteId) {
+    if (!interaction.operation) {
+      const shape = shapeMutationPayload(interaction.shape);
+      interaction.operation = {
+        documentId: interaction.documentId,
+        pending: false,
+        payload: {
+          request_id: crypto.randomUUID(),
+          page: interaction.record.pageNumber,
+          rect: shapeBounds(shape),
+          text: interaction.text.trim(),
+          shape_annotation: shape
+        }
+      };
+    }
+    return runShapeCreate(interaction);
+  }
+  const note = noteStateFor(interaction.noteId);
+  if (!note?.shape_annotation || note.deleted_at || note.purged || note.revision !== interaction.revision) {
+    setStatus("shapeStale", "error");
+    return null;
+  }
+  if (!interaction.operation) {
+    interaction.operation = makeLifecycleMutation(state.document, note, "shape", {
+      text: interaction.text.trim(),
+      shape_annotation: shapeMutationPayload(interaction.shape)
+    });
+  }
+  if (!interaction.operation) return null;
+  return runMutation(interaction.operation);
 }
 
 async function runTextAnnotationSave(operation) {
@@ -3503,18 +4890,17 @@ async function runTextAnnotationSave(operation) {
     });
     const savedState = await api(`/api/v1/documents/${encodeURIComponent(documentId)}/notes/${encodeURIComponent(note.id)}/state`);
     if (savedState.id !== note.id || savedState.document_id !== documentId || !savedState.annotation) throw new ApiError("request_failed");
+    annotationHistory.record(documentId, {
+      kind: "create", noteId: savedState.id, beforeRevision: null, afterRevision: savedState.revision,
+      beforeStyle: { ...savedState.annotation }, afterStyle: { ...savedState.annotation }, beforeDeleted: false, afterDeleted: false,
+      beforeSnapshot: null, afterSnapshot: annotationSnapshot(savedState)
+    });
     if (state.document?.id === documentId) {
       state.noteStates = [savedState, ...state.noteStates.filter((item) => item.id !== savedState.id)];
       state.notes = [savedState, ...state.notes.filter((item) => item.id !== savedState.id)];
-      state.highlight = savedState;
-      state.highlightRevealId = savedState.id;
       renderNotes();
       renderTextAnnotations();
-      drawHighlight();
-      workspace?.showNotes();
-      requestAnimationFrame(() => {
-        if (state.document?.id === documentId) revealSavedNote(savedState.id);
-      });
+      selectTextAnnotation(savedState);
     }
     if (state.annotationSaves.get(documentId) === operation) state.annotationSaves.delete(documentId);
     if (state.capturedTextSelection?.documentId === documentId && state.capturedTextSelection.sequence === operation.selectionSequence && state.capturedTextSelection.text === operation.payload.annotation.quote) {
@@ -3579,9 +4965,11 @@ function submitTextAnnotation(kind) {
   void runTextAnnotationSave(operation);
 }
 
-function requestRender() {
+function requestRender(preservedAnchor) {
   if (!state.pdf || !state.document) return Promise.resolve();
-  const anchor = captureReaderAnchor();
+  readerObjects?.close();
+  readerShapes?.cancel();
+  const anchor = preservedAnchor === undefined ? captureReaderAnchor() : preservedAnchor;
   const layoutSequence = beginReaderLayout();
   const sequence = ++state.renderSequence;
   clearHighlights();
@@ -3601,7 +4989,12 @@ function requestRender() {
     record.textReady = false;
     record.sequence = -1;
     record.textLayer.replaceChildren();
+    record.imageLayer.replaceChildren();
+    record.linkAnnotationLayer?.destroy();
+    record.linkAnnotationLayer = null;
+    record.linkLayer.replaceChildren();
     record.textAnnotationsLayer.replaceChildren();
+    record.shapeLayer?.replaceChildren();
     setPageEstimate(record);
   }
   state.renderTask = null;
@@ -3664,6 +5057,7 @@ function drawHighlight() {
 }
 
 async function openNote(noteId, options = {}) {
+  invalidateWorkspaceModeIntent();
   cancelReaderProgressRestore();
   const navigationSequence = ++state.noteNavigationSequence;
   if (isStudy()) {
@@ -3716,7 +5110,9 @@ async function openNote(noteId, options = {}) {
 }
 
 function setRegionMode(active) {
+  if (active) readerShapes?.cancel();
   state.regionActive = Boolean(active && state.pdf && state.document);
+  readerShapes?.updateControls();
   elements.regionMode.setAttribute("aria-pressed", String(state.regionActive));
   elements.regionMode.textContent = t(state.regionActive ? "cancelRegion" : "regionMode");
   elements.readerRegionMode.setAttribute("aria-pressed", String(state.regionActive));
@@ -3773,23 +5169,254 @@ function makeRegionPreview(rect, record) {
   return preview;
 }
 
-function cancelRegionDraft() {
-  if (!state.document || state.pendingSaves > 0 || state.pendingMutations.size > 0) return;
-  const draft = ensureDraft(state.document.id);
-  if (!draft.previewCanvas && !draft.rect) return;
-  if (draft.text.trim() && !window.confirm(t("regionDraftCancelConfirm"))) return;
-  draft.page = null;
-  draft.rect = null;
-  draft.includeExcerpt = false;
-  draft.previewCanvas = null;
-  invalidateRequestId(draft);
-  state.highlight = null;
-  state.highlightRevealId = null;
-  clearHighlights();
+function readerRecordIsCurrent(record, documentId, sourceSha, renderSequence) {
+  return Boolean(
+    record &&
+    state.document &&
+    state.document.id === documentId &&
+    typeof sourceSha === "string" &&
+    sourceSha &&
+    state.document.sha256 === sourceSha &&
+    state.renderSequence === renderSequence &&
+    state.readerPages.get(record.pageNumber) === record &&
+    record.rendered &&
+    record.sequence === renderSequence &&
+    record.canvas.dataset.documentId === documentId
+  );
+}
+
+function captureIsCurrent(capture) {
+  return Boolean(
+    state.regionCapture === capture &&
+    state.document?.id === capture.documentId &&
+    state.document.sha256 === capture.sourceSha &&
+    capture.previewCanvas?.width > 0 &&
+    capture.previewCanvas.height > 0
+  );
+}
+
+async function copyReaderObject(record, object) {
+  const owner = state.document;
+  const renderSequence = state.renderSequence;
+  if (!readerRecordIsCurrent(record, owner?.id, owner?.sha256, renderSequence)) {
+    setStatus("objectStale", "error");
+    return;
+  }
+  try {
+    const preview = makeRegionPreview(object.rect, record);
+    const blob = await new Promise((resolve) => preview.toBlob(resolve, "image/png"));
+    if (!readerRecordIsCurrent(record, owner.id, owner.sha256, renderSequence)) {
+      setStatus("objectStale", "error");
+      return;
+    }
+    if (!blob || !navigator.clipboard?.write || typeof ClipboardItem === "undefined") throw new Error("clipboard unavailable");
+    await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+    setStatus("objectCopied", "success");
+  } catch {
+    setStatus("objectCopyFailed", "error");
+  }
+}
+
+async function handleReaderObjectAction(record, object, action) {
+  if (action === "copy") {
+    await copyReaderObject(record, object);
+    return;
+  }
+  const owner = state.document;
+  const renderSequence = state.renderSequence;
+  if (!readerRecordIsCurrent(record, owner?.id, owner?.sha256, renderSequence)) {
+    setStatus("objectStale", "error");
+    return;
+  }
+  if (state.regionCapture || state.pendingSaves > 0 || state.pendingMutations.size > 0) {
+    setStatus("objectCapturePending", "error");
+    return;
+  }
+  state.regionCapture = {
+    documentId: owner.id,
+    sourceSha: owner.sha256,
+    page: record.pageNumber,
+    rect: [...object.rect],
+    previewCanvas: makeRegionPreview(object.rect, record),
+    requestId: crypto.randomUUID(),
+    image: null,
+    pending: false,
+    error: null,
+    record,
+    renderSequence
+  };
+  clearStatus();
+  renderDraft();
+  if (action === "note") await addCaptureToNote();
+  else if (action === "agent") await addCaptureToAgent();
+}
+
+async function captureShape(interaction, target) {
+  const owner = state.document;
+  const record = interaction.record;
+  const note = noteStateFor(interaction.noteId);
+  const renderSequence = state.renderSequence;
+  if (!note?.shape_annotation || note.deleted_at || note.purged || note.revision !== interaction.revision || !readerRecordIsCurrent(record, owner?.id, owner?.sha256, renderSequence)) {
+    setStatus("shapeStale", "error");
+    return;
+  }
+  if (state.regionCapture || state.pendingSaves > 0 || state.pendingMutations.size > 0) {
+    setStatus("objectCapturePending", "error");
+    return;
+  }
+  const composed = readerShapes?.composeCapture(record, note.shape_annotation, note.text);
+  if (["shapeTextboxEmpty", "shapeTextboxTooLong", "shapeTextboxOverflow"].includes(composed?.error)) {
+    setStatus(composed.error, "error");
+    return;
+  }
+  const rect = composed?.rect;
+  if (!composed?.canvas || !Array.isArray(rect) || rect.length !== 4 || !rect.every(Number.isFinite) || rect[0] < 0 || rect[1] < 0 || rect[2] > 1 || rect[3] > 1 || rect[2] <= rect[0] || rect[3] <= rect[1]) {
+    setStatus("shapeStale", "error");
+    return;
+  }
+  const capture = {
+    shape: true,
+    shapeNoteId: note.id,
+    shapeRevision: note.revision,
+    shapeKind: note.shape_annotation.kind,
+    description: note.text,
+    documentId: owner.id,
+    sourceSha: owner.sha256,
+    page: record.pageNumber,
+    rect: [...rect],
+    previewCanvas: composed.canvas,
+    requestId: crypto.randomUUID(),
+    image: null,
+    pending: false,
+    error: null,
+    record,
+    renderSequence
+  };
+  const provenance = shapeSourceProvenance(capture);
+  if (!provenance) {
+    setStatus("shapeStale", "error");
+    return;
+  }
+  Object.assign(capture, provenance);
+  state.regionCapture = capture;
+  clearStatus();
+  renderDraft();
+  if (target === "note") await addCaptureToNote();
+  else if (target === "agent") await addCaptureToAgent();
+}
+
+async function shareShapeFromNote(document, note, target) {
+  if (!note?.shape_annotation || note.deleted_at || note.purged) return;
+  if (state.document?.id !== document.id) await openDocument(document.id, { force: true });
+  if (state.document?.id !== document.id) return;
+  if (state.page !== note.page || !state.readerPages.get(note.page)?.rendered) await goToPage(note.page, { preserveHighlight: true });
+  if (readerShapes?.select(note.id)) await readerShapes.share(target);
+}
+
+function cancelRegionCapture() {
+  const capture = state.regionCapture;
+  if (!capture || capture.pending || state.pendingSaves > 0 || state.pendingMutations.size > 0) return;
+  state.regionCapture = null;
+  if (state.highlight?.id === `reader-capture-${capture.documentId}`) {
+    state.highlight = null;
+    state.highlightRevealId = null;
+    clearHighlights();
+  }
   clearStatus();
   renderDraft();
   assistant?.contextChanged();
-  elements.noteText.focus();
+}
+
+async function ensureCaptureImage(capture) {
+  if (capture.image) return capture.image;
+  if (capture.pending || !captureIsCurrent(capture)) return null;
+  capture.pending = true;
+  capture.error = null;
+  renderDraft();
+  try {
+    const image = await imageLibrary.uploadCanvas(capture.documentId, capture.previewCanvas, {
+      requestId: capture.requestId,
+      filename: capture.shape ? `page-${capture.page}-shape-${capture.shapeNoteId}.png` : `page-${capture.page}-region.png`
+    });
+    if (!captureIsCurrent(capture)) return null;
+    capture.image = image;
+    return image;
+  } catch (error) {
+    if (captureIsCurrent(capture)) capture.error = error.code || "request_failed";
+    return null;
+  } finally {
+    capture.pending = false;
+    if (state.regionCapture === capture && state.document?.id === capture.documentId) renderDraft();
+  }
+}
+
+async function addCaptureToNote() {
+  const capture = state.regionCapture;
+  if (!capture || capture.pending || state.pendingSaves > 0 || state.pendingMutations.size > 0) return;
+  if (!captureIsCurrent(capture)) {
+    setStatus("objectStale", "error");
+    return;
+  }
+  const draft = state.editDrafts.get(capture.documentId) || ensureDraft(capture.documentId);
+  const shouldAnchor = !state.editDrafts.has(capture.documentId) && !draft.text.trim() && draft.page === null;
+  const bookmark = richText?.getBookmark();
+  const image = await ensureCaptureImage(capture);
+  if (!image || !captureIsCurrent(capture)) return;
+  if (shouldAnchor) {
+    draft.page = capture.page;
+    draft.rect = [...capture.rect];
+  }
+  const inserted = richText?.insertImage(bookmark, {
+    document_id: image.document_id,
+    image_id: image.id,
+    sha256: image.sha256,
+    alt: t(capture.shape ? "shapeCaptureAlt" : "regionCaption", { page: capture.page })
+  }, readerSourceProvenance(capture), capture.shape ? capture.description : "");
+  if (!inserted) {
+    if (shouldAnchor) {
+      draft.page = null;
+      draft.rect = null;
+      renderDraft();
+    }
+    setStatus("captureInsertFailed", "error");
+    return;
+  }
+  anchorNewDraftAfterInsertion(capture.documentId, capture, shouldAnchor);
+  state.regionCapture = null;
+  highlightDraft(capture.documentId, capture.page, capture.rect);
+  workspace?.showNotes();
+  renderDraft();
+  setStatus("captureNoteReady", "success");
+  assistant?.contextChanged();
+  richText?.focus();
+}
+
+async function addCaptureToAgent() {
+  const capture = state.regionCapture;
+  if (!capture || capture.pending || state.pendingSaves > 0 || state.pendingMutations.size > 0) return;
+  if (!captureIsCurrent(capture)) {
+    setStatus("objectStale", "error");
+    return;
+  }
+  const image = await ensureCaptureImage(capture);
+  if (!image || !captureIsCurrent(capture)) return;
+  const result = assistant?.prepareReaderAction(capture.documentId, {
+    kind: "image",
+    page: capture.page,
+    rect: [...capture.rect],
+    quote: "",
+    image,
+    description: capture.shape ? capture.description : undefined,
+    sourceUrl: capture.shape ? capture.sourceUrl : undefined,
+    sourceLabel: capture.shape ? capture.sourceLabel : undefined
+  });
+  if (result !== "added") {
+    setStatus(readerActionFailureStatus(result || "unavailable"), "error");
+    return;
+  }
+  state.regionCapture = null;
+  renderDraft();
+  setStatus("readerActionReady", "success");
 }
 
 function finishSelection(event) {
@@ -3809,28 +5436,43 @@ function finishSelection(event) {
     setStatus("selectionTooSmall", "error");
     return;
   }
-  const documentId = state.document?.id;
+  const owner = state.document;
+  const documentId = owner?.id;
   const page = selection.record.pageNumber;
-  if (!documentId || !prepareDraftReplacement(documentId)) {
+  const renderSequence = state.renderSequence;
+  if (!readerRecordIsCurrent(selection.record, documentId, owner?.sha256, renderSequence)) {
     setRegionMode(false);
+    setStatus("objectStale", "error");
+    renderDraft();
+    return;
+  }
+  if (state.regionCapture) {
+    setRegionMode(false);
+    setStatus("objectCapturePending", "error");
     renderDraft();
     return;
   }
   const rect = [left / point.width, top / point.height, (left + width) / point.width, (top + height) / point.height];
-  const draft = ensureDraft(documentId);
-  draft.page = page;
-  draft.rect = rect;
-  draft.previewCanvas = makeRegionPreview(rect, selection.record);
-  draft.includeExcerpt = false;
-  if (!draft.text.trim()) draft.text = t("regionCaption", { page });
-  invalidateRequestId(draft);
+  state.regionCapture = {
+    documentId,
+    sourceSha: owner.sha256,
+    page,
+    rect,
+    previewCanvas: makeRegionPreview(rect, selection.record),
+    requestId: crypto.randomUUID(),
+    image: null,
+    pending: false,
+    error: null,
+    record: selection.record,
+    renderSequence
+  };
   setRegionMode(false);
   highlightDraft(documentId, page, rect);
+  state.highlight.id = `reader-capture-${documentId}`;
   workspace?.showNotes();
   clearStatus();
   renderDraft();
   assistant?.contextChanged();
-  elements.noteText.focus();
 }
 
 function revealSavedNote(noteId) {
@@ -3939,6 +5581,7 @@ async function submitSave(includeExcerpt = false) {
 
     const currentDraft = ensureDraft(document.id);
     if (currentDraft.requestId === requestId) {
+      richText?.close({ restoreFocus: false });
       state.drafts.set(document.id, makeEmptyDraft());
       imageLibrary?.clearNoteSelection(document.id, imageIds);
     }
@@ -3979,8 +5622,10 @@ async function submitSave(includeExcerpt = false) {
 function startEditNote(document, note) {
   const noteState = noteStateFor(note.id);
   if (!noteState || state.pendingSaves > 0 || state.pendingMutations.size > 0 || state.pendingExcerpts.size > 0 || state.editDrafts.has(document.id)) return;
+  workspace?.showNotes();
   richText?.close({ restoreFocus: false });
   captureCurrentDraft();
+  readerShapes?.cancel();
   setRegionMode(false);
   state.editDrafts.set(document.id, {
     noteId: note.id,
@@ -4049,11 +5694,12 @@ function makeLifecycleMutation(document, note, action, change = {}) {
   const labels = {
     review: ["reviewSaving", noteState.review_status === "source_checked" ? "reviewUnmarked" : "reviewSaved"],
     style: ["annotationStyleSaving", "annotationStyleSaved"],
+    shape: ["shapeSaving", "shapeSaved"],
     delete: ["deleting", "deleted"],
     restore: ["restoring", "restored"],
     purge: ["purging", "purged"]
   }[action];
-  return {
+  const operation = {
     document,
     noteId: note.id,
     action,
@@ -4067,6 +5713,17 @@ function makeLifecycleMutation(document, note, action, change = {}) {
     pendingStatus: labels[0],
     successStatus: labels[1]
   };
+  const style = noteState.shape_annotation || noteState.annotation;
+  if (["style", "shape", "delete", "restore"].includes(action) && style) {
+    operation.historyEntry = {
+      kind: action, noteId: note.id, beforeRevision: noteState.revision, afterRevision: null,
+      beforeStyle: { kind: style.kind, color: style.color },
+      afterStyle: action === "style" ? { ...change.annotation_style } : action === "shape" ? { kind: change.shape_annotation.kind, color: change.shape_annotation.color } : { kind: style.kind, color: style.color },
+      beforeDeleted: Boolean(noteState.deleted_at), afterDeleted: action === "delete" ? true : action === "restore" ? false : Boolean(noteState.deleted_at),
+      beforeSnapshot: annotationSnapshot(noteState), afterSnapshot: null
+    };
+  }
+  return operation;
 }
 
 async function changeAnnotationStyle(document, note, change) {
@@ -4106,17 +5763,14 @@ async function reviewNote(document, note) {
 }
 
 async function deleteNote(document, note) {
-  if (state.pendingSaves > 0 || state.pendingMutations.size > 0 || state.editDrafts.has(document.id)) return;
+  if (state.pendingSaves > 0 || state.pendingMutations.size > 0 || state.editDrafts.has(document.id)) return null;
   const key = mutationKey(document.id, note.id);
   const failed = state.failedMutations.get(key);
-  if (failed?.action === "delete" && !failed.conflicted) {
-    await runMutation(failed);
-    return;
-  }
+  if (failed?.action === "delete" && !failed.conflicted) return runMutation(failed);
   if (failed?.conflicted) state.failedMutations.delete(key);
-  if (!window.confirm(t("deleteConfirm"))) return;
+  if (!window.confirm(t("deleteConfirm"))) return null;
   const operation = makeLifecycleMutation(document, note, "delete");
-  if (operation) await runMutation(operation);
+  return operation ? runMutation(operation) : null;
 }
 
 async function restoreNote(document, note) {
@@ -4147,6 +5801,8 @@ async function purgeNote(document, note) {
 }
 
 function applyNotePurge(document, noteId) {
+  annotationHistory.invalidate(document.id, noteId);
+  if (state.selectedAnnotationId === noteId) closeSelectedAnnotation();
   state.search.notes = state.search.notes.filter((item) => item.id !== noteId || item.document_id !== document.id);
   imageViewer?.clearSource(document.id, "pdf_excerpt", noteId);
   imageLibrary?.reload(document.id);
@@ -4161,7 +5817,9 @@ function applyNotePurge(document, noteId) {
   }
   const urlNoteId = new URLSearchParams(window.location.search).get("note");
   if (urlNoteId === noteId) updateUrl(document.id);
+  readerShapes?.noteChanged({ id: noteId, purged: true });
   renderTextAnnotations();
+  readerShapes?.render();
 }
 
 function applyMutationState(operation, savedState) {
@@ -4169,6 +5827,7 @@ function applyMutationState(operation, savedState) {
   if (state.document?.id !== document.id) return;
   state.noteStates = [savedState, ...state.noteStates.filter((item) => item.id !== noteId)];
   if (savedState.deleted_at) {
+    if (state.selectedAnnotationId === noteId) closeSelectedAnnotation();
     state.notes = state.notes.filter((item) => item.id !== noteId);
     if (state.highlight?.id === noteId) {
       state.highlight = null;
@@ -4189,8 +5848,10 @@ function applyMutationState(operation, savedState) {
     state.notes = [note, ...state.notes.filter((item) => item.id !== noteId)];
     if (state.highlight?.id === noteId) state.highlight = note;
   }
+  readerShapes?.noteChanged(savedState);
   renderNotes();
   renderTextAnnotations();
+  readerShapes?.render();
   renderDraft();
   if (action === "restore") {
     const retry = async () => {
@@ -4210,7 +5871,7 @@ function applyMutationState(operation, savedState) {
 async function runMutation(operation) {
   const { document, noteId, action } = operation;
   const key = mutationKey(document.id, noteId);
-  if (state.pendingMutations.has(key)) return;
+  if (state.pendingMutations.has(key)) return null;
   state.pendingMutations.set(key, operation);
   const editDraft = state.editDrafts.get(document.id);
   if (action === "edit" && editDraft?.noteId === noteId) editDraft.saveFailed = false;
@@ -4232,6 +5893,15 @@ async function runMutation(operation) {
       applyMutationState(operation, savedState);
     }
     state.failedMutations.delete(key);
+    if (operation.historyReplay) {
+      annotationHistory.complete(document.id, operation.historyReplay.direction, savedState.revision, operation.historyReplay.entry);
+    } else if (operation.historyEntry) {
+      operation.historyEntry.afterRevision = savedState.revision;
+      operation.historyEntry.afterSnapshot = annotationSnapshot(savedState);
+      annotationHistory.record(document.id, operation.historyEntry);
+    } else if (["edit", "review", "purge"].includes(action)) {
+      annotationHistory.invalidate(document.id, noteId);
+    }
     if (action === "edit") {
       const currentDraft = state.editDrafts.get(document.id);
       if (currentDraft?.requestId === operation.payload.request_id) state.editDrafts.delete(document.id);
@@ -4240,6 +5910,7 @@ async function runMutation(operation) {
     renderDraft();
     renderNotes();
     setStatus(operation.successStatus, "success");
+    return savedState;
   } catch (error) {
     const conflicted = error.code === "revision_conflict";
     if (action === "edit") {
@@ -4252,17 +5923,65 @@ async function runMutation(operation) {
       state.failedMutations.set(key, { ...operation, conflicted });
     }
     if (conflicted) {
+      annotationHistory.invalidate(document.id, noteId);
       setStatus("revisionConflict", "error", {}, () => refreshLatest(document), "viewLatest");
     } else {
       const key = action === "purge" && error.code === "storage_unavailable" ? "purgeStorageUnavailable" : error.code || "request_failed";
       setStatus(key, "error", {}, () => retryMutation(operation));
     }
+    return null;
   } finally {
     state.pendingMutations.delete(key);
     renderDocumentDetails();
     renderDraft();
     renderNotes();
   }
+}
+
+async function replayAnnotationHistory(direction) {
+  if (!state.document || readerShapes?.hasUnsavedChanges?.() || state.pendingSaves > 0 || state.pendingMutations.size > 0 || state.editDrafts.has(state.document.id)) return;
+  const document = state.document;
+  const entry = annotationHistory.peek(document.id, direction);
+  if (!entry) return;
+  readerShapes?.cancel();
+  const failed = state.failedMutations.get(mutationKey(document.id, entry.noteId));
+  if (failed) {
+    if (!failed.conflicted && failed.historyReplay?.direction === direction && failed.historyReplay.entry === entry) await runMutation(failed);
+    return;
+  }
+  const note = noteStateFor(entry.noteId);
+  const expected = annotationHistory.expectedRevision(entry, direction);
+  if (!note || note.revision !== expected || (!note.annotation && !note.shape_annotation)) {
+    annotationHistory.invalidate(document.id, entry.noteId);
+    renderDocumentDetails();
+    setStatus("annotationHistoryStale", "error");
+    return;
+  }
+  let action;
+  let change = {};
+  if (entry.kind === "style") {
+    action = "style";
+    change.annotation_style = { ...(direction === "undo" ? entry.beforeStyle : entry.afterStyle) };
+  } else if (entry.kind === "shape") {
+    const snapshot = direction === "undo" ? entry.beforeSnapshot : entry.afterSnapshot;
+    if (!snapshot?.shape_annotation) {
+      annotationHistory.invalidate(document.id, entry.noteId);
+      setStatus("annotationHistoryStale", "error");
+      return;
+    }
+    action = "shape";
+    change.text = snapshot.text;
+    change.shape_annotation = shapeMutationPayload(snapshot.shape_annotation);
+  } else {
+    const deleted = direction === "undo" ? entry.beforeDeleted : entry.afterDeleted;
+    if (entry.kind === "create") action = direction === "undo" ? "delete" : "restore";
+    else action = deleted ? "delete" : "restore";
+  }
+  const operation = makeLifecycleMutation(document, note, action, change);
+  if (!operation) return;
+  delete operation.historyEntry;
+  operation.historyReplay = { direction, entry };
+  await runMutation(operation);
 }
 
 async function retryMutation(operation) {
@@ -4292,6 +6011,10 @@ async function refreshLatest(document) {
 }
 
 async function createExcerpt(document, note) {
+  if (noteStateFor(note.id)?.shape_annotation) {
+    setStatus("shape_annotation_excerpt_unsupported", "error");
+    return;
+  }
   if (!note.rect) {
     setStatus("region_required", "error");
     return;
@@ -4321,7 +6044,7 @@ async function createExcerpt(document, note) {
 }
 
 async function exportReadingRecord(document) {
-  if (!document || isStudy(document) || richText?.isOpen() || state.pendingExports.size > 0 || state.pendingSaves > 0 || state.pendingExcerpts.size > 0 || state.pendingMutations.size > 0 || state.pendingMetadata.size > 0 || state.editDrafts.has(document.id) || ensureMetadata(document.id).draft) return;
+  if (!document || isStudy(document) || state.pendingExports.size > 0 || state.pendingSaves > 0 || state.pendingExcerpts.size > 0 || state.pendingMutations.size > 0 || state.pendingMetadata.size > 0 || state.editDrafts.has(document.id) || ensureMetadata(document.id).draft) return;
   state.pendingExports.add(document.id);
   renderDocumentDetails();
   setStatus("exporting");
@@ -4364,7 +6087,7 @@ function annotatedPdfExportRequestIsCurrent(request) {
 }
 
 async function exportAnnotatedPdf(request) {
-  if (!annotatedPdfExportRequestIsCurrent(request) || !hasActiveSavedPdfNotes(state.document) || richText?.isOpen() || state.pendingExports.size > 0 || state.pendingSaves > 0 || state.pendingExcerpts.size > 0 || state.pendingMutations.size > 0 || state.pendingMetadata.size > 0 || state.editDrafts.has(request.documentId) || ensureMetadata(request.documentId).draft) return;
+  if (!annotatedPdfExportRequestIsCurrent(request) || !hasActiveSavedPdfNotes(state.document) || state.pendingExports.size > 0 || state.pendingSaves > 0 || state.pendingExcerpts.size > 0 || state.pendingMutations.size > 0 || state.pendingMetadata.size > 0 || state.editDrafts.has(request.documentId) || ensureMetadata(request.documentId).draft) return;
   const pendingKey = `annotated-pdf:${request.documentId}`;
   state.pendingExports.add(pendingKey);
   renderDocumentDetails();
@@ -4557,6 +6280,15 @@ elements.searchInput.addEventListener("input", () => {
   renderSearch();
 });
 
+elements.metadataLookup.addEventListener("click", () => {
+  if (state.document) void lookupMetadata(state.document.id);
+});
+elements.metadataDoiCandidates.addEventListener("change", () => {
+  if (!elements.metadataDoiCandidates.value) return;
+  elements.metadataDoi.value = elements.metadataDoiCandidates.value;
+  elements.metadataDoi.dispatchEvent(new Event("input", { bubbles: true }));
+  elements.metadataDoi.focus();
+});
 elements.metadataEdit.addEventListener("click", startMetadataEdit);
 elements.metadataCancel.addEventListener("click", cancelMetadataEdit);
 elements.metadataForm.addEventListener("submit", (event) => {
@@ -4567,6 +6299,7 @@ elements.metadataRetry.addEventListener("click", () => {
   if (!state.document) return;
   const entry = ensureMetadata(state.document.id);
   if (entry.status?.retry === "save") submitMetadataSave(state.document.id);
+  else if (entry.status?.retry === "lookup") void lookupMetadata(state.document.id);
   else if (entry.status?.retry === "latest") loadMetadata(state.document, state.loadSequence, state.loadController?.signal, { viewLatest: true });
   else loadMetadata(state.document, state.loadSequence, state.loadController?.signal);
 });
@@ -4586,7 +6319,7 @@ for (const [input, field] of [
     entry.draft[field] = input.value;
     entry.draft.operation = null;
     entry.draft.saveFailed = false;
-    entry.status = null;
+    if (!entry.lookup) entry.status = null;
     entry.latestVisible = false;
     renderDocumentDetails();
     renderMetadata();
@@ -4603,8 +6336,34 @@ elements.uploadButton.addEventListener("click", () => {
   if (!state.pendingUpload) elements.uploadInput.click();
 });
 elements.sample.addEventListener("click", openSample);
+elements.pageFirst.addEventListener("click", () => goToPage(1));
 elements.pagePrev.addEventListener("click", () => goToPage(state.page - 1));
 elements.pageNext.addEventListener("click", () => goToPage(state.page + 1));
+elements.pageLast.addEventListener("click", () => goToPage(state.document?.page_count || 1));
+elements.annotationUndo.addEventListener("click", () => replayAnnotationHistory("undo"));
+elements.annotationRedo.addEventListener("click", () => replayAnnotationHistory("redo"));
+elements.selectedAnnotationCopy.addEventListener("click", copySelectedAnnotation);
+elements.selectedAnnotationNote.addEventListener("click", addSelectedAnnotationToNote);
+elements.selectedAnnotationAgent.addEventListener("click", () => {
+  const note = selectedAnnotation();
+  if (note) assistant?.addNoteReference(note.document_id, note);
+});
+elements.selectedAnnotationEdit.addEventListener("click", () => {
+  const note = selectedAnnotation();
+  if (note) startEditNote(state.document, note);
+});
+elements.selectedAnnotationKind.addEventListener("change", () => {
+  const note = selectedAnnotation();
+  if (note) changeAnnotationStyle(state.document, note, { kind: elements.selectedAnnotationKind.value });
+});
+elements.selectedAnnotationColor.addEventListener("change", () => {
+  const note = selectedAnnotation();
+  if (note) changeAnnotationStyle(state.document, note, { color: elements.selectedAnnotationColor.value });
+});
+elements.selectedAnnotationDelete.addEventListener("click", () => {
+  const note = selectedAnnotation();
+  if (note) deleteNote(state.document, note);
+});
 elements.pageInput.addEventListener("change", () => {
   if (!state.document) return;
   const page = Number(elements.pageInput.value);
@@ -4632,6 +6391,48 @@ elements.zoomFit.addEventListener("click", () => {
   state.zoomMode = "fit";
   requestRender();
 });
+elements.zoomFitPage.addEventListener("click", async () => {
+  const pdf = state.pdf;
+  const record = state.activePageRecord;
+  const documentId = state.document?.id;
+  const loadSequence = state.loadSequence;
+  const pageNumber = state.page;
+  if (!pdf || !record) return;
+  try {
+    const page = record.page || await pdf.getPage(pageNumber);
+    if (state.pdf !== pdf || state.activePageRecord !== record || state.document?.id !== documentId || state.loadSequence !== loadSequence || state.page !== pageNumber) return;
+    const base = page.getViewport({ scale: 1 });
+    const style = getComputedStyle(elements.readerStage);
+    const width = elements.readerStage.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+    const height = elements.readerStage.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom);
+    state.zoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, Math.min(width / base.width, height / base.height)));
+    state.zoomMode = "manual";
+    await requestRender();
+  } catch (error) {
+    if (state.pdf === pdf && state.document?.id === documentId && state.loadSequence === loadSequence) setStatus(error.code || "renderFailed", "error", {}, () => requestRender());
+  }
+});
+let fullscreenAnchor = null;
+elements.readerFullscreen.addEventListener("click", async () => {
+  const panel = document.querySelector(".reader-panel");
+  fullscreenAnchor = captureReaderAnchor();
+  try {
+    if (document.fullscreenElement) await document.exitFullscreen();
+    else if (panel.requestFullscreen) await panel.requestFullscreen();
+    else throw new Error("unsupported");
+  } catch {
+    fullscreenAnchor = null;
+    setStatus("fullscreenFailed", "error");
+  }
+});
+document.addEventListener("fullscreenchange", () => {
+  const active = Boolean(document.fullscreenElement);
+  elements.readerFullscreen.textContent = t(active ? "exitFullscreen" : "readerFullscreen");
+  elements.readerFullscreen.setAttribute("aria-label", t(active ? "exitFullscreen" : "readerFullscreen"));
+  const anchor = fullscreenAnchor;
+  fullscreenAnchor = null;
+  if (state.pdf) void requestRender(anchor);
+});
 elements.viewMode.addEventListener("change", () => {
   if (!state.pdf) return;
   flushReaderProgress();
@@ -4649,14 +6450,15 @@ elements.exportReadingRecord.addEventListener("click", () => {
 elements.exportAnnotatedPdf.addEventListener("click", () => {
   if (state.document && hasActiveSavedPdfNotes(state.document)) void exportAnnotatedPdf(makeAnnotatedPdfExportRequest(state.document));
 });
-elements.regionMode.addEventListener("click", () => setRegionMode(!state.regionActive));
-elements.readerRegionMode.addEventListener("click", () => elements.regionMode.click());
+elements.readerRegionMode.addEventListener("click", () => setRegionMode(!state.regionActive));
 elements.textSelectionNote.addEventListener("mousedown", (event) => {
   if (event.button !== 0 || elements.textSelectionNote.disabled) return;
   event.preventDefault();
   state.capturedTextSelection = readPdfTextSelection();
 });
 elements.textSelectionNote.addEventListener("click", addTextSelectionToNote);
+elements.textSelectionAsk.addEventListener("click", () => prepareTextReaderAction("ask"));
+elements.textSelectionTranslate.addEventListener("click", () => prepareTextReaderAction("translate"));
 elements.textAnnotationToolbar.addEventListener("pointerdown", (event) => {
   if (event.button !== 0 || !event.target.closest("button, input, label")) return;
   event.preventDefault();
@@ -4667,12 +6469,17 @@ elements.textAnnotationUnderline.addEventListener("click", () => submitTextAnnot
 document.addEventListener("selectionchange", updateTextAnnotationToolbar);
 elements.readerStage.addEventListener("scroll", () => {
   if (elements.textAnnotationToolbar.dataset.contextual === "true") updateTextAnnotationToolbar();
+  readerNavigation?.update();
+  renderSelectedAnnotationToolbar();
+  readerShapes?.positionEditor();
   handleContinuousScroll();
   scheduleReaderProgressCapture();
 });
-elements.regionDraftCancel.addEventListener("click", cancelRegionDraft);
+elements.regionAddNote.addEventListener("click", addCaptureToNote);
+elements.regionAddAgent.addEventListener("click", addCaptureToAgent);
+elements.regionDraftCancel.addEventListener("click", cancelRegionCapture);
 elements.pageNote.addEventListener("click", () => {
-  if (!state.document || !state.pdf || !prepareDraftReplacement(state.document.id)) return;
+  if (!state.document || !state.pdf || state.editDrafts.has(state.document.id) || state.pendingSaves > 0 || state.pendingMutations.size > 0) return;
   const draft = ensureDraft(state.document.id);
   draft.page = state.page;
   draft.rect = null;
@@ -4683,7 +6490,7 @@ elements.pageNote.addEventListener("click", () => {
   clearStatus();
   renderDraft();
   assistant?.contextChanged();
-  elements.noteText.focus();
+  richText?.focus();
 });
 elements.noteText.addEventListener("input", () => {
   if (!state.document) return;
@@ -4699,6 +6506,10 @@ elements.noteText.addEventListener("input", () => {
   }
   const draft = ensureDraft(state.document.id);
   draft.text = elements.noteText.value;
+  if (draft.page === null && draft.text.trim()) {
+    draft.page = state.page;
+    draft.rect = null;
+  }
   invalidateRequestId(draft);
   elements.characterCount.textContent = `${draft.text.length} / 10000`;
   renderDraft();
@@ -4803,11 +6614,33 @@ document.addEventListener("pointercancel", () => {
   state.pointerDragPage = null;
 });
 
+document.addEventListener("pointerdown", (event) => {
+  if (!event.target.closest("#selected-annotation-toolbar, .text-annotation, [data-action='annotation-actions']")) closeSelectedAnnotation();
+});
+
 document.addEventListener("keydown", (event) => {
+  const target = event.target;
+  const editable = target?.isContentEditable || target?.closest?.("input, textarea, select, [contenteditable='true'], .ql-editor");
+  const readerScope = document.querySelector(".reader-panel")?.contains(target) || target === document.body;
+  if ((event.ctrlKey || event.metaKey) && !event.altKey && readerScope && !editable && ["z", "y"].includes(event.key.toLowerCase())) {
+    const direction = event.key.toLowerCase() === "y" || event.shiftKey ? "redo" : "undo";
+    if (annotationHistory.counts(state.document?.id)[direction]) {
+      event.preventDefault();
+      void replayAnnotationHistory(direction);
+    }
+    return;
+  }
   if (event.key !== "Escape") return;
   if (state.documentMenu) {
     event.preventDefault();
     closeDocumentMenu(true);
+  } else if (readerShapes?.handleEscape()) {
+    event.preventDefault();
+  } else if (state.selectedAnnotationId) {
+    closeSelectedAnnotation();
+  } else if (!elements.navigationPanel.hidden) {
+    readerNavigation?.close();
+    elements.navigationToggle.focus({ preventScroll: true });
   } else if (state.regionActive) {
     setRegionMode(false);
   }
@@ -4816,6 +6649,7 @@ document.addEventListener("keydown", (event) => {
 window.addEventListener("pagehide", flushReaderProgress);
 
 window.addEventListener("popstate", () => {
+  invalidateWorkspaceModeIntent();
   const params = new URLSearchParams(window.location.search);
   const studyId = params.get("study");
   const documentId = studyId || params.get("document");
@@ -4887,10 +6721,11 @@ let observedStageWidth = null;
 const resizeObserver = new ResizeObserver(() => {
   if (state.resizeFrame) cancelAnimationFrame(state.resizeFrame);
   state.resizeFrame = requestAnimationFrame(() => {
+    readerNavigation?.update();
     const width = elements.readerStage.clientWidth;
     if (width === observedStageWidth) return;
     observedStageWidth = width;
-    if (!width) return;
+    if (!width || state.readerLayoutLocked) return;
     if (state.zoomMode === "fit" && state.pdf) requestRender();
     else drawHighlight();
   });
@@ -4919,23 +6754,26 @@ async function navigateAssistantSource(source) {
   cancelReaderProgressRestore();
   const attached = source.source;
   if (attached?.kind === "study") {
-    await openDocument(source.document_id, { ownerKind: "study", workspace: "reading" });
+    await openDocument(source.document_id, { ownerKind: "study", workspace: "reading", explicitIntent: true });
     return;
   }
   if (attached?.kind === "dataset") source = { ...source, kind: "dataset_sample", dataset_id: attached.id };
   else if (attached?.kind === "analysis") source = { ...source, kind: "analysis_result", analysis_id: attached.id };
   else if (attached?.kind === "chart") source = { ...source, kind: "chart_result", chart_id: attached.id };
   if (source.kind === "study_context") {
-    await openDocument(source.document_id, { ownerKind: "study", workspace: "reading" });
+    await openDocument(source.document_id, { ownerKind: "study", workspace: "reading", explicitIntent: true });
     return;
   }
   if (source.kind === "data") source = { ...source, kind: "dataset_sample", dataset_id: source.dataset_id || source.id };
+  if (source.kind === "reference_dataset_sample") source = { ...source, kind: "dataset_sample" };
   if (source.kind === "analysis") source = { ...source, kind: "analysis_result", analysis_id: source.analysis_id || source.id };
   if (source.kind === "chart") source = { ...source, kind: "chart_result", chart_id: source.chart_id || source.id };
   if (source.kind === "dataset_sample") {
     if (!source.dataset_id) return;
-    if (state.document?.id !== source.document_id) await openDocument(source.document_id, { datasetId: source.dataset_id });
+    if (state.document?.id !== source.document_id) await openDocument(source.document_id, { workspace: "data", datasetId: source.dataset_id, explicitIntent: true });
     else {
+      invalidateWorkspaceModeIntent();
+      if (workspace?.getMode() !== "data" && !prepareContextNavigation()) return;
       workspace?.reveal("data", { tool: "analysis" });
       await analysis?.openDataset(source.dataset_id);
     }
@@ -4966,6 +6804,7 @@ async function navigateAssistantSource(source) {
     await openDocument(source.document_id, { noteId: source.note_id || null, explicitIntent: true });
   }
   if (state.document?.id !== source.document_id) return;
+  invalidateWorkspaceModeIntent();
   if (source.note_id) {
     openNote(source.note_id);
     return;
@@ -5010,6 +6849,8 @@ async function refreshAfterAgent(documentId) {
 
 function showDatasetInUrl(documentId, datasetId) {
   if (state.document?.id !== documentId || workspace?.getMode() !== "data" || workspace?.getTool() !== "analysis") return;
+  lastDataDocumentId = documentId;
+  lastDataSelection = { datasetId, analysisId: null, chartId: null };
   const url = new URL(window.location.href);
   const replace = url.searchParams.get(isStudy() ? "study" : "document") === documentId && url.searchParams.get("dataset") === datasetId;
   setOwnerInUrl(url, documentId);
@@ -5022,6 +6863,8 @@ function showDatasetInUrl(documentId, datasetId) {
 
 function showAnalysisInUrl(documentId, analysisId) {
   if (state.document?.id !== documentId || workspace?.getMode() !== "data" || workspace?.getTool() !== "analysis") return;
+  lastDataDocumentId = documentId;
+  lastDataSelection = { datasetId: null, analysisId, chartId: null };
   const url = new URL(window.location.href);
   const replace = url.searchParams.get(isStudy() ? "study" : "document") === documentId && url.searchParams.get("analysis") === analysisId;
   setOwnerInUrl(url, documentId);
@@ -5034,8 +6877,10 @@ function showAnalysisInUrl(documentId, analysisId) {
 
 async function openAnalysisJob(documentId, analysisId) {
   if (!analysisId) return;
+  invalidateWorkspaceModeIntent();
+  if (state.document?.id === documentId && workspace?.getMode() !== "data" && !prepareContextNavigation()) return;
   cancelReaderProgressRestore();
-  if (state.document?.id !== documentId) await openDocument(documentId, { analysisId });
+  if (state.document?.id !== documentId) await openDocument(documentId, { workspace: "data", analysisId, explicitIntent: true });
   else {
     workspace?.reveal("data", { tool: "analysis" });
     await analysis?.openJob(analysisId);
@@ -5044,6 +6889,8 @@ async function openAnalysisJob(documentId, analysisId) {
 
 function showChartInUrl(documentId, chartId) {
   if (state.document?.id !== documentId || workspace?.getMode() !== "data" || workspace?.getTool() !== "charts") return;
+  lastDataDocumentId = documentId;
+  lastDataSelection = { datasetId: null, analysisId: null, chartId };
   const url = new URL(window.location.href);
   const replace = url.searchParams.get(isStudy() ? "study" : "document") === documentId && url.searchParams.get("chart") === chartId;
   setOwnerInUrl(url, documentId);
@@ -5056,8 +6903,10 @@ function showChartInUrl(documentId, chartId) {
 
 async function openChart(documentId, chartId) {
   if (!chartId) return;
+  invalidateWorkspaceModeIntent();
+  if (state.document?.id === documentId && workspace?.getMode() !== "data" && !prepareContextNavigation()) return;
   cancelReaderProgressRestore();
-  if (state.document?.id !== documentId) await openDocument(documentId, { chartId });
+  if (state.document?.id !== documentId) await openDocument(documentId, { workspace: "data", chartId, explicitIntent: true });
   else {
     workspace?.reveal("data", { tool: "charts" });
     await charts?.openChart(documentId, chartId);
@@ -5073,8 +6922,18 @@ async function addAnalysisCitation(documentId, job) {
   url.searchParams.set("workspace", "data");
   url.searchParams.set("tool", "analysis");
   const isPaired = job.method === "ttest_paired";
-  const method = job.method === "ttest_independent" ? "Independent-samples t-test" : isPaired ? "Paired t-test" : "Descriptive analysis";
+  const isCorrelation = job.method === "correlation";
+  const method = job.method === "ttest_independent" ? "Independent-samples t-test" : isPaired ? "Paired t-test" : isCorrelation ? "Correlation analysis" : "Descriptive analysis";
   let citation = `Analysis: ${method} · ${job.dataset_name}\n${url.pathname}${url.search}`;
+  if (isCorrelation) {
+    const result = job.result || {};
+    const test = result.test || {};
+    const kind = test.kind || job.correlation?.kind || "pearson";
+    const columns = Array.isArray(test.columns) ? test.columns : Array.isArray(result.pairs?.columns) ? result.pairs.columns : job.columns || [];
+    const coefficient = test.coefficient || (kind === "spearman" ? "rho" : "r");
+    const interval = test.ci ? `[${test.ci.lower ?? "—"}, ${test.ci.upper ?? "—"}]` : "Unavailable";
+    citation = `Analysis: ${method} · ${job.dataset_name}\nColumns: ${columns[0] || "—"}, ${columns[1] || "—"}\nMethod: ${kind === "spearman" ? "Spearman" : "Pearson"}\n${coefficient}: ${test.estimate ?? "—"} · p: ${test.p_value ?? "—"}\nComplete pairs: ${result.counts?.used ?? "—"} · Excluded pairs: ${result.counts?.excluded ?? "—"}\nConfidence interval: ${interval}\nCorrelation does not imply causation.\n${url.pathname}${url.search}`;
+  }
   if (isPaired) {
     const result = job.result || {};
     const test = result.test || {};
@@ -5173,6 +7032,10 @@ function applyRichTextDraft(scope, result) {
     draft.requestId = null;
     draft.saveFailed = false;
   } else {
+    if (draft.page === null && draft.text.trim()) {
+      draft.page = state.page;
+      draft.rect = null;
+    }
     invalidateRequestId(draft);
   }
   clearStatus();
@@ -5194,20 +7057,32 @@ function convertRichDraftToPlain() {
   } else {
     invalidateRequestId(draft);
   }
+  richText?.close({ restoreFocus: false });
   clearStatus();
   renderDraft();
   elements.noteText.focus();
 }
 
+dataNavigation = createDataNavigation({
+  api,
+  getLanguage: () => state.language,
+  openCatalogItem,
+  openPersonalData
+});
+
 workspace = createWorkspace({
   getDocument: () => state.document,
   getLanguage: () => state.language,
+  modeSelected: (mode) => mode === "data" ? openDataWorkspace() : openReadingWorkspace(),
+  modeRendered: (mode) => dataNavigation?.setMode(mode),
+  modePendingChanged: (pending) => dataNavigation?.setNavigationPending(pending),
   readingVisible: () => {
     if (readerWorkspaceVisible) return;
     readerWorkspaceVisible = true;
     if (state.pdf) void requestRender().then(restorePendingReaderProgress);
   },
   toolVisible: (tool) => {
+    readerObjects?.close();
     readerWorkspaceVisible = false;
     if (tool === "charts") charts?.refreshLayout();
   },
@@ -5221,6 +7096,7 @@ richText = createRichText({
   getDraft: matchingRichTextDraft,
   applyDraft: applyRichTextDraft,
   convertToPlain: convertRichDraftToPlain,
+  isBusy: () => state.pendingSaves > 0 || state.pendingMutations.size > 0,
   onOpenChange: () => {
     renderDocumentDetails();
     renderDraft();
@@ -5281,6 +7157,7 @@ analysis = createAnalysis({
   },
   sourcesChanged: (documentId) => {
     if (state.document?.id === documentId) charts?.reload(documentId);
+    dataNavigation?.sourcesChanged(documentId);
   }
 });
 
@@ -5304,6 +7181,7 @@ dataImports = createDataImports({
   datasetConfirmed: (documentId, dataset, navigationGeneration) => {
     analysis.openImportedDataset(documentId, dataset, { select: navigationGeneration === workspace.getNavigationGeneration() });
     if (state.document?.id === documentId) charts?.reload(documentId);
+    dataNavigation?.sourcesChanged(documentId);
   }
 });
 
@@ -5390,6 +7268,7 @@ assistant = createAssistant({
   getContext: assistantContext,
   getSharedDatasetId: () => analysis.getSharedDatasetId(),
   getSelectedDatasetId: () => analysis.getSelectedDatasetId(),
+  getSelectedDataset: () => analysis.getSelectedDataset(),
   acceptDatasetSelection: (documentId, dataset, options) => {
     analysis.openImportedDataset(documentId, dataset, options);
     if (state.document?.id === documentId) charts?.reload(documentId);
@@ -5405,6 +7284,8 @@ assistant = createAssistant({
     return charts.previewProposal(documentId, proposal);
   },
   getChatImages: (documentId) => documentId ? imageLibrary.getChatImages(documentId) : [],
+  selectChatImage: (documentId, imageId) => imageLibrary.selectChatImage(documentId, imageId),
+  deselectChatImage: (documentId, imageId) => imageLibrary.deselectChatImage(documentId, imageId),
   getImages: (documentId, imageIds) => documentId ? imageLibrary.getImages(documentId, imageIds) : [],
   getActiveImage: (documentId) => imageViewer.getActiveImage(documentId),
   clearActiveImage: (documentId) => imageViewer.clearActiveContext(documentId),
@@ -5423,6 +7304,70 @@ readerFind = createReaderFind({
   goToPage,
   getTextLayer: (page) => state.page === page ? elements.textLayer : elements.readerStage.querySelector(`[data-reader-page="${page}"] .textLayer`),
   getPageSurface: (page) => state.page === page ? elements.pageSurface : elements.readerStage.querySelector(`[data-reader-page="${page}"]`)
+});
+
+readerObjects = createReaderObjectMenu({
+  stage: elements.readerStage,
+  api,
+  t,
+  getDocument: () => state.document && !isStudy() ? state.document : null,
+  getRecord: (page) => state.readerPages.get(page),
+  getRenderSequence: () => state.renderSequence,
+  onAction: handleReaderObjectAction,
+  onManualCapture: () => setRegionMode(true)
+});
+
+readerShapes = createReaderShapes({
+  t,
+  getDocument: () => state.document,
+  getNotes: () => state.noteStates,
+  getRecord: (page) => state.readerPages.get(page),
+  getRenderSequence: () => state.renderSequence,
+  getStage: () => elements.readerStage,
+  recordIsCurrent: (record) => readerRecordIsCurrent(record, state.document?.id, state.document?.sha256, state.renderSequence),
+  generationCurrent(target) {
+    if (!readerRecordIsCurrent(target.record, target.documentId, target.sourceSha, target.renderSequence)) return false;
+    if (!target.noteId) return true;
+    const note = noteStateFor(target.noteId);
+    return Boolean(note?.shape_annotation && !note.deleted_at && !note.purged && note.revision === target.revision);
+  },
+  isBusy: () => !state.pdf || !state.document || isStudy() || state.pendingSaves > 0 || state.pendingMutations.size > 0 || state.editDrafts.has(state.document.id),
+  isSuspended: () => state.regionActive || workspace?.getMode() !== "reading",
+  beforeInteraction() {
+    setRegionMode(false);
+    clearPdfTextSelection();
+    closeSelectedAnnotation();
+    readerObjects?.close();
+  },
+  beforeSelect() {
+    setRegionMode(false);
+    clearPdfTextSelection();
+    closeSelectedAnnotation();
+    readerObjects?.close();
+  },
+  save: saveShape,
+  remove: (target) => deleteNote(state.document, noteStateFor(target.noteId)),
+  capture: captureShape,
+  status: (key) => setStatus(key, "error")
+});
+$("reader-shape-rectangle").addEventListener("click", () => readerShapes.start("rectangle"));
+$("reader-shape-arrow").addEventListener("click", () => readerShapes.start("arrow"));
+$("reader-shape-line").addEventListener("click", () => readerShapes.start("line"));
+$("reader-shape-ellipse").addEventListener("click", () => readerShapes.start("ellipse"));
+$("reader-shape-ink").addEventListener("click", () => readerShapes.start("ink"));
+$("reader-shape-textbox").addEventListener("click", () => readerShapes.start("textbox"));
+
+readerNavigation = createReaderNavigation({
+  elements: {
+    toggle: elements.navigationToggle, panel: elements.navigationPanel, close: elements.navigationClose,
+    outlineTab: elements.outlineTab, thumbnailsTab: elements.thumbnailsTab, outline: elements.outline,
+    thumbnailsPanel: elements.thumbnailsPanel, thumbnails: elements.thumbnails, pageInput: elements.pageInput,
+    previous: elements.thumbnailsPrev, next: elements.thumbnailsNext, range: elements.thumbnailsRange,
+    outlineList: elements.outlineList, outlineStatus: elements.outlineStatus, outlineRetry: elements.outlineRetry
+  },
+  t,
+  goToPage,
+  goToDestination: (destination) => state.pdfLinks?.goToDestination(destination)
 });
 
 applyTheme();

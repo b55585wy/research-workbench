@@ -27,6 +27,24 @@ def collect(notes):
     return list({i['id']:i for n in notes for i in n.get('attachments',[])}.values())
 
 
+def note_rich_html(note):
+    from .rich_content import render_html
+    from .models import WorkspaceError
+    images={i['id']:i for i in note.get('attachments',[])}
+    def image_url(image):
+        saved=images.get(image['image_id'])
+        if saved is None or saved['document_id']!=image['document_id'] or saved['sha256']!=image['sha256']:
+            raise WorkspaceError('rich_image_changed','正文图片来源不完整，暂时无法导出。',409)
+        return portable(saved)['preview_path']
+    return render_html(note['rich_content'],image_url=image_url)
+
+
+def attachment_only(note):
+    from .rich_images import references
+    embedded=references(note.get('rich_content'))
+    return [image for image in note.get('attachments',[]) if image['id'] not in embedded]
+
+
 def archive_files(store,identifier,notes):
     images=collect(notes)
     if not images:return []

@@ -16,43 +16,24 @@
   background: var(--ui-surface-subtle);
 }
 
-.rich-text-dialog {
-  width: min(720px, calc(100vw - 32px));
-  max-width: 100%;
-  max-height: 92vh;
-  padding: 0;
-  overflow: auto;
-  border: 1px solid var(--ui-border);
-  border-radius: 6px;
-  background: var(--ui-surface);
-  color: var(--ui-text);
-  box-shadow: 0 18px 60px rgb(0 0 0 / 22%);
-}
-
-.rich-text-dialog::backdrop {
-  background: rgb(15 23 42 / 45%);
-}
-
-.rich-text-dialog-header {
-  padding: 16px 18px 12px;
-  border-bottom: 1px solid var(--ui-border);
-}
-
-.rich-text-dialog-header h2 {
-  margin: 0;
-  font-size: 18px;
+#note-text[hidden],
+#rich-text-editor:empty {
+  display: none;
 }
 
 #rich-text-editor {
   display: flex;
-  min-height: 310px;
+  min-height: 190px;
   flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--ui-input-border);
+  border-radius: 3px;
   background: var(--ui-input-bg);
 }
 
 #rich-text-editor .ql-toolbar {
   flex: none;
-  padding: 10px 14px;
+  padding: 6px;
   border: 0;
   border-bottom: 1px solid var(--ui-border);
   background: var(--ui-surface-subtle);
@@ -77,9 +58,9 @@
 }
 
 #rich-text-editor .ql-editor {
-  min-height: 250px;
-  max-height: 56vh;
-  padding: 16px 18px;
+  min-height: 150px;
+  max-height: 360px;
+  padding: 12px;
   overflow-y: auto;
   color: var(--ui-text);
   line-height: 1.65;
@@ -122,34 +103,32 @@
   content: "Remove";
 }
 
-.rich-text-dialog[data-language="zh"] #rich-text-editor .ql-tooltip::before {
+#rich-text-editor[data-language="zh"] .ql-tooltip::before {
   content: "访问链接：";
 }
 
-.rich-text-dialog[data-language="zh"] #rich-text-editor .ql-tooltip[data-mode="link"]::before {
+#rich-text-editor[data-language="zh"] .ql-tooltip[data-mode="link"]::before {
   content: "输入链接：";
 }
 
-.rich-text-dialog[data-language="zh"] #rich-text-editor .ql-tooltip a.ql-action::after {
+#rich-text-editor[data-language="zh"] .ql-tooltip a.ql-action::after {
   content: "编辑";
 }
 
-.rich-text-dialog[data-language="zh"] #rich-text-editor .ql-tooltip.ql-editing a.ql-action::after {
+#rich-text-editor[data-language="zh"] .ql-tooltip.ql-editing a.ql-action::after {
   content: "保存";
 }
 
-.rich-text-dialog[data-language="zh"] #rich-text-editor .ql-tooltip a.ql-remove::before {
+#rich-text-editor[data-language="zh"] .ql-tooltip a.ql-remove::before {
   content: "移除";
 }
 
 #rich-text-status {
-  min-height: 40px;
-  margin: 0;
-  padding: 10px 18px;
-  border-top: 1px solid var(--ui-border);
+  min-height: 20px;
+  margin: 5px 0 0;
   color: var(--ui-text-muted);
   font-size: 12px;
-  line-height: 20px;
+  line-height: 1.5;
 }
 
 #rich-text-status[data-kind="error"],
@@ -157,12 +136,12 @@
   color: var(--ui-danger);
 }
 
-.rich-text-dialog-actions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 8px;
-  padding: 0 18px 16px;
+.research-inline-image {
+  display: inline-block;
+  max-width: 100%;
+  height: auto;
+  vertical-align: middle;
+  box-shadow: 0 0 0 1px var(--ui-border);
 }
 
 .note-rich-content {
@@ -206,6 +185,14 @@
   overflow-wrap: anywhere;
 }
 
+.note-rich-content img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 8px 0;
+  box-shadow: 0 0 0 1px var(--ui-border);
+}
+
 .rich-text-plain-fallback {
   white-space: pre-wrap;
 }
@@ -221,33 +208,25 @@
 }
 
 @media (max-width: 480px) {
-  .rich-text-dialog {
-    width: calc(100vw - 16px);
-    max-height: 96vh;
-  }
-
-  .rich-text-dialog-header {
-    padding: 13px 12px 10px;
-  }
-
   #rich-text-editor {
-    min-height: 280px;
+    min-height: 180px;
   }
 
   #rich-text-editor .ql-toolbar {
-    padding: 8px;
+    padding: 5px;
+  }
+
+  #rich-text-editor .ql-toolbar button,
+  #rich-text-editor .ql-toolbar .ql-picker {
+    min-height: 36px;
+  }
+
+  #rich-text-editor .ql-toolbar button {
+    min-width: 36px;
   }
 
   #rich-text-editor .ql-editor {
-    min-height: 220px;
-    padding: 13px 12px;
-  }
-
-  #rich-text-status {
-    padding-inline: 12px;
-  }
-
-  .rich-text-dialog-actions {
-    padding: 0 12px 12px;
+    min-height: 140px;
+    padding: 12px;
   }
 }

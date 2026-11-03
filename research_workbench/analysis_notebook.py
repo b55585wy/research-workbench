@@ -47,6 +47,9 @@ def literal_summary(job):
 
 
 def result_table(result):
+    if result.get('method')=='correlation':
+        from .correlation_result import table
+        return table(result)
     if result.get('method')=='ttest_paired':
         from .paired_ttest_result import table
         return table(result)
@@ -74,6 +77,7 @@ def notebook_from_snapshot(job,files):
                   'engine':job['engine'],'columns':job['columns'],'recipe_sha256':job['recipe']['sha256']}
         if job.get('method')=='ttest_independent':expected.update({k:job[k] for k in ('method','ttest','library_sha256')})
         if job.get('method')=='ttest_paired':expected.update({k:job[k] for k in ('method','paired','library_sha256')})
+        if job.get('method')=='correlation':expected.update({k:job[k] for k in ('method','correlation','library_sha256')})
         if any(parameters['parameters'][k]!=v for k,v in expected.items()):raise invalid()
         if parameters['engine_version']!=job['engine_version'] or json.loads(files['summary.json'])!=job['result']:raise invalid()
         logs=[{'output_type':'stream','name':name,'text':files[name+'.txt'].decode('utf-8')} for name in ('stdout','stderr') if files[name+'.txt']]

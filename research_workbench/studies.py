@@ -10,6 +10,19 @@ def identity(identifier, name, question):
     return hashlib.sha256(canonical({'kind':'study/v1','id':identifier,'name':name,'question':question}).encode()).hexdigest()
 
 
+PERSONAL_ROLE='personal_analysis'
+
+
+def tagged_personal(connection, identifier):
+    return connection.execute('SELECT 1 FROM personal_analysis_owner WHERE document_id=?',
+                              (identifier,)).fetchone() is not None
+
+
+def user_study_count(connection):
+    return connection.execute('''SELECT COUNT(*) FROM studies s
+        WHERE NOT EXISTS(SELECT 1 FROM personal_analysis_owner p WHERE p.document_id=s.document_id)''').fetchone()[0]
+
+
 class StudyCreate(BaseModel):
     model_config = ConfigDict(extra='forbid')
     request_id: UUID
@@ -36,8 +49,10 @@ def owner(connection, metadata):
         raise WorkspaceError('study_changed','研究归属记录不完整，请检查资料。',409)
     checksum=identity(metadata['id'],metadata['title'],row['question'])
     if checksum!=row['request_hash']:raise WorkspaceError('study_changed','研究描述已发生变化。',409)
-    return {**metadata,'kind':'study','name':metadata['title'],'question':row['question'],
+    record={**metadata,'kind':'study','name':metadata['title'],'question':row['question'],
             'sha256':checksum,'scope_sha256':checksum}
+    if tagged_personal(connection,metadata['id']):record['workspace_role']=PERSONAL_ROLE
+    return record
 
 
 def verify_owner(store, record):
@@ -60,7 +75,9 @@ class Studies:
 
     def list(self):
         with self.store.connection() as db:
-            ids=[r[0] for r in db.execute('SELECT document_id FROM studies ORDER BY rowid DESC')]
+            ids=[r[0] for r in db.execute('''SELECT s.document_id FROM studies s
+                WHERE NOT EXISTS(SELECT 1 FROM personal_analysis_owner p WHERE p.document_id=s.document_id)
+                ORDER BY s.rowid DESC''')]
         return [self.get(i) for i in ids]
 
     def create(self,payload):
@@ -74,7 +91,7 @@ class Studies:
                 return self.get(identifier),False
             if db.execute('SELECT 1 FROM documents WHERE id=?',(identifier,)).fetchone():
                 raise WorkspaceError('idempotency_conflict','编号已用于已有资料。',409)
-            if db.execute('SELECT COUNT(*) FROM studies').fetchone()[0]>=100:raise WorkspaceError('study_quota','研究数量已达100项。',409)
+            if user_study_count(db)>=100:raise WorkspaceError('study_quota','研究数量已达100项。',409)
             created=timestamp()
             db.execute('INSERT INTO documents VALUES (?,?,?,?,?,?,?)',(identifier,payload.name,None,None,None,None,created))
             db.execute('INSERT INTO studies VALUES (?,?,?,?)',(identifier,payload.question,checksum,created))
@@ -82,7 +99,8 @@ class Studies:
             return read_metadata(db,identifier),True
 
     def papers(self,identifier):
-        self.get(identifier)
+        record=self.get(identifier)
+        if record.get('workspace_role')==PERSONAL_ROLE:return []
         with self.store.connection() as db:
             rows=db.execute('SELECT paper_id,sha256 FROM study_papers WHERE study_id=? ORDER BY created_at,paper_id',(identifier,)).fetchall()
         result=[]
@@ -95,7 +113,10 @@ class Studies:
     def link(self,identifier,payload):
         from .excerpts import verify_source
         from .store import timestamp
-        self.get(identifier);paper=self.store.get_document(str(payload.document_id))
+        record=self.get(identifier)
+        if record.get('workspace_role')==PERSONAL_ROLE:
+            raise WorkspaceError('personal_workspace_not_project','个人数据工作区不是研究项目，不能关联文献。',409)
+        paper=self.store.get_document(str(payload.document_id))
         if paper.get('kind')=='study':raise WorkspaceError('invalid_paper','请选择实际PDF文献。',422)
         if paper['sha256']!=payload.sha256:raise WorkspaceError('source_changed','文献版本已变化。',409)
         verify_source(self.store,paper)
@@ -109,7 +130,9 @@ class Studies:
         return paper,True
 
     def unlink(self,identifier,paper_id,checksum):
-        self.get(identifier)
+        record=self.get(identifier)
+        if record.get('workspace_role')==PERSONAL_ROLE:
+            raise WorkspaceError('personal_workspace_not_project','个人数据工作区不是研究项目，不能关联文献。',409)
         with self.store.connection() as db:
             old=db.execute('SELECT * FROM study_papers WHERE study_id=? AND paper_id=?',(identifier,paper_id)).fetchone()
             if old and old['sha256']!=checksum:raise WorkspaceError('source_changed','关联版本不同，请重新读取。',409)

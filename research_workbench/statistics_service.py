@@ -28,7 +28,12 @@ def methods(service):
          'library':library,'limits':{'outcomes':1,'groups':2,'seconds':30}},
         {'id':'ttest_paired','title':'配对 t 检验','engine':'r','available':library['available'] and bool(service.catalog.r_version),
          'recipe_sha256':recipe('r','ttest_paired')['sha256'],'code_url':'/api/v1/analysis/recipes/r?method=ttest_paired',
-         'library':library,'limits':{'outcomes':2,'unit_columns':1,'seconds':30}}]}
+         'library':library,'limits':{'outcomes':2,'unit_columns':1,'seconds':30}},
+        {'id':'correlation','title':'相关分析','engine':'r','variants':['pearson','spearman'],
+         'available':library['available'] and bool(service.catalog.r_version),
+         'recipe_sha256':recipe('r','correlation')['sha256'],'code_url':'/api/v1/analysis/recipes/r?method=correlation',
+         'library':library,'limits':{'outcomes':2,'minimum_complete_pairs':3,'seconds':30},
+         'spearman_p':'asymptotic','pearson_interval_minimum_pairs':4}]}
 
 
 def probe(service,row,request):

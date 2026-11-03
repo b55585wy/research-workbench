@@ -9,6 +9,7 @@ import tempfile
 import threading
 
 from .models import WorkspaceError
+from .note_lifecycle import ensure_active, read_state
 from .store import timestamp
 
 WORKER = Path(__file__).with_name('excerpt_worker.py')
@@ -92,7 +93,11 @@ class Excerpts:
 
     def create(self, identifier, note_id):
         document = self.store.get_document(identifier)
-        note = self.store.get_note(identifier, note_id)
+        with self.store.connection() as connection:
+            note = ensure_active(read_state(connection, identifier, note_id))
+        if note.get('shape_annotation'):
+            raise WorkspaceError('shape_annotation_excerpt_unsupported',
+                                 '形状批注请使用独立图片上传分享，不能生成图表摘录。', 409)
         if note['rect'] is None:
             raise WorkspaceError('region_required', '请先框选要摘录的图表区域。')
         source = verify_source(self.store, document)

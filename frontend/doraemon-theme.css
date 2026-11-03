@@ -472,7 +472,6 @@ html[data-theme="doraemon-blue"] .assistant-settings {
 }
 
 html[data-theme="doraemon-blue"] :where(
-  .rich-text-dialog,
   .analysis-notebook-dialog,
   .image-viewer-dialog
 ) {
@@ -482,7 +481,6 @@ html[data-theme="doraemon-blue"] :where(
 }
 
 html[data-theme="doraemon-blue"] :where(
-  .rich-text-dialog-header,
   .analysis-notebook-header,
   .image-viewer-header
 ) {
@@ -537,7 +535,7 @@ html[data-theme="doraemon-blue"] .image-annotation-preview {
     border-radius: 22px 22px 0 0;
   }
 
-  html[data-theme="doraemon-blue"] :where(.rich-text-dialog, .analysis-notebook-dialog) {
+  html[data-theme="doraemon-blue"] .analysis-notebook-dialog {
     border-radius: 20px;
   }
 }

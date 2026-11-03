@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Annotated, Literal, Union
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator, model_serializer
@@ -24,6 +24,30 @@ class NoteReference(BaseModel):
     revision: int=Field(strict=True,ge=1)
 
 
+class PaperResourceReference(BaseModel):
+    model_config=ConfigDict(extra='forbid')
+    kind: Literal['paper']
+    document_id: UUID
+    sha256: str=Field(pattern='^[a-f0-9]{64}$')
+
+
+class DatasetResourceReference(BaseModel):
+    model_config=ConfigDict(extra='forbid')
+    kind: Literal['dataset']
+    document_id: UUID
+    dataset_id: UUID
+    sha256: str=Field(pattern='^[a-f0-9]{64}$')
+
+
+ResourceReference = Annotated[
+    Union[PaperResourceReference,DatasetResourceReference],Field(discriminator='kind')]
+
+
+def reference_identity(reference):
+    dataset_id = reference.dataset_id if reference.kind == 'dataset' else None
+    return (reference.kind,reference.document_id,dataset_id)
+
+
 class ReadingContext(BaseModel):
     model_config=ConfigDict(extra='forbid')
     page: int | None=Field(...,strict=True,ge=1,le=200)
@@ -36,6 +60,7 @@ class ReadingContext(BaseModel):
     active_chart_id: UUID | None=None
     language: Literal['zh','en']='zh'
     note_refs: list[NoteReference]=Field(default_factory=list,max_length=8)
+    resource_refs: list[ResourceReference]=Field(default_factory=list,max_length=8)
 
     @field_validator('note_refs')
     @classmethod
@@ -44,11 +69,20 @@ class ReadingContext(BaseModel):
             raise ValueError('Pinned notes must be unique')
         return values
 
+    @field_validator('resource_refs')
+    @classmethod
+    def unique_resource_refs(cls, values):
+        if len({reference_identity(value) for value in values}) != len(values):
+            raise ValueError('Pinned references must be unique')
+        return values
+
     @model_serializer(mode='wrap')
     def compatible_serialization(self, handler):
         value=handler(self)
         if not value.get('note_refs'):
             value.pop('note_refs',None)
+        if not value.get('resource_refs'):
+            value.pop('resource_refs',None)
         return value
 
     @field_validator('rect',mode='before')

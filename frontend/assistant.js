@@ -1,5 +1,8 @@
 import { renderRichHtml } from "/rich-text.js";
 import { createTaskClient } from "/task-client.js";
+import { createAssistantWindow } from "/assistant-window.js";
+import { isPdfPageSource, onlineDatasetSourceUrl, pdfPageApplicationUrl, renderAssistantAnswer } from "/assistant-answer.js";
+import { createReferencePicker, resourceReferenceKey, resourceReferencesFromTurn, resourceReferenceWire } from "/assistant-references.js";
 
 const ACTIVE_STATES = new Set(["queued", "running"]);
 const TERMINAL_STATES = new Set(["waiting_confirmation", "completed", "failed", "cancelled", "interrupted"]);
@@ -8,6 +11,16 @@ const messages = {
   zh: {
     assistant: "研究助手",
     close: "关闭研究助手",
+    window: "移动助手窗口",
+    fullPage: "全屏",
+    exitFullPage: "退出全屏",
+    resize: "调整助手窗口大小",
+    resizeLeft: "从左侧调整助手窗口宽度",
+    resizeRight: "从右侧调整助手窗口宽度",
+    moveHelp: "拖动标题栏移动；聚焦后使用方向键移动。",
+    resizeHelp: "拖动或使用方向键调整窗口大小；按住 Shift 加速。",
+    resizeEdgeHelp: "拖动或使用左右方向键调整宽度；按住 Shift 加速，另一侧边缘保持不动。",
+    windowHelp: "拖动标题栏空白区域移动窗口。聚焦标题栏后使用方向键移动，按住 Shift 加速。左右边缘手柄用于调整宽度，右下角手柄用于调整宽度和高度；也可聚焦手柄使用方向键。全屏或窄屏时不能手动移动或调整大小。",
     history: "对话记录",
     new: "新对话",
     emptyHistory: "暂无对话",
@@ -28,18 +41,33 @@ const messages = {
     cancelled: "已停止",
     interrupted: "服务重启后已中断；不会自动重试或写入。",
     contextPaper: "文献：{title}",
-    contextStudy: "研究：{title}",
+    contextStudy: "项目：{title}",
+    contextPersonal: "我的数据",
     studySource: "研究笔记来源",
     sourceHash: "来源 SHA-256",
     contextPage: "第 {page} 页",
     contextRegion: "选定区域",
     contextWhole: "整页上下文",
+    readerActions: "已加入的原文操作",
+    readerActionAsk: "原文提问",
+    readerActionTranslate: "原文翻译",
+    readerActionImage: "PDF 区域截图",
+    readerActionOpen: "打开固定来源",
+    readerActionRemove: "移除这条原文贡献",
+    readerActionRemoved: "已移除所选原文贡献，其他草稿内容保持不变。",
+    readerActionRemovedEdited: "已移除所选原文来源；其中已编辑的文字仍保留在草稿中。",
+    readerActionPage: "第 {page} 页 · 选定区域",
+    readerAskPrompt: "请解释并回答以下原文涉及的问题：\n“{quote}”\n{source}",
+    readerTranslatePrompt: "请翻译以下原文，并在译文后保留来源：\n“{quote}”\n{source}",
+    readerImagePrompt: "请查看本次明确选择的 PDF 区域截图并解释其内容。截图是用户框选的画面像素，不是已提取的原始嵌入图片。\n{source}",
+    readerImageDescription: "图形批注说明：{description}",
     contextNote: "当前笔记",
     contextImages: "已选 {count} 张图片",
     contextImagePixels: "图片：{name} · 提供预览像素",
     contextImageMetadata: "图片：{name} · 仅提供来源和批注文字，不提供像素",
     clearImageContext: "清除图片上下文",
-    contextDataset: "将提供所选数据的预览",
+    contextDataset: "数据：{title} · 已共享预览",
+    contextDatasetNotShared: "数据：{title} · 未共享",
     contextAnalysis: "将提供当前已保存的分析结果",
     contextChart: "图表：{title} · 仅元信息和摘要",
     clearChartContext: "清除图表上下文",
@@ -68,7 +96,7 @@ const messages = {
     analysisCodeUnavailable: "固定代码暂不可用，不能确认运行。",
     analysisCodeMismatch: "固定代码与提案不一致，不能确认运行。",
     analysisConfirm: "确认运行",
-    analysisQueued: "分析任务已排队，尚未完成。",
+    analysisQueued: "已提交分析任务，请在任务记录中查看运行状态。",
     analysisOpen: "查看分析任务",
     analysisMethod: "分析方法",
     analysisTtest: "独立样本 t 检验（r-stats）",
@@ -140,12 +168,32 @@ const messages = {
     paired_alternative_two_sided: "双侧（第 1 列与第 2 列的差值不为零）",
     paired_alternative_greater: "第 1 列减去第 2 列大于零",
     paired_alternative_less: "第 1 列减去第 2 列小于零",
+    analysisCorrelation: "相关分析（r-stats）",
+    analysisCorrelationFirst: "第 1 个数值列（X）",
+    analysisCorrelationSecond: "第 2 个数值列（Y）",
+    analysisCorrelationKind: "相关系数",
+    analysisCorrelationDeclaration: "同一观察对象与独立性声明",
+    analysisCorrelationConfirmed: "已明确确认每行 X/Y 属于同一观察对象，且各观测行相互独立；未根据列名推断。",
+    analysisCorrelationCompletePairs: "仅使用 X 和 Y 均完整的配对行",
+    analysisCorrelationPairs: "配对核对",
+    analysisCorrelationMatching: "同一观察对象逐行配对",
+    analysisCorrelationTiesFirst: "X 重复值数（不含首次）",
+    analysisCorrelationTiesSecond: "Y 重复值数（不含首次）",
+    analysisCorrelationStats: "完整配对变量摘要",
+    analysisCorrelationSpearman: "Spearman 使用 exact = FALSE、continuity = FALSE；p 值为渐近近似值，不提供置信区间。",
+    correlation_pearson: "Pearson（线性相关）",
+    correlation_spearman: "Spearman（秩相关）",
+    correlation_alternative_two_sided: "双侧（相关系数不为零）",
+    correlation_alternative_greater: "正相关（相关系数大于零）",
+    correlation_alternative_less: "负相关（相关系数小于零）",
     noDocument: "选择一篇文献后可向助手提问。",
     emptyChat: "发送一条消息开始。助手会保留来源、工具进度和待确认操作。",
     you: "你",
     assistantAnswer: "助手",
     tools: "工具记录",
     sources: "来源",
+    sourceExcerpt: "查看原文文字",
+    otherSources: "其他来源（未在回答中引用，{count}）",
     reviewResearchRecord: "查看导出范围",
     proposals: "待确认操作",
     proposalStatus: "状态：{status}",
@@ -186,6 +234,17 @@ const messages = {
     receiptRestored: "已恢复笔记。",
     receiptSaved: "已保存修改。",
     openSource: "打开来源",
+    copyTable: "复制表格",
+    downloadCsv: "下载 CSV",
+    tableCopied: "表格已复制。",
+    copyFailed: "复制失败。回答内容未更改，请重试。",
+    downloadFailed: "下载失败，请重试。",
+    tableScroll: "表格，可水平滚动",
+    citationNewTab: "在新标签页打开 {ref} 来源：{label}",
+    citationOpen: "打开 {ref} 来源：{label}",
+    citationUnverified: "未核实的来源引用",
+    provenance: "引用来源",
+    sourceUrl: "来源 URL",
     not_found: "找不到请求的内容。",
     agent_invalid_state: "当前任务状态不能处理此提案。",
     agent_proposal_changed: "提案内容已变化，请重新查看。",
@@ -194,6 +253,7 @@ const messages = {
     agent_image_not_selected: "只能使用本次明确选择的图片。",
     agent_scope: "此提案不属于当前文献，未执行写入。",
     agent_tool_unavailable: "这项操作当前不可用。",
+    agent_answer_incomplete: "回答未完整生成；当前范围和原文摘录已保留。",
     confirm: "确认保存",
     reject: "拒绝",
     receipt: "实际保存结果",
@@ -216,6 +276,7 @@ const messages = {
     visionOff: "不支持或未确认",
     agent_not_configured: "尚未配置模型。请先在“本地模型设置”中保存连接。",
     agent_vision_disabled: "当前模型未确认支持图片。请移除图片或调整模型设置；消息草稿已保留。",
+    agent_image_limit: "每次最多向助手提供 4 张图片。请明确移除多余图片后再发送。",
     agent_busy: "此对话已有正在处理的任务，请等待或停止后再发送。",
     agent_task_dataset_required: "连续任务需要先明确共享所选数据。",
     agent_task_busy: "此对话已有连续任务。请停止接续，或开始新对话。",
@@ -260,11 +321,57 @@ const messages = {
     note_reference_limit: "笔记来源数量超出限制。请移除多余来源后重新发送。",
     note_purged: "一条笔记来源已彻底删除。请移除它或重新加入其他已保存笔记。",
     noteReferenceUnavailable: "一条笔记来源不存在、已删除或不属于当前文献。请移除后重新加入。",
+    resourceReferences: "已加入的跨项目资料",
+    resourceReferenceHelp: "固定的资料会在发送时提供给助手；论文按页读取，数据仅提供字段和少量样本行。",
+    contextResourceReferences: "外部资料：{count} 项 · 发送时提供",
+    addReferences: "添加资料",
+    referencePickerTitle: "添加资料到当前对话",
+    closeReferences: "关闭资料选择",
+    referenceSearch: "搜索资料",
+    referenceSearchPlaceholder: "搜索标题、作者、DOI 或所属项目",
+    referenceSearchSubmit: "搜索",
+    referencePapers: "论文",
+    referenceDatasets: "数据",
+    referencePickerScope: "仅在明确添加后共享。论文按页读取；数据仅提供字段和最多 5 行样本，不提供完整数据统计。",
+    referenceResults: "资料搜索结果",
+    referencePrevious: "上一页",
+    referenceNext: "下一页",
+    referenceCatalogLoading: "正在加载资料目录…",
+    referenceCatalogEmpty: "没有匹配的资料。可更换搜索词或资料类型。",
+    referenceCatalogFailed: "无法加载资料目录，请重试。尚未添加或共享任何资料。",
+    referencePaper: "论文",
+    referenceDataset: "数据",
+    referenceUntitled: "未命名资料",
+    referenceOwnerUnknown: "所属项目未知",
+    referencePages: "{count} 页",
+    referenceAdd: "添加",
+    referenceAdded: "已添加",
+    referenceAddedNotice: "资料已固定到当前对话，尚未发送。",
+    referenceDuplicate: "这项资料已在当前对话中。",
+    resourceReferenceRemove: "移除这项资料",
+    resourceReferenceRemoved: "已移除资料；之后的请求不会再提供它。",
+    resourceReferenceLimit: "每次最多固定 8 项不同资料。请先移除一项。",
+    resourceReferenceBusy: "当前请求或任务未结束，暂时不能修改资料。",
+    referenceContinueTask: "跨项目资料不支持连续任务。请关闭“连续完成分析、图表和笔记”后再发送。",
+    agent_reference_task_unsupported: "跨项目资料不支持连续任务。请关闭连续任务后重新发送。",
+    resourceReferenceChanged: "固定资料在添加后已变化。可按原请求重试；若要更新资料，请先编辑草稿以取消原重试，再移除并重新添加最新版本。",
+    resourceReferenceUnavailable: "固定资料不存在、已删除或不再可用。可按原请求重试；或先编辑草稿以取消原重试，再移除这项资料。",
+    resourceReferenceRejected: "资料未通过来源校验。原请求保持不变；可按原请求重试，或编辑草稿取消重试后调整资料。",
     untitled: "未命名文献"
   },
   en: {
     assistant: "Research assistant",
     close: "Close research assistant",
+    window: "Move assistant window",
+    fullPage: "Full screen",
+    exitFullPage: "Exit full screen",
+    resize: "Resize assistant window",
+    resizeLeft: "Resize assistant width from the left",
+    resizeRight: "Resize assistant width from the right",
+    moveHelp: "Drag the header to move; focus it and use the arrow keys.",
+    resizeHelp: "Drag or use the arrow keys to resize; hold Shift for larger steps.",
+    resizeEdgeHelp: "Drag or use Left/Right Arrow to resize width; hold Shift for larger steps. The opposite edge stays fixed.",
+    windowHelp: "Drag a free area of the header to move the window. Focus the header and use the arrow keys to move; hold Shift for larger steps. Drag the left or right edge to adjust width, or the bottom-right corner to adjust width and height. Focus a handle to use arrow keys. Manual moving and resizing are unavailable in full-screen or narrow-screen mode.",
     history: "Conversations",
     new: "New conversation",
     emptyHistory: "No conversations",
@@ -285,18 +392,33 @@ const messages = {
     cancelled: "Stopped",
     interrupted: "Interrupted by a service restart; no automatic retry or write will occur.",
     contextPaper: "Paper: {title}",
-    contextStudy: "Research: {title}",
+    contextStudy: "Project: {title}",
+    contextPersonal: "My data",
     studySource: "Study note source",
     sourceHash: "Source SHA-256",
     contextPage: "Page {page}",
     contextRegion: "Selected region",
     contextWhole: "Whole-page context",
+    readerActions: "Prepared reader actions",
+    readerActionAsk: "Question about source text",
+    readerActionTranslate: "Translate source text",
+    readerActionImage: "PDF region capture",
+    readerActionOpen: "Open frozen source",
+    readerActionRemove: "Remove this source contribution",
+    readerActionRemoved: "The selected source contribution was removed. Other draft content was preserved.",
+    readerActionRemovedEdited: "The frozen source was removed. Its edited text remains in your draft.",
+    readerActionPage: "Page {page} · selected region",
+    readerAskPrompt: "Explain the following source text and answer the question it raises:\n“{quote}”\n{source}",
+    readerTranslatePrompt: "Translate the following source text and retain its source after the translation:\n“{quote}”\n{source}",
+    readerImagePrompt: "Inspect the explicitly selected PDF region capture and explain its contents. It contains user-selected canvas pixels, not a proven original embedded PDF image.\n{source}",
+    readerImageDescription: "Shape annotation description: {description}",
     contextNote: "Active note",
     contextImages: "{count} images selected",
     contextImagePixels: "Image: {name} · preview pixels provided",
     contextImageMetadata: "Image: {name} · source and annotation text only; no pixels",
     clearImageContext: "Clear image context",
-    contextDataset: "Selected data preview will be provided",
+    contextDataset: "Data: {title} · preview shared",
+    contextDatasetNotShared: "Data: {title} · not shared",
     contextAnalysis: "The current saved analysis will be provided",
     contextChart: "Chart: {title} · metadata and summary only",
     clearChartContext: "Clear chart context",
@@ -325,7 +447,7 @@ const messages = {
     analysisCodeUnavailable: "The fixed code is unavailable, so this run cannot be confirmed.",
     analysisCodeMismatch: "The fixed code does not match the proposal, so this run cannot be confirmed.",
     analysisConfirm: "Confirm run",
-    analysisQueued: "The analysis task is queued, not complete.",
+    analysisQueued: "Analysis submitted. Check its status in the task list.",
     analysisOpen: "Open analysis task",
     analysisMethod: "Analysis method",
     analysisTtest: "Independent-samples t-test (r-stats)",
@@ -397,12 +519,32 @@ const messages = {
     paired_alternative_two_sided: "Two-sided (first minus second is nonzero)",
     paired_alternative_greater: "First minus second is greater than zero",
     paired_alternative_less: "First minus second is less than zero",
+    analysisCorrelation: "Correlation analysis (r-stats)",
+    analysisCorrelationFirst: "First numeric column (X)",
+    analysisCorrelationSecond: "Second numeric column (Y)",
+    analysisCorrelationKind: "Correlation coefficient",
+    analysisCorrelationDeclaration: "Same observational unit and independence declaration",
+    analysisCorrelationConfirmed: "Explicitly confirmed: each row’s X/Y values belong to the same observational unit and observational rows are independent; this was not inferred from column labels.",
+    analysisCorrelationCompletePairs: "Only rows with both X and Y present are used",
+    analysisCorrelationPairs: "Pairing review",
+    analysisCorrelationMatching: "Same-observational-unit row pairing",
+    analysisCorrelationTiesFirst: "X duplicate values (excluding first)",
+    analysisCorrelationTiesSecond: "Y duplicate values (excluding first)",
+    analysisCorrelationStats: "Complete-pair variable summaries",
+    analysisCorrelationSpearman: "Spearman uses exact = FALSE and continuity = FALSE; the p value is an asymptotic approximation and no confidence interval is provided.",
+    correlation_pearson: "Pearson (linear correlation)",
+    correlation_spearman: "Spearman (rank correlation)",
+    correlation_alternative_two_sided: "Two-sided (nonzero correlation)",
+    correlation_alternative_greater: "Positive correlation (coefficient greater than zero)",
+    correlation_alternative_less: "Negative correlation (coefficient less than zero)",
     noDocument: "Choose a paper before asking the assistant.",
     emptyChat: "Send a message to start. Sources, tool progress, and pending actions are retained.",
     you: "You",
     assistantAnswer: "Assistant",
     tools: "Tool history",
     sources: "Sources",
+    sourceExcerpt: "View original page text",
+    otherSources: "Other sources (not cited in the answer, {count})",
     reviewResearchRecord: "Review export scope",
     proposals: "Actions awaiting confirmation",
     proposalStatus: "Status: {status}",
@@ -443,6 +585,17 @@ const messages = {
     receiptRestored: "Note restored.",
     receiptSaved: "Changes saved.",
     openSource: "Open source",
+    copyTable: "Copy table",
+    downloadCsv: "Download CSV",
+    tableCopied: "Table copied.",
+    copyFailed: "Copy failed. The answer is unchanged; try again.",
+    downloadFailed: "Download failed. Try again.",
+    tableScroll: "Table; scroll horizontally",
+    citationNewTab: "Open {ref} source in a new tab: {label}",
+    citationOpen: "Open {ref} source: {label}",
+    citationUnverified: "Unverified source citation",
+    provenance: "Cited sources",
+    sourceUrl: "Source URL",
     not_found: "The requested content could not be found.",
     agent_invalid_state: "The current task state cannot process this proposal.",
     agent_proposal_changed: "The proposal changed. Review it again.",
@@ -451,6 +604,7 @@ const messages = {
     agent_image_not_selected: "Only images explicitly selected for this request can be used.",
     agent_scope: "This proposal does not belong to the current paper; no write occurred.",
     agent_tool_unavailable: "This action is currently unavailable.",
+    agent_answer_incomplete: "No complete answer was generated. The current scope and source excerpts are retained.",
     confirm: "Confirm save",
     reject: "Reject",
     receipt: "Actual save receipt",
@@ -473,6 +627,7 @@ const messages = {
     visionOff: "unsupported or unconfirmed",
     agent_not_configured: "No model is configured. Save a connection under “Local model settings” first.",
     agent_vision_disabled: "This model has not confirmed image support. Remove the images or change settings; your draft is retained.",
+    agent_image_limit: "Provide at most 4 images per request. Explicitly remove extra images before sending.",
     agent_busy: "This conversation already has an active task. Wait or stop it before sending.",
     agent_task_dataset_required: "Share the selected data explicitly before starting a continuation task.",
     agent_task_busy: "This conversation has a continuation task. Stop it or start a new conversation.",
@@ -517,6 +672,42 @@ const messages = {
     note_reference_limit: "The note-source limit was exceeded. Remove extra pins before sending again.",
     note_purged: "A pinned note was permanently deleted. Remove it or pin another saved note.",
     noteReferenceUnavailable: "A pinned note is missing, deleted, or belongs to another paper. Remove it and pin a valid note.",
+    resourceReferences: "Pinned cross-project references",
+    resourceReferenceHelp: "Pinned references are provided when you send. Papers are read by page; datasets provide only fields and a few sample rows.",
+    contextResourceReferences: "External references: {count} · provided on send",
+    addReferences: "Add references",
+    referencePickerTitle: "Add references to this conversation",
+    closeReferences: "Close reference picker",
+    referenceSearch: "Search references",
+    referenceSearchPlaceholder: "Search title, authors, DOI, or owner",
+    referenceSearchSubmit: "Search",
+    referencePapers: "Papers",
+    referenceDatasets: "Datasets",
+    referencePickerScope: "Nothing is shared until you explicitly add it. Papers are read by page; datasets provide only fields and up to 5 sample rows, not full-data statistics.",
+    referenceResults: "Reference search results",
+    referencePrevious: "Previous",
+    referenceNext: "Next",
+    referenceCatalogLoading: "Loading reference catalog…",
+    referenceCatalogEmpty: "No matching references. Try another search or reference type.",
+    referenceCatalogFailed: "The reference catalog could not be loaded. Retry; nothing has been added or shared.",
+    referencePaper: "Paper",
+    referenceDataset: "Dataset",
+    referenceUntitled: "Untitled reference",
+    referenceOwnerUnknown: "Unknown owner",
+    referencePages: "{count} pages",
+    referenceAdd: "Add",
+    referenceAdded: "Added",
+    referenceAddedNotice: "Reference pinned to this conversation; nothing has been sent.",
+    referenceDuplicate: "This reference is already in the conversation.",
+    resourceReferenceRemove: "Remove this reference",
+    resourceReferenceRemoved: "Reference removed; later requests will not provide it.",
+    resourceReferenceLimit: "Pin at most 8 unique references. Remove one first.",
+    resourceReferenceBusy: "References cannot be changed while a request or task is unresolved.",
+    referenceContinueTask: "Cross-project references do not support continuation tasks. Turn off “Continue analysis, charts, and notes” before sending.",
+    agent_reference_task_unsupported: "Cross-project references do not support continuation tasks. Turn off continuation and send again.",
+    resourceReferenceChanged: "A pinned reference changed after it was added. Retry the exact request, or edit the draft to cancel that retry before removing and re-adding the latest version.",
+    resourceReferenceUnavailable: "A pinned reference is missing, deleted, or unavailable. Retry the exact request, or edit the draft to cancel that retry before removing it.",
+    resourceReferenceRejected: "Reference validation failed. The exact request is unchanged; retry it, or edit the draft to cancel the retry before changing references.",
     untitled: "Untitled paper"
   }
 };
@@ -526,7 +717,13 @@ export function createAssistant(adapter) {
   const elements = {
     toggle: byId("assistant-toggle"),
     panel: byId("assistant-panel"),
+    header: document.querySelector(".assistant-header"),
     close: byId("assistant-close"),
+    fullPage: byId("assistant-full-page"),
+    resize: byId("assistant-resize"),
+    resizeLeft: byId("assistant-resize-left"),
+    resizeRight: byId("assistant-resize-right"),
+    windowHelp: byId("assistant-window-help"),
     heading: byId("assistant-heading"),
     history: byId("assistant-history"),
     new: byId("assistant-new"),
@@ -536,7 +733,25 @@ export function createAssistant(adapter) {
     proposals: byId("assistant-proposals"),
     status: byId("assistant-status"),
     form: byId("assistant-form"),
+    resourceReferenceHelp: byId("assistant-resource-reference-help"),
+    resourceReferences: byId("assistant-resource-references"),
     noteReferences: byId("assistant-note-references"),
+    readerActions: byId("assistant-reader-actions"),
+    referenceAdd: byId("assistant-add-references"),
+    referenceDialog: byId("assistant-reference-picker"),
+    referenceHeading: byId("assistant-reference-picker-heading"),
+    referenceClose: byId("assistant-reference-picker-close"),
+    referenceScope: byId("assistant-reference-picker-scope"),
+    referenceSearchForm: byId("assistant-reference-search-form"),
+    referenceSearchLabel: byId("assistant-reference-search-label"),
+    referenceSearch: byId("assistant-reference-search"),
+    referenceSearchSubmit: byId("assistant-reference-search-submit"),
+    referenceTabPaper: byId("assistant-reference-tab-paper"),
+    referenceTabDataset: byId("assistant-reference-tab-dataset"),
+    referenceStatus: byId("assistant-reference-picker-status"),
+    referenceResults: byId("assistant-reference-results"),
+    referencePrevious: byId("assistant-reference-previous"),
+    referenceNext: byId("assistant-reference-next"),
     message: byId("assistant-message"),
     send: byId("assistant-send"),
     cancel: byId("assistant-cancel"),
@@ -565,6 +780,16 @@ export function createAssistant(adapter) {
     return text;
   }
 
+  const windowControls = createAssistantWindow({
+    panel: elements.panel,
+    header: elements.header,
+    fullPageToggle: elements.fullPage,
+    resizeHandle: elements.resize,
+    leftResizeHandle: elements.resizeLeft,
+    rightResizeHandle: elements.resizeRight,
+    help: elements.windowHelp
+  });
+
   const tasks = createTaskClient({
     api: adapter.api,
     getDocument: adapter.getDocument,
@@ -587,10 +812,39 @@ export function createAssistant(adapter) {
     render: () => render()
   });
 
+  const referencePicker = createReferencePicker({
+    api: adapter.api,
+    t,
+    elements: {
+      add: elements.referenceAdd,
+      dialog: elements.referenceDialog,
+      heading: elements.referenceHeading,
+      close: elements.referenceClose,
+      scope: elements.referenceScope,
+      searchForm: elements.referenceSearchForm,
+      searchLabel: elements.referenceSearchLabel,
+      search: elements.referenceSearch,
+      searchSubmit: elements.referenceSearchSubmit,
+      tabs: { paper: elements.referenceTabPaper, dataset: elements.referenceTabDataset },
+      status: elements.referenceStatus,
+      list: elements.referenceResults,
+      previous: elements.referencePrevious,
+      next: elements.referenceNext
+    },
+    getTarget: () => {
+      const { paper, entry } = current();
+      return paper && entry ? { paperId: paper.id, entry, conversationId: entry.conversationId } : null;
+    },
+    canEdit: (target) => canEditReferences(target.paperId, target.entry),
+    onAdd: addResourceReference
+  });
+
   function entryFor(documentId) {
     if (!papers.has(documentId)) {
       papers.set(documentId, {
         conversations: [],
+        conversationsLoading: false,
+        conversationsLoadSequence: 0,
         conversationId: null,
         turns: [],
         draft: "",
@@ -600,7 +854,9 @@ export function createAssistant(adapter) {
         loadSequence: 0,
         loadController: null,
         pendingSend: null,
+        resourceRefs: [],
         noteRefs: [],
+        readerActions: [],
         explicitNoteContext: false,
         pendingDecision: null,
         chartPreviews: new Map(),
@@ -658,21 +914,32 @@ export function createAssistant(adapter) {
     }
     const context = adapter.getContext();
     const images = adapter.getChatImages(paper.id);
+    const pendingContext = entry?.pendingSend?.payload?.context;
+    const readerAction = entry?.readerActions?.at(-1);
+    const sourcePage = pendingContext ? pendingContext.page : readerAction?.page ?? context.page;
+    const sourceRect = pendingContext ? pendingContext.rect : readerAction ? readerAction.rect : context.rect;
     const badges = paper.kind === "study" ? [
-      t("contextStudy", { title: paper.title || paper.name || t("untitled") })
+      t(paper.workspace_role === "personal_analysis" ? "contextPersonal" : "contextStudy", { title: paper.title || paper.name || t("untitled") })
     ] : [
       t("contextPaper", { title: paper.title || paper.original_filename || t("untitled") }),
-      t("contextPage", { page: context.page }),
-      t(context.rect ? "contextRegion" : "contextWhole")
+      t("contextPage", { page: sourcePage }),
+      t(sourceRect ? "contextRegion" : "contextWhole")
     ];
-    const pendingContext = entry?.pendingSend?.payload?.context;
     const hasNoteContext = pendingContext
       ? Boolean(pendingContext.active_note_id || pendingContext.note_refs?.length)
       : entry?.explicitNoteContext ? Boolean(entry.noteRefs.length) : Boolean(context.activeNoteId);
     if (hasNoteContext) badges.push(t("contextNote"));
     if (images.length) badges.push(t("contextImages", { count: images.length }));
-    if (adapter.getSharedDatasetId?.()) badges.push(t("contextDataset"));
+    const selectedDataset = adapter.getSelectedDataset?.();
+    const sharedDatasetId = adapter.getSharedDatasetId?.();
+    if (selectedDataset || sharedDatasetId) {
+      badges.push(t(sharedDatasetId ? "contextDataset" : "contextDatasetNotShared", {
+        title: selectedDataset?.original_filename || selectedDataset?.name || selectedDataset?.id || sharedDatasetId
+      }));
+    }
     if (adapter.getActiveAnalysisId?.()) badges.push(t("contextAnalysis"));
+    const resourceRefCount = pendingContext ? pendingContext.resource_refs?.length || 0 : entry?.resourceRefs.length || 0;
+    if (resourceRefCount) badges.push(t("contextResourceReferences", { count: resourceRefCount }));
     for (const label of badges) {
       const badge = document.createElement("span");
       badge.className = "assistant-context-badge";
@@ -707,6 +974,63 @@ export function createAssistant(adapter) {
       clear.textContent = t("clearImageContext");
       clear.addEventListener("click", () => adapter.clearActiveImage(paper.id));
       elements.context.append(badge, clear);
+    }
+  }
+
+  function canEditReferences(paperId, entry) {
+    return isCurrent(paperId, entry) && !entry.loading && !entry.conversationsLoading && !entry.pendingSend && !activeTurn(entry) && !entry.pendingDecision && !tasks.isBusy(paperId, entry.conversationId);
+  }
+
+  function addResourceReference(target, reference) {
+    const { paperId, entry } = target;
+    if (!canEditReferences(paperId, entry)) return "busy";
+    const key = resourceReferenceKey(reference);
+    if (entry.resourceRefs.some((item) => resourceReferenceKey(item) === key)) return "duplicate";
+    if (entry.resourceRefs.length >= 8) {
+      entry.status = { key: "resourceReferenceLimit", kind: "error" };
+      render();
+      return "limit";
+    }
+    entry.resourceRefs = [...entry.resourceRefs, reference];
+    entry.status = { key: "referenceAddedNotice", kind: "success" };
+    render();
+    return "added";
+  }
+
+  function renderResourceReferences(entry) {
+    elements.resourceReferences.replaceChildren();
+    elements.resourceReferences.setAttribute("aria-label", t("resourceReferences"));
+    const paper = adapter.getDocument();
+    elements.resourceReferenceHelp.hidden = !paper || !entry?.resourceRefs.length;
+    elements.resourceReferenceHelp.textContent = t("resourceReferenceHelp");
+    if (!paper || !entry) return;
+    const editable = canEditReferences(paper.id, entry);
+    for (const reference of entry.resourceRefs) {
+      const chip = document.createElement("article");
+      chip.className = "assistant-resource-reference";
+      chip.dataset.referenceKey = resourceReferenceKey(reference);
+      const description = document.createElement("div");
+      description.className = "assistant-resource-reference-description";
+      const title = document.createElement("strong");
+      title.textContent = reference.title || t("referenceUntitled");
+      const meta = document.createElement("span");
+      meta.textContent = `${t(reference.kind === "paper" ? "referencePaper" : "referenceDataset")} · ${reference.owner_title || t("referenceOwnerUnknown")}`;
+      description.append(title, meta);
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "button button-quiet assistant-resource-reference-remove";
+      remove.textContent = t("resourceReferenceRemove");
+      remove.setAttribute("aria-label", `${t("resourceReferenceRemove")}: ${title.textContent}`);
+      remove.disabled = !editable;
+      remove.addEventListener("click", () => {
+        if (!canEditReferences(paper.id, entry)) return;
+        const key = resourceReferenceKey(reference);
+        entry.resourceRefs = entry.resourceRefs.filter((item) => resourceReferenceKey(item) !== key);
+        entry.status = { key: "resourceReferenceRemoved", kind: "info" };
+        render();
+      });
+      chip.append(description, remove);
+      elements.resourceReferences.append(chip);
     }
   }
 
@@ -792,6 +1116,7 @@ export function createAssistant(adapter) {
     if (isCurrent(documentId, entry)) {
       elements.panel.hidden = false;
       elements.toggle.setAttribute("aria-expanded", "true");
+      windowControls.show();
       render();
       elements.message.focus();
     }
@@ -800,6 +1125,174 @@ export function createAssistant(adapter) {
 
   function addNoteReference(documentId, note) {
     return addNoteReferences(documentId, [note]) === "added";
+  }
+
+  function frozenImageSource(documentId, action) {
+    const supplied = action.description !== undefined || action.sourceUrl !== undefined || action.sourceLabel !== undefined;
+    if (!supplied) return { description: "", sourceUrl: null, sourceLabel: null };
+    const sourceLabel = typeof action.sourceLabel === "string" ? action.sourceLabel.replace(/\s+/g, " ").trim() : "";
+    if (action.kind !== "image" || typeof action.description !== "string" || !sourceLabel || sourceLabel.length > 200 || typeof action.sourceUrl !== "string" || action.sourceUrl.length > 2048) return null;
+    let url;
+    try {
+      url = new URL(action.sourceUrl);
+    } catch {
+      return null;
+    }
+    const rect = (url.searchParams.get("rect") || "").split(",").map(Number);
+    const revision = Number(url.searchParams.get("shape_revision"));
+    if (url.origin !== window.location.origin || url.pathname !== "/" || url.username || url.password || url.hash || url.href.length > 2048 ||
+      url.searchParams.get("document") !== documentId || url.searchParams.get("page") !== String(action.page) || url.searchParams.get("workspace") !== "reading" ||
+      url.searchParams.get("source_sha256") !== adapter.getDocument()?.sha256 || !url.searchParams.get("shape_note") ||
+      !Number.isInteger(revision) || revision < 1 || !["rectangle", "arrow", "textbox", "line", "ellipse", "ink"].includes(url.searchParams.get("shape_kind")) ||
+      rect.length !== 4 || !rect.every(Number.isFinite) || !rect.every((value, index) => Math.abs(value - action.rect[index]) <= 1e-6)) return null;
+    return { description: action.description, sourceUrl: url.href, sourceLabel };
+  }
+
+  function readerSource(documentId, action) {
+    const url = action.sourceUrl ? new URL(action.sourceUrl) : new URL("/", window.location.origin);
+    if (!action.sourceUrl) {
+      url.searchParams.set("document", documentId);
+      url.searchParams.set("page", String(action.page));
+      url.searchParams.set("workspace", "reading");
+    }
+    const label = action.sourceLabel || (language === "zh" ? `来源：第 ${action.page} 页 · 选定区域` : `Source: page ${action.page} · selected region`);
+    return `${label}\n${url.href}`;
+  }
+
+  function transformReaderActionRanges(entry, previous, next) {
+    let prefix = 0;
+    while (prefix < previous.length && prefix < next.length && previous[prefix] === next[prefix]) prefix += 1;
+    let suffix = 0;
+    while (suffix < previous.length - prefix && suffix < next.length - prefix && previous[previous.length - 1 - suffix] === next[next.length - 1 - suffix]) suffix += 1;
+    const oldEnd = previous.length - suffix;
+    const insertedLength = next.length - prefix - suffix;
+    const transform = (position, priority) => {
+      const delta = insertedLength - (oldEnd - prefix);
+      if (position < prefix || position === prefix && !priority) return position;
+      if (position > oldEnd || position === oldEnd && priority) return position + delta;
+      if (position === prefix && priority) return position + insertedLength;
+      if (position === oldEnd && !priority) return prefix;
+      return prefix + Math.min(position - prefix, insertedLength);
+    };
+    for (const action of entry.readerActions) {
+      const start = transform(action.draftStart, true);
+      const end = transform(action.draftEnd, false);
+      action.draftStart = start;
+      action.draftEnd = Math.max(start, end);
+    }
+  }
+
+  function removeReaderAction(entry, action) {
+    if (entry.pendingSend?.pending) return;
+    const index = entry.readerActions.findIndex((item) => item.id === action.id);
+    if (index < 0) return;
+    const previous = entry.draft;
+    const unchanged = previous.slice(action.draftStart, action.draftEnd) === action.draftText;
+    let next = previous;
+    if (unchanged) {
+      let start = action.draftStart;
+      let end = action.draftEnd;
+      const nextAction = entry.readerActions[index + 1];
+      if (nextAction && nextAction.draftStart === end + nextAction.separator.length && nextAction.separator && previous.slice(end, end + nextAction.separator.length) === nextAction.separator) {
+        end += nextAction.separator.length;
+      } else if (action.separator && previous.slice(start - action.separator.length, start) === action.separator) {
+        start -= action.separator.length;
+      }
+      next = `${previous.slice(0, start)}${previous.slice(end)}`;
+      for (const item of entry.readerActions) {
+        const shift = (position) => position <= start ? position : position >= end ? position - (end - start) : start;
+        item.draftStart = shift(item.draftStart);
+        item.draftEnd = shift(item.draftEnd);
+      }
+    }
+    entry.readerActions = entry.readerActions.filter((item) => item.id !== action.id);
+    entry.draft = next;
+    entry.pendingSend = null;
+    if (action.imageAdded && !entry.readerActions.some((item) => item.imageId === action.imageId)) {
+      adapter.deselectChatImage?.(adapter.getDocument().id, action.imageId);
+    }
+    entry.status = { key: unchanged ? "readerActionRemoved" : "readerActionRemovedEdited", kind: "info" };
+    render();
+  }
+
+  function renderReaderActions(entry) {
+    elements.readerActions.replaceChildren();
+    elements.readerActions.setAttribute("aria-label", t("readerActions"));
+    const paper = adapter.getDocument();
+    if (!paper || !entry) return;
+    for (const action of entry.readerActions) {
+      const chip = document.createElement("article");
+      chip.className = "assistant-reader-action";
+      chip.dataset.readerActionId = action.id;
+      const kind = document.createElement("strong");
+      kind.textContent = t(action.kind === "ask" ? "readerActionAsk" : action.kind === "translate" ? "readerActionTranslate" : "readerActionImage");
+      const source = document.createElement("button");
+      source.type = "button";
+      source.className = "button button-quiet assistant-reader-action-source";
+      source.dataset.action = "open-reader-action-source";
+      source.textContent = `${t("readerActionPage", { page: action.page })} · ${t("readerActionOpen")}`;
+      source.addEventListener("click", () => adapter.navigateSource({ document_id: paper.id, page: action.page, rect: [...action.rect] }));
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "button button-quiet assistant-reader-action-remove";
+      remove.dataset.action = "remove-reader-action";
+      remove.disabled = Boolean(entry.pendingSend?.pending);
+      remove.textContent = t("readerActionRemove");
+      remove.setAttribute("aria-label", `${t("readerActionRemove")}: ${kind.textContent}, ${t("contextPage", { page: action.page })}`);
+      remove.addEventListener("click", () => removeReaderAction(entry, action));
+      chip.append(kind, source, remove);
+      elements.readerActions.append(chip);
+    }
+  }
+
+  function prepareReaderAction(documentId, action) {
+    const paper = adapter.getDocument();
+    if (paper && paper.id !== documentId) return "owner";
+    if (!paper || paper.kind === "study" || !action) return "invalid";
+    const kind = ["ask", "translate", "image"].includes(action.kind) ? action.kind : null;
+    const rect = action.rect;
+    const validRect = Array.isArray(rect) && rect.length === 4 && rect.every(Number.isFinite) &&
+      rect[0] >= 0 && rect[1] >= 0 && rect[2] <= 1 && rect[3] <= 1 && rect[2] > rect[0] && rect[3] > rect[1];
+    if (!kind || !Number.isInteger(action.page) || action.page < 1 || action.page > paper.page_count || !validRect) return "invalid";
+    if (kind !== "image" && (typeof action.quote !== "string" || !action.quote.trim())) return "invalid";
+    if (kind === "image" && (!action.image?.id || action.image.document_id !== documentId || !/^[0-9a-f]{64}$/.test(action.image.sha256 || ""))) return "invalid";
+    const frozenSource = frozenImageSource(documentId, action);
+    if (!frozenSource) return "invalid";
+    const entry = entryFor(documentId);
+    if (entry.pendingSend?.pending) return "pending";
+    const frozen = {
+      id: crypto.randomUUID(),
+      kind,
+      page: action.page,
+      rect: [...rect],
+      quote: typeof action.quote === "string" ? action.quote : "",
+      imageId: kind === "image" ? action.image.id : null,
+      imageAdded: kind === "image" && !adapter.getChatImages(documentId).some((image) => image.id === action.image.id),
+      ...frozenSource
+    };
+    const promptKey = kind === "ask" ? "readerAskPrompt" : kind === "translate" ? "readerTranslatePrompt" : "readerImagePrompt";
+    const description = frozen.description ? `\n${t("readerImageDescription", { description: frozen.description })}` : "";
+    const prompt = `${t(promptKey, { quote: frozen.quote, source: readerSource(documentId, frozen) })}${description}`;
+    const separator = entry.draft ? (entry.draft.endsWith("\n") ? "\n" : "\n\n") : "";
+    const nextDraft = `${entry.draft}${separator}${prompt}`;
+    if (nextDraft.length > 8000) return "limit";
+    frozen.separator = separator;
+    frozen.draftText = prompt;
+    frozen.draftStart = entry.draft.length + separator.length;
+    frozen.draftEnd = nextDraft.length;
+    if (kind === "image" && (!adapter.selectChatImage || !adapter.selectChatImage(documentId, frozen.imageId))) {
+      return adapter.getChatImages(documentId).length >= 4 ? "imageLimit" : "invalid";
+    }
+    entry.pendingSend = null;
+    entry.readerActions.push(frozen);
+    entry.draft = nextDraft;
+    entry.status = null;
+    elements.panel.hidden = false;
+    elements.toggle.setAttribute("aria-expanded", "true");
+    windowControls.show();
+    render();
+    elements.message.focus();
+    return "added";
   }
 
   function renderHistory(entry) {
@@ -828,7 +1321,14 @@ export function createAssistant(adapter) {
     elements.history.disabled = !entry?.conversations.length || entry.loading || Boolean(entry.pendingSend?.pending) || Boolean(entry.pendingDecision);
   }
 
+  function openTurnSource(source) {
+    if (source.kind === "online_dataset") return;
+    if (source.kind === "research_record") adapter.reviewResearchRecord?.(source);
+    else adapter.navigateSource(source);
+  }
+
   function renderMessages(entry) {
+    const expandedTools = new Set([...elements.messages.querySelectorAll("details.assistant-tools[data-turn-id][open]")].map((details) => details.dataset.turnId));
     elements.messages.replaceChildren();
     if (!entry?.turns.length) {
       const empty = document.createElement("p");
@@ -861,9 +1361,16 @@ export function createAssistant(adapter) {
         answer.className = "assistant-answer";
         const label = document.createElement("strong");
         label.textContent = t("assistantAnswer");
-        const text = document.createElement("p");
-        text.textContent = turn.answer;
-        answer.append(label, text);
+        const content = document.createElement("div");
+        content.className = "assistant-answer-content";
+        renderAssistantAnswer(content, {
+          answer: turn.answer,
+          sources: turn.sources,
+          language,
+          t,
+          onOpenSource: openTurnSource
+        });
+        answer.append(label, content);
         article.append(answer);
       }
       if (turn.error) {
@@ -872,20 +1379,25 @@ export function createAssistant(adapter) {
         error.textContent = errorText(turn.error, "turnFailed");
         article.append(error);
       }
-      if (Array.isArray(turn.events) && turn.events.length) {
+      const events = (Array.isArray(turn.events) ? turn.events : []).filter((event) => event && (String(event.title || "").trim() || String(event.summary || "").trim()));
+      if (events.length) {
         const details = document.createElement("details");
         details.className = "assistant-tools";
+        details.dataset.turnId = turn.id;
+        details.open = expandedTools.has(String(turn.id));
         const summary = document.createElement("summary");
-        summary.textContent = `${t("tools")} (${turn.events.length})`;
+        summary.textContent = `${t("tools")} (${events.length})`;
         const list = document.createElement("ol");
-        for (const event of turn.events) {
+        for (const event of events) {
           const item = document.createElement("li");
-          item.dataset.eventKind = event.kind;
-          item.dataset.status = event.status;
-          const title = document.createElement("strong");
-          title.textContent = `${event.title} · ${event.status}`;
-          item.append(title);
-          if (event.summary) {
+          item.dataset.eventKind = event.kind || "";
+          item.dataset.status = event.status || "";
+          if (String(event.title || "").trim()) {
+            const title = document.createElement("strong");
+            title.textContent = event.status ? `${event.title} · ${event.status}` : event.title;
+            item.append(title);
+          }
+          if (String(event.summary || "").trim()) {
             const text = document.createElement("p");
             text.textContent = event.summary;
             item.append(text);
@@ -899,38 +1411,103 @@ export function createAssistant(adapter) {
     }
   }
 
+  function appendSourceExcerpt(item, source, key, expanded) {
+    if (!source.text) return;
+    const details = document.createElement("details");
+    details.className = "assistant-source-excerpt";
+    details.dataset.sourceDetail = key;
+    details.open = expanded.has(key);
+    const summary = document.createElement("summary");
+    summary.textContent = t("sourceExcerpt");
+    details.append(summary);
+    const populate = () => {
+      if (details.dataset.loaded === "true") return;
+      const excerpt = document.createElement("p");
+      excerpt.textContent = source.text;
+      details.append(excerpt);
+      details.dataset.loaded = "true";
+    };
+    details.addEventListener("toggle", () => {
+      if (details.open) populate();
+    });
+    if (details.open) populate();
+    item.append(details);
+  }
+
+  function appendSourceItem(list, source, index, expanded) {
+    const item = document.createElement("li");
+    const isResearchRecord = source.kind === "research_record";
+    const isPdfPage = isPdfPageSource(source);
+    const onlineDatasetUrl = onlineDatasetSourceUrl(source);
+    const isUnverifiedOnlineDataset = source.kind === "online_dataset" && !onlineDatasetUrl;
+    const control = document.createElement(isPdfPage || onlineDatasetUrl ? "a" : isUnverifiedOnlineDataset ? "span" : "button");
+    control.className = "assistant-source-button";
+    const label = isResearchRecord ? t("reviewResearchRecord") : source.label || source.ref || t("openSource");
+    control.textContent = label;
+    if (isPdfPage || onlineDatasetUrl) {
+      control.href = onlineDatasetUrl || pdfPageApplicationUrl(source);
+      control.target = "_blank";
+      control.rel = "noopener noreferrer";
+      control.classList.add("assistant-source-link");
+      control.setAttribute("aria-label", t("citationNewTab", { ref: source.ref || label, label }));
+    } else if (isUnverifiedOnlineDataset) {
+      control.classList.add("assistant-citation-unverified");
+      control.title = t("citationUnverified");
+      control.setAttribute("aria-label", `${label}: ${t("citationUnverified")}`);
+    } else {
+      control.type = "button";
+      control.addEventListener("click", () => openTurnSource(source));
+    }
+    item.append(control);
+    if (isPdfPage) {
+      const page = document.createElement("span");
+      page.className = "assistant-source-page";
+      page.textContent = t("pageValue", { page: source.page });
+      item.append(page);
+    }
+    if (isResearchRecord && source.ref) {
+      const reference = document.createElement("p");
+      reference.className = "assistant-source-ref";
+      reference.textContent = t("sourceRef", { ref: source.ref });
+      item.append(reference);
+    }
+    const key = source.ref || `${source.kind || "source"}:${source.document_id || ""}:${source.page || ""}:${index}`;
+    appendSourceExcerpt(item, source, key, expanded);
+    list.append(item);
+  }
+
   function renderSources(turn) {
+    const expanded = new Set([...elements.sources.querySelectorAll("details[data-source-detail][open]")].map((details) => details.dataset.sourceDetail));
     elements.sources.replaceChildren();
-    if (!Array.isArray(turn?.sources) || !turn.sources.length) return;
+    const sources = (Array.isArray(turn?.sources) ? turn.sources : []).filter((source) => source && typeof source === "object");
+    if (!sources.length) return;
+    const citedRefs = new Set();
+    for (const marker of String(turn.answer || "").matchAll(/\[R\d+(?:\s*,\s*R\d+)*\]/g)) {
+      for (const ref of marker[0].matchAll(/R\d+/g)) citedRefs.add(ref[0]);
+    }
+    const cited = sources.filter((source) => source.ref && citedRefs.has(source.ref));
+    const uncited = sources.filter((source) => !source.ref || !citedRefs.has(source.ref));
     const heading = document.createElement("h3");
     heading.textContent = t("sources");
-    const list = document.createElement("ul");
-    for (const source of turn.sources) {
-      const item = document.createElement("li");
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = "assistant-source-button";
-      const isResearchRecord = source.kind === "research_record";
-      button.textContent = isResearchRecord ? t("reviewResearchRecord") : source.label || source.ref;
-      button.addEventListener("click", () => {
-        if (isResearchRecord) adapter.reviewResearchRecord?.(source);
-        else adapter.navigateSource(source);
-      });
-      item.append(button);
-      if (isResearchRecord && source.ref) {
-        const reference = document.createElement("p");
-        reference.className = "assistant-source-ref";
-        reference.textContent = t("sourceRef", { ref: source.ref });
-        item.append(reference);
-      }
-      if (source.text) {
-        const excerpt = document.createElement("p");
-        excerpt.textContent = source.text;
-        item.append(excerpt);
-      }
-      list.append(item);
+    elements.sources.append(heading);
+    if (cited.length) {
+      const list = document.createElement("ul");
+      list.className = "assistant-cited-sources";
+      cited.forEach((source, index) => appendSourceItem(list, source, index, expanded));
+      elements.sources.append(list);
     }
-    elements.sources.append(heading, list);
+    if (uncited.length) {
+      const details = document.createElement("details");
+      details.className = "assistant-other-sources";
+      details.dataset.sourceDetail = "other-sources";
+      details.open = expanded.has("other-sources");
+      const summary = document.createElement("summary");
+      summary.textContent = t("otherSources", { count: uncited.length });
+      const list = document.createElement("ul");
+      uncited.forEach((source, index) => appendSourceItem(list, source, index, expanded));
+      details.append(summary, list);
+      elements.sources.append(details);
+    }
   }
 
   function errorText(error, fallback = "request_failed") {
@@ -1001,7 +1578,7 @@ export function createAssistant(adapter) {
 
   function analysisRecipe(payload) {
     const engine = payload.engine === "r" ? "r" : "python";
-    const method = ["ttest_independent", "ttest_paired"].includes(payload.method) ? payload.method : "describe";
+    const method = ["ttest_independent", "ttest_paired", "correlation"].includes(payload.method) ? payload.method : "describe";
     const key = `${engine}:${method}`;
     if (!analysisRecipes.has(key)) {
       const state = { status: "loading", recipe: null };
@@ -1145,15 +1722,97 @@ export function createAssistant(adapter) {
       pairing.missing === "complete_pairs" && JSON.stringify(pairing.columns) === JSON.stringify(columns);
   }
 
+  function appendCorrelationProposal(card, details, payload) {
+    const options = payload.correlation || {};
+    const columns = Array.isArray(payload.columns) ? payload.columns : [];
+    const preview = payload.preview || {};
+    const pairs = preview.pairs || {};
+    const kind = options.kind || "pearson";
+    appendProposalField(details, t("analysisMethod"), t("analysisCorrelation"));
+    appendProposalField(details, t("analysisCorrelationFirst"), columns[0] || "—");
+    appendProposalField(details, t("analysisCorrelationSecond"), columns[1] || "—");
+    appendProposalField(details, t("analysisCorrelationKind"), t(`correlation_${kind}`));
+    appendProposalField(details, t("analysisAlternative"), t(`correlation_alternative_${options.alternative || "two_sided"}`));
+    if (kind === "pearson") appendProposalField(details, t("analysisConfidence"), `${Number(options.confidence ?? 0.95) * 100}%`);
+    appendProposalField(details, t("analysisCorrelationDeclaration"), options.independent_pairs_confirmed === true ? t("analysisCorrelationConfirmed") : "—");
+    appendProposalField(details, t("analysisMissing"), t("analysisCorrelationCompletePairs"));
+    if (payload.library) appendProposalField(details, t("analysisLibrary"), `${payload.library.id || "r-stats"} ${payload.library.version || ""} · ${payload.library.sha256 || "—"}`);
+    const counts = preview.counts || {};
+    const firstTiesReady = Number.isInteger(pairs.ties?.first) && pairs.ties.first >= 0 && Number.isInteger(counts.used) && pairs.ties.first <= counts.used;
+    const secondTiesReady = Number.isInteger(pairs.ties?.second) && pairs.ties.second >= 0 && Number.isInteger(counts.used) && pairs.ties.second <= counts.used;
+    for (const [field, key] of [["total", "analysisPairedTotal"], ["used", "analysisPairedUsed"], ["excluded", "analysisPairedExcluded"], ["missing_first_only", "analysisPairedMissingFirst"], ["missing_second_only", "analysisPairedMissingSecond"], ["missing_both", "analysisPairedMissingBoth"]]) {
+      appendProposalField(details, `${t("analysisCounts")} · ${t(key)}`, counts[field] ?? "—");
+    }
+    if (Array.isArray(preview.stats)) {
+      const label = document.createElement("strong");
+      label.textContent = t("analysisCorrelationStats");
+      const basis = document.createElement("p");
+      basis.className = "assistant-proposal-inactive";
+      basis.textContent = t("analysisPairedStatsBasis");
+      const scroll = document.createElement("div");
+      scroll.className = "assistant-ttest-stats";
+      const table = document.createElement("table");
+      const thead = document.createElement("thead");
+      const header = document.createElement("tr");
+      for (const text of [t("analysisColumns"), t("analysisCompletePairN"), t("analysisExcludedPairN"), t("analysisMean"), t("analysisSd"), t("analysisMedian"), t("analysisMin"), t("analysisMax")]) {
+        const cell = document.createElement("th");
+        cell.textContent = text;
+        header.append(cell);
+      }
+      thead.append(header);
+      const tbody = document.createElement("tbody");
+      for (const stat of preview.stats) {
+        const row = document.createElement("tr");
+        for (const [index, value] of [stat.column, stat.n, stat.missing, stat.mean, stat.sd, stat.median, stat.min, stat.max].entries()) {
+          const cell = document.createElement(index === 0 ? "th" : "td");
+          cell.textContent = value ?? "—";
+          row.append(cell);
+        }
+        tbody.append(row);
+      }
+      table.append(thead, tbody);
+      scroll.append(table);
+      card.append(label, basis, scroll);
+    }
+    appendProposalField(details, t("analysisCorrelationPairs"), Array.isArray(pairs.columns) ? pairs.columns.join(", ") : "—");
+    appendProposalField(details, t("analysisCorrelationMatching"), pairs.matching || "—");
+    appendProposalField(details, t("analysisCorrelationTiesFirst"), firstTiesReady ? String(pairs.ties.first) : "—");
+    appendProposalField(details, t("analysisCorrelationTiesSecond"), secondTiesReady ? String(pairs.ties.second) : "—");
+    if (kind === "spearman") {
+      const note = document.createElement("p");
+      note.className = "assistant-proposal-inactive";
+      note.textContent = t("analysisCorrelationSpearman");
+      card.append(note);
+    }
+    for (const warning of preview.warnings || []) {
+      const text = document.createElement("p");
+      text.className = "assistant-proposal-inactive";
+      text.textContent = warning;
+      card.append(text);
+    }
+    const confidenceReady = kind === "pearson"
+      ? Number.isFinite(options.confidence) && options.confidence >= 0.5 && options.confidence <= 0.999
+      : kind === "spearman" && options.confidence === null;
+    return payload.method === "correlation" && payload.engine === "r" && payload.recipe_id === "correlation-rstats-v1" && Number(payload.recipe_version || 1) === 1 &&
+      typeof payload.document_id === "string" && typeof payload.dataset_id === "string" && typeof (payload.dataset_sha256 || payload.source_sha256) === "string" &&
+      typeof payload.recipe_sha256 === "string" && typeof payload.library_sha256 === "string" && columns.length === 2 && columns[0] && columns[1] && columns[0] !== columns[1] &&
+      ["pearson", "spearman"].includes(kind) && ["two_sided", "greater", "less"].includes(options.alternative) && confidenceReady &&
+      options.missing === "complete_pairs" && options.independent_pairs_confirmed === true && preview.stats_basis === "complete_pairs" &&
+      Number.isInteger(counts.used) && counts.used >= 3 && Array.isArray(preview.stats) && preview.stats.length === 2 &&
+      pairs.missing === "complete_pairs" && typeof pairs.matching === "string" && Boolean(pairs.matching) &&
+      JSON.stringify(pairs.columns) === JSON.stringify(columns) && firstTiesReady && secondTiesReady;
+  }
+
   function appendAnalysisProposal(card, details, payload) {
     const isTTest = payload.method === "ttest_independent";
     const isPaired = payload.method === "ttest_paired";
+    const isCorrelation = payload.method === "correlation";
     appendProposalField(details, t("analysisDataset"), payload.dataset_name || payload.dataset_id || "—");
-    appendProposalField(details, t("analysisDatasetHash"), payload.dataset_sha256 || "—");
+    appendProposalField(details, t("analysisDatasetHash"), payload.dataset_sha256 || payload.source_sha256 || "—");
     appendProposalField(details, t("analysisEngine"), payload.engine === "r" ? "R" : "Python");
     appendProposalField(details, t("analysisColumns"), Array.isArray(payload.columns) ? payload.columns.join(", ") : "—");
-    const scientificReady = isTTest ? appendTtestProposal(card, details, payload) : isPaired ? appendPairedProposal(card, details, payload) : true;
-    const defaultRecipe = isPaired ? "ttest-paired-rstats-v1" : isTTest ? "ttest-independent-rstats-v1" : "describe-v1";
+    const scientificReady = isTTest ? appendTtestProposal(card, details, payload) : isPaired ? appendPairedProposal(card, details, payload) : isCorrelation ? appendCorrelationProposal(card, details, payload) : true;
+    const defaultRecipe = isCorrelation ? "correlation-rstats-v1" : isPaired ? "ttest-paired-rstats-v1" : isTTest ? "ttest-independent-rstats-v1" : "describe-v1";
     appendProposalField(details, t("analysisRecipe"), `${payload.recipe_id || defaultRecipe} · v${payload.recipe_version || 1}`);
     appendProposalField(details, t("analysisRecipeHash"), payload.recipe_sha256 || "—");
     const state = analysisRecipe(payload);
@@ -1179,7 +1838,8 @@ export function createAssistant(adapter) {
     code.tabIndex = 0;
     code.textContent = state.recipe.code;
     card.append(code);
-    if (state.recipe.sha256 !== payload.recipe_sha256) {
+    const metadataMismatch = isCorrelation && (state.recipe.id !== payload.recipe_id || Number(state.recipe.version) !== Number(payload.recipe_version || 1));
+    if (state.recipe.sha256 !== payload.recipe_sha256 || metadataMismatch) {
       const mismatch = document.createElement("p");
       mismatch.className = "assistant-error";
       mismatch.textContent = t("analysisCodeMismatch");
@@ -1197,7 +1857,7 @@ export function createAssistant(adapter) {
     elements.proposals.append(heading);
     for (const proposal of turn.proposals) {
       const payload = proposal.payload && typeof proposal.payload === "object" ? proposal.payload : {};
-      const isAnalysis = ["run_analysis", "run_t_test", "run_paired_t_test"].includes(proposal.kind);
+      const isAnalysis = ["run_analysis", "run_t_test", "run_paired_t_test", "run_correlation"].includes(proposal.kind);
       const isCancelAnalysis = proposal.kind === "cancel_analysis";
       const isDatasetSelection = proposal.kind === "create_dataset_selection";
       const isCreateChart = proposal.kind === "create_chart";
@@ -1424,8 +2084,17 @@ export function createAssistant(adapter) {
     }
   }
 
+  function hasContinuationReferenceConflict(paperId, entry) {
+    if (entry.pendingSend) {
+      const payload = entry.pendingSend.payload;
+      return Boolean(payload.context?.resource_refs?.length && payload.continue_task);
+    }
+    return Boolean(entry.resourceRefs?.length && tasks.continueTaskRequested(paperId));
+  }
+
   function derivedStatus(paper, entry) {
     if (!paper) return { key: "noDocument", kind: "info" };
+    if (hasContinuationReferenceConflict(paper.id, entry)) return { key: "referenceContinueTask", kind: "error" };
     if (entry.status) return entry.status;
     if (!provider.loaded) return providerStatus;
     if (!provider.configured) return { key: "notConfigured", kind: "info" };
@@ -1462,7 +2131,9 @@ export function createAssistant(adapter) {
   function render() {
     const { paper, entry } = current();
     renderContext(entry);
+    renderResourceReferences(entry);
     renderNoteReferences(entry);
+    renderReaderActions(entry);
     renderHistory(entry);
     renderMessages(entry);
     const turn = latestTurn(entry || { turns: [] });
@@ -1470,13 +2141,15 @@ export function createAssistant(adapter) {
     if (paper && entry) renderProposals(paper, entry, turn);
     else elements.proposals.replaceChildren();
     tasks.render();
+    referencePicker.render();
     renderStatus(paper, entry);
     if (entry && elements.message.value !== entry.draft) elements.message.value = entry.draft;
     elements.message.disabled = !paper || Boolean(entry?.pendingSend?.pending);
     const active = entry ? activeTurn(entry) : null;
     const sending = Boolean(entry?.pendingSend?.pending);
     const taskBusy = Boolean(paper && entry && tasks.isBusy(paper.id, entry.conversationId));
-    elements.send.disabled = !paper || sending || Boolean(active) || taskBusy || Boolean(entry?.pendingDecision) || (!entry?.draft.trim() && !adapter.getChatImages(paper?.id).length && !entry?.noteRefs.length && !entry?.pendingSend);
+    const continuationReferenceConflict = Boolean(paper && entry && hasContinuationReferenceConflict(paper.id, entry));
+    elements.send.disabled = !paper || Boolean(entry?.loading) || Boolean(entry?.conversationsLoading) || sending || Boolean(active) || taskBusy || continuationReferenceConflict || Boolean(entry?.pendingDecision) || (!entry?.draft.trim() && !adapter.getChatImages(paper?.id).length && !entry?.noteRefs.length && !entry?.pendingSend);
     elements.send.textContent = t(entry?.pendingSend ? "retry" : "send");
     elements.cancel.hidden = !active;
     elements.cancel.disabled = !active || Boolean(entry?.cancelling);
@@ -1543,7 +2216,10 @@ export function createAssistant(adapter) {
       entry.loaded = true;
       entry.conversationId = conversationId;
       entry.fresh = false;
-      if (!options.taskRefresh) tasks.conversationChanged(paperId, conversationId);
+      if (!options.taskRefresh) {
+        entry.resourceRefs = !entry.draft && !entry.pendingSend ? resourceReferencesFromTurn(latestTurn(entry)) : [];
+        tasks.conversationChanged(paperId, conversationId);
+      }
       const active = activeTurn(entry);
       if (active) startPolling(paperId, entry, active.id);
     } catch (error) {
@@ -1559,34 +2235,55 @@ export function createAssistant(adapter) {
   }
 
   async function loadConversations(paperId, entry, openLatest = true) {
+    const sequence = ++entry.conversationsLoadSequence;
+    entry.conversationsLoading = true;
+    if (isCurrent(paperId, entry)) render();
     try {
       const body = await adapter.api(`/api/v1/documents/${encodeURIComponent(paperId)}/agent/conversations`);
+      if (sequence !== entry.conversationsLoadSequence) return;
       entry.conversations = Array.isArray(body.items) ? body.items : [];
       if (openLatest && !entry.conversationId && !entry.fresh && !entry.pendingSend && entry.conversations.length) {
         await loadConversation(paperId, entry, entry.conversations[0].id);
       }
     } catch (error) {
+      if (sequence !== entry.conversationsLoadSequence) return;
       entry.status = { key: error.code || "loadFailed", kind: "error", retry: () => loadConversations(paperId, entry, true) };
+    } finally {
+      if (sequence === entry.conversationsLoadSequence) {
+        entry.conversationsLoading = false;
+        if (isCurrent(paperId, entry)) render();
+      }
     }
-    if (isCurrent(paperId, entry)) render();
   }
 
   async function send(paperId, entry) {
-    if (entry.pendingSend?.pending || activeTurn(entry)) return;
+    if (entry.loading || entry.conversationsLoading || entry.pendingSend?.pending || activeTurn(entry)) return;
     if (!entry.pendingSend && tasks.isBusy(paperId, entry.conversationId)) {
       entry.status = { key: "agent_task_busy", kind: "error" };
       render();
       return;
     }
+    if (hasContinuationReferenceConflict(paperId, entry)) {
+      entry.status = { key: "referenceContinueTask", kind: "error" };
+      render();
+      return;
+    }
     if (!entry.pendingSend) {
       const context = adapter.getContext();
+      const readerAction = entry.readerActions.at(-1) || null;
       const imageIds = adapter.getChatImages(paperId).map((image) => image.id);
       const noteRefs = entry.noteRefs.map((reference) => ({ note_id: reference.note_id, revision: reference.revision }));
       const sentNoteRefs = entry.noteRefs.map((reference) => ({ pinId: reference.pinId, note_id: reference.note_id, revision: reference.revision }));
+      const resourceRefs = Object.freeze(entry.resourceRefs.map(resourceReferenceWire));
       const message = entry.draft;
       if (!message.trim() && !imageIds.length && !noteRefs.length) return;
       if (!provider.configured) {
         entry.status = { key: "agent_not_configured", kind: "error" };
+        render();
+        return;
+      }
+      if (imageIds.length > 4) {
+        entry.status = { key: "agent_image_limit", kind: "error" };
         render();
         return;
       }
@@ -1595,32 +2292,37 @@ export function createAssistant(adapter) {
         render();
         return;
       }
+      const payload = {
+        request_id: crypto.randomUUID(),
+        conversation_id: entry.conversationId || null,
+        message,
+        context: {
+          page: readerAction?.page ?? context.page,
+          rect: readerAction ? [...readerAction.rect] : context.rect ? [...context.rect] : null,
+          active_note_id: entry.explicitNoteContext ? null : context.activeNoteId || null,
+          active_image: context.activeImage ? {
+            source_kind: context.activeImage.source_kind,
+            source_id: context.activeImage.source_id,
+            ...(context.activeImage.annotation_id ? { annotation_id: context.activeImage.annotation_id } : {})
+          } : null,
+          image_ids: imageIds,
+          dataset_id: adapter.getSharedDatasetId?.() || null,
+          active_analysis_id: context.activeAnalysisId || null,
+          active_chart_id: context.activeChartId || null,
+          language,
+          ...(noteRefs.length ? { note_refs: noteRefs } : {}),
+          ...(resourceRefs.length ? { resource_refs: resourceRefs } : {})
+        }
+      };
+      if (tasks.continueTaskRequested(paperId)) payload.continue_task = true;
+      Object.freeze(payload.context);
+      Object.freeze(payload);
       entry.pendingSend = {
         pending: false,
         noteRefs: sentNoteRefs,
-        payload: {
-          request_id: crypto.randomUUID(),
-          conversation_id: entry.conversationId || null,
-          message,
-          context: {
-            page: context.page,
-            rect: context.rect ? [...context.rect] : null,
-            active_note_id: entry.explicitNoteContext ? null : context.activeNoteId || null,
-            active_image: context.activeImage ? {
-              source_kind: context.activeImage.source_kind,
-              source_id: context.activeImage.source_id,
-              ...(context.activeImage.annotation_id ? { annotation_id: context.activeImage.annotation_id } : {})
-            } : null,
-            image_ids: imageIds,
-            dataset_id: adapter.getSharedDatasetId?.() || null,
-            active_analysis_id: context.activeAnalysisId || null,
-            active_chart_id: context.activeChartId || null,
-            language,
-            ...(noteRefs.length ? { note_refs: noteRefs } : {})
-          }
-        }
+        readerActionIds: entry.readerActions.map((action) => action.id),
+        payload
       };
-      if (tasks.continueTaskRequested(paperId)) entry.pendingSend.payload.continue_task = true;
     }
     const operation = entry.pendingSend;
     operation.pending = true;
@@ -1635,6 +2337,7 @@ export function createAssistant(adapter) {
       if (entry.pendingSend === operation) entry.pendingSend = null;
       if (entry.draft === operation.payload.message) entry.draft = "";
       entry.noteRefs = entry.noteRefs.filter((reference) => !(operation.noteRefs || []).some((sent) => sent.pinId === reference.pinId && sent.note_id === reference.note_id && sent.revision === reference.revision));
+      entry.readerActions = entry.readerActions.filter((action) => !(operation.readerActionIds || []).includes(action.id));
       upsertTurn(entry, turn);
       tasks.acceptTurn(paperId, turn.conversation_id, turn);
       entry.status = null;
@@ -1643,7 +2346,12 @@ export function createAssistant(adapter) {
       if (ACTIVE_STATES.has(turn.status)) startPolling(paperId, entry, turn.id);
     } catch (error) {
       operation.pending = false;
-      const code = operation.payload.context.note_refs?.length && error.code === "not_found" ? "noteReferenceUnavailable" : error.code || "network";
+      let code = operation.payload.context.note_refs?.length && error.code === "not_found" ? "noteReferenceUnavailable" : error.code || "network";
+      if (operation.payload.context.resource_refs?.length) {
+        if (["source_changed", "dataset_changed", "reference_changed", "agent_reference_changed", "agent_reference_source_changed"].includes(error.code)) code = "resourceReferenceChanged";
+        else if (["not_found", "document_trashed", "document_purged", "file_missing", "reference_unavailable", "agent_reference_unavailable", "agent_reference_missing"].includes(error.code) && code !== "noteReferenceUnavailable") code = "resourceReferenceUnavailable";
+        else if (["reference_rejected", "agent_reference_rejected", "agent_reference_scope", "reference_not_paper"].includes(error.code)) code = "resourceReferenceRejected";
+      }
       entry.status = { key: code, kind: "error" };
       if (isCurrent(paperId, entry)) render();
     }
@@ -1721,12 +2429,12 @@ export function createAssistant(adapter) {
         body: JSON.stringify({ approved, proposal_sha256: proposal.sha256 })
       });
       upsertTurn(entry, updated);
-      entry.status = { key: approved ? ["run_analysis", "run_t_test", "run_paired_t_test"].includes(proposal.kind) ? "analysisQueued" : proposal.kind === "cancel_analysis" ? "analysisCancelled" : proposal.kind === "create_dataset_selection" ? "selectionCreated" : "confirmed" : "rejectedDone", kind: "success" };
+      entry.status = { key: approved ? ["run_analysis", "run_t_test", "run_paired_t_test", "run_correlation"].includes(proposal.kind) ? "analysisQueued" : proposal.kind === "cancel_analysis" ? "analysisCancelled" : proposal.kind === "create_dataset_selection" ? "selectionCreated" : "confirmed" : "rejectedDone", kind: "success" };
       if (approved) {
         await adapter.refreshAfterAgent(paperId, proposal.kind);
         const result = updated.proposals?.find((item) => item.id === proposal.id)?.result;
         const analysisId = result?.analysis_id;
-        if (["run_analysis", "run_t_test", "run_paired_t_test", "cancel_analysis"].includes(proposal.kind) && analysisId && adapter.getDocument()?.id === paperId) await adapter.openAnalysisJob?.(paperId, analysisId);
+        if (["run_analysis", "run_t_test", "run_paired_t_test", "run_correlation", "cancel_analysis"].includes(proposal.kind) && analysisId && adapter.getDocument()?.id === paperId) await adapter.openAnalysisJob?.(paperId, analysisId);
         const chartId = result?.chart_id || proposal.payload?.chart_id || result?.id;
         if (["create_chart", "restore_chart"].includes(proposal.kind) && chartId && adapter.getDocument()?.id === paperId) await adapter.openChart?.(paperId, chartId);
         if (proposal.kind === "create_dataset_selection") await acceptDatasetSelectionResult(paperId, entry, proposal, result);
@@ -1814,15 +2522,27 @@ export function createAssistant(adapter) {
     const open = elements.panel.hidden;
     elements.panel.hidden = !open;
     elements.toggle.setAttribute("aria-expanded", String(open));
-    if (open) elements.message.focus();
+    if (open) {
+      windowControls.show();
+      elements.message.focus();
+    } else {
+      referencePicker.close();
+    }
   });
   elements.close.addEventListener("click", () => {
+    referencePicker.close();
     elements.panel.hidden = true;
     elements.toggle.setAttribute("aria-expanded", "false");
     elements.toggle.focus();
   });
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && !elements.panel.hidden) {
+      if (referencePicker.isOpen()) return;
+      if (windowControls.exitFullPage()) {
+        event.preventDefault();
+        return;
+      }
+      referencePicker.close();
       elements.panel.hidden = true;
       elements.toggle.setAttribute("aria-expanded", "false");
       elements.toggle.focus();
@@ -1831,6 +2551,7 @@ export function createAssistant(adapter) {
   elements.new.addEventListener("click", () => {
     const { paper, entry } = current();
     if (!paper) return;
+    referencePicker.close();
     stopPolling(entry);
     entry.loadSequence += 1;
     entry.loadController?.abort();
@@ -1838,6 +2559,7 @@ export function createAssistant(adapter) {
     entry.turns = [];
     entry.fresh = true;
     entry.pendingSend = null;
+    entry.resourceRefs = [];
     entry.status = null;
     tasks.conversationChanged(paper.id, null);
     render();
@@ -1846,16 +2568,21 @@ export function createAssistant(adapter) {
   elements.history.addEventListener("change", () => {
     const { paper, entry } = current();
     if (!paper || !elements.history.value) return;
+    referencePicker.close();
     entry.conversationId = elements.history.value;
     entry.turns = [];
     entry.pendingSend = null;
+    entry.resourceRefs = [];
     tasks.conversationChanged(paper.id, entry.conversationId);
     loadConversation(paper.id, entry, entry.conversationId);
   });
   elements.message.addEventListener("input", () => {
     const { entry } = current();
     if (!entry) return;
-    entry.draft = elements.message.value;
+    const previous = entry.draft;
+    const next = elements.message.value;
+    transformReaderActionRanges(entry, previous, next);
+    entry.draft = next;
     if (entry.pendingSend && !entry.pendingSend.pending) entry.pendingSend = null;
     entry.status = null;
     render();
@@ -1879,6 +2606,18 @@ export function createAssistant(adapter) {
       elements.toggle.textContent = t("assistant");
       elements.heading.textContent = t("assistant");
       elements.close.setAttribute("aria-label", t("close"));
+      windowControls.applyLanguage({
+        window: t("window"),
+        fullPage: t("fullPage"),
+        exitFullPage: t("exitFullPage"),
+        resize: t("resize"),
+        resizeLeft: t("resizeLeft"),
+        resizeRight: t("resizeRight"),
+        moveHelp: t("moveHelp"),
+        resizeHelp: t("resizeHelp"),
+        resizeEdgeHelp: t("resizeEdgeHelp"),
+        help: t("windowHelp")
+      });
       elements.new.textContent = t("new");
       elements.message.setAttribute("aria-label", t("messageLabel"));
       elements.message.placeholder = t("placeholder");
@@ -1889,21 +2628,25 @@ export function createAssistant(adapter) {
       elements.settingsForm.querySelector('label[for="assistant-provider-key"]').textContent = t("providerKey");
       elements.settingsForm.querySelector(".assistant-vision-option span").textContent = t("providerImages");
       tasks.applyLanguage(nextLanguage);
+      referencePicker.applyLanguage();
       render();
     },
     addNoteReference,
     addNoteReferences,
+    prepareReaderAction,
     planAnalysis(documentId, datasetId, navigationGeneration) {
       if (adapter.getDocument()?.id !== documentId || adapter.getSelectedDatasetId?.() !== datasetId || adapter.getSharedDatasetId?.() !== datasetId || navigationGeneration !== adapter.getNavigationGeneration?.()) return false;
       const entry = entryFor(documentId);
       if (entry.draft === "") entry.draft = t("analysisPlanPrompt");
       elements.panel.hidden = false;
       elements.toggle.setAttribute("aria-expanded", "true");
+      windowControls.show();
       render();
       elements.message.focus();
       return true;
     },
     documentChanged() {
+      referencePicker.close();
       const { paper, entry } = current();
       if (paper && !entry.loaded && !entry.loading && !entry.conversations.length) loadConversations(paper.id, entry, true);
       tasks.documentChanged();

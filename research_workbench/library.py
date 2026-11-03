@@ -21,6 +21,8 @@ def base_document(metadata):
 def read_metadata(connection, identifier, include_trashed=False):
     row = connection.execute(DOCUMENT_QUERY + ' WHERE d.id=?', (identifier,)).fetchone()
     if row is None:
+        if connection.execute('SELECT 1 FROM document_purges WHERE document_id=?', (identifier,)).fetchone():
+            raise WorkspaceError('document_purged', '这篇文献已彻底删除，无法恢复。', 410)
         raise WorkspaceError('not_found', '找不到这篇文献。', 404)
     if not include_trashed and connection.execute('SELECT 1 FROM document_trash WHERE document_id=?', (identifier,)).fetchone():
         raise WorkspaceError('document_trashed', '这篇论文已移入回收站，请先恢复。', 410)
@@ -121,7 +123,9 @@ class Library:
     def find_studies(connection,folded,limit):
         found=[]
         rows=connection.execute('''SELECT d.id,d.title,s.question FROM studies s
-            JOIN documents d ON d.id=s.document_id ORDER BY d.created_at DESC,d.id DESC''')
+            JOIN documents d ON d.id=s.document_id
+            WHERE NOT EXISTS(SELECT 1 FROM personal_analysis_owner p WHERE p.document_id=s.document_id)
+            ORDER BY d.created_at DESC,d.id DESC''')
         for row in rows:
             matches=[key for key,value in (('name',row['title']),('question',row['question'])) if folded in value.casefold()]
             if matches:found.append({**read_metadata(connection,row['id']),'matched_fields':matches})

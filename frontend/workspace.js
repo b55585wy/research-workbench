@@ -9,10 +9,12 @@ const messages = {
     hideNotes: "隐藏笔记",
     dataTitle: "数据工作区",
     dataHelp: "数据、设置、结果和图表均属于当前文献。预览仅显示前 5 行，运行分析前仍需核对并明确确认。",
-    studyDataHelp: "数据、设置、结果和图表均属于当前研究。预览仅显示前 5 行，运行分析前仍需核对并明确确认。",
-    prerequisite: "请先从左侧选择或上传一篇文献，再导入与该文献关联的数据。",
-    studyPrerequisite: "请先从左侧选择一项研究，再导入与该研究关联的数据。",
-    study: "研究",
+    studyDataHelp: "数据、设置、结果和图表均属于当前项目。预览仅显示前 5 行，运行分析前仍需核对并明确确认。",
+    personalDataHelp: "数据、设置、结果和图表均属于“我的数据”。预览仅显示前 5 行，运行分析前仍需核对并明确确认。",
+    prerequisite: "请点击“我的数据”开始，或从目录打开已有数据、分析或图表。",
+    paperContext: "当前文献：{title}",
+    projectContext: "当前项目：{title}",
+    personalContext: "我的数据",
     imports: "数据导入记录",
     importsHelp: "SAV/ZSAV 原始文件和核对记录保留在此处。打开记录不会更改当前数据或运行设置。"
   },
@@ -26,10 +28,12 @@ const messages = {
     hideNotes: "Hide notes",
     dataTitle: "Data workspace",
     dataHelp: "Data, settings, results, and charts belong to the current paper. Previews show only the first 5 rows; every analysis run still requires review and explicit confirmation.",
-    studyDataHelp: "Data, settings, results, and charts belong to the current research. Previews show only the first 5 rows; every analysis run still requires review and explicit confirmation.",
-    prerequisite: "Choose or upload a paper on the left before importing data associated with that paper.",
-    studyPrerequisite: "Choose a research entry on the left before importing data associated with it.",
-    study: "Research",
+    studyDataHelp: "Data, settings, results, and charts belong to the current project. Previews show only the first 5 rows; every analysis run still requires review and explicit confirmation.",
+    personalDataHelp: "Data, settings, results, and charts belong to My data. Previews show only the first 5 rows; every analysis run still requires review and explicit confirmation.",
+    prerequisite: "Choose My data to begin, or open an existing dataset, analysis, or chart from the catalog.",
+    paperContext: "Current paper: {title}",
+    projectContext: "Current project: {title}",
+    personalContext: "My data",
     imports: "Data import history",
     importsHelp: "SAV/ZSAV originals and reviews remain available here. Opening a review does not change the current data or run settings."
   }
@@ -103,6 +107,7 @@ export function createWorkspace(adapter) {
     byId("analysis-engine"),
     byId("ttest-options"),
     byId("analysis-paired-fields"),
+    byId("analysis-correlation-fields"),
     analysisBody.querySelector(".analysis-runtime"),
     byId("analysis-prepare"),
     byId("analysis-confirmation")
@@ -139,18 +144,26 @@ export function createWorkspace(adapter) {
   const focusByMode = new Map();
   let initialized = false;
   let navigationGeneration = 0;
+  let modePending = false;
 
-  function t(key) {
-    return messages[language]?.[key] || messages.en[key] || key;
+  function t(key, values = {}) {
+    let text = messages[language]?.[key] || messages.en[key] || key;
+    for (const [name, value] of Object.entries(values)) text = text.replaceAll(`{${name}}`, String(value));
+    return text;
   }
 
   function renderOwnerCopy() {
     const owner = adapter.getDocument();
     const studyOwner = owner?.kind === "study";
-    main.dataset.ownerKind = studyOwner ? "study" : owner ? "paper" : "none";
-    modeReading.textContent = t(studyOwner ? "study" : "reading");
-    byId("data-workspace-help").textContent = t(studyOwner ? "studyDataHelp" : "dataHelp");
-    prerequisite.textContent = t(studyOwner ? "studyPrerequisite" : "prerequisite");
+    const personalOwner = studyOwner && owner.workspace_role === "personal_analysis";
+    main.dataset.ownerKind = personalOwner ? "personal" : studyOwner ? "study" : owner ? "paper" : "none";
+    modeReading.textContent = t("reading");
+    byId("data-workspace-help").textContent = t(personalOwner ? "personalDataHelp" : studyOwner ? "studyDataHelp" : "dataHelp");
+    prerequisite.textContent = t("prerequisite");
+    const context = byId("data-owner-context");
+    context.textContent = !owner ? "" : personalOwner ? t("personalContext") : t(studyOwner ? "projectContext" : "paperContext", {
+      title: owner.title || owner.name || owner.original_filename || owner.id
+    });
   }
 
   function modeForParams(search) {
@@ -178,10 +191,15 @@ export function createWorkspace(adapter) {
     reader.hidden = mode !== "reading";
     dataWorkspace.hidden = mode !== "data";
     notes.hidden = !notesVisible;
+    byId("reading-sidebar").hidden = mode !== "reading";
     modeReading.setAttribute("aria-pressed", String(mode === "reading"));
     modeData.setAttribute("aria-pressed", String(mode === "data"));
+    modeReading.disabled = modePending;
+    modeData.disabled = modePending;
     analysisTab.setAttribute("aria-pressed", String(tool === "analysis"));
     chartsTab.setAttribute("aria-pressed", String(tool === "charts"));
+    analysisTab.disabled = modePending;
+    chartsTab.disabled = modePending;
     analysis.hidden = tool !== "analysis" || reviewVisible;
     charts.hidden = tool !== "charts";
     byId("data-tool-switch").hidden = reviewVisible;
@@ -191,6 +209,7 @@ export function createWorkspace(adapter) {
     notesToggle.textContent = t(notesVisible ? "hideNotes" : "showNotes");
     notesToggle.setAttribute("aria-pressed", String(notesVisible));
     notesToggle.setAttribute("aria-label", t(notesVisible ? "hideNotes" : "showNotes"));
+    adapter.modeRendered?.(mode);
     if (initialized) {
       if (mode === "reading") adapter.readingVisible?.();
       else adapter.toolVisible?.(tool);
@@ -243,8 +262,8 @@ export function createWorkspace(adapter) {
     if (changed && initialized && options.focus !== false) requestAnimationFrame(restoreFocus);
   }
 
-  modeReading.addEventListener("click", () => reveal("reading", { updateUrl: true, clearSources: true }));
-  modeData.addEventListener("click", () => reveal("data", { updateUrl: true, clearSources: true }));
+  modeReading.addEventListener("click", () => void adapter.modeSelected?.("reading"));
+  modeData.addEventListener("click", () => void adapter.modeSelected?.("data"));
   analysisTab.addEventListener("click", () => reveal("data", { tool: "analysis", updateUrl: true, clearSources: true, reviewOpen: false }));
   chartsTab.addEventListener("click", () => {
     reveal("data", { tool: "charts", updateUrl: true, clearSources: true, reviewOpen: false });
@@ -292,6 +311,11 @@ export function createWorkspace(adapter) {
     },
     getNavigationGeneration() {
       return navigationGeneration;
+    },
+    setModePending(pending) {
+      modePending = Boolean(pending);
+      adapter.modePendingChanged?.(modePending);
+      render();
     },
     reveal,
     showNotes() {

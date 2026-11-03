@@ -157,7 +157,9 @@ class DataImports:
         with self.store.connection() as connection:return self._insert_review_in(connection,data)
 
     def _insert_review_in(self,connection,data):
+        from .library import read_metadata
         connection.execute('BEGIN IMMEDIATE')
+        read_metadata(connection,data['document_id'])
         old=connection.execute('SELECT * FROM data_imports WHERE id=?',(data['id'],)).fetchone()
         if old is not None:
             self.same(old,data['document_id'],data['original_filename'],data['sha256'],data['byte_size']);self.checked(old)

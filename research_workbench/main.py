@@ -20,11 +20,13 @@ from .models import MAX_FILE_BYTES, DocumentUpdate, NoteCreate, NoteMutation, No
 from .pdf_validation import PdfValidator
 from .store import Store, timestamp
 from .excerpts import Excerpts, checked_image, verify_excerpt_source, verify_source
+from .pdf_regions import PdfRegions
 from .reading_export import build_export, ExportResponse
 from .annotated_pdf_export import AnnotatedPdfExport
 from .images import ImageLibrary
 from .agent_provider import ModelConnection
 from .agent_runtime import ReadingAgent
+from .bibliography import Bibliography,LookupRequest
 from .agent_api import router as agent_router
 from .datasets import Datasets
 from .analyses import Analyses
@@ -149,6 +151,7 @@ def create_app(data_root=None, validator=None, renderer=None, *, agent_provider=
     store = Store(data_root or os.environ.get('RESEARCH_WORKBENCH_DATA', ROOT / 'data'))
     validator = validator or PdfValidator()
     images=ImageLibrary(store)
+    bibliography=Bibliography(store)
     provider=agent_provider or ModelConnection(store.root,agent_config or os.environ.get('RESEARCH_AGENT_CONFIG'))
     datasets=Datasets(store)
     from .data_imports import DataImports
@@ -176,8 +179,15 @@ def create_app(data_root=None, validator=None, renderer=None, *, agent_provider=
     from .study_notes import StudyNotes
     from .study_api import router as study_router
     studies=Studies(store)
+    from .data_workspace import DataWorkspace
+    from .data_workspace_api import router as data_workspace_router
+    data_workspace=DataWorkspace(store)
+    from .agent_references import ReferenceCatalog
+    from .agent_reference_api import router as agent_reference_router
+    reference_catalog=ReferenceCatalog(store)
     store.study_notes=StudyNotes(store,datasets,analysis,charts)
     agent.workspace.records=records
+    agent.workspace.references=reference_catalog
 
     @asynccontextmanager
     async def lifespan(app):
@@ -192,8 +202,10 @@ def create_app(data_root=None, validator=None, renderer=None, *, agent_provider=
     app = FastAPI(title='Research workbench', version=__version__, docs_url=None, redoc_url=None,lifespan=lifespan)
     app.state.store, app.state.validator = store, validator
     app.state.excerpts = Excerpts(store, renderer)
+    app.state.pdf_regions = PdfRegions(store)
     app.state.annotated_pdf = AnnotatedPdfExport(store)
     app.state.images,app.state.agent=images,agent
+    app.state.bibliography=bibliography
     app.state.datasets,app.state.analysis=datasets,analysis
     app.state.data_imports=data_imports
     app.state.selections=selections
@@ -204,7 +216,10 @@ def create_app(data_root=None, validator=None, renderer=None, *, agent_provider=
     app.state.charts=charts
     app.state.records=records
     app.state.studies=studies
+    app.state.data_workspace=data_workspace
+    app.state.reference_catalog=reference_catalog
     app.include_router(study_router)
+    app.include_router(data_workspace_router)
     app.include_router(record_router)
     app.include_router(chart_router)
     app.include_router(data_import_router)
@@ -256,6 +271,10 @@ def create_app(data_root=None, validator=None, renderer=None, *, agent_provider=
     def update_document_metadata(identifier: UUID, payload: DocumentUpdate):
         return store.library.update(str(identifier),payload)
 
+    @app.post('/api/v1/documents/{identifier}/metadata/lookup')
+    def lookup_document_metadata(identifier: UUID,payload:LookupRequest):
+        return bibliography.lookup(str(identifier),payload)
+
     @app.get('/api/v1/documents/{identifier}')
     def document(identifier: UUID):
         return store.get_document(str(identifier))
@@ -269,6 +288,10 @@ def create_app(data_root=None, validator=None, renderer=None, *, agent_provider=
             raise WorkspaceError('file_missing', '原文件暂时无法打开，请检查资料存储。', 409)
         return FileResponse(path, media_type='application/pdf', filename=record['original_filename'],
                             content_disposition_type='inline')
+
+    @app.get('/api/v1/documents/{identifier}/pages/{page}/regions')
+    def page_regions(identifier: UUID, page: int):
+        return app.state.pdf_regions.get_page(str(identifier), page)
 
     @app.get('/api/v1/documents/{identifier}/notes')
     def notes(identifier: UUID):
@@ -329,6 +352,7 @@ def create_app(data_root=None, validator=None, renderer=None, *, agent_provider=
                               headers={'Cache-Control': 'no-store'})
 
     app.include_router(agent_router)
+    app.include_router(agent_reference_router)
     app.include_router(analysis_router)
     app.mount('/', StaticFiles(directory=ROOT / 'frontend', html=True), name='reader')
     return app

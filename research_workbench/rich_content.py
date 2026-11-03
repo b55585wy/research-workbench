@@ -33,23 +33,34 @@ def attributes(value,insert):
 
 
 def validate_content(value):
-    if type(value) is not dict or set(value)!={'version','ops'} or type(value['version']) is not int or value['version']!=1:raise ValueError('Unsupported rich document')
+    if type(value) is not dict or set(value)!={'version','ops'} or type(value['version']) is not int or value['version'] not in (1,2):raise ValueError('Unsupported rich document')
     ops=value['ops']
     if type(ops) is not list or not 1<=len(ops)<=MAX_RICH_OPS:raise ValueError('Too many or missing rich operations')
     clean=[];length=0
     for op in ops:
         if type(op) is not dict or 'insert' not in op or set(op)-{'insert','attributes'}:raise ValueError('Only text insert operations are supported')
         insert=op['insert']
+        if value['version']==2 and isinstance(insert,dict):
+            from .rich_images import image_insert,image_text
+            if set(op)!={'insert'}:raise ValueError('Image embeds do not accept text attributes')
+            item=image_insert(insert)
+            length+=len(image_text(item['research_image']))
+            if length>10001:raise ValueError('Rich text exceeds the note limit')
+            clean.append({'insert':item})
+            continue
         if not isinstance(insert,str) or not insert or any(ord(c)<32 and c not in '\n\t' for c in insert):raise ValueError('Invalid rich text')
         length+=len(insert)
         if length>10001:raise ValueError('Rich text exceeds the note limit')
         attrs=attributes(op.get('attributes',{}),insert)
         item={'insert':insert}
         if attrs:item['attributes']=attrs
-        if clean and clean[-1].get('attributes')==item.get('attributes'):clean[-1]['insert']+=insert
+        if clean and isinstance(clean[-1]['insert'],str) and clean[-1].get('attributes')==item.get('attributes'):clean[-1]['insert']+=insert
         else:clean.append(item)
-    if not clean[-1]['insert'].endswith('\n'):raise ValueError('Rich documents must end in a newline')
-    result={'version':1,'ops':clean}
+    if not isinstance(clean[-1]['insert'],str) or not clean[-1]['insert'].endswith('\n'):raise ValueError('Rich documents must end in a newline')
+    result={'version':value['version'],'ops':clean}
+    if value['version']==2:
+        from .rich_images import references,MAX_INLINE_IMAGES
+        if len(references(result))>MAX_INLINE_IMAGES:raise ValueError('Too many inline images')
     if not plaintext(result):raise ValueError('Rich text must not be empty')
     try:size=len(canonical(result).encode('utf-8'))
     except (ValueError,UnicodeError):raise ValueError('Invalid rich encoding') from None
@@ -57,7 +68,9 @@ def validate_content(value):
     return result
 
 
-def plaintext(value):return ''.join(op['insert'] for op in value['ops']).strip()
+def plaintext(value):
+    from .rich_images import image_text
+    return ''.join(op['insert'] if isinstance(op['insert'],str) else image_text(op['insert']['research_image']) for op in value['ops']).strip()
 
 
 def inline(text,attrs):
@@ -68,9 +81,15 @@ def inline(text,attrs):
     return result
 
 
-def render_html(value):
+def render_html(value,image_url=None):
     lines=[];pieces=[]
     for op in value['ops']:
+        if isinstance(op['insert'],dict):
+            from .rich_images import web_image_url
+            image=op['insert']['research_image']
+            url=(image_url or web_image_url)(image)
+            pieces.append('<img src="'+escape(url,quote=True)+'" alt="'+escape(image['alt'],quote=True)+'" loading="lazy">')
+            continue
         attrs=op.get('attributes',{});parts=op['insert'].split('\n')
         for index,part in enumerate(parts):
             if part:pieces.append(inline(part,attrs))

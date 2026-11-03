@@ -7,6 +7,7 @@ import tempfile
 from uuid import UUID
 import zipfile
 from .text_annotations import export_markup as text_annotation_markup
+from .shape_annotations import export_markup as shape_annotation_markup, export_summary as shape_summary
 
 from starlette.responses import FileResponse
 
@@ -55,13 +56,19 @@ def reading_documents(document, notes, excerpts, exported_at,annotation_groups=N
         review_label = '已核对原文（自行确认） / Source checked (self-reported)' if checked else '待核对原文 / Needs source checking'
         markdown.extend([review_label, ''])
         markdown.extend('> ' + markdown_text(line) for line in note['text'].splitlines())
-        body = render_html(note['rich_content']) if note.get('rich_content') else '<p>'+html.escape(note['text']).replace('\n', '<br>')+'</p>'
+        from .image_export import note_rich_html,attachment_only
+        body = note_rich_html(note) if note.get('rich_content') else '<p>'+html.escape(note['text']).replace('\n', '<br>')+'</p>'
         if note.get('annotation'):
             annotation = note['annotation']
             markdown.extend(['', 'Text annotation: '+annotation['kind']+' / '+annotation['color'], ''])
             if annotation['quote'] != note['text']:
                 markdown.extend('> '+markdown_text(line) for line in annotation['quote'].splitlines())
             body = text_annotation_markup(note) + (body if annotation['quote'] != note['text'] else '')
+        if note.get('shape_annotation'):
+            shape_label = {'textbox': 'Text box', 'line': 'Line drawing', 'ellipse': 'Ellipse drawing',
+                           'ink': 'Freehand drawing'}.get(note['shape_annotation']['kind'], 'Shape annotation')
+            markdown.extend(['', shape_label+': '+shape_summary(note['shape_annotation']), ''])
+            body = shape_annotation_markup(note) + body
         section = f'<section><h2>{index}. 第 {note["page"]} 页 / Page {note["page"]}</h2>'
         section += f'<p><a href="{source_link}">查看原文 / View source</a></p><p class="review-status">{review_label}</p>'+body
         image_path = f'images/{identifier}.png' if image else None
@@ -69,12 +76,13 @@ def reading_documents(document, notes, excerpts, exported_at,annotation_groups=N
             markdown.extend(['', f'![第 {note["page"]} 页图表摘录]({image_path})'])
             section += f'<a href="{source_link}"><img src="{image_path}" alt="第 {note["page"]} 页图表摘录"></a>'
         uploads=note.get('attachments',[])
+        separate_ids={upload['id'] for upload in attachment_only(note)}
         for upload in uploads:
             paths=portable_upload(upload)
             markdown.extend(['',f'用户上传图片 / User-uploaded image: {markdown_text(upload["original_filename"])}',
                 f'![上传图片 / Uploaded image]({paths["preview_path"]})',
                 f'[下载上传原文件 / Original upload]({paths["file_path"]})'])
-            section+=uploaded_markup(upload)
+            if upload['id'] in separate_ids:section+=uploaded_markup(upload)
         markdown.append('')
         sections.append(section + '</section>')
         portable_note={**note, 'excerpt': None if image is None else {

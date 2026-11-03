@@ -5,7 +5,7 @@ const ACTIVE_JOBS = new Set(["queued", "running"]);
 const messages = {
   zh: {
     panel: "数据与分析",
-    help: "导入 CSV、TSV、SAV 或 ZSAV，选择描述统计、独立样本 t 检验或配对 t 检验，并核对固定分析代码。结果不构成科学结论。",
+    help: "导入 CSV、TSV、SAV 或 ZSAV，选择描述统计、t 检验或相关分析，并核对固定分析代码。结果不构成科学结论。",
     upload: "导入数据",
     selectDataset: "选择数据",
     noDataset: "尚未选择数据",
@@ -44,6 +44,7 @@ const messages = {
     recipeMismatch: "代码版本已变化，请重新查看后再运行。",
     runningRequest: "正在提交运行请求…",
     queuedReceipt: "任务已排队，尚未完成。",
+    submissionReceipt: "已提交分析任务，请在任务记录中查看运行状态。",
     loading: "正在加载数据与分析任务…",
     loadFailed: "无法加载数据或分析任务，请重试。",
     statusFailed: "无法读取可用语言，请重试。",
@@ -180,6 +181,37 @@ const messages = {
     pairedDifference: "均值差（第 1 列 − 第 2 列）",
     pairedResultNote: "以下配对结果不包含显著性结论，也不表示配对设计、差值正态性、不同单位之间的独立性或科学有效性已得到验证。",
     pairedIdentity: "配对标识：精确、唯一、非空",
+    correlation: "相关分析（r-stats）",
+    correlationMethodUnavailable: "相关分析当前不可用。",
+    correlationFirst: "第 1 个数值列（X）",
+    correlationSecond: "第 2 个数值列（Y）",
+    correlationKind: "相关系数",
+    pearson: "Pearson（线性相关）",
+    spearman: "Spearman（秩相关）",
+    correlation_two_sided: "双侧（相关系数不为零）",
+    correlation_greater: "正相关（相关系数大于零）",
+    correlation_less: "负相关（相关系数小于零）",
+    correlationDeclaration: "我确认每一行的 X/Y 来自同一观察对象，且各观测行相互独立；此声明不是根据列名推断的。",
+    correlationDeclarationConfirmed: "已明确确认：每行 X/Y 属于同一观察对象，各观测行相互独立。",
+    correlationMissing: "缺失处理：仅使用 X 和 Y 均完整的配对行",
+    correlationAssumptions: "请核对同一观察对象测量、观测独立性、异常值和所选方法的前提；相关不表示因果。Spearman 的 p 值为不含连续性校正的渐近近似值。",
+    correlationSpearmanNote: "Spearman 使用 exact = FALSE、continuity = FALSE；p 值为渐近近似值，不提供置信区间。",
+    correlationCounts: "完整配对计数与排除",
+    correlationPairs: "配对核对",
+    correlationMatching: "同一观察对象逐行配对",
+    correlationTiesFirst: "X 重复值数（不含首次）",
+    correlationTiesSecond: "Y 重复值数（不含首次）",
+    correlationStatsBasis: "统计基础：仅完整配对；n 为完整配对数，missing 为排除配对数。",
+    correlationResult: "相关分析结果",
+    correlationCoefficient: "相关系数",
+    correlationStatistic: "检验统计量",
+    correlationPValueMethod: "p 值计算方法",
+    correlationResultNote: "相关不表示因果。结果不包含显著性结论，也不表示同一观察对象测量、观测独立性或方法前提已得到验证。",
+    correlationCiUnavailable: "此结果没有可用的置信区间。",
+    invalid_correlation_data: "请选择两个不同的非常量数值列，并确保至少有 3 个完整配对。",
+    correlation_preview_timeout: "相关分析预览超时，请按原请求重试。",
+    correlation_preview_failed: "相关分析预览失败，请按原请求重试。",
+    correlation_preview_required: "必须先成功预览当前完整请求。",
     resultSummary: "结果摘要",
     fullResult: "完整结果与原始精度",
     unavailable: "不可用",
@@ -193,7 +225,7 @@ const messages = {
   },
   en: {
     panel: "Data & analysis",
-    help: "Import CSV, TSV, SAV, or ZSAV, choose descriptive statistics, an independent-samples t-test, or a paired t-test, and review the fixed code. Results are not scientific conclusions.",
+    help: "Import CSV, TSV, SAV, or ZSAV, choose descriptive statistics, a t-test, or correlation analysis, and review the fixed code. Results are not scientific conclusions.",
     upload: "Import data",
     selectDataset: "Choose data",
     noDataset: "No data selected",
@@ -232,6 +264,7 @@ const messages = {
     recipeMismatch: "The code version changed. Review it again before running.",
     runningRequest: "Submitting the run request…",
     queuedReceipt: "The task is queued, not complete.",
+    submissionReceipt: "Analysis submitted. Check its status in the task list.",
     loading: "Loading data and analysis tasks…",
     loadFailed: "Data or analysis tasks could not be loaded. Try again.",
     statusFailed: "Available languages could not be read. Try again.",
@@ -368,6 +401,37 @@ const messages = {
     pairedDifference: "Mean difference (first − second)",
     pairedResultNote: "These paired results include no significance verdict and do not claim that the paired design, normality of differences, independence across units, or scientific validity has been verified.",
     pairedIdentity: "Pairing identity: exact, unique, nonempty",
+    correlation: "Correlation analysis (r-stats)",
+    correlationMethodUnavailable: "Correlation analysis is currently unavailable.",
+    correlationFirst: "First numeric column (X)",
+    correlationSecond: "Second numeric column (Y)",
+    correlationKind: "Correlation coefficient",
+    pearson: "Pearson (linear correlation)",
+    spearman: "Spearman (rank correlation)",
+    correlation_two_sided: "Two-sided (nonzero correlation)",
+    correlation_greater: "Positive correlation (coefficient greater than zero)",
+    correlation_less: "Negative correlation (coefficient less than zero)",
+    correlationDeclaration: "I confirm that each row’s X/Y values come from the same observational unit and observational rows are independent; this declaration is not inferred from column labels.",
+    correlationDeclarationConfirmed: "Explicitly confirmed: each row’s X/Y values belong to the same observational unit and observational rows are independent.",
+    correlationMissing: "Missing data: only rows with both X and Y present are used",
+    correlationAssumptions: "Review same-observational-unit measurement, independent observations, outliers, and method prerequisites; correlation does not imply causation. Spearman p values are asymptotic approximations without continuity correction.",
+    correlationSpearmanNote: "Spearman uses exact = FALSE and continuity = FALSE; the p value is an asymptotic approximation and no confidence interval is provided.",
+    correlationCounts: "Complete-pair counts and exclusions",
+    correlationPairs: "Pairing review",
+    correlationMatching: "Same-observational-unit row pairing",
+    correlationTiesFirst: "X duplicate values (excluding first)",
+    correlationTiesSecond: "Y duplicate values (excluding first)",
+    correlationStatsBasis: "Basis: complete pairs only; n is used pairs and missing is excluded pairs.",
+    correlationResult: "Correlation analysis result",
+    correlationCoefficient: "Correlation coefficient",
+    correlationStatistic: "Test statistic",
+    correlationPValueMethod: "p value method",
+    correlationResultNote: "Correlation does not imply causation. These results include no significance verdict and do not claim that same-observational-unit measurement, independent observations, or method prerequisites have been verified.",
+    correlationCiUnavailable: "No confidence interval is available for this result.",
+    invalid_correlation_data: "Choose two different, nonconstant numeric columns with at least 3 complete pairs.",
+    correlation_preview_timeout: "The correlation preview timed out. Retry the exact request.",
+    correlation_preview_failed: "The correlation preview failed. Retry the exact request.",
+    correlation_preview_required: "The exact current request must be previewed successfully first.",
     resultSummary: "Result summary",
     fullResult: "Full result and original precision",
     unavailable: "Unavailable",
@@ -421,6 +485,17 @@ export function createAnalysis(adapter) {
     pairedConfidence: byId("analysis-paired-confidence"),
     pairedConfirmed: byId("analysis-paired-confirmed"),
     pairedPreview: byId("analysis-paired-preview"),
+    correlationOptions: byId("analysis-correlation-fields"),
+    correlationFirst: byId("analysis-correlation-first"),
+    correlationSecond: byId("analysis-correlation-second"),
+    correlationDirection: byId("analysis-correlation-direction"),
+    correlationKind: byId("analysis-correlation-kind"),
+    correlationAlternative: byId("analysis-correlation-alternative"),
+    correlationConfidenceLabel: byId("analysis-correlation-confidence-label"),
+    correlationConfidence: byId("analysis-correlation-confidence"),
+    correlationSpearmanNote: byId("analysis-correlation-spearman-note"),
+    correlationConfirmed: byId("analysis-correlation-confirmed"),
+    correlationPreview: byId("analysis-correlation-preview"),
     confirmation: byId("analysis-confirmation"),
     confirmationDetails: document.querySelector(".analysis-confirmation-details"),
     code: byId("analysis-code"),
@@ -513,6 +588,7 @@ export function createAnalysis(adapter) {
   function methodName(method) {
     if (method === "ttest_independent") return t("ttestIndependent");
     if (method === "ttest_paired") return t("ttestPaired");
+    if (method === "correlation") return t("correlation");
     return t("describe");
   }
 
@@ -583,6 +659,32 @@ export function createAnalysis(adapter) {
     return Boolean(dataset && draft && info?.available && info.library?.available && engineInfo(entry, "r")?.available &&
       draft.unit && draft.first && draft.second && draft.unit !== draft.first && draft.unit !== draft.second && draft.first !== draft.second &&
       draft.pairedConfirmed && Number.isFinite(draft.confidence) && draft.confidence >= 0.5 && draft.confidence <= 0.999 && !entry.confirmation?.pending);
+  }
+
+  function correlationDraft(entry) {
+    const dataset = selectedDataset(entry);
+    if (!entry || !dataset) return null;
+    const drafts = entry.correlationDrafts ||= new Map();
+    if (!drafts.has(dataset.id)) {
+      const numeric = (dataset.columns || []).filter((column) => column.numeric);
+      drafts.set(dataset.id, {
+        first: numeric[0]?.name || "",
+        second: numeric[1]?.name || "",
+        kind: "pearson",
+        alternative: "two_sided",
+        confidence: 0.95,
+        independentConfirmed: false
+      });
+    }
+    return drafts.get(dataset.id);
+  }
+
+  function correlationReady(entry, draft) {
+    const dataset = selectedDataset(entry);
+    const info = methodInfo(entry, "correlation");
+    const confidenceReady = draft?.kind === "spearman" || Number.isFinite(draft?.confidence) && draft.confidence >= 0.5 && draft.confidence <= 0.999;
+    return Boolean(dataset && draft && info?.available && info.library?.available && engineInfo(entry, "r")?.available &&
+      draft.first && draft.second && draft.first !== draft.second && draft.independentConfirmed && confidenceReady && !entry.confirmation?.pending);
   }
 
   function fillSelect(select, items, value, placeholder = null) {
@@ -768,14 +870,17 @@ export function createAnalysis(adapter) {
   function renderMethod(entry) {
     const isTTest = entry?.method === "ttest_independent";
     const isPaired = entry?.method === "ttest_paired";
-    const isStatMethod = isTTest || isPaired;
+    const isCorrelation = entry?.method === "correlation";
+    const isStatMethod = isTTest || isPaired || isCorrelation;
     const independentInfo = methodInfo(entry, "ttest_independent");
     const pairedInfo = methodInfo(entry, "ttest_paired");
-    const info = isPaired ? pairedInfo : independentInfo;
+    const correlationInfo = methodInfo(entry, "correlation");
+    const info = isCorrelation ? correlationInfo : isPaired ? pairedInfo : independentInfo;
     fillSelect(elements.method, [
       { value: "describe", label: t("describe") },
       { value: "ttest_independent", label: t("ttestIndependent"), disabled: Boolean(methodCatalog && !independentInfo?.available) },
-      { value: "ttest_paired", label: t("ttestPaired"), disabled: Boolean(methodCatalog && !pairedInfo?.available) }
+      { value: "ttest_paired", label: t("ttestPaired"), disabled: Boolean(methodCatalog && !pairedInfo?.available) },
+      { value: "correlation", label: t("correlation"), disabled: Boolean(methodCatalog && !correlationInfo?.available) }
     ], entry?.method || "describe");
     elements.method.disabled = !entry || Boolean(entry?.confirmation?.pending);
     elements.fieldset.hidden = isStatMethod;
@@ -784,8 +889,10 @@ export function createAnalysis(adapter) {
     elements.prepare.hidden = isStatMethod;
     elements.ttestOptions.hidden = !isTTest;
     elements.pairedOptions.hidden = !isPaired;
+    elements.correlationOptions.hidden = !isCorrelation;
     elements.methodStatus.replaceChildren();
-    const status = entry?.methodStatus || (methodCatalog && (!info?.available || !info.library?.available) ? { key: info?.available ? "libraryUnavailable" : isPaired ? "pairedMethodUnavailable" : "methodUnavailable", kind: "error", retry: () => discoverMethods(entry, true) } : null);
+    const unavailableKey = isCorrelation ? "correlationMethodUnavailable" : isPaired ? "pairedMethodUnavailable" : "methodUnavailable";
+    const status = entry?.methodStatus || (methodCatalog && (!info?.available || !info.library?.available) ? { key: info?.available ? "libraryUnavailable" : unavailableKey, kind: "error", retry: () => discoverMethods(entry, true) } : null);
     if (status) {
       elements.methodStatus.dataset.kind = status.kind || "info";
       elements.methodStatus.append(make("span", "", errorText(status, "methodFailed")));
@@ -857,12 +964,33 @@ export function createAnalysis(adapter) {
     elements.pairedPreview.textContent = t(entry?.confirmation?.method === "ttest_paired" && entry.confirmation.pending && entry.confirmation.phase === "preview" ? "previewing" : "preview");
   }
 
+  function renderCorrelation(entry) {
+    const draft = correlationDraft(entry);
+    const dataset = selectedDataset(entry);
+    const locked = !dataset || Boolean(entry?.confirmation?.pending);
+    const numeric = (dataset?.columns || []).filter((column) => column.numeric).map((column) => ({ value: column.name, label: column.name }));
+    fillSelect(elements.correlationFirst, numeric, draft?.first, t("choosePairedColumn"));
+    fillSelect(elements.correlationSecond, numeric, draft?.second, t("choosePairedColumn"));
+    elements.correlationKind.value = draft?.kind || "pearson";
+    elements.correlationAlternative.value = draft?.alternative || "two_sided";
+    if (document.activeElement !== elements.correlationConfidence) elements.correlationConfidence.value = String(draft?.confidence ?? 0.95);
+    elements.correlationConfirmed.checked = Boolean(draft?.independentConfirmed);
+    for (const control of [elements.correlationFirst, elements.correlationSecond, elements.correlationKind, elements.correlationAlternative, elements.correlationConfidence, elements.correlationConfirmed]) control.disabled = locked;
+    const spearman = draft?.kind === "spearman";
+    elements.correlationConfidence.hidden = spearman;
+    elements.correlationConfidenceLabel.hidden = spearman;
+    elements.correlationSpearmanNote.hidden = !spearman;
+    elements.correlationDirection.textContent = `X: ${draft?.first || "—"} · Y: ${draft?.second || "—"} · ${t("correlationMissing")}`;
+    elements.correlationPreview.disabled = !correlationReady(entry, draft);
+    elements.correlationPreview.textContent = t(entry?.confirmation?.method === "correlation" && entry.confirmation.pending && entry.confirmation.phase === "preview" ? "previewing" : "preview");
+  }
+
   function renderRuntime(entry) {
-    if (["ttest_independent", "ttest_paired"].includes(entry?.method)) {
+    if (["ttest_independent", "ttest_paired", "correlation"].includes(entry?.method)) {
       const method = entry.method;
       const info = methodInfo(entry, method);
       const runtime = engineInfo(entry, "r");
-      const fallbackRecipe = method === "ttest_paired" ? "ttest-paired-rstats-v1" : "ttest-independent-rstats-v1";
+      const fallbackRecipe = method === "correlation" ? "correlation-rstats-v1" : method === "ttest_paired" ? "ttest-paired-rstats-v1" : "ttest-independent-rstats-v1";
       elements.runtime.replaceChildren();
       elements.runtime.dataset.kind = info?.available && info.library?.available && runtime?.available ? "info" : "error";
       elements.runtime.append(make("p", "", info?.available && info.library?.available
@@ -966,6 +1094,21 @@ export function createAnalysis(adapter) {
     }
   }
 
+  function validCorrelationTieCount(value, used) {
+    return Number.isInteger(value) && value >= 0 && Number.isInteger(used) && value <= used;
+  }
+
+  function appendCorrelationPairs(container, pairs, counts) {
+    if (!pairs) return;
+    container.append(make("h4", "ttest-preview-heading", t("correlationPairs")));
+    const list = make("dl", "ttest-counts");
+    appendField(list, t("selectedColumns"), Array.isArray(pairs.columns) ? pairs.columns.join(", ") : "—");
+    appendField(list, t("correlationMatching"), pairs.matching || "—");
+    appendField(list, t("correlationTiesFirst"), validCorrelationTieCount(pairs.ties?.first, counts?.used) ? String(pairs.ties.first) : "—");
+    appendField(list, t("correlationTiesSecond"), validCorrelationTieCount(pairs.ties?.second, counts?.used) ? String(pairs.ties.second) : "—");
+    container.append(list);
+  }
+
   function renderConfirmation(entry) {
     const confirmation = entry?.confirmation;
     elements.confirmation.hidden = !confirmation;
@@ -974,7 +1117,7 @@ export function createAnalysis(adapter) {
       elements.code.textContent = "";
       return;
     }
-    const isStatMethod = ["ttest_independent", "ttest_paired"].includes(confirmation.method);
+    const isStatMethod = ["ttest_independent", "ttest_paired", "correlation"].includes(confirmation.method);
     const list = make("dl", isStatMethod ? "analysis-confirmation-list ttest-confirmation-list" : "analysis-confirmation-list");
     appendField(list, t("dataset"), confirmation.datasetName);
     appendField(list, t("datasetHash"), confirmation.datasetHash);
@@ -1003,6 +1146,17 @@ export function createAnalysis(adapter) {
       appendField(list, t("pairedStatement"), t("pairedIdentity"));
       appendField(list, t("pairedMissing"), "complete_pairs");
       appendField(list, "r-stats SHA-256", confirmation.body.library_sha256);
+    } else if (confirmation.method === "correlation") {
+      const options = confirmation.body.correlation;
+      appendField(list, t("method"), t("correlation"));
+      appendField(list, t("correlationFirst"), confirmation.body.columns[0]);
+      appendField(list, t("correlationSecond"), confirmation.body.columns[1]);
+      appendField(list, t("correlationKind"), t(options.kind));
+      appendField(list, t("alternative"), t(`correlation_${options.alternative}`));
+      if (options.kind === "pearson") appendField(list, t("confidence"), `${Number(options.confidence) * 100}%`);
+      appendField(list, t("correlationDeclaration"), t("correlationDeclarationConfirmed"));
+      appendField(list, t("correlationMissing"), "complete_pairs");
+      appendField(list, "r-stats SHA-256", confirmation.body.library_sha256);
     } else {
       appendField(list, t("selectedColumns"), confirmation.columns.join(", "));
       appendField(list, t("language"), engineName(confirmation.engine));
@@ -1015,6 +1169,10 @@ export function createAnalysis(adapter) {
       if (confirmation.method === "ttest_paired") {
         appendPairedCounts(preview, confirmation.preview.counts);
         appendPairedStats(preview, confirmation.preview.stats, confirmation.preview.difference_stats);
+      } else if (confirmation.method === "correlation") {
+        appendPairedCounts(preview, confirmation.preview.counts);
+        appendPairedStats(preview, confirmation.preview.stats);
+        appendCorrelationPairs(preview, confirmation.preview.pairs, confirmation.preview.counts);
       } else {
         appendTtestCounts(preview, confirmation.preview.counts);
         appendTtestStats(preview, confirmation.preview.stats);
@@ -1136,6 +1294,20 @@ export function createAnalysis(adapter) {
       appendField(values, t("pairedExcluded"), summaryCount(result.counts?.excluded));
       appendTestSummary(values, test, job.paired || {}, `${columns[0] || "—"} − ${columns[1] || "—"}`, t("pairedDifference"));
       reminder = "pairedResultNote";
+    } else if (job.method === "correlation" || result.method === "correlation") {
+      const kind = test.kind || job.correlation?.kind || "pearson";
+      const coefficient = test.coefficient || (kind === "spearman" ? "rho" : "r");
+      appendField(values, t("correlationKind"), t(kind));
+      appendField(values, `${t("correlationCoefficient")} (${coefficient === "rho" ? "ρ" : "r"})`, summaryNumber(test.estimate));
+      appendField(values, t("pValue"), summaryPValue(test.p_value));
+      appendField(values, t("pairedUsed"), summaryCount(result.counts?.used));
+      appendField(values, t("pairedExcluded"), summaryCount(result.counts?.excluded));
+      const confidence = test.confidence ?? job.correlation?.confidence;
+      const confidenceText = confidence === null || confidence === undefined ? t("unavailable") : summaryNumber(Number(confidence) * 100);
+      const interval = test.ci ? `[${summaryConfidenceBound(test.ci, true)}, ${summaryConfidenceBound(test.ci, false)}]` : t("unavailable");
+      appendField(values, t("confidenceInterval", { confidence: confidenceText }), interval);
+      reminder = "correlationResultNote";
+      if (kind === "spearman") section.append(make("p", "analysis-result-note", t("correlationSpearmanNote")));
     } else {
       const stats = Array.isArray(result.stats) ? result.stats : [];
       appendField(values, t("rows"), summaryCount(result.row_count));
@@ -1236,6 +1408,48 @@ export function createAnalysis(adapter) {
     }
   }
 
+  function renderCorrelationResult(container, job) {
+    const result = job.result;
+    const test = result.test || {};
+    const options = job.correlation || {};
+    const kind = test.kind || options.kind || "pearson";
+    const columns = Array.isArray(test.columns) ? test.columns : Array.isArray(result.pairs?.columns) ? result.pairs.columns : job.columns || [];
+    container.append(make("p", "analysis-result-note", t("correlationResultNote")), make("p", "ttest-assumptions", t("correlationAssumptions")));
+    if (kind === "spearman") container.append(make("p", "ttest-assumptions", t("correlationSpearmanNote")));
+    const definition = make("dl", "ttest-definition");
+    appendField(definition, t("correlationFirst"), columns[0] || "—");
+    appendField(definition, t("correlationSecond"), columns[1] || "—");
+    appendField(definition, t("correlationKind"), t(kind));
+    appendField(definition, t("alternative"), t(`correlation_${test.alternative || options.alternative || "two_sided"}`));
+    appendField(definition, t("correlationDeclaration"), t("correlationDeclarationConfirmed"));
+    appendField(definition, t("correlationMissing"), result.pairs?.missing || options.missing || "complete_pairs");
+    container.append(definition);
+    appendPairedCounts(container, result.counts);
+    appendPairedStats(container, result.stats);
+    appendCorrelationPairs(container, result.pairs, result.counts);
+    container.append(make("h4", "ttest-result-heading", t("correlationResult")));
+    const values = make("dl", "ttest-test-values");
+    const coefficient = test.coefficient || (kind === "spearman" ? "rho" : "r");
+    appendField(values, `${t("correlationCoefficient")} (${coefficient === "rho" ? "ρ" : "r"})`, test.estimate ?? "—");
+    const statistic = test.statistic_infinite === -1 ? "−∞" : test.statistic_infinite === 1 ? "+∞" : test.statistic ?? "—";
+    appendField(values, `${t("correlationStatistic")} (${test.statistic_name || (kind === "spearman" ? "S" : "t")})`, statistic);
+    appendField(values, t("df"), test.df ?? "—");
+    appendField(values, t("pValue"), test.p_value ?? "—");
+    appendField(values, t("correlationPValueMethod"), test.p_value_method || "—");
+    const confidence = test.confidence ?? options.confidence;
+    const confidenceText = confidence === null || confidence === undefined ? t("unavailable") : String(Number(confidence) * 100);
+    const interval = test.ci ? `[${confidenceBound(test.ci, true)}, ${confidenceBound(test.ci, false)}]` : t("correlationCiUnavailable");
+    appendField(values, t("confidenceInterval", { confidence: confidenceText }), interval);
+    appendField(values, t("software"), softwareText(job));
+    container.append(values);
+    if (result.warnings?.length) {
+      container.append(make("h4", "ttest-result-heading", t("warnings")));
+      const warnings = make("ul", "ttest-warning-list");
+      for (const warning of result.warnings) warnings.append(make("li", "", warning));
+      container.append(warnings);
+    }
+  }
+
   function renderDescriptiveResult(container, job) {
     container.append(make("p", "analysis-result-note", t("resultNote")));
     const scroll = make("div", "analysis-table-scroll");
@@ -1306,6 +1520,7 @@ export function createAnalysis(adapter) {
       const full = make("div", "analysis-result-full-content");
       if (job.method === "ttest_independent" || job.result.method === "ttest_independent") renderTtestResult(full, job);
       else if (job.method === "ttest_paired" || job.result.method === "ttest_paired") renderPairedResult(full, job);
+      else if (job.method === "correlation" || job.result.method === "correlation") renderCorrelationResult(full, job);
       else renderDescriptiveResult(full, job);
       details.append(full);
       details.addEventListener("toggle", () => entry.resultDetailsOpen.set(job.id, details.open));
@@ -1342,6 +1557,7 @@ export function createAnalysis(adapter) {
     elements.assistantPlanHelp.textContent = t(!dataset ? "assistantPlanNoDataset" : shared ? "assistantPlanHelp" : "assistantPlanShareRequired");
     renderTtest(entry);
     renderPaired(entry);
+    renderCorrelation(entry);
     renderRuntime(entry);
     elements.prepare.disabled = entry?.method !== "describe" || !dataset || !entry?.selectedColumns.size || !engineInfo(entry)?.available || Boolean(entry?.confirmation?.pending);
     elements.prepare.textContent = t("prepare");
@@ -1355,7 +1571,7 @@ export function createAnalysis(adapter) {
   function invalidateConfirmation(entry) {
     if (entry.confirmation && !entry.confirmation.pending) {
       entry.confirmation = null;
-      if (["previewing", "previewReady", "previewFailed", "ttest_preview_required"].includes(entry.status?.key)) entry.status = null;
+      if (["previewing", "previewReady", "previewFailed", "ttest_preview_required", "correlation_preview_required"].includes(entry.status?.key)) entry.status = null;
     }
   }
 
@@ -1619,6 +1835,96 @@ export function createAnalysis(adapter) {
     if (entry === currentEntry()) render();
   }
 
+  async function previewCorrelation(entry) {
+    const dataset = selectedDataset(entry);
+    const draft = correlationDraft(entry);
+    const documentId = currentId;
+    if (!entry || !dataset || !draft || !documentId || entry.confirmation?.pending) return;
+    let confirmation = entry.confirmation?.method === "correlation" ? entry.confirmation : null;
+    if (confirmation) confirmation.preview = null;
+    entry.status = { key: "previewing", kind: "info" };
+    render();
+    const unchanged = () => entry === currentEntry() && currentId === documentId && correlationDraft(entry) === draft && entry.method === "correlation";
+    try {
+      if (!methodCatalog) await discoverMethods(entry);
+      if (!unchanged()) return;
+      const info = methodInfo(entry, "correlation");
+      if (!info?.available || !info.library?.available) throw new Error("library_unavailable");
+      if (!confirmation) {
+        if (!correlationReady(entry, draft)) throw new Error("correlation_preview_required");
+        const recipe = await getRecipe("r", "correlation");
+        if (!unchanged()) return;
+        if (recipe.sha256 !== info.recipe_sha256) throw new Error("recipeMismatch");
+        const requestId = crypto.randomUUID();
+        const body = {
+          request_id: requestId,
+          dataset_id: dataset.id,
+          dataset_sha256: dataset.sha256,
+          engine: "r",
+          method: "correlation",
+          columns: [draft.first, draft.second],
+          recipe_sha256: recipe.sha256,
+          library_sha256: info.library.sha256,
+          correlation: {
+            kind: draft.kind,
+            alternative: draft.alternative,
+            confidence: draft.kind === "pearson" ? draft.confidence : null,
+            missing: "complete_pairs",
+            independent_pairs_confirmed: true
+          }
+        };
+        confirmation = {
+          method: "correlation",
+          documentId,
+          datasetId: dataset.id,
+          datasetName: dataset.original_filename,
+          datasetHash: dataset.sha256,
+          engine: "r",
+          recipe,
+          requestId,
+          body,
+          preview: null,
+          phase: "preview",
+          pending: false,
+          runFailed: false
+        };
+        entry.confirmation = confirmation;
+      }
+      confirmation.phase = "preview";
+      confirmation.pending = true;
+      entry.status = { key: "previewing", kind: "info" };
+      render();
+      const preview = await adapter.api(`/api/v1/documents/${encodeURIComponent(documentId)}/analyses/correlation/preview`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(confirmation.body)
+      });
+      if (entry.confirmation !== confirmation || correlationDraft(entry) !== draft) return;
+      const pairs = preview?.pairs;
+      if (preview?.saved !== false || JSON.stringify(canonical(preview.parameters)) !== JSON.stringify(canonical(confirmation.body)) ||
+        preview.recipe?.sha256 !== confirmation.body.recipe_sha256 || preview.library?.sha256 !== confirmation.body.library_sha256 ||
+        !preview.counts || !Array.isArray(preview.stats) || preview.stats_basis !== "complete_pairs" ||
+        pairs?.missing !== "complete_pairs" || typeof pairs?.matching !== "string" || !pairs.matching ||
+        !validCorrelationTieCount(pairs?.ties?.first, preview.counts?.used) || !validCorrelationTieCount(pairs?.ties?.second, preview.counts?.used) ||
+        JSON.stringify(pairs?.columns) !== JSON.stringify(confirmation.body.columns)) throw new Error("previewFailed");
+      confirmation.preview = preview;
+      confirmation.pending = false;
+      entry.status = { key: "previewReady", kind: "success" };
+    } catch (error) {
+      const currentAttempt = confirmation
+        ? entry.confirmation === confirmation
+        : !entry.confirmation && entry === currentEntry() && currentId === documentId;
+      if (currentAttempt && correlationDraft(entry) === draft) {
+        if (confirmation) {
+          confirmation.preview = null;
+          confirmation.pending = false;
+        }
+        entry.status = { key: error.code || error.message || "previewFailed", kind: "error", retry: () => previewCorrelation(entry) };
+      }
+    }
+    if (entry === currentEntry()) render();
+  }
+
   async function prepare(entry) {
     const documentId = currentId;
     const dataset = selectedDataset(entry);
@@ -1656,7 +1962,7 @@ export function createAnalysis(adapter) {
 
   async function confirmRun(entry) {
     const confirmation = entry.confirmation;
-    const isStatMethod = ["ttest_independent", "ttest_paired"].includes(confirmation?.method);
+    const isStatMethod = ["ttest_independent", "ttest_paired", "correlation"].includes(confirmation?.method);
     if (!confirmation || confirmation.pending || isStatMethod && !confirmation.preview) return;
     const documentId = confirmation.documentId;
     const navigationGeneration = adapter.getNavigationGeneration?.();
@@ -1693,7 +1999,7 @@ export function createAnalysis(adapter) {
         entry.selectedJobId = job.id;
         adapter.contextChanged?.();
         entry.status = {
-          key: job.status === "queued" ? "queuedReceipt" : job.status,
+          key: "submissionReceipt",
           kind: job.status === "succeeded" ? "success" : ["failed", "cancelled", "interrupted"].includes(job.status) ? "error" : "info"
         };
         adapter.onJobOpened?.(documentId, job.id);
@@ -2071,7 +2377,7 @@ export function createAnalysis(adapter) {
   elements.method.addEventListener("change", () => {
     const entry = currentEntry();
     if (!entry) return;
-    entry.method = ["ttest_independent", "ttest_paired"].includes(elements.method.value) ? elements.method.value : "describe";
+    entry.method = ["ttest_independent", "ttest_paired", "correlation"].includes(elements.method.value) ? elements.method.value : "describe";
     invalidateConfirmation(entry);
     if (entry.method !== "describe") discoverMethods(entry);
     render();
@@ -2159,6 +2465,36 @@ export function createAnalysis(adapter) {
     const entry = currentEntry();
     if (entry) previewPaired(entry);
   });
+  for (const [control, field] of [[elements.correlationFirst, "first"], [elements.correlationSecond, "second"], [elements.correlationKind, "kind"], [elements.correlationAlternative, "alternative"]]) {
+    control.addEventListener("change", () => {
+      const entry = currentEntry();
+      const draft = correlationDraft(entry);
+      if (!draft) return;
+      draft[field] = control.value;
+      invalidateConfirmation(entry);
+      render();
+    });
+  }
+  elements.correlationConfidence.addEventListener("input", () => {
+    const entry = currentEntry();
+    const draft = correlationDraft(entry);
+    if (!draft) return;
+    draft.confidence = Number(elements.correlationConfidence.value);
+    invalidateConfirmation(entry);
+    render();
+  });
+  elements.correlationConfirmed.addEventListener("change", () => {
+    const entry = currentEntry();
+    const draft = correlationDraft(entry);
+    if (!draft) return;
+    draft.independentConfirmed = elements.correlationConfirmed.checked;
+    invalidateConfirmation(entry);
+    render();
+  });
+  elements.correlationPreview.addEventListener("click", () => {
+    const entry = currentEntry();
+    if (entry) previewCorrelation(entry);
+  });
   elements.uploadButton.addEventListener("click", () => elements.uploadInput.click());
   elements.uploadInput.addEventListener("change", () => {
     const entry = currentEntry();
@@ -2233,7 +2569,7 @@ export function createAnalysis(adapter) {
       entry.confirmation = null;
       entry.status = null;
       render();
-      (entry.method === "ttest_independent" ? elements.ttestPreview : entry.method === "ttest_paired" ? elements.pairedPreview : elements.prepare).focus();
+      (entry.method === "ttest_independent" ? elements.ttestPreview : entry.method === "ttest_paired" ? elements.pairedPreview : entry.method === "correlation" ? elements.correlationPreview : elements.prepare).focus();
     }
   });
   elements.log.addEventListener("toggle", () => {
@@ -2275,6 +2611,20 @@ export function createAnalysis(adapter) {
       elements.pairedConfirmed.nextElementSibling.textContent = t("pairedLabel");
       elements.pairedOptions.querySelector(".ttest-assumptions").textContent = t("pairedAssumptions");
       elements.pairedOptions.setAttribute("aria-label", t("ttestPaired"));
+      elements.panel.querySelector('label[for="analysis-correlation-first"]').textContent = t("correlationFirst");
+      elements.panel.querySelector('label[for="analysis-correlation-second"]').textContent = t("correlationSecond");
+      elements.panel.querySelector('label[for="analysis-correlation-kind"]').textContent = t("correlationKind");
+      elements.panel.querySelector('label[for="analysis-correlation-alternative"]').textContent = t("alternative");
+      elements.correlationConfidenceLabel.textContent = t("confidence");
+      elements.correlationKind.querySelector('option[value="pearson"]').textContent = t("pearson");
+      elements.correlationKind.querySelector('option[value="spearman"]').textContent = t("spearman");
+      elements.correlationAlternative.querySelector('option[value="two_sided"]').textContent = t("correlation_two_sided");
+      elements.correlationAlternative.querySelector('option[value="greater"]').textContent = t("correlation_greater");
+      elements.correlationAlternative.querySelector('option[value="less"]').textContent = t("correlation_less");
+      elements.correlationConfirmed.nextElementSibling.textContent = t("correlationDeclaration");
+      elements.correlationSpearmanNote.textContent = t("correlationSpearmanNote");
+      elements.correlationConfirmed.parentElement.nextElementSibling.textContent = t("correlationAssumptions");
+      elements.correlationOptions.setAttribute("aria-label", t("correlation"));
       elements.confirmation.setAttribute("aria-label", t("confirmation"));
       elements.result.setAttribute("aria-label", t("jobs"));
       notebook.applyLanguage(nextLanguage);
@@ -2298,6 +2648,10 @@ export function createAnalysis(adapter) {
       const sharedDatasetId = entry?.shared && selectedDataset(entry) ? entry.selectedDatasetId : null;
       const job = jobFor(entry, entry?.selectedJobId);
       return sharedDatasetId && job?.dataset_id === sharedDatasetId ? job.id : null;
+    },
+    hasPending(documentId) {
+      const entry = documentId ? entryFor(documentId) : currentEntry();
+      return Boolean(entry?.upload?.pending || entry?.confirmation?.pending);
     },
     reload,
     openJob,

@@ -32,11 +32,11 @@ def build_analysis_export(service,document_id,identifier):
     html+='<p>'+escape(dataset['original_filename'])+' · '+escape(job['engine_version'])+'</p>'
     html+='<p>Software output, not scientific or clinical validation. Empty cells are missing; sample SD uses n−1.</p>'
     html+='<table><thead><tr>'+''.join('<th>'+k+'</th>' for k in ('Column','n','Missing','Mean','Median','SD','Min','Max'))+'</tr></thead><tbody>'+''.join(rows)+'</tbody></table><img src="chart.svg" alt="Non-missing counts">'
-    if job.get('method') in ('ttest_independent','ttest_paired'):
-        label='Paired samples t-test' if job.get('method')=='ttest_paired' else 'Independent samples t-test'
+    if job.get('method') in ('ttest_independent','ttest_paired','correlation'):
+        label='Correlation analysis' if job.get('method')=='correlation' else 'Paired samples t-test' if job.get('method')=='ttest_paired' else 'Independent samples t-test'
         html='<!doctype html><meta charset="utf-8"><title>'+label+'</title><h1>'+label+'</h1>'
         html+='<p>'+escape(dataset['original_filename'])+' · '+escape(job['engine_version'])+'</p>'
-        html+=result_table(job['result'])+'<img src="chart.svg" alt="'+('Complete pairs per measurement' if job.get('method')=='ttest_paired' else 'Included samples per group')+'">'
+        html+=result_table(job['result'])+'<img src="chart.svg" alt="'+('Complete observations per variable' if job.get('method')=='correlation' else 'Complete pairs per measurement' if job.get('method')=='ttest_paired' else 'Included samples per group')+'">'
     html+='<ul>'+''.join('<li><a href="'+escape(name)+'">'+escape(name)+'</a></li>' for name in sorted(files))+'</ul>'
     files['index.html']=html.encode('utf-8')
     manifest={'analysis_id':identifier,'dataset_sha256':job['dataset_sha256'],

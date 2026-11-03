@@ -10,6 +10,8 @@ from .note_lifecycle import NoteLifecycle, base_note, read_state, read_states, e
 from .library import Library, DOCUMENT_QUERY, base_document, read_metadata
 from .rich_content import canonical
 from .library_lifecycle import SCHEMA as LIFECYCLE_SCHEMA, PaperTrash, NotePurge, reject_purged
+from .document_purge import SCHEMA as PAPER_PURGE_SCHEMA, PaperPurge
+from .shape_annotations import SCHEMA as SHAPE_ANNOTATION_SCHEMA, creation_json as shape_creation_json
 from .text_annotations import SCHEMA as TEXT_ANNOTATION_SCHEMA, creation_json
 
 SCHEMA = '''
@@ -365,6 +367,24 @@ COMMIT;
 
 SCHEMA = SCHEMA.replace('COMMIT;', LIFECYCLE_SCHEMA + '\nPRAGMA user_version=14;\nCOMMIT;')
 SCHEMA = SCHEMA.replace('COMMIT;', TEXT_ANNOTATION_SCHEMA + '\nPRAGMA user_version=15;\nCOMMIT;')
+SCHEMA = SCHEMA.replace('COMMIT;', PAPER_PURGE_SCHEMA + '\nPRAGMA user_version=16;\nCOMMIT;')
+SCHEMA = SCHEMA.replace('COMMIT;', SHAPE_ANNOTATION_SCHEMA + '\nPRAGMA user_version=17;\nCOMMIT;')
+# Version 18 was a marker only: textbox rows reuse the schema-17 sidecar table, but an
+# older application build cannot safely read the new closed shape kind.
+SCHEMA = SCHEMA.replace('COMMIT;', 'PRAGMA user_version=18;\nCOMMIT;')
+# Version 19 is a marker only again: line/ellipse/freehand rows reuse the same sidecar
+# table and keep one source of truth, but an older build cannot safely read the new kinds.
+SCHEMA = SCHEMA.replace('COMMIT;', 'PRAGMA user_version=19;\nCOMMIT;')
+# Version 20 adds the singleton marker for the internal personal data analysis owner.
+# The migration creates the marker table only; the owner rows themselves exist only
+# after an explicit user request, never as a read-side default.
+SCHEMA = SCHEMA.replace('COMMIT;', '''
+CREATE TABLE IF NOT EXISTS personal_analysis_owner (
+ slot TEXT PRIMARY KEY CHECK(slot='personal'),
+ document_id TEXT NOT NULL UNIQUE REFERENCES studies(document_id)
+);
+PRAGMA user_version=20;
+COMMIT;''')
 
 
 def timestamp():
@@ -391,7 +411,7 @@ class Store:
         self.exports.mkdir(exist_ok=True)
         self.database = self.root / 'workspace.sqlite3'
         with self.connection() as connection:
-            if connection.execute('PRAGMA user_version').fetchone()[0] > 15:
+            if connection.execute('PRAGMA user_version').fetchone()[0] > 20:
                 raise RuntimeError('Database requires a newer application')
             from .study_migration import install
             install(connection,SCHEMA)
@@ -400,6 +420,8 @@ class Store:
         self.paper_trash = PaperTrash(self)
         self.note_purge = NotePurge(self)
         self.note_purge.resume_pending()
+        self.paper_purge = PaperPurge(self)
+        self.paper_purge.resume_pending()
 
     @contextmanager
     def connection(self):
@@ -456,6 +478,11 @@ class Store:
         reject_purged(connection, identifier, str(payload.request_id))
         owner=read_metadata(connection,identifier)
         annotation = creation_json(payload, owner.get('sha256'))
+        shape = shape_creation_json(payload, owner.get('sha256'))
+        if shape is not None:
+            if owner.get('kind')=='study':raise WorkspaceError('source_has_no_pdf','形状批注需要实际PDF原文，请打开关联文献绘制。',409)
+            from .excerpts import verify_source
+            verify_source(self, owner)
         if owner.get('kind')=='study':return self.study_notes.save_in(connection,identifier,payload)
         if payload.page is None or payload.source is not None:raise WorkspaceError('invalid_page','文献笔记需要实际PDF页码。',422)
         rectangle = json.dumps(payload.rect) if payload.rect is not None else None
@@ -471,7 +498,9 @@ class Store:
             verify_source(self, owner)
         existing = connection.execute('SELECT * FROM notes WHERE id=?', (note['id'],)).fetchone()
         if existing is not None:
-            self.repeated_note(existing, note)
+            old_shape = connection.execute('SELECT original_json FROM note_shape_annotations WHERE note_id=?',
+                                           (note['id'],)).fetchone()
+            self.repeated_note(existing, note, old_shape[0] if old_shape else None, shape)
             old_annotation = connection.execute('SELECT original_json FROM note_text_annotations WHERE note_id=?', (note['id'],)).fetchone()
             if (old_annotation[0] if old_annotation else None) != annotation:
                 raise WorkspaceError('idempotency_conflict', '文字批注与原保存请求不一致。', 409)
@@ -487,9 +516,13 @@ class Store:
         connection.execute('INSERT INTO notes VALUES (?,?,?,?,?,?)', tuple(note.values()))
         if annotation is not None:
             connection.execute('INSERT INTO note_text_annotations VALUES (?,?,?)', (note['id'], annotation, annotation))
+        if shape is not None:
+            connection.execute('INSERT INTO note_shape_annotations VALUES (?,?,?)', (note['id'], shape, shape))
         if payload.rich_content is not None:
             body=canonical(payload.rich_content)
             connection.execute('INSERT INTO note_rich_content VALUES (?,?,?)',(note['id'],body,body))
+            from .rich_images import sync_note_images
+            sync_note_images(self,connection,identifier,note['id'],None,payload.rich_content)
         return note_record(note), True
 
     def get_note(self, identifier, note_id):
@@ -528,7 +561,10 @@ class Store:
     def add_excerpt(self, identifier, record):
         with self.connection() as connection:
             connection.execute('BEGIN IMMEDIATE')
-            ensure_active(read_state(connection, identifier, record['note_id']))
+            state = ensure_active(read_state(connection, identifier, record['note_id']))
+            if state.get('shape_annotation'):
+                raise WorkspaceError('shape_annotation_excerpt_unsupported',
+                                     '形状批注请使用独立图片上传分享，不能生成图表摘录。', 409)
             connection.execute('INSERT INTO excerpts VALUES (?,?,?,?,?,?,?)', (
                 record['note_id'], record['source_sha256'], record['sha256'],
                 record['byte_size'], record['width'], record['height'], record['created_at']))
@@ -552,7 +588,9 @@ class Store:
             return result
 
     @staticmethod
-    def repeated_note(existing, proposed):
+    def repeated_note(existing, proposed, original_shape=None, proposed_shape=None):
         if any(existing[key] != proposed[key] for key in ('document_id', 'page', 'rect', 'text')):
             raise WorkspaceError('idempotency_conflict', '这次保存与已有记录冲突，请保留内容后重新打开资料。', 409)
+        if original_shape != proposed_shape:
+            raise WorkspaceError('idempotency_conflict', '形状批注与原保存请求不一致，请保留内容后重新打开资料。', 409)
         return note_record(existing)

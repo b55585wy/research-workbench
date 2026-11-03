@@ -218,3 +218,8 @@ Proposal preview does not write. Confirmation verifies proposal hash, current
 source and revision and atomically writes the annotation and receipt. Origin
 manual/agent_proposal describes the workflow, not an authenticated user identity.
 
+
+
+## v0.26：研究内的多论文读取
+
+研究任务发送时可提供关联论文目录，正文由 Agent 按任务调用 list_study_papers/read_study_paper 读取。关联不会自动发送全部 PDF，跨研究正文、图片像素和数据共享权限不因此扩大。表格作为普通对话消息渲染、保留和导出。引用复用检查关联及原文版本并重映射编号；笔记保存仍需原有确认。见 [AGENT-READING.md](AGENT-READING.md)。
