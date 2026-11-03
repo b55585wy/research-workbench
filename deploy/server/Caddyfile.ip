@@ -1,0 +1,40 @@
+# Temporary HTTPS IP entry with automatic ACME renewal.
+{
+ default_sni 103.149.91.75
+}
+https://103.149.91.75 {
+ tls {
+  issuer acme {
+   dir https://acme-v02.api.letsencrypt.org/directory
+   profile shortlived
+   timeout 2m
+  }
+ }
+	route {
+		@cross_site header Sec-Fetch-Site cross-site
+		respond @cross_site "跨站请求已拒绝 / Cross-site request refused." 403
+		@foreign_origin {
+			header Origin *
+			not header Origin https://103.149.91.75
+		}
+		respond @foreign_origin "来源不被接受 / Origin not accepted." 403
+		basic_auth {
+			owner {$RESEARCH_HTTP_PASSWORD_HASH}
+		}
+		reverse_proxy 127.0.0.1:3150 {
+			header_up Host localhost
+			header_up -Origin
+			header_up -Authorization
+			header_up -Forwarded
+			header_up -X-Forwarded-For
+			header_up -X-Forwarded-Host
+			header_up -X-Forwarded-Proto
+			header_up -X-Forwarded-Port
+			header_up -X-Forwarded-Ssl
+			header_up -X-Real-IP
+			header_up -Front-End-Https
+			header_down Location "^http://localhost(:[0-9]+)?(/.*)?$" "https://103.149.91.75$2"
+			header_down Location "^http://127[.]0[.]0[.]1(:[0-9]+)?(/.*)?$" "https://103.149.91.75$2"
+		}
+	}
+}

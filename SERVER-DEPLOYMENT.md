@@ -2,7 +2,9 @@
 
 本轮运行于用户指定的 CentOS 7，应用 v0.50.0，代码发布包来自
 `5ab1d09f833c03e3fbd4195c78133aaf6b6d38df`。域名为 `itsyiyi.com`，
-目标服务器为 `103.149.91.75`。HTTPS 尚待根域名 A 记录生效后启用。
+目标服务器为 `103.149.91.75`。当前可通过 **https://103.149.91.75/** 登录访问。
+该 IP 已取得受信任的 Let's Encrypt 证书，由 Caddy 自动续期。
+域名入口等待根域名 A 记录生效后接入。
 当前记录：原 A 记录为 `185.53.179.149`，未发现 AAAA 或 CAA 记录。
 
 ## 运行边界
@@ -57,6 +59,14 @@
    确认 DNS 指向本机、80/443 可达后启用 Caddy，让它申请和续期证书。
    调整 DNS 时保留已有邮件和其他记录。
 
+DNS 尚未就绪时，使用 `deploy/server/Caddyfile.ip` 的 IP 入口模板。
+它显式选择 Let's Encrypt 的 `shortlived` 配置，Caddy 自动维护有效期约六天的
+IP 证书；`default_sni` 用于没有发送 SNI 的 IP 访问。网页口令哈希继续来自
+同一个受限环境文件。无需在浏览器添加自签证书信任。
+域名模板已保存在服务器 `/etc/caddy/research-domain.pending.Caddyfile`。
+DNS 生效后可将域名站点块加入配置，校验后 reload Caddy；保留 IP 入口便于已有
+书签继续使用。两个入口分别校验自己的 Origin，使用同一拥有者口令和资料库。
+
 只使用经核对的构建包，不把摘要校验等同于任意第三方归档安全。
 新服务器安装步骤应由部署者核对，不盲目覆盖在线实例。
 
@@ -71,7 +81,8 @@ MinerU 解析运行环境尚未部署，因此选页解析、沉浸式翻译和�
 本轮核对源码/资源摘要、依赖版本及导入、服务启动、资源限制和健康接口。
 临时回环代理的 10 项访问检查通过：未登录拒绝页面/API/文件、正确登录放行、
 只接受指定 Origin，并拒绝跨站请求。临时代理已停止并移除。
-未运行功能回归、论文解析、统计任务或模型调用；公网 HTTPS 尚未验收。
+IP 入口另完成八项公网 HTTPS 检查：验证证书、登录后页面/API/资源、未登录拒绝访问，
+并检查来源限制。未运行功能回归、论文解析、统计任务或模型调用。
 
 ## 之后更新与恢复
 
@@ -84,4 +95,5 @@ MinerU 解析运行环境尚未部署，因此选页解析、沉浸式翻译和�
 
 依据：[Miniforge 支持范围](https://github.com/conda-forge/miniforge)、
 [Caddy Basic Auth](https://caddyserver.com/docs/caddyfile/directives/basic_auth)、
+[Let's Encrypt IP 证书](https://letsencrypt.org/2026/01/15/6day-and-ip-general-availability)、
 [CentOS 维护状态](https://www.centos.org/centos-linux/)。
