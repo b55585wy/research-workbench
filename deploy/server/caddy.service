@@ -1,0 +1,76 @@
+# /etc/systemd/system/caddy.service
+#
+# 研究台边缘单元：Caddy 2.11.7 官方静态二进制（不是发行版包），
+# 目标 CentOS 7 自带 systemd 219 + cgroup v1。
+#
+# 二进制：/opt/research-workspace/bin/caddy（root:root 0755，由 Codex 校验 SHA 后放置）
+# 文件能力：cap_net_bind_service=+ep（绑定 80/443 用；同样由 Codex 设置）
+#   setcap cap_net_bind_service=+ep /opt/research-workspace/bin/caddy
+#   → 因此本单元必须 NoNewPrivileges=no：NoNewPrivileges=yes 会剥掉文件能力，
+#     Caddy 以非 root 运行时就无法绑定 1024 以下端口。
+#   → 219 无 AmbientCapabilities，不要试图用它替代文件能力。
+# 配置：/etc/caddy/Caddyfile（root:root，不可被 research-caddy 改写）
+# 凭据：/etc/research-workspace/access.env（root:root 0600），由 systemd 以 root 读入。
+#   ExecStart 与 ExecReload 都不从网络下载任何东西；站点口令哈希只来自这个文件。
+#
+# 不自动启动：只有在 access.env 写好、DNS 已指向本机、80/443 未被其它反代占用
+# 之后才 enable/start（见 SERVER-DEPLOYMENT.md）。凭据缺失时 EnvironmentFile
+# 读取失败，单元直接进入 failed，不会以“无口令”状态对外服务。
+#
+# 管理接口：Caddy 默认 admin 监听 127.0.0.1:2019（仅本机），本单元不修改它，
+# 也不要改成 0.0.0.0 或公网可达地址；ExecReload 依赖它。
+
+[Unit]
+Description=Caddy edge proxy for research workbench (standalone binary)
+Documentation=file:///opt/research-workspace/current/SERVER-DEPLOYMENT.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+# 219 无 Type=exec；Caddy 前台运行，simple 即可。
+Type=simple
+User=research-caddy
+Group=research-caddy
+ExecStart=/opt/research-workspace/bin/caddy run --config /etc/caddy/Caddyfile --adapter caddyfile
+# reload 走 admin API；本命令自己会用同一份环境重新解析 Caddyfile，
+# 所以 EnvironmentFile 必须在单元里（而不是只在手动命令里）。
+ExecReload=/opt/research-workspace/bin/caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile
+# 启动前只做本地配置解析，不联网、不申请证书，失败即不启动。
+ExecStartPre=/opt/research-workspace/bin/caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+
+Restart=on-failure
+RestartSec=5
+TimeoutStartSec=90
+TimeoutStopSec=30
+# 219 里这两个键在 [Service] 段且没有 Sec 后缀。
+StartLimitInterval=60
+StartLimitBurst=5
+
+# 219 无 StateDirectory：/var/lib/research-caddy 与下面三个 XDG 子目录
+# 由安装步骤手工创建并 chown research-caddy（见 SERVER-DEPLOYMENT.md）。
+Environment=HOME=/var/lib/research-caddy
+Environment=XDG_CONFIG_HOME=/var/lib/research-caddy/.config
+Environment=XDG_DATA_HOME=/var/lib/research-caddy/.local/share
+Environment=XDG_CACHE_HOME=/var/lib/research-caddy/.cache
+# 口令哈希（RESEARCH_HTTP_PASSWORD_HASH）。缺文件 = 启动失败，不静默放行。
+EnvironmentFile=/etc/research-workspace/access.env
+
+# 文件能力需要关闭 NoNewPrivileges（见文件头）；作为交换，只保留一个能力。
+NoNewPrivileges=no
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+UMask=0027
+ProtectSystem=full
+ProtectHome=yes
+PrivateTmp=yes
+KillMode=control-group
+# 证书、OCSP 与 autosave 只写在自己的状态目录里；二进制与配置只读。
+ReadWriteDirectories=/var/lib/research-caddy
+ReadOnlyDirectories=/opt/research-workspace/bin
+ReadOnlyDirectories=/etc/caddy
+# 219 无 MemoryHigh/MemoryMax/MemorySwapMax，只有硬上限。
+MemoryLimit=256M
+LimitNPROC=192
+LimitNOFILE=8192
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,70 @@
+# /etc/caddy/Caddyfile —— 研究台边缘配置（Caddy 2.11.7 官方静态二进制）
+#
+# 这份文件属于本机专用 Caddy 实例（caddy.service）。若 80/443 已被其它反代占用，
+# 就只把下面的 itsyiyi.com 站点块并入那台反代，并且不要启用本实例（见 SERVER-DEPLOYMENT.md）。
+#
+# 信任边界（全部安全假设都在这一块里）：
+# 1. 应用只监听 127.0.0.1:3150，并要求回环对端 + Host 为 localhost/127.0.0.1/::1。
+#    所以这里只代理回环，并把 Host 统一改写成 localhost。
+# 2. 应用以 proxy_headers=False 启动，不读 X-Forwarded-*/Forwarded；客户端自带的值在这里删除。
+# 3. 应用没有账号体系。这里的 Basic 认证是唯一“单人闸门”，不是身份系统，不构成多账号能力。
+# 4. 浏览器同源请求带 Origin: https://itsyiyi.com，而应用只认自己看到的 http://localhost：
+#    因此必须先校验、后剔除 Origin，任何其它 Origin 一律 403。
+# 5. 应用自己写出 CSP / X-Frame-Options / nosniff / CORP / Referrer-Policy；本文件不改写、不覆盖。
+# 6. 只服务 itsyiyi.com 顶点域，不配置 www 或其它别名。
+
+itsyiyi.com {
+	# TLS 由 Caddy 自动申请与续期（需要 DNS 指向本机且 80/443 可达）。
+
+	# route 固定处理顺序：Caddy 默认会按指令全局重排，那样鉴权可能落到代理之后。
+	route {
+		# ---- 1. 来源校验：跨站请求、非公开 Origin 直接拒绝 ----
+		@cross_site header Sec-Fetch-Site cross-site
+		respond @cross_site "跨站请求已拒绝 / Cross-site request refused." 403
+
+		# 正则两端锚定：header 匹配器是子串匹配，会把 https://itsyiyi.com.evil.example
+		# 当成同源；这里必须精确等于公开源。两个命名子匹配器同时生效：
+		# 先要求 Origin 存在（否则缺 Origin 的请求会被误拒），再要求它恰好是公开源。
+		@foreign_origin {
+			header Origin *
+			not header Origin https://itsyiyi.com
+		}
+		respond @foreign_origin "来源不被接受 / Origin not accepted." 403
+
+		# ---- 2. 单人闸门：所有路径都要认证 ----
+		# 页面、静态资源、/api/*、PDF 与导出端点都在这里之后才可达；未认证一律 401，
+		# 不存在匿名可读的资产或接口。哈希只来自 access.env（caddy.service 的 EnvironmentFile），
+		# 本文件不含凭据；变量缺失或格式错误时 Caddy 无法加载配置（不会退化为匿名放行）。
+		basic_auth {
+			owner {$RESEARCH_HTTP_PASSWORD_HASH}
+		}
+
+		# ---- 3. 反代到本机应用 ----
+		# 上游写 127.0.0.1 而不是 localhost：应用只绑 IPv4 回环，localhost 若先解析到
+		# ::1 会得到 502。应用接受的 Host 只有 localhost，所以下面改写 Host。
+		reverse_proxy 127.0.0.1:3150 {
+			header_up Host localhost
+
+			# Origin 已在上方校验通过，这里才剔除，使应用看到“非浏览器跨源请求”的状态。
+			header_up -Origin
+
+			# Basic 凭据止于边缘：不进入应用、不进入应用日志。
+			header_up -Authorization
+
+			# 不透传客户端自带的转发身份头（应用本身也不读取）。
+			header_up -Forwarded
+			header_up -X-Forwarded-For
+			header_up -X-Forwarded-Host
+			header_up -X-Forwarded-Proto
+			header_up -X-Forwarded-Port
+			header_up -X-Forwarded-Ssl
+			header_up -X-Real-IP
+			header_up -Front-End-Https
+
+			# 应用按 Host 生成绝对 Location（例如补斜杠的 307）。两条规则都锚定到行尾，
+			# 并把“端口 + 路径”整体替换：旧规则只替换主机部分，会留下 :3150 端口。
+			header_down Location "^http://localhost(:[0-9]+)?(/.*)?$" "https://itsyiyi.com$2"
+			header_down Location "^http://127[.]0[.]0[.]1(:[0-9]+)?(/.*)?$" "https://itsyiyi.com$2"
+		}
+	}
+}

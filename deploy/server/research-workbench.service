@@ -1,0 +1,105 @@
+# /etc/systemd/system/research-workbench.service
+#
+# 研究台应用单元：单进程、单 worker、仅回环监听，供本机 Caddy 反代。
+# 目标是 CentOS 7 自带 systemd 219 + cgroup v1（不重装系统）。
+# 因此只使用 219 已支持的指令；下面注释里「219 无」的写法一律不用。
+#
+# 目录约定（见 SERVER-DEPLOYMENT.md）：
+#   /opt/research-workspace/releases/<版本>/  只读源码发布目录（frontend/vendor 随包）
+#   /opt/research-workspace/current           指向当前发布目录的符号链接
+#   /opt/research-workspace/runtimes/app-<版本>/ 只读 Python 运行时（每个版本独立）
+#   /opt/research-workspace/current/.venv     指向上述运行时的符号链接（沿用既有服务路径）
+#   /var/lib/research-workspace/data          唯一可写数据目录（SQLite + 文件）
+#   /etc/research-workspace/                  凭据与可选环境文件（不进 Git）
+
+[Unit]
+Description=Research workbench (single-owner personal workspace, loopback only)
+Documentation=file:///opt/research-workspace/current/SERVER-DEPLOYMENT.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+# 219 无 Type=exec；simple 表示 exec 后立即视为启动成功（不等待应用就绪），
+# 进程随后退出即判为失败，并由下面的 Restart=on-failure 兜住。
+Type=simple
+User=research-workspace
+Group=research-workspace
+WorkingDirectory=/opt/research-workspace/current
+ExecStart=/opt/research-workspace/current/.venv/bin/python -m research_workbench --port 3150 --data /var/lib/research-workspace/data --rscript /opt/research-workspace/runtimes/rstats-4.6.2/lib/R/bin/Rscript --statistics-root /opt/research-workspace/runtimes/rstats-manifest
+
+# 失败自动重启；正常停止不重启（升级时先 stop 再切换 current）。
+Restart=on-failure
+RestartSec=5
+TimeoutStartSec=60
+TimeoutStopSec=45
+# 219 里这两个键在 [Service] 段，且名字没有 Sec 后缀；写错只会被静默忽略，
+# 所以数值保持保守：60 秒内最多 5 次，之后停在 failed 状态等人工处理。
+StartLimitInterval=60
+StartLimitBurst=5
+
+# ── 运行期环境 ───────────────────────────────────────────────────────────────
+# 应用只读取这些 RESEARCH_* 变量；未设置即“该能力未配置”，界面会如实报告。
+# -m 依赖 WorkingDirectory 找到 research_workbench 包，不要改成绝对脚本路径。
+Environment=RESEARCH_WORKBENCH_DATA=/var/lib/research-workspace/data
+Environment=PYTHONUNBUFFERED=1
+# 发布目录与运行时只读：禁止写 __pycache__，也避免 .pyc 时间戳不一致。
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=LANG=C.UTF-8
+# 服务器约 1837 MiB 内存：BLAS/OpenMP 默认按核数开线程会成倍放大 RSS，
+# 这里统一压到 1 线程。单 worker 由 __main__ 的 uvicorn.run 默认保证，
+# 不要加 --workers，也不要用 gunicorn 多进程（SQLite 与后台任务需单实例协调）。
+Environment=OMP_NUM_THREADS=1
+Environment=OPENBLAS_NUM_THREADS=1
+Environment=MKL_NUM_THREADS=1
+Environment=NUMEXPR_NUM_THREADS=1
+Environment=VECLIB_MAXIMUM_THREADS=1
+Environment=BLIS_NUM_THREADS=1
+Environment=TOKENIZERS_PARALLELISM=false
+Environment=MALLOC_ARENA_MAX=2
+# 219 无 StateDirectory：家目录与缓存目录由安装步骤手工建好并 chown，
+# 这里只用 Environment 指过去（不要在包装脚本里改 HOME）。
+Environment=HOME=/var/lib/research-workspace
+Environment=XDG_CACHE_HOME=/var/lib/research-workspace/.cache
+Environment=XDG_CONFIG_HOME=/var/lib/research-workspace/.config
+# 可选路径（RESEARCH_TRANSLATION_RUNTIME / RESEARCH_IMPORT_ROOT /
+# RESEARCH_RSCRIPT / RESEARCH_AGENT_CONFIG）。文件缺失不影响启动，
+# 相应能力在界面中显示为不可用。文件内不含密码，不进 Git。
+EnvironmentFile=-/etc/research-workspace/runtime.env
+
+# ── 文件系统与权限 ───────────────────────────────────────────────────────────
+# UMask 0077：数据文件 0600 / 目录 0700，备份与排障不外泄到其他用户。
+UMask=0077
+NoNewPrivileges=yes
+# 空赋值 = 丢弃全部能力（服务以非特权用户运行，绑定 3150 不需要任何能力）。
+CapabilityBoundingSet=
+# 219 无 ProtectSystem=strict（231 起才有）。full 把 /usr /boot /etc 挂只读；
+# /opt 不在其中，只靠 root:root 权限 + 下面的 ReadOnlyDirectories 保护。
+ProtectSystem=full
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+KillMode=control-group
+# 219 只有 ReadOnly/ReadWriteDirectories（*Paths 是 231 的改名，219 会忽略）。
+# 这些路径必须存在：缺目录时单元拒绝启动，避免应用在错误位置初始化空数据库。
+ReadOnlyDirectories=/opt/research-workspace/releases
+ReadOnlyDirectories=/opt/research-workspace/runtimes
+ReadWriteDirectories=/var/lib/research-workspace/data
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+SystemCallArchitectures=native
+# 219 无这些：AmbientCapabilities / ProtectKernel* / ProtectClock / ProtectHostname
+# / RestrictNamespaces / RestrictRealtime / RestrictSUIDSGID / LockPersonality /
+# MemoryDenyWriteExecute。SystemCallFilter 在 219 里其实存在，但本部署按约定不用：
+# 过严的系统调用过滤会让解析器与 R 子进程“启动成功、实际失败”。
+# Python 与本地 PDF/图像原生库需要可执行内存映射，也不要自行加 MemoryDenyWriteExecute。
+
+# ── 资源上限（1837 MiB 内存 + 2 GiB swap，cgroup v1）──────────────────────────
+# 219 无 MemoryHigh / MemoryMax / MemorySwapMax：cgroup v1 只有硬上限 MemoryLimit。
+# 1280M 给应用，余量留给系统与 Caddy。注意 cgroup v1 计入页缓存，大 PDF 解析时
+# 可能触发内核 OOM 选择本服务；换页不受本行约束（memsw 上限不在本切片设置）。
+MemoryLimit=1280M
+# 219 无 TasksMax；线程/进程数用 RLIMIT_NPROC 限制（按 UID 计，含本用户其它进程）。
+LimitNPROC=192
+LimitNOFILE=8192
+
+[Install]
+WantedBy=multi-user.target

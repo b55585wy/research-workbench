@@ -1,3 +1,5 @@
+Personal server deployment and current status: [SERVER-DEPLOYMENT.md](SERVER-DEPLOYMENT.md).
+
 # research workspace · v0.50.0
 
 v0.50.0 证据检索支持逐篇指定页码，例如“比较 A 的第35—38页与 B 的第12—15页”。指定页先限定范围，再执行有上限的检索，避免被排序更靠前的准备页挤出。仍在现有助手中使用，不自动准备全文；交互与召回未验收。见 [EVIDENCE-SEARCH.md](EVIDENCE-SEARCH.md)。
