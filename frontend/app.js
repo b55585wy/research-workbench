@@ -22,6 +22,7 @@ import { createReaderShapes, shapeBounds } from "/reader-shapes.js";
 import { createWorkspaceShellBridge } from "/workspace-shell-bridge.js";
 import { createTranslationBridge } from "/translation-bridge.js";
 import { createTranslationOverlay } from "/translation-overlay.js";
+import { createFlowReadingBridge } from "/flow-reading-bridge.js";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = "/vendor/pdfjs/build/pdf.worker.mjs";
 
@@ -378,6 +379,9 @@ const messages = {
     viewMode: "阅读模式",
     viewContinuous: "连续滚动",
     viewSingle: "单页",
+    viewFlow: "段落阅读",
+    flowLoading: "正在载入段落阅读…",
+    flowUnavailable: "段落阅读暂时不可用，仍可查看原始 PDF。",
     findInPdf: "查找正文",
     findPlaceholder: "在当前 PDF 中查找",
     findClose: "关闭",
@@ -796,6 +800,9 @@ const messages = {
     viewMode: "Reading mode",
     viewContinuous: "Continuous",
     viewSingle: "Single page",
+    viewFlow: "Paragraph reading",
+    flowLoading: "Loading paragraph reading…",
+    flowUnavailable: "Paragraph reading is unavailable. The original PDF remains available.",
     findInPdf: "Find in PDF",
     findPlaceholder: "Find in the current PDF",
     findClose: "Close",
@@ -951,6 +958,7 @@ const elements = {
   metadataRetry: $("metadata-retry"),
   metadataViewLatest: $("metadata-view-latest"),
   readerStage: $("reader-stage"),
+  flowReader: $("flow-reader"),
   translationLayout: $("reader-translation-layout"),
   translationControls: $("translation-controls"),
   translationPanel: $("translation-panel"),
@@ -1030,6 +1038,8 @@ const state = {
   pdfTask: null,
   page: 1,
   viewMode: readViewMode(),
+  flowActive: false,
+  flowViewedPage: 1,
   readerPages: new Map(),
   readerPagesContainer: null,
   activePageRecord: null,
@@ -1160,6 +1170,16 @@ const translationOverlay = createTranslationOverlay({
   onPageStatus: (status) => {
     elements.translationControls.dispatchEvent(new CustomEvent("translation-overlay-status", { detail: status }));
   }
+});
+const flowReader = createFlowReadingBridge({
+  container: elements.flowReader,
+  getModel: flowReaderModel,
+  api,
+  getPdf: () => state.pdf,
+  getDocument: () => state.document && !isStudy() ? state.document : null,
+  goToSource: goToFlowSource,
+  onPageViewed: flowPageViewed,
+  onRequestTranslation: openFlowTranslation
 });
 elements.translationControls.addEventListener("translation-presentation-change", (event) => {
   const snapshot = event.detail;
@@ -1492,19 +1512,148 @@ function translationModel() {
   };
 }
 
+function flowReaderModel() {
+  const paper = state.document && !isStudy() ? state.document : null;
+  return {
+    visible: Boolean(state.flowActive && paper && state.pdf && workspace?.getMode() === "reading"),
+    language: state.language,
+    document: paper ? {
+      id: paper.id,
+      sha256: paper.sha256,
+      pageCount: paper.page_count,
+      title: paper.title || paper.original_filename || null
+    } : null,
+    currentPage: state.page
+  };
+}
+
 function syncTranslationLayout() {
   const model = translationModel();
-  const visible = Boolean(model.open && model.reading && model.document && translationPresentationMode === "dual");
+  const visible = Boolean(model.open && model.reading && model.document && translationPresentationMode === "dual" && !flowReaderModel().visible);
   elements.translationLayout.dataset.translationOpen = String(visible);
   elements.translationLayout.dataset.translationMode = translationPresentationMode;
   elements.translationPanel.hidden = !visible;
   if (!model.reading) translationOverlay.clear();
 }
 
+function syncFlowLayout() {
+  const model = flowReaderModel();
+  elements.flowReader.hidden = !model.visible;
+  elements.readerStage.hidden = model.visible;
+  elements.translationLayout.dataset.flowActive = String(model.visible);
+  elements.readerStage.closest(".reader-panel").dataset.flowActive = String(model.visible);
+  elements.viewMode.value = model.visible ? "flow" : state.viewMode || "continuous";
+  flowReader.update(model);
+}
+
 function setTranslationOpen(open) {
   state.translationOpen = Boolean(open && state.pdf && state.document && !isStudy());
   syncTranslationLayout();
   translation.update(translationModel());
+}
+
+function deactivateFlow() {
+  state.flowActive = false;
+  flowReader.clearVisuals();
+  syncTranslationLayout();
+  syncFlowLayout();
+}
+
+async function enterFlowReading() {
+  if (!state.pdf || !state.document || isStudy() || state.flowActive) return;
+  const documentId = state.document.id;
+  const sourceSha256 = state.document.sha256;
+  const sequence = state.loadSequence;
+  flushReaderProgress();
+  state.flowViewedPage = state.page;
+  state.flowActive = true;
+  syncTranslationLayout();
+  syncFlowLayout();
+  const available = await flowReader.load();
+  if (!state.flowActive || sequence !== state.loadSequence || state.document?.id !== documentId || state.document?.sha256 !== sourceSha256) return;
+  if (!available) {
+    deactivateFlow();
+    setStatus("flowUnavailable", "error");
+    return;
+  }
+  syncFlowLayout();
+}
+
+async function exitFlowReading(nextMode = state.viewMode) {
+  if (!state.flowActive || !prepareContextNavigation()) return false;
+  state.viewMode = nextMode === "single" ? "single" : "continuous";
+  try {
+    localStorage.setItem("research-workbench-reader-view-mode", state.viewMode);
+  } catch {
+    // The selected mode still applies for this session.
+  }
+  deactivateFlow();
+  await goToPage(state.flowViewedPage);
+  return true;
+}
+
+function flowPageViewed(page, expectedDocumentId, expectedSourceSha256) {
+  if (
+    !state.flowActive
+    || !state.pdf
+    || state.document?.id !== expectedDocumentId
+    || state.document?.sha256 !== expectedSourceSha256
+    || !Number.isInteger(page)
+    || page < 1
+    || page > state.document.page_count
+  ) return;
+  state.flowViewedPage = page;
+}
+
+async function goToFlowSource(page, rect, expectedDocumentId, expectedSourceSha256) {
+  const identityMatches = () => Boolean(
+    state.flowActive &&
+    state.pdf &&
+    state.document &&
+    !isStudy() &&
+    state.document.id === expectedDocumentId &&
+    state.document.sha256 === expectedSourceSha256
+  );
+  if (!identityMatches() || !Number.isInteger(page) || page < 1 || page > state.document.page_count) return false;
+  if (rect !== null && (!rect || ![rect.x, rect.y, rect.width, rect.height].every(Number.isFinite) || rect.x < 0 || rect.y < 0 || rect.width <= 0 || rect.height <= 0 || rect.x + rect.width > 1 || rect.y + rect.height > 1)) return false;
+  if (!prepareContextNavigation()) return false;
+  const highlightId = `flow-source-${expectedDocumentId}`;
+  state.highlight = rect ? {
+    id: highlightId,
+    document_id: expectedDocumentId,
+    page,
+    rect: [rect.x, rect.y, rect.x + rect.width, rect.y + rect.height]
+  } : null;
+  state.highlightRevealId = rect ? highlightId : null;
+  if (!identityMatches()) return false;
+  deactivateFlow();
+  await goToPage(page, { preserveHighlight: true });
+  if (state.document?.id !== expectedDocumentId || state.document?.sha256 !== expectedSourceSha256) return false;
+  return state.page === page;
+}
+
+async function openFlowTranslation(page, expectedDocumentId, expectedSourceSha256) {
+  if (
+    !state.flowActive
+    || !state.pdf
+    || state.document?.id !== expectedDocumentId
+    || state.document?.sha256 !== expectedSourceSha256
+    || !Number.isInteger(page)
+    || page < 1
+    || page > state.document.page_count
+    || !prepareContextNavigation()
+  ) return false;
+  deactivateFlow();
+  await goToPage(page);
+  await translation.load();
+  if (
+    !state.pdf
+    || state.document?.id !== expectedDocumentId
+    || state.document?.sha256 !== expectedSourceSha256
+    || state.page !== page
+    || workspace?.getMode() !== "reading"
+  ) return false;
+  return translation.openDual();
 }
 
 function openTranslationSettings() {
@@ -2844,11 +2993,12 @@ function renderDocumentDetails() {
   elements.exportAnnotatedPdf.disabled = !hasActiveSavedPdfNotes(document) || state.pendingSaves > 0 || state.pendingExcerpts.size > 0 || state.pendingExports.size > 0 || state.pendingMutations.size > 0 || state.pendingMetadata.size > 0 || state.editDrafts.has(document.id) || Boolean(document && !isStudy(document) && ensureMetadata(document.id).draft);
   elements.exportAnnotatedPdf.textContent = t(document && state.pendingExports.has(`annotated-pdf:${document.id}`) ? "exportingAnnotatedPdf" : "exportAnnotatedPdf");
   elements.viewMode.disabled = !hasPdf;
-  elements.viewMode.value = state.viewMode || "continuous";
+  elements.viewMode.value = state.flowActive ? "flow" : state.viewMode || "continuous";
   readerFind?.update();
   assistant?.contextChanged();
   syncTranslationLayout();
   translation.update(translationModel());
+  syncFlowLayout();
 }
 
 function renderRegionCapture() {
@@ -3421,6 +3571,10 @@ async function restorePendingReaderProgress() {
 }
 
 function cancelDocumentWork() {
+  state.flowActive = false;
+  state.flowViewedPage = 1;
+  flowReader.update(flowReaderModel());
+  flowReader.clearVisuals();
   translationOverlay.clear();
   readerObjects?.reset();
   readerShapes?.documentChanged();
@@ -4509,6 +4663,7 @@ async function navigatePdfLink({ pageNumber, destArray }) {
 
 async function goToPage(page, options = {}) {
   if (!state.pdf || !state.document) return;
+  if (state.flowActive) deactivateFlow();
   readerObjects?.close();
   readerShapes?.cancel();
   if (!options.restoreProgress) cancelReaderProgressRestore();
@@ -5143,7 +5298,7 @@ function submitTextAnnotation(kind) {
 }
 
 function requestRender(preservedAnchor) {
-  if (!state.pdf || !state.document) return Promise.resolve();
+  if (!state.pdf || !state.document || state.flowActive) return Promise.resolve();
   readerObjects?.close();
   readerShapes?.cancel();
   const anchor = preservedAnchor === undefined ? captureReaderAnchor() : preservedAnchor;
@@ -6617,8 +6772,21 @@ document.addEventListener("fullscreenchange", () => {
 });
 elements.viewMode.addEventListener("change", () => {
   if (!state.pdf) return;
+  const selected = elements.viewMode.value;
+  if (selected === "flow") {
+    elements.viewMode.value = state.flowActive ? "flow" : state.viewMode;
+    void enterFlowReading();
+    return;
+  }
+  if (state.flowActive) {
+    elements.viewMode.value = "flow";
+    void exitFlowReading(selected).then((exited) => {
+      if (!exited && state.flowActive) elements.viewMode.value = "flow";
+    });
+    return;
+  }
   flushReaderProgress();
-  state.viewMode = elements.viewMode.value === "single" ? "single" : "continuous";
+  state.viewMode = selected === "single" ? "single" : "continuous";
   try {
     localStorage.setItem("research-workbench-reader-view-mode", state.viewMode);
   } catch {
@@ -7259,8 +7427,10 @@ workspace = createWorkspace({
   modeSelected: (mode) => mode === "data" ? openDataWorkspace() : openReadingWorkspace(),
   modeRendered: (mode) => {
     dataNavigation?.setMode(mode);
+    if (mode !== "reading" && state.flowActive) deactivateFlow();
     syncTranslationLayout();
     translation.update(translationModel());
+    syncFlowLayout();
   },
   modePendingChanged: (pending) => dataNavigation?.setNavigationPending(pending),
   readingVisible: () => {

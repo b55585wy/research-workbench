@@ -763,6 +763,7 @@ function TranslationExperience({ model, callbacks, controlsContainer, panelConta
           <button
             className="button button-quiet translation-mode-button"
             type="button"
+            data-translation-mode={item}
             aria-pressed={mode === item}
             disabled={!model.reading || !document}
             onClick={() => changeMode(item)}

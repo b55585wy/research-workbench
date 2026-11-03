@@ -1,0 +1,736 @@
+import { useEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
+import { createRoot, type Root } from "react-dom/client";
+
+type FlowLanguage = "zh" | "en";
+type FlowPhase = "cache" | "preparing" | "ready" | "error" | "cancelled" | "unavailable";
+type TextMode = "original" | "translated";
+
+export interface FlowRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+interface FlowDocument {
+  id: string;
+  sha256: string;
+  pageCount: number;
+  title?: string | null;
+}
+
+export interface FlowReaderModel {
+  visible: boolean;
+  language: FlowLanguage;
+  document: FlowDocument | null;
+  currentPage: number;
+}
+
+interface SourceBlock {
+  id: string;
+  kind: "text" | "title" | "caption" | "formula" | "image" | "table" | "code" | "other";
+  order: number;
+  rect: FlowRect | null;
+  source_text: string;
+  translated_text: null;
+}
+
+interface SourcePage {
+  page: number;
+  status: "completed" | "partial" | "unavailable";
+  warning: string | null;
+  blocks: SourceBlock[];
+}
+
+interface ReadingResult {
+  document_id: string;
+  source_sha256: string;
+  parser: { id: string; version: string };
+  result_schema_version: 1;
+  requested_pages: number[];
+  cached_pages: number[];
+  missing_pages: number[];
+  result_pages: SourcePage[];
+}
+
+interface ReadingCapabilities {
+  ready: boolean;
+  parser_ready: boolean;
+  reason: string | null;
+  max_pages: number;
+  parser: { id: string; version: string };
+  result_schema_version: 1;
+}
+
+interface TranslationJob {
+  id: string;
+  document_id: string;
+  source_sha256: string;
+  pages: number[];
+  target_language: "zh" | "en";
+  status: string;
+  created_at: string;
+  parser?: { id: string; version: string };
+  result_schema_version?: number;
+  result_pages?: Array<{
+    page: number;
+    status: string;
+    blocks: Array<{
+      id: string;
+      kind: string;
+      source_text: string;
+      translated_text: string | null;
+    }>;
+  }>;
+}
+
+interface VisualResult {
+  url: string;
+  width: number;
+  height: number;
+  release: () => void;
+}
+
+export interface FlowReaderCallbacks {
+  api: <T = unknown>(path: string, options?: RequestInit) => Promise<T>;
+  getVisual: (input: {
+    documentId: string;
+    sourceSha256: string;
+    page: number;
+    rect: FlowRect;
+    signal: AbortSignal;
+  }) => Promise<VisualResult | null>;
+  onOpenOriginal: (page: number, rect: FlowRect | null, id: string, hash: string) => Promise<boolean>;
+  onPageViewed: (page: number, id: string, hash: string) => void;
+  onRequestTranslation: (page: number, id: string, hash: string) => void;
+}
+
+export interface MountFlowReaderOptions {
+  container: HTMLElement;
+  model: FlowReaderModel;
+  callbacks: FlowReaderCallbacks;
+}
+
+export interface FlowReaderHandle {
+  update: (model: FlowReaderModel) => boolean;
+  destroy: () => void;
+}
+
+interface FlowRegistration {
+  container: HTMLElement;
+  root: Root;
+  callbacks: FlowReaderCallbacks;
+  active: boolean;
+}
+
+const owners = new WeakMap<HTMLElement, FlowRegistration>();
+const translatableKinds = new Set(["text", "title", "caption"]);
+const visualKinds = new Set(["image", "table", "formula"]);
+
+const strings = {
+  zh: {
+    heading: "段落阅读",
+    original: "原文",
+    translated: "已存译文",
+    previous: "上一批",
+    next: "下一批",
+    returnPdf: "返回 PDF",
+    openPage: "查看原页",
+    page: (page: number) => `第 ${page} 页`,
+    batch: (start: number, end: number) => `第 ${start}–${end} 页`,
+    loadingCache: "正在读取已准备的原文…",
+    preparing: "准备阅读中…",
+    cancel: "取消",
+    retry: "重试",
+    cancelled: "已取消准备。已缓存的内容仍可阅读。",
+    failed: "原文准备失败。已缓存的内容仍可阅读，或返回原页。",
+    unavailable: "当前无法准备新页面。已缓存的内容仍可阅读。",
+    incomplete: "部分页面尚未准备完成，可通过原页继续阅读。",
+    noBlocks: "此页没有可排列的文本块，请查看原页。",
+    unavailablePage: "此页原文不可用，请查看原页。",
+    partialPage: "此页仅提供部分原文，版式不确定的内容请查看原页。",
+    loadingVisual: "正在载入原文图像…",
+    visualFailed: "无法显示此区域，请查看原页。",
+    imageAlt: (page: number) => `第 ${page} 页原文区域`,
+    loadingTranslations: "正在读取已保存的译文…",
+    noTranslations: "当前文献没有匹配的已保存译文。",
+    translationFailed: "无法读取已保存的译文。",
+    translationScope: "缺少译文的段落保留原文；图像、表格和公式始终保留原文。",
+    translate: "翻译当前页",
+    untitled: "未命名文献",
+    translationLabel: "选择已保存译文",
+    sourceReady: "原文按解析顺序排列；复杂版式请对照原页。"
+  },
+  en: {
+    heading: "Paragraph reading",
+    original: "Original",
+    translated: "Saved translation",
+    previous: "Previous batch",
+    next: "Next batch",
+    returnPdf: "Return to PDF",
+    openPage: "Open original page",
+    page: (page: number) => `Page ${page}`,
+    batch: (start: number, end: number) => `Pages ${start}–${end}`,
+    loadingCache: "Reading prepared source text…",
+    preparing: "Preparing reading…",
+    cancel: "Cancel",
+    retry: "Retry",
+    cancelled: "Preparation cancelled. Cached content remains available.",
+    failed: "Source preparation failed. Cached content remains available, or open the original page.",
+    unavailable: "New pages cannot be prepared right now. Cached content remains available.",
+    incomplete: "Some pages are not prepared yet. You can continue in the original PDF.",
+    noBlocks: "This page has no flowable text blocks. Open the original page.",
+    unavailablePage: "Source text is unavailable for this page. Open the original page.",
+    partialPage: "Only partial source text is available. Check the original page for uncertain layout.",
+    loadingVisual: "Loading original visual…",
+    visualFailed: "This region cannot be displayed. Open the original page.",
+    imageAlt: (page: number) => `Original region from page ${page}`,
+    loadingTranslations: "Reading saved translations…",
+    noTranslations: "No matching saved translation is available for this paper.",
+    translationFailed: "Saved translations could not be read.",
+    translationScope: "Paragraphs without a translation remain in the original language; images, tables, and formulas always remain original.",
+    translate: "Translate current page",
+    untitled: "Untitled paper",
+    translationLabel: "Saved translation",
+    sourceReady: "Source text follows parsed reading order; compare complex layouts with the original page."
+  }
+} as const;
+
+type Copy = (typeof strings)[FlowLanguage];
+
+function isAbort(error: unknown) {
+  return typeof error === "object" && error !== null && "name" in error && error.name === "AbortError";
+}
+
+function errorCode(error: unknown) {
+  return typeof error === "object" && error !== null && "code" in error && typeof error.code === "string"
+    ? error.code
+    : "request_failed";
+}
+
+function validRect(value: unknown): value is FlowRect {
+  if (!value || typeof value !== "object") return false;
+  const rect = value as Partial<FlowRect>;
+  return [rect.x, rect.y, rect.width, rect.height].every(Number.isFinite)
+    && Number(rect.x) >= 0 && Number(rect.y) >= 0
+    && Number(rect.width) > 0 && Number(rect.height) > 0
+    && Number(rect.x) + Number(rect.width) <= 1
+    && Number(rect.y) + Number(rect.height) <= 1;
+}
+
+function samePages(first: number[], second: number[]) {
+  return first.length === second.length && first.every((page, index) => page === second[index]);
+}
+
+function parseReadingResult(value: unknown, document: FlowDocument, requestedPages: number[]): ReadingResult {
+  if (!value || typeof value !== "object") throw new Error("request_failed");
+  const result = value as ReadingResult;
+  if (
+    result.document_id !== document.id
+    || result.source_sha256 !== document.sha256
+    || result.result_schema_version !== 1
+    || typeof result.parser?.id !== "string"
+    || typeof result.parser?.version !== "string"
+    || !Array.isArray(result.requested_pages)
+    || !samePages(result.requested_pages, requestedPages)
+    || !Array.isArray(result.cached_pages)
+    || !Array.isArray(result.missing_pages)
+    || !Array.isArray(result.result_pages)
+  ) throw new Error("request_failed");
+  for (const page of result.result_pages) {
+    if (
+      !requestedPages.includes(page.page)
+      || !["completed", "partial", "unavailable"].includes(page.status)
+      || !Array.isArray(page.blocks)
+    ) throw new Error("request_failed");
+    for (const block of page.blocks) {
+      if (
+        typeof block.id !== "string"
+        || typeof block.kind !== "string"
+        || !Number.isFinite(block.order)
+        || typeof block.source_text !== "string"
+        || block.translated_text !== null
+        || (block.rect !== null && !validRect(block.rect))
+      ) throw new Error("request_failed");
+    }
+  }
+  return result;
+}
+
+function translationSummaryInScope(value: unknown, document: FlowDocument): value is TranslationJob {
+  if (!value || typeof value !== "object") return false;
+  const job = value as Partial<TranslationJob>;
+  return typeof job.id === "string"
+    && job.document_id === document.id
+    && job.source_sha256 === document.sha256
+    && Array.isArray(job.pages)
+    && job.pages.every((page) => Number.isInteger(page))
+    && (job.target_language === "zh" || job.target_language === "en")
+    && typeof job.created_at === "string";
+}
+
+function translationDetailInScope(
+  value: unknown,
+  document: FlowDocument,
+  parser: { id: string; version: string }
+): value is TranslationJob {
+  if (!translationSummaryInScope(value, document)) return false;
+  const job = value as TranslationJob;
+  return job.result_schema_version === 1
+    && job.parser?.id === parser.id
+    && job.parser?.version === parser.version
+    && Array.isArray(job.result_pages);
+}
+
+function translatedBlock(job: TranslationJob | null, page: number, block: SourceBlock) {
+  if (!job || !translatableKinds.has(block.kind)) return null;
+  for (const resultPage of job.result_pages || []) {
+    if (resultPage.page !== page || !Array.isArray(resultPage.blocks)) continue;
+    for (const candidate of resultPage.blocks) {
+      if (
+        candidate.id === block.id
+        && candidate.source_text === block.source_text
+        && typeof candidate.translated_text === "string"
+        && candidate.translated_text.trim()
+      ) return candidate.translated_text;
+    }
+  }
+  return null;
+}
+
+function SourceVisual({ block, page, document, callbacks, copy }: {
+  block: SourceBlock;
+  page: number;
+  document: FlowDocument;
+  callbacks: FlowReaderCallbacks;
+  copy: Copy;
+}) {
+  const figureRef = useRef<HTMLElement | null>(null);
+  const [inRange, setInRange] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  const [visual, setVisual] = useState<{ url: string; width: number; height: number } | null>(null);
+  const [failed, setFailed] = useState(false);
+  const rect = block.rect;
+
+  useEffect(() => {
+    const figure = figureRef.current;
+    const root = figure?.closest(".flow-scroll");
+    if (!figure || !(root instanceof HTMLElement)) return;
+    if (typeof IntersectionObserver === "undefined") {
+      setFailed(true);
+      return;
+    }
+    setInRange(false);
+    const observer = new IntersectionObserver((entries) => {
+      setInRange(entries.some((entry) => entry.isIntersecting));
+    }, { root, rootMargin: "200px 0px", threshold: 0 });
+    observer.observe(figure);
+    return () => {
+      setInRange(false);
+      observer.disconnect();
+    };
+  }, [block.id, document.id, document.sha256, page]);
+
+  useEffect(() => {
+    if (!inRange || !rect || !visualKinds.has(block.kind)) return;
+    const controller = new AbortController();
+    let stopped = false;
+    let owned: VisualResult | null = null;
+    setVisual(null);
+    setFailed(false);
+    void callbacks.getVisual({
+      documentId: document.id,
+      sourceSha256: document.sha256,
+      page,
+      rect,
+      signal: controller.signal
+    }).then((result) => {
+      if (stopped) {
+        result?.release();
+        return;
+      }
+      owned = result;
+      if (result) setVisual({ url: result.url, width: result.width, height: result.height });
+      else setFailed(true);
+    }).catch(() => {
+      if (!stopped) setFailed(true);
+    });
+    return () => {
+      stopped = true;
+      controller.abort();
+      owned?.release();
+      setVisual(null);
+    };
+  }, [attempt, block.id, block.kind, callbacks, document.id, document.sha256, inRange, page, rect]);
+
+  const fallback = failed || !rect;
+  return (
+    <figure className={`flow-visual flow-visual-${block.kind}`} ref={figureRef}>
+      {!fallback && !visual && <p className="flow-visual-status" role="status">{copy.loadingVisual}</p>}
+      {!fallback && visual && (
+        <div className="flow-visual-viewport" tabIndex={0}>
+          <img src={visual.url} width={visual.width} height={visual.height} alt={copy.imageAlt(page)} draggable={false} />
+        </div>
+      )}
+      {fallback && (
+        <>
+          {block.source_text && <pre className="flow-raw-text">{block.source_text}</pre>}
+          <p className="flow-visual-status">{copy.visualFailed}</p>
+          {failed && rect && typeof IntersectionObserver !== "undefined" && <button className="button button-quiet" type="button" onClick={() => setAttempt((value) => value + 1)}>{copy.retry}</button>}
+        </>
+      )}
+      <button className="button button-quiet flow-source-link" type="button" onClick={() => void callbacks.onOpenOriginal(page, rect, document.id, document.sha256)}>
+        {copy.openPage}
+      </button>
+    </figure>
+  );
+}
+
+function BlockView({ block, page, document, callbacks, copy, mode, translation }: {
+  block: SourceBlock;
+  page: number;
+  document: FlowDocument;
+  callbacks: FlowReaderCallbacks;
+  copy: Copy;
+  mode: TextMode;
+  translation: TranslationJob | null;
+}) {
+  if (visualKinds.has(block.kind)) {
+    return <SourceVisual block={block} page={page} document={document} callbacks={callbacks} copy={copy} />;
+  }
+  const text = mode === "translated" ? translatedBlock(translation, page, block) || block.source_text : block.source_text;
+  if (!text.trim()) return null;
+  if (block.kind === "title") return <h3 className="flow-block flow-block-title">{text}</h3>;
+  if (block.kind === "caption") return <p className="flow-block flow-block-caption">{text}</p>;
+  if (block.kind === "code") return <pre className="flow-block flow-block-code">{text}</pre>;
+  return <p className={`flow-block flow-block-${block.kind}`}>{text}</p>;
+}
+
+function FlowReader({ model, callbacks }: { model: FlowReaderModel; callbacks: FlowReaderCallbacks }) {
+  const document = model.document as FlowDocument;
+  const copy = strings[model.language];
+  const initialPage = Math.max(1, Math.min(document.pageCount, Math.trunc(model.currentPage) || 1));
+  const [batchStart, setBatchStart] = useState(initialPage);
+  const [retry, setRetry] = useState(0);
+  const [pages, setPages] = useState<SourcePage[]>([]);
+  const [parser, setParser] = useState<{ id: string; version: string } | null>(null);
+  const [phase, setPhase] = useState<FlowPhase>("cache");
+  const [error, setError] = useState<string | null>(null);
+  const [mode, setMode] = useState<TextMode>("original");
+  const [viewedPage, setViewedPage] = useState(initialPage);
+  const [jobs, setJobs] = useState<TranslationJob[]>([]);
+  const [jobsLoaded, setJobsLoaded] = useState(false);
+  const [jobsError, setJobsError] = useState<string | null>(null);
+  const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  const [translation, setTranslation] = useState<TranslationJob | null>(null);
+  const [translationLoading, setTranslationLoading] = useState(false);
+  const [translationError, setTranslationError] = useState<string | null>(null);
+  const [translationRetry, setTranslationRetry] = useState(0);
+  const requestRef = useRef<AbortController | null>(null);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const modelRef = useRef(model);
+  modelRef.current = model;
+  const scope = `${document.id}:${document.sha256}`;
+  const batchPages = useMemo(
+    () => Array.from({ length: Math.min(3, document.pageCount - batchStart + 1) }, (_, index) => batchStart + index),
+    [batchStart, document.pageCount]
+  );
+  const batchEnd = batchPages[batchPages.length - 1];
+
+  useEffect(() => {
+    const controller = new AbortController();
+    requestRef.current = controller;
+    let active = true;
+    setPages([]);
+    setParser(null);
+    setPhase("cache");
+    setError(null);
+    setViewedPage(batchStart);
+    if (scrollRef.current) scrollRef.current.scrollTop = 0;
+    const current = () => active && !controller.signal.aborted;
+
+    async function load() {
+      const capabilityPromise = callbacks.api<ReadingCapabilities>("/api/v1/reading-capabilities", {
+        signal: controller.signal
+      }).catch(() => null);
+      try {
+        const query = batchPages.join(",");
+        const cachedResult = parseReadingResult(await callbacks.api<unknown>(
+          `/api/v1/documents/${encodeURIComponent(document.id)}/reading-pages?source_sha256=${encodeURIComponent(document.sha256)}&pages=${query}`,
+          { signal: controller.signal }
+        ), document, batchPages);
+        if (!current()) return;
+        setParser(cachedResult.parser);
+        setPages(cachedResult.result_pages);
+        if (!cachedResult.missing_pages.length) {
+          setPhase("ready");
+          return;
+        }
+        const capabilities = await capabilityPromise;
+        if (!current()) return;
+        if (!capabilities?.ready || !capabilities.parser_ready) {
+          setPhase("unavailable");
+          return;
+        }
+        setPhase("preparing");
+        const prepared = parseReadingResult(await callbacks.api<unknown>(
+          `/api/v1/documents/${encodeURIComponent(document.id)}/reading-pages/prepare`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ source_sha256: document.sha256, pages: cachedResult.missing_pages }),
+            signal: controller.signal
+          }
+        ), document, cachedResult.missing_pages);
+        if (!current()) return;
+        const merged = new Map<number, SourcePage>();
+        for (const page of [...cachedResult.result_pages, ...prepared.result_pages]) merged.set(page.page, page);
+        setPages([...merged.values()].sort((first, second) => first.page - second.page));
+        if (batchPages.every((page) => merged.has(page))) setPhase("ready");
+        else {
+          setError("incomplete_reading");
+          setPhase("error");
+        }
+      } catch (reason: unknown) {
+        if (!active) return;
+        if (isAbort(reason)) {
+          setPhase("cancelled");
+          return;
+        }
+        setError(errorCode(reason));
+        setPhase("error");
+      }
+    }
+
+    void load();
+    return () => {
+      active = false;
+      controller.abort();
+      if (requestRef.current === controller) requestRef.current = null;
+    };
+  }, [callbacks, scope, batchStart, retry]);
+
+  useEffect(() => {
+    if (mode !== "translated") return;
+    const controller = new AbortController();
+    let active = true;
+    setJobsError(null);
+    if (!jobsLoaded) {
+      void callbacks.api<{ items: unknown[] }>(
+        `/api/v1/documents/${encodeURIComponent(document.id)}/translations?limit=20`,
+        { signal: controller.signal }
+      ).then((body) => {
+        if (!active) return;
+        const items = Array.isArray(body.items)
+          ? body.items.filter((job): job is TranslationJob => translationSummaryInScope(job, document)).slice(0, 20)
+          : [];
+        setJobs(items);
+        setSelectedJobId((current) => items.some((job) => job.id === current) ? current : items[0]?.id || null);
+        setJobsLoaded(true);
+      }).catch((reason: unknown) => {
+        if (active && !isAbort(reason)) setJobsError(errorCode(reason));
+      });
+    }
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [callbacks, document.id, document.sha256, jobsLoaded, mode, translationRetry]);
+
+  useEffect(() => {
+    if (mode !== "translated" || !selectedJobId || !parser) {
+      setTranslation(null);
+      setTranslationLoading(false);
+      return;
+    }
+    const controller = new AbortController();
+    let active = true;
+    setTranslation(null);
+    setTranslationLoading(true);
+    setTranslationError(null);
+    void callbacks.api<unknown>(`/api/v1/translations/${encodeURIComponent(selectedJobId)}`, {
+      signal: controller.signal
+    }).then((job) => {
+      if (!active) return;
+      if (translationDetailInScope(job, document, parser)) setTranslation(job);
+      else setTranslationError("translation_scope_mismatch");
+    }).catch((reason: unknown) => {
+      if (active && !isAbort(reason)) setTranslationError(errorCode(reason));
+    }).finally(() => {
+      if (active) setTranslationLoading(false);
+    });
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [callbacks, document.id, document.sha256, mode, parser, selectedJobId, translationRetry]);
+
+  useEffect(() => {
+    const root = scrollRef.current;
+    if (!root || !pages.length || typeof IntersectionObserver === "undefined") return;
+    const ratios = new Map<number, number>();
+    let reported = 0;
+    const observer = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        const page = Number((entry.target as HTMLElement).dataset.flowPage);
+        if (Number.isInteger(page)) ratios.set(page, entry.isIntersecting ? entry.intersectionRatio : 0);
+      }
+      const visible = [...ratios.entries()].filter(([, ratio]) => ratio > 0)
+        .sort((first, second) => second[1] - first[1] || first[0] - second[0]);
+      const page = visible[0]?.[0];
+      if (!page || page === reported) return;
+      reported = page;
+      setViewedPage(page);
+      const current = modelRef.current.document;
+      if (current?.id === document.id && current.sha256 === document.sha256) {
+        callbacks.onPageViewed(page, document.id, document.sha256);
+      }
+    }, { root, threshold: [0, 0.2, 0.5, 0.8], rootMargin: "0px 0px -45% 0px" });
+    root.querySelectorAll<HTMLElement>("[data-flow-page]").forEach((element) => observer.observe(element));
+    return () => observer.disconnect();
+  }, [callbacks, document.id, document.sha256, pages]);
+
+  const missingTranslation = mode === "translated" && translation !== null && pages.some((page) => (
+    page.blocks.some((block) => translatableKinds.has(block.kind) && block.source_text.trim() && !translatedBlock(translation, page.page, block))
+  ));
+  const busy = phase === "cache" || phase === "preparing";
+  const statusMessage = phase === "cache"
+    ? copy.loadingCache
+    : phase === "preparing"
+      ? copy.preparing
+      : phase === "cancelled"
+        ? copy.cancelled
+        : phase === "unavailable"
+          ? copy.unavailable
+          : phase === "error"
+            ? error === "incomplete_reading" ? copy.incomplete : copy.failed
+            : null;
+
+  return (
+    <section className="flow-reader" aria-label={copy.heading}>
+      <header className="flow-header">
+        <div className="flow-heading-wrap">
+          <h2>{copy.heading}</h2>
+          <p title={document.title || copy.untitled}>{document.title || copy.untitled}</p>
+        </div>
+        <button className="button button-secondary" type="button" onClick={() => void callbacks.onOpenOriginal(viewedPage, null, document.id, document.sha256)}>
+          {copy.returnPdf}
+        </button>
+      </header>
+      <div className="flow-controls">
+        <div className="flow-text-modes" role="group" aria-label={copy.original}>
+          <button className="button button-quiet" type="button" aria-pressed={mode === "original"} onClick={() => setMode("original")}>{copy.original}</button>
+          <button className="button button-quiet" type="button" aria-pressed={mode === "translated"} onClick={() => setMode("translated")}>{copy.translated}</button>
+        </div>
+        <span className="flow-batch-label">{copy.batch(batchStart, batchEnd)}</span>
+        <div className="flow-batch-controls">
+          <button className="button button-quiet" type="button" disabled={batchStart <= 1 || busy} onClick={() => setBatchStart(Math.max(1, batchStart - 3))}>{copy.previous}</button>
+          <button className="button button-quiet" type="button" disabled={batchEnd >= document.pageCount || busy} onClick={() => setBatchStart(Math.min(document.pageCount, batchStart + 3))}>{copy.next}</button>
+        </div>
+      </div>
+      {mode === "translated" && (
+        <div className="flow-translation-bar">
+          {jobs.length > 1 && (
+            <label>{copy.translationLabel}
+              <select value={selectedJobId || ""} onChange={(event) => setSelectedJobId(event.target.value || null)}>
+                {jobs.map((job) => <option value={job.id} key={job.id}>{job.target_language.toUpperCase()} · {job.created_at}</option>)}
+              </select>
+            </label>
+          )}
+          <button className="button button-secondary" type="button" onClick={() => callbacks.onRequestTranslation(viewedPage, document.id, document.sha256)}>
+            {copy.translate}
+          </button>
+          {(translationLoading || (!jobsLoaded && !jobsError)) && <p role="status">{copy.loadingTranslations}</p>}
+          {(jobsError || translationError) && (
+            <p className="flow-error" role="alert">
+              {jobsError ? copy.noTranslations : copy.translationFailed}
+              <button className="button button-quiet" type="button" onClick={() => {
+                setJobsLoaded(false);
+                setJobsError(null);
+                setTranslationError(null);
+                setTranslationRetry((value) => value + 1);
+              }}>{copy.retry}</button>
+            </p>
+          )}
+          {jobsLoaded && !jobs.length && !jobsError && <p>{copy.noTranslations}</p>}
+          {missingTranslation && <p>{copy.translationScope}</p>}
+        </div>
+      )}
+      {statusMessage && (
+        <div className={`flow-status flow-status-${phase}`} role={phase === "error" ? "alert" : "status"}>
+          <span>{statusMessage}</span>
+          {busy && <button className="button button-quiet" type="button" onClick={() => requestRef.current?.abort()}>{copy.cancel}</button>}
+          {!busy && phase !== "ready" && <button className="button button-quiet" type="button" onClick={() => setRetry((value) => value + 1)}>{copy.retry}</button>}
+        </div>
+      )}
+      <div className="flow-scroll" ref={scrollRef}>
+        {phase === "ready" && pages.length > 0 && <p className="flow-order-note">{copy.sourceReady}</p>}
+        {pages.map((page) => {
+          const blocks = [...page.blocks].sort((first, second) => first.order - second.order);
+          return (
+            <article className="flow-page" data-flow-page={page.page} key={page.page} aria-labelledby={`flow-page-${page.page}`}>
+              <header className="flow-page-header">
+                <h3 id={`flow-page-${page.page}`}>{copy.page(page.page)}</h3>
+                <button className="button button-quiet flow-source-link" type="button" onClick={() => void callbacks.onOpenOriginal(page.page, null, document.id, document.sha256)}>{copy.openPage}</button>
+              </header>
+              {page.warning && <p className="flow-page-warning">{copy.partialPage}</p>}
+              {page.status === "partial" && !page.warning && <p className="flow-page-warning">{copy.partialPage}</p>}
+              {page.status === "unavailable" && <p className="flow-page-warning">{copy.unavailablePage}</p>}
+              {page.status !== "unavailable" && !blocks.length && <p className="flow-page-warning">{copy.noBlocks}</p>}
+              {page.status !== "unavailable" && <div className="flow-blocks">
+                {blocks.map((block) => (
+                  <BlockView key={block.id} block={block} page={page.page} document={document} callbacks={callbacks} copy={copy} mode={mode} translation={translation} />
+                ))}
+              </div>}
+            </article>
+          );
+        })}
+      </div>
+      <footer className="flow-footer">
+        <button className="button button-quiet" type="button" disabled={batchStart <= 1 || busy} onClick={() => setBatchStart(Math.max(1, batchStart - 3))}>{copy.previous}</button>
+        <button className="button button-secondary" type="button" onClick={() => void callbacks.onOpenOriginal(viewedPage, null, document.id, document.sha256)}>{copy.returnPdf}</button>
+        <button className="button button-quiet" type="button" disabled={batchEnd >= document.pageCount || busy} onClick={() => setBatchStart(Math.min(document.pageCount, batchStart + 3))}>{copy.next}</button>
+      </footer>
+    </section>
+  );
+}
+
+function render(registration: FlowRegistration, model: FlowReaderModel) {
+  registration.root.render(
+    model.visible && model.document
+      ? <FlowReader model={model} callbacks={registration.callbacks} />
+      : null
+  );
+}
+
+function destroy(registration: FlowRegistration) {
+  if (!registration.active) return;
+  registration.active = false;
+  if (owners.get(registration.container) === registration) owners.delete(registration.container);
+  registration.root.unmount();
+}
+
+export function mountFlowReader({ container, model, callbacks }: MountFlowReaderOptions): FlowReaderHandle {
+  if (!(container instanceof HTMLElement)) throw new TypeError("Flow reader mount host must be an element");
+  const previous = owners.get(container);
+  if (previous) destroy(previous);
+  const registration: FlowRegistration = {
+    container,
+    root: createRoot(container),
+    callbacks,
+    active: true
+  };
+  owners.set(container, registration);
+  flushSync(() => render(registration, model));
+  return {
+    update(nextModel) {
+      if (!registration.active || owners.get(container) !== registration) return false;
+      render(registration, nextModel);
+      return true;
+    },
+    destroy() {
+      destroy(registration);
+    }
+  };
+}

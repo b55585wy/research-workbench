@@ -8,6 +8,14 @@ export type {
   TranslationPanelHandle,
   TranslationPanelModel
 } from "./translation";
+export { mountFlowReader } from "./flow-reading";
+export type {
+  FlowReaderCallbacks,
+  FlowReaderHandle,
+  FlowReaderModel,
+  FlowRect,
+  MountFlowReaderOptions
+} from "./flow-reading";
 
 export type WorkspaceLanguage = "zh" | "en";
 

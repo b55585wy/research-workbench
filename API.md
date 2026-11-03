@@ -562,3 +562,38 @@ See [PAGE-TRANSLATION.md](PAGE-TRANSLATION.md) for limits and verification scope
 # v0.46 saved translation presentation
 
 Original / parallel / translated-overlay modes consume the existing source-bound saved translation results. No new endpoints, model calls, parser jobs or schema changes occur when changing mode. Independent worker contention handling now retries claims only, while execution failures reach recovery. No functional acceptance claimed; see OVERLAY-TRANSLATION.md.
+
+
+# v0.47 model-free paragraph source pages
+
+`GET /api/v1/reading-capabilities` reports parser readiness only:
+`{ready, parser_ready, reason, max_pages:5, parser:{id:"mineru-flash-txt",version:"4.1.5"}, result_schema_version:1}`.
+It does not inspect model credentials or start the parser.
+
+`GET /api/v1/documents/{id}/reading-pages?source_sha256=<64-lowercase-hex>&pages=1,2,3`
+reads matching cached source pages only. The active document and stored hash/file stat
+are checked; no digest computation, parsing, worker or model call occurs on GET.
+
+`POST /api/v1/documents/{id}/reading-pages/prepare` takes exactly
+`{source_sha256:"<64-lowercase-hex>",pages:[1,2,3]}`. Pages are 1-based, unique,
+inside the document and limited to five (source document bound 200 pages / 100 MiB).
+Only missing pages are prepared. Concurrent preparation returns 429
+`reading_prepare_busy`; no shared scoring/analysis/translation queue is used.
+Abort/disconnect or shutdown cancels owned parsing; publication rechecks source
+identity, digest and cancellation in its transaction. Preparation timeout is 150 s,
+inner parser timeout 120 s, output 4 MiB, owned process tree 4 GiB / 8 processes.
+
+Both page routes return
+`{document_id,source_sha256,parser,result_schema_version,requested_pages,cached_pages,missing_pages,result_pages}`.
+Each result page is `{page,status,warning,blocks}`, with status
+`completed|partial|unavailable`. A block is
+`{id,kind,order,rect,source_text,translated_text:null}`. Rectangles are optional,
+normalized display coordinates. Partial/unavailable results retain original-page
+fallbacks; no OCR or semantic layout recovery is claimed. Failed parses are not cached.
+
+Schema 24 adds `reading_pages`, keyed by `(document_id,page)` and source/parser/schema
+identity, with document FK cascade. Existing translation sources may be reused
+read-only, at most the newest matching row per requested page; saved translations
+are never rewritten. Cache GET never writes and remains available without parser/model
+readiness. No authentication, ownership, original-file or tFUS contract changes.
+See FLOW-READING.md for the explicit unverified interaction scope.

@@ -57,6 +57,12 @@ export function createTranslationBridge({
 
   return {
     load,
+    openDual() {
+      const control = controlsContainer.querySelector('[data-translation-mode="dual"]');
+      if (!(control instanceof HTMLButtonElement) || control.disabled) return false;
+      control.click();
+      return true;
+    },
     update(model) {
       return handle?.update(model) || false;
     },

@@ -1,5 +1,7 @@
 # research workspace：架构决定与实施顺序
 
+v0.47.0 新增窄屏段落阅读：原文准备不依赖模型，支持查看匹配的已有译文、图表区域预览和返回原页。入口为阅读布局中的“段落阅读”。本轮是选页重排，不含扫描识别或完整语义版面重建；交互未验收。见 [FLOW-READING.md](FLOW-READING.md)。
+
 v0.46.0 新增原文／双栏／译文覆盖切换，复用已保存结果；不明确的区域保留原文，长译文可展开。手机语义重排仍未实现，交互未验收。见 [OVERLAY-TRANSLATION.md](OVERLAY-TRANSLATION.md)。
 
 v0.45.0 更新：新增独立的选页翻译调度/执行/本地解析进程，结果存入本机 SQLite；React 双栏消费原页绑定的译文。原 PDF 继续由现有阅读器管理。范围和未验收项见 [PAGE-TRANSLATION.md](PAGE-TRANSLATION.md)。

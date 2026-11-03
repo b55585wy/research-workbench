@@ -15,7 +15,8 @@ const sourceFiles = [
   "vite.config.ts",
   "scripts/build.mjs",
   "src/index.tsx",
-  "src/translation.tsx"
+  "src/translation.tsx",
+  "src/flow-reading.tsx"
 ];
 const runtimePackages = ["react", "react-dom", "scheduler"];
 

@@ -236,6 +236,7 @@
             <select id="reader-view-mode" disabled>
               <option value="continuous" data-i18n="viewContinuous">连续滚动</option>
               <option value="single" data-i18n="viewSingle">单页</option>
+              <option value="flow" data-i18n="viewFlow">段落阅读</option>
             </select>
           </label>
           <button id="reader-find-toggle" class="button button-quiet reader-find-toggle" type="button" aria-controls="reader-find-panel" aria-expanded="false" disabled>
@@ -349,6 +350,9 @@
               <div id="active-selection" class="active-selection" hidden></div>
             </div>
           </div>
+        </div>
+        <div id="flow-reader" class="flow-reader-host" hidden>
+          <p class="flow-reader-loading" role="status" data-i18n="flowLoading">正在载入段落阅读…</p>
         </div>
         <aside id="translation-panel" class="translation-panel" aria-labelledby="translation-heading" hidden></aside>
       </div>

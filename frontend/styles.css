@@ -2926,3 +2926,356 @@ h3 {
     max-width: none;
   }
 }
+
+.reader-panel[data-flow-active="true"] :is(
+  .page-controls,
+  .zoom-controls,
+  .reader-source-controls,
+  .reader-find-toggle,
+  .reader-find-panel,
+  #annotation-undo,
+  #annotation-redo,
+  #translation-controls,
+  #export-reading-record,
+  .annotated-pdf-export
+) {
+  display: none;
+}
+
+.reader-translation-layout[data-flow-active="true"] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.flow-reader-host {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--ui-bg);
+  color: var(--ui-text);
+}
+
+.flow-reader-loading {
+  margin: 0;
+  padding: 32px 20px;
+  color: var(--ui-text-muted);
+  text-align: center;
+}
+
+.flow-reader {
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.flow-header,
+.flow-controls,
+.flow-footer,
+.flow-translation-bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--ui-border);
+  background: var(--ui-surface);
+}
+
+.flow-header {
+  justify-content: space-between;
+}
+
+.flow-heading-wrap {
+  min-width: 0;
+}
+
+.flow-heading-wrap h2 {
+  color: var(--ui-primary);
+  font-size: 17px;
+}
+
+.flow-heading-wrap p {
+  max-width: min(60vw, 640px);
+  margin-top: 3px;
+  overflow: hidden;
+  color: var(--ui-text-muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.flow-controls {
+  justify-content: space-between;
+  padding-block: 8px;
+  background: var(--ui-surface-subtle);
+}
+
+.flow-text-modes,
+.flow-batch-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.flow-text-modes .button[aria-pressed="true"] {
+  border-color: var(--ui-primary);
+  background: var(--ui-info-bg);
+  color: var(--ui-primary);
+}
+
+.flow-batch-label {
+  color: var(--ui-text-soft);
+  font-size: 12px;
+}
+
+.flow-translation-bar {
+  color: var(--ui-text-soft);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.flow-translation-bar label {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.flow-translation-bar select {
+  max-width: min(420px, 60vw);
+  min-height: 36px;
+  padding: 4px 7px;
+  border: 1px solid var(--ui-input-border);
+  border-radius: 3px;
+  background: var(--ui-input-bg);
+  color: var(--ui-text);
+}
+
+.flow-translation-bar p {
+  margin: 0;
+}
+
+.flow-status {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 9px 16px;
+  border-bottom: 1px solid var(--ui-border);
+  background: var(--ui-info-bg);
+  color: var(--ui-text-soft);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.flow-status-error,
+.flow-error,
+.flow-page-warning {
+  color: var(--ui-danger);
+}
+
+.flow-scroll {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  padding: 20px 16px 36px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.flow-order-note,
+.flow-page {
+  width: min(100%, 760px);
+  margin-inline: auto;
+}
+
+.flow-order-note {
+  margin-block: 0 16px;
+  color: var(--ui-text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.flow-page {
+  padding: 18px 0 24px;
+  border-top: 1px solid var(--ui-border);
+}
+
+.flow-page:first-of-type {
+  border-top: 0;
+}
+
+.flow-page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.flow-page-header h3 {
+  color: var(--ui-primary);
+  font-size: 14px;
+}
+
+.flow-page-warning {
+  margin: 8px 0 14px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.flow-blocks {
+  display: grid;
+  gap: 14px;
+}
+
+.flow-block {
+  margin: 0;
+  color: var(--ui-text);
+  font-family: Georgia, "Times New Roman", "Microsoft YaHei", serif;
+  font-size: 17px;
+  line-height: 1.85;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  user-select: text;
+}
+
+.flow-block-title {
+  font-size: 21px;
+  line-height: 1.5;
+}
+
+.flow-block-caption {
+  color: var(--ui-text-soft);
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+.flow-block-code,
+.flow-raw-text {
+  max-width: 100%;
+  margin: 0;
+  padding: 12px;
+  overflow: auto;
+  border: 1px solid var(--ui-border);
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text);
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+.flow-visual {
+  min-width: 0;
+  margin: 0;
+}
+
+.flow-visual-viewport {
+  max-width: 100%;
+  overflow: auto;
+  border: 1px solid var(--ui-border);
+  background: #ffffff;
+  overscroll-behavior: contain;
+}
+
+.flow-visual-viewport:focus-visible {
+  outline: 2px solid var(--ui-primary);
+  outline-offset: 2px;
+}
+
+.flow-visual img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin-inline: auto;
+}
+
+.flow-visual-table img,
+.flow-visual-formula img {
+  max-width: none;
+  margin-inline: 0;
+}
+
+.flow-visual-status {
+  margin: 6px 0;
+  color: var(--ui-text-muted);
+  font-size: 12px;
+}
+
+.flow-source-link {
+  flex: none;
+  min-height: 34px;
+  font-size: 12px;
+}
+
+.flow-footer {
+  justify-content: space-between;
+  border-top: 1px solid var(--ui-border);
+  border-bottom: 0;
+}
+
+@media (max-width: 680px) {
+  .flow-header,
+  .flow-controls,
+  .flow-footer,
+  .flow-translation-bar {
+    padding-inline: 12px;
+  }
+
+  .flow-header {
+    align-items: flex-start;
+  }
+
+  .flow-heading-wrap p {
+    max-width: 52vw;
+  }
+
+  .flow-controls {
+    align-items: flex-start;
+  }
+
+  .flow-batch-label {
+    order: 3;
+    flex-basis: 100%;
+  }
+
+  .flow-scroll {
+    padding: 14px 12px 28px;
+    scrollbar-gutter: auto;
+  }
+
+  .flow-block {
+    font-size: 17px;
+    line-height: 1.8;
+  }
+
+  .flow-header .button,
+  .flow-controls .button,
+  .flow-footer .button,
+  .flow-translation-bar .button,
+  .flow-source-link,
+  .flow-status .button {
+    min-height: 42px;
+  }
+
+  .flow-translation-bar,
+  .flow-translation-bar label,
+  .flow-translation-bar select {
+    width: 100%;
+    max-width: none;
+  }
+
+  .flow-translation-bar label {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

@@ -161,6 +161,11 @@ def create_app(data_root=None, validator=None, renderer=None, *, agent_provider=
     translations = Translations(store, provider, TranslationRuntime(translation_root))
     translation_supervisor = TranslationSupervisor(translations, translation_root,
         agent_config or os.environ.get('RESEARCH_AGENT_CONFIG')) if translation_autostart else None
+    # Model-free paragraph reading reuses the resolved translation runtime root
+    # for its pinned local parser; it never reads model configuration.
+    from .reading_pages import ReadingPages
+    from .reading_page_api import router as reading_page_router
+    reading_pages = ReadingPages(store, translation_root)
     datasets=Datasets(store)
     from .data_imports import DataImports
     from .data_import_api import router as data_import_router
@@ -208,6 +213,7 @@ def create_app(data_root=None, validator=None, renderer=None, *, agent_provider=
         try:
             yield
         finally:
+            reading_pages.close()
             if translation_supervisor:translation_supervisor.close()
             agent.close()
             if supervisor:supervisor.close()
@@ -216,6 +222,8 @@ def create_app(data_root=None, validator=None, renderer=None, *, agent_provider=
     app.state.store, app.state.validator = store, validator
     app.state.translations = translations
     app.include_router(translation_router)
+    app.state.reading_pages = reading_pages
+    app.include_router(reading_page_router)
     app.state.excerpts = Excerpts(store, renderer)
     app.state.pdf_regions = PdfRegions(store)
     app.state.annotated_pdf = AnnotatedPdfExport(store)
