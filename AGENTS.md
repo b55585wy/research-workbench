@@ -16,6 +16,17 @@ chart imperative DOM behind explicit lifecycle adapters, never dual ownership.
 Preserve existing URLs, saved data, source coordinates, drafts and API semantics.
 Agent orchestration, RAG literature QA and Python/R analysis are committed product
 capabilities, not optional add-ons. See ARCHITECTURE.md for current versus target.
+The latest user decision is standalone-first, single-machine with a default local
+guest workspace. No registration/login or password/user tables in the first slice;
+formal data stays in the local backend's SQLite/files, not solely browser cache.
+Guest means unverified local context, never an authenticated actor or fake token.
+Multi-account management comes later; preserve source IDs and explicitly migrate
+guest ownership without assigning all history to the first account. Later isolated
+authentication and tFUS integration use verified external identity mapping/APIs,
+not shared databases, copied passwords or automatic email/name account merges.
+There is no dependency on tFUS identity or release progress.
+This supersedes this workbench's older tFUS-directory-first planning, without
+changing tFUS's own identity policy. Multi-user access is not implemented yet.
 Reuse PDF.js locally; no external CDN, whole ELN deployment, notebook server,
 shared workspace schema or tFUS queue.
 Read API.md and ACCEPTANCE.md. Implement actual persistence, not mocked success.
