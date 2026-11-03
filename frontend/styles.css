@@ -2462,3 +2462,333 @@ h3 {
     align-items: flex-start;
   }
 }
+
+.translation-controls {
+  display: flex;
+  align-items: center;
+}
+
+.reader-translation-layout {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  overflow: hidden;
+}
+
+.reader-translation-layout[data-translation-open="true"] {
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 40%);
+}
+
+.reader-translation-layout > .reader-stage {
+  min-width: 0;
+  min-height: 0;
+}
+
+.translation-panel {
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-left: 1px solid var(--ui-border);
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  scrollbar-gutter: stable;
+}
+
+.translation-panel-content {
+  min-width: 0;
+}
+
+.translation-header {
+  padding: 14px 16px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--ui-border);
+  background: var(--ui-surface-subtle);
+}
+
+.translation-header h2 {
+  color: var(--ui-primary);
+}
+
+.translation-header p {
+  margin-top: 5px;
+  color: var(--ui-text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.translation-close {
+  flex: none;
+  width: 36px;
+  padding: 4px;
+  font-size: 20px;
+}
+
+.translation-form {
+  padding: 14px 16px;
+  display: grid;
+  gap: 12px;
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.translation-page-choice {
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  border: 0;
+}
+
+.translation-page-choice label {
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ui-text-soft);
+  cursor: pointer;
+}
+
+.translation-page-choice input {
+  accent-color: var(--ui-primary);
+}
+
+.translation-field {
+  display: grid;
+  gap: 5px;
+  color: var(--ui-text-soft);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.translation-field input,
+.translation-field select,
+.translation-saved-row select {
+  width: 100%;
+  min-width: 0;
+  min-height: 38px;
+  padding: 7px 9px;
+  border: 1px solid var(--ui-input-border);
+  border-radius: 3px;
+  background: var(--ui-input-bg);
+  color: var(--ui-text);
+}
+
+.translation-start-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.translation-page-limit,
+.translation-retry-hint {
+  color: var(--ui-text-muted);
+  font-size: 11px;
+}
+
+.translation-retry-hint {
+  line-height: 1.5;
+}
+
+.translation-unavailable,
+.translation-progress {
+  margin: 12px 16px;
+  padding: 10px;
+  display: grid;
+  gap: 8px;
+  border: 1px solid var(--ui-border);
+  border-radius: 4px;
+  background: var(--ui-info-bg);
+  line-height: 1.55;
+}
+
+.translation-unavailable .button,
+.translation-progress .button {
+  justify-self: start;
+}
+
+.translation-saved-row {
+  padding: 14px 16px 8px;
+  display: grid;
+  gap: 6px;
+  color: var(--ui-text-soft);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.translation-status,
+.translation-empty,
+.translation-visual-notice {
+  margin: 8px 16px;
+  color: var(--ui-text-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.translation-status[data-kind="error"],
+.translation-page-warning {
+  color: var(--ui-danger);
+}
+
+.translation-job {
+  padding-bottom: 16px;
+}
+
+.translation-job-summary {
+  padding: 10px 16px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: var(--ui-primary);
+}
+
+.translation-job-summary p {
+  margin-top: 4px;
+  color: var(--ui-text-muted);
+  font-size: 12px;
+}
+
+.translation-progress progress {
+  width: 100%;
+  height: 8px;
+  accent-color: var(--ui-primary);
+}
+
+.translation-results {
+  padding: 0 16px;
+}
+
+.translation-results .translation-empty,
+.translation-results .translation-visual-notice {
+  margin-inline: 0;
+}
+
+.translation-visual-notice {
+  padding: 8px 10px;
+  border-left: 3px solid var(--ui-primary);
+  background: var(--ui-info-bg);
+}
+
+.translation-result-page {
+  padding: 12px 0;
+  border-top: 1px solid var(--ui-border);
+}
+
+.translation-page-header {
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.translation-page-header h3 {
+  color: var(--ui-primary);
+}
+
+.translation-source-link {
+  min-height: 32px;
+  padding: 2px 0;
+  border: 0;
+  background: transparent;
+  color: var(--ui-primary);
+  font-size: 12px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.translation-block {
+  position: relative;
+  padding: 6px 0;
+}
+
+.translation-paragraph,
+.translation-translated-title {
+  color: var(--ui-text);
+  line-height: 1.75;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.translation-translated-title {
+  font-size: 15px;
+  font-weight: 650;
+}
+
+.translation-original-marker {
+  padding: 7px 9px;
+  border: 1px dashed var(--ui-border-strong);
+  border-radius: 3px;
+  color: var(--ui-text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.translation-block .translation-source-link {
+  display: block;
+  margin-top: 2px;
+}
+
+.translation-page-warning {
+  margin: 6px 0;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+@media (max-width: 1120px) {
+  .reader-translation-layout[data-translation-open="true"] {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(320px, 1fr) minmax(220px, 45%);
+  }
+
+  .translation-panel {
+    border-top: 1px solid var(--ui-border);
+    border-left: 0;
+  }
+}
+
+@media (max-width: 820px) {
+  .reader-translation-layout {
+    overflow: visible;
+  }
+
+  .reader-translation-layout[data-translation-open="true"] {
+    grid-template-rows: auto auto;
+  }
+
+  .translation-panel {
+    max-height: 560px;
+  }
+}
+
+@media (max-width: 480px) {
+  .translation-header,
+  .translation-form,
+  .translation-saved-row,
+  .translation-results {
+    padding-inline: 12px;
+  }
+
+  .translation-status,
+  .translation-empty,
+  .translation-visual-notice,
+  .translation-unavailable,
+  .translation-progress {
+    margin-inline: 12px;
+  }
+
+  .translation-start-row .button,
+  .translation-unavailable .button,
+  .translation-progress .button {
+    min-height: 40px;
+  }
+}

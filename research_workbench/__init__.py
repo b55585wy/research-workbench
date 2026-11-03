@@ -1,3 +1,3 @@
 """Our research application; reusable readers are dependencies, not its domain."""
 
-__version__ = '0.44.0'
+__version__ = '0.45.0'

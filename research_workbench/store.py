@@ -419,6 +419,8 @@ COMMIT;''')
 # the closed run_reference_analysis proposal kind, which older builds cannot
 # interpret safely.  Existing rows, receipts and hashes are retained unchanged.
 SCHEMA = SCHEMA.replace('COMMIT;', 'PRAGMA user_version=22;\nCOMMIT;')
+from .translation_schema import SCHEMA as TRANSLATION_SCHEMA
+SCHEMA = SCHEMA.replace('COMMIT;', TRANSLATION_SCHEMA + '\nPRAGMA user_version=23;\nCOMMIT;')
 
 
 def timestamp():
@@ -445,7 +447,7 @@ class Store:
         self.exports.mkdir(exist_ok=True)
         self.database = self.root / 'workspace.sqlite3'
         with self.connection() as connection:
-            if connection.execute('PRAGMA user_version').fetchone()[0] > 22:
+            if connection.execute('PRAGMA user_version').fetchone()[0] > 23:
                 raise RuntimeError('Database requires a newer application')
             from .study_migration import install
             install(connection,SCHEMA)

@@ -14,7 +14,8 @@ const sourceFiles = [
   "tsconfig.json",
   "vite.config.ts",
   "scripts/build.mjs",
-  "src/index.tsx"
+  "src/index.tsx",
+  "src/translation.tsx"
 ];
 const runtimePackages = ["react", "react-dom", "scheduler"];
 

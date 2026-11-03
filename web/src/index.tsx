@@ -1,6 +1,14 @@
 import { flushSync } from "react-dom";
 import { createRoot, type Root } from "react-dom/client";
 
+export { mountTranslationPanel } from "./translation";
+export type {
+  MountTranslationPanelOptions,
+  TranslationPanelCallbacks,
+  TranslationPanelHandle,
+  TranslationPanelModel
+} from "./translation";
+
 export type WorkspaceLanguage = "zh" | "en";
 
 export interface WorkspaceDocument {

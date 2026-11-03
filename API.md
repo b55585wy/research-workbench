@@ -532,3 +532,28 @@ server-bound. agent_reading_budget is an embedded tool error stopping expansion.
 may now retain nonempty answer excerpts with error.code=agent_answer_incomplete; it remains
 failed, not a completed overview. Existing task_id analysis flows retain their confirmation
 state machine. Health0.31.0. See READING-EXPERIENCE.md.
+
+
+# v0.45 selected-page translation
+
+Local-guest/same-origin boundary is unchanged. No authenticated account is added.
+`GET /api/v1/translation-capabilities` reads parser/model readiness only.
+`POST /api/v1/documents/{id}/translations` accepts request_id (UUID), source_sha256,
+pages (1-based distinct sorted 1..5 pages), and target_language (zh or en). Exact
+request UUID retries are idempotent; different payload is a conflict. The fixed
+local parser and existing model connection execute in independent owned workers.
+`GET /api/v1/documents/{id}/translations?limit=20` lists saved jobs;
+`GET /api/v1/translations/{id}` includes saved page/block results;
+`POST /api/v1/translations/{id}/cancel` cancels only the identified task.
+GET never parses PDFs, downloads models or submits translation work.
+
+Job records include document/source identity, requested pages/language,
+queued/running/completed/partial/failed/cancelled/interrupted state, stage,
+completed/total pages, error, parser version, nonsecret model name and result_pages.
+Results retain 1-based original page, ordered typed blocks, source text and
+translated text; verified source rectangles use display-normalized 0..1 geometry
+or null when conversion is unavailable. Nontext visual/formula bodies are retained
+as original markers, not fabricated translations. SQLite schema advances 22 to23.
+The trusted local `--translation-runtime` directory contains runtime.json; client
+requests cannot select executables, files, endpoints or parser models.
+See [PAGE-TRANSLATION.md](PAGE-TRANSLATION.md) for limits and verification scope.

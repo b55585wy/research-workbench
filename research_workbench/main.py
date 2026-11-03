@@ -147,12 +147,20 @@ def copy_upload(upload, output):
 
 def create_app(data_root=None, validator=None, renderer=None, *, agent_provider=None, agent_config=None,
                page_reader=None, agent_autostart=True, analysis_rscript=None, analysis_autostart=True,
-               statistics_root=None,import_root=None):
+               statistics_root=None,import_root=None,translation_runtime=None,translation_autostart=True):
     store = Store(data_root or os.environ.get('RESEARCH_WORKBENCH_DATA', ROOT / 'data'))
     validator = validator or PdfValidator()
     images=ImageLibrary(store)
     bibliography=Bibliography(store)
     provider=agent_provider or ModelConnection(store.root,agent_config or os.environ.get('RESEARCH_AGENT_CONFIG'))
+    from .translation import Translations
+    from .translation_runtime import TranslationRuntime
+    from .translation_process import TranslationSupervisor
+    from .translation_api import router as translation_router
+    translation_root = translation_runtime or os.environ.get('RESEARCH_TRANSLATION_RUNTIME')
+    translations = Translations(store, provider, TranslationRuntime(translation_root))
+    translation_supervisor = TranslationSupervisor(translations, translation_root,
+        agent_config or os.environ.get('RESEARCH_AGENT_CONFIG')) if translation_autostart else None
     datasets=Datasets(store)
     from .data_imports import DataImports
     from .data_import_api import router as data_import_router
@@ -194,16 +202,20 @@ def create_app(data_root=None, validator=None, renderer=None, *, agent_provider=
 
     @asynccontextmanager
     async def lifespan(app):
+        if translation_supervisor:translation_supervisor.start()
         if supervisor:supervisor.recover()
         if agent_autostart:agent.start()
         try:
             yield
         finally:
+            if translation_supervisor:translation_supervisor.close()
             agent.close()
             if supervisor:supervisor.close()
 
     app = FastAPI(title='Research workbench', version=__version__, docs_url=None, redoc_url=None,lifespan=lifespan)
     app.state.store, app.state.validator = store, validator
+    app.state.translations = translations
+    app.include_router(translation_router)
     app.state.excerpts = Excerpts(store, renderer)
     app.state.pdf_regions = PdfRegions(store)
     app.state.annotated_pdf = AnnotatedPdfExport(store)

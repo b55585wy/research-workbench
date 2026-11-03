@@ -20,6 +20,7 @@ import { createReaderNavigation } from "/reader-navigation.js";
 import { createReaderObjectMenu } from "/reader-object-menu.js";
 import { createReaderShapes, shapeBounds } from "/reader-shapes.js";
 import { createWorkspaceShellBridge } from "/workspace-shell-bridge.js";
+import { createTranslationBridge } from "/translation-bridge.js";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = "/vendor/pdfjs/build/pdf.worker.mjs";
 
@@ -43,6 +44,8 @@ const messages = {
     reader: "阅读器",
     emptyReader: "从左侧选择一篇文献开始阅读。",
     fitWidth: "适应宽度",
+    translatePages: "翻译页面",
+    translationUnavailable: "翻译功能暂不可用，原文阅读不受影响。",
     page: "页码",
     notes: "笔记",
     noSource: "输入后默认关联当前页",
@@ -459,6 +462,8 @@ const messages = {
     reader: "Reader",
     emptyReader: "Choose a paper on the left to start reading.",
     fitWidth: "Fit width",
+    translatePages: "Translate pages",
+    translationUnavailable: "Translation is unavailable. The original reader is unaffected.",
     page: "Page",
     notes: "Notes",
     noSource: "Typing anchors this note to the current page",
@@ -945,6 +950,10 @@ const elements = {
   metadataRetry: $("metadata-retry"),
   metadataViewLatest: $("metadata-view-latest"),
   readerStage: $("reader-stage"),
+  translationLayout: $("reader-translation-layout"),
+  translationControls: $("translation-controls"),
+  translationPanel: $("translation-panel"),
+  translationFallback: $("translation-fallback"),
   readerEmpty: $("reader-empty"),
   pageSurface: $("page-surface"),
   canvas: $("reader-canvas"),
@@ -1095,6 +1104,8 @@ const state = {
   selection: null,
   selectedAnnotationId: null,
   status: null,
+  translationOpen: false,
+  translationUnavailable: false,
   resizeFrame: null
 };
 
@@ -1129,6 +1140,17 @@ const workspaceShell = createWorkspaceShellBridge({
   onMounted: rebindDocumentMenuReturnFocus,
   onOpenDocument: (documentId) => openDocument(documentId, { workspace: "reading" }),
   onDocumentMenu: (documentId, anchor, point) => openDocumentMenu(documentId, anchor, point)
+});
+
+const translation = createTranslationBridge({
+  controlsContainer: elements.translationControls,
+  panelContainer: elements.translationPanel,
+  getModel: translationModel,
+  api,
+  onOpenChange: setTranslationOpen,
+  goToSource: goToTranslationSource,
+  onOpenSettings: openTranslationSettings,
+  onMounted: syncTranslationLayout
 });
 
 function isStudy(document = state.document) {
@@ -1213,6 +1235,7 @@ function applyLanguage() {
     node.setAttribute("aria-label", t(node.dataset.i18nAria));
     node.title = t(node.dataset.i18nAria);
   });
+  elements.translationFallback.textContent = t(state.translationUnavailable ? "translationUnavailable" : "translatePages");
   elements.selectedAnnotationToolbar.setAttribute("aria-label", t("selectedAnnotationActions"));
   elements.language.textContent = state.language === "zh" ? "EN" : "中";
   elements.language.setAttribute("aria-label", state.language === "zh" ? "Switch to English" : "切换为中文");
@@ -1430,6 +1453,62 @@ function workspaceShellModel() {
     activeDocumentId: state.document?.id || null,
     openMenuDocumentId: state.documentMenu?.documentId || null
   };
+}
+
+function translationModel() {
+  const paper = state.document && !isStudy() ? state.document : null;
+  return {
+    language: state.language,
+    open: state.translationOpen,
+    reading: Boolean(paper && state.pdf && workspace?.getMode() === "reading"),
+    document: paper ? { id: paper.id, sha256: paper.sha256, pageCount: paper.page_count } : null,
+    currentPage: state.page
+  };
+}
+
+function syncTranslationLayout() {
+  const model = translationModel();
+  const visible = Boolean(model.open && model.reading && model.document);
+  elements.translationLayout.dataset.translationOpen = String(visible);
+  elements.translationPanel.hidden = !visible;
+}
+
+function setTranslationOpen(open) {
+  state.translationOpen = Boolean(open && state.pdf && state.document && !isStudy());
+  syncTranslationLayout();
+  translation.update(translationModel());
+}
+
+function openTranslationSettings() {
+  if ($("assistant-panel").hidden) $("assistant-toggle").click();
+  $("assistant-management").open = true;
+  $("assistant-settings").open = true;
+  $("assistant-settings-toggle").focus({ preventScroll: true });
+}
+
+async function goToTranslationSource(page, rect, expectedDocumentId, expectedSourceSha256) {
+  const identityMatches = () => Boolean(
+    state.pdf &&
+    state.document &&
+    !isStudy() &&
+    state.document.id === expectedDocumentId &&
+    state.document.sha256 === expectedSourceSha256
+  );
+  if (!identityMatches() || !Number.isInteger(page) || page < 1 || page > state.document.page_count) return false;
+  if (rect !== null && (!rect || ![rect.x, rect.y, rect.width, rect.height].every(Number.isFinite) || rect.x < 0 || rect.y < 0 || rect.width <= 0 || rect.height <= 0 || rect.x + rect.width > 1 || rect.y + rect.height > 1)) return false;
+  if (!prepareContextNavigation()) return false;
+  const highlightId = `translation-source-${expectedDocumentId}`;
+  state.highlight = rect ? {
+    id: highlightId,
+    document_id: expectedDocumentId,
+    page,
+    rect: [rect.x, rect.y, rect.x + rect.width, rect.y + rect.height]
+  } : null;
+  state.highlightRevealId = rect ? highlightId : null;
+  if (!identityMatches()) return false;
+  await goToPage(page, { preserveHighlight: true });
+  if (!identityMatches()) return false;
+  return state.page === page;
 }
 
 function closeDocumentMenu(restoreFocus = false) {
@@ -2740,6 +2819,8 @@ function renderDocumentDetails() {
   elements.viewMode.value = state.viewMode || "continuous";
   readerFind?.update();
   assistant?.contextChanged();
+  syncTranslationLayout();
+  translation.update(translationModel());
 }
 
 function renderRegionCapture() {
@@ -7142,7 +7223,11 @@ workspace = createWorkspace({
   getDocument: () => state.document,
   getLanguage: () => state.language,
   modeSelected: (mode) => mode === "data" ? openDataWorkspace() : openReadingWorkspace(),
-  modeRendered: (mode) => dataNavigation?.setMode(mode),
+  modeRendered: (mode) => {
+    dataNavigation?.setMode(mode);
+    syncTranslationLayout();
+    translation.update(translationModel());
+  },
   modePendingChanged: (pending) => dataNavigation?.setNavigationPending(pending),
   readingVisible: () => {
     if (readerWorkspaceVisible) return;
@@ -7438,7 +7523,17 @@ readerNavigation = createReaderNavigation({
   goToDestination: (destination) => state.pdfLinks?.goToDestination(destination)
 });
 
+elements.translationFallback.addEventListener("click", () => setStatus("translationUnavailable", "error"));
+
 applyTheme();
 applyLanguage();
 void workspaceShell.load();
+void translation.load().then((available) => {
+  if (available) return;
+  state.translationUnavailable = true;
+  if (!elements.translationFallback.isConnected) elements.translationControls.replaceChildren(elements.translationFallback);
+  elements.translationFallback.disabled = false;
+  elements.translationFallback.textContent = t("translationUnavailable");
+  syncTranslationLayout();
+});
 loadDocuments();

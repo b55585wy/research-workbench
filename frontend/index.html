@@ -247,6 +247,9 @@
           </button>
           <button id="annotation-undo" class="button button-quiet" type="button" data-i18n="annotationUndo" disabled>撤销批注</button>
           <button id="annotation-redo" class="button button-quiet" type="button" data-i18n="annotationRedo" disabled>重做批注</button>
+          <div id="translation-controls" class="translation-controls">
+            <button id="translation-fallback" class="button button-secondary" type="button" disabled>翻译页面</button>
+          </div>
         </div>
         <div class="reader-source-controls" aria-label="原文操作">
           <div id="text-annotation-toolbar" class="text-annotation-toolbar" role="group" aria-label="选中文字操作">
@@ -311,40 +314,43 @@
       <p id="reader-text-status" class="reader-text-status" role="status" aria-live="polite" hidden></p>
       <p id="reader-progress-status" class="reader-progress-status" role="status" aria-live="polite" hidden></p>
 
-      <div id="reader-stage" class="reader-stage">
-        <section id="reader-navigation-panel" class="reader-navigation-panel" aria-label="PDF 导航" hidden>
-          <div class="reader-navigation-heading">
-            <div class="reader-navigation-tabs" role="tablist" aria-label="PDF 导航">
-              <button id="reader-outline-tab" type="button" role="tab" aria-controls="reader-outline" aria-selected="true" data-i18n="pdfOutline">PDF 目录</button>
-              <button id="reader-thumbnails-tab" type="button" role="tab" aria-controls="reader-thumbnails-panel" aria-selected="false" data-i18n="pageThumbnails">页面缩略图</button>
+      <div id="reader-translation-layout" class="reader-translation-layout" data-translation-open="false">
+        <div id="reader-stage" class="reader-stage">
+          <section id="reader-navigation-panel" class="reader-navigation-panel" aria-label="PDF 导航" hidden>
+            <div class="reader-navigation-heading">
+              <div class="reader-navigation-tabs" role="tablist" aria-label="PDF 导航">
+                <button id="reader-outline-tab" type="button" role="tab" aria-controls="reader-outline" aria-selected="true" data-i18n="pdfOutline">PDF 目录</button>
+                <button id="reader-thumbnails-tab" type="button" role="tab" aria-controls="reader-thumbnails-panel" aria-selected="false" data-i18n="pageThumbnails">页面缩略图</button>
+              </div>
+              <button id="reader-navigation-close" class="button button-icon" type="button" data-i18n-aria="close" aria-label="关闭">×</button>
             </div>
-            <button id="reader-navigation-close" class="button button-icon" type="button" data-i18n-aria="close" aria-label="关闭">×</button>
+            <div id="reader-outline" role="tabpanel" aria-labelledby="reader-outline-tab">
+              <p id="reader-outline-status" class="reader-navigation-status" role="status"></p>
+              <button id="reader-outline-retry" class="button button-quiet" type="button" data-i18n="retry" hidden>重试</button>
+              <div id="reader-outline-list" class="reader-outline-list"></div>
+            </div>
+            <div id="reader-thumbnails-panel" role="tabpanel" aria-labelledby="reader-thumbnails-tab" hidden>
+              <div id="reader-thumbnails" class="reader-thumbnails"></div>
+              <div class="reader-thumbnail-pages">
+                <button id="reader-thumbnails-prev" class="button button-quiet" type="button" data-i18n="previousPage">上一页</button>
+                <output id="reader-thumbnails-range"></output>
+                <button id="reader-thumbnails-next" class="button button-quiet" type="button" data-i18n="nextPage">下一页</button>
+              </div>
+            </div>
+          </section>
+          <div id="reader-empty" class="reader-empty">
+            <p data-i18n="emptyReader">从左侧选择一篇文献开始阅读。</p>
           </div>
-          <div id="reader-outline" role="tabpanel" aria-labelledby="reader-outline-tab">
-            <p id="reader-outline-status" class="reader-navigation-status" role="status"></p>
-            <button id="reader-outline-retry" class="button button-quiet" type="button" data-i18n="retry" hidden>重试</button>
-            <div id="reader-outline-list" class="reader-outline-list"></div>
-          </div>
-          <div id="reader-thumbnails-panel" role="tabpanel" aria-labelledby="reader-thumbnails-tab" hidden>
-            <div id="reader-thumbnails" class="reader-thumbnails"></div>
-            <div class="reader-thumbnail-pages">
-              <button id="reader-thumbnails-prev" class="button button-quiet" type="button" data-i18n="previousPage">上一页</button>
-              <output id="reader-thumbnails-range"></output>
-              <button id="reader-thumbnails-next" class="button button-quiet" type="button" data-i18n="nextPage">下一页</button>
+          <div id="page-surface" class="page-surface" hidden>
+            <canvas id="reader-canvas" data-testid="reader-canvas" aria-label="PDF 页面"></canvas>
+            <div id="reader-text-layer" class="textLayer" aria-label="PDF 文字层"></div>
+            <div id="text-annotations-layer" class="text-annotations-layer" aria-hidden="true"></div>
+            <div id="region-overlay" class="region-overlay" data-testid="region-overlay" aria-hidden="true">
+              <div id="active-selection" class="active-selection" hidden></div>
             </div>
           </div>
-        </section>
-        <div id="reader-empty" class="reader-empty">
-          <p data-i18n="emptyReader">从左侧选择一篇文献开始阅读。</p>
         </div>
-        <div id="page-surface" class="page-surface" hidden>
-          <canvas id="reader-canvas" data-testid="reader-canvas" aria-label="PDF 页面"></canvas>
-          <div id="reader-text-layer" class="textLayer" aria-label="PDF 文字层"></div>
-          <div id="text-annotations-layer" class="text-annotations-layer" aria-hidden="true"></div>
-          <div id="region-overlay" class="region-overlay" data-testid="region-overlay" aria-hidden="true">
-            <div id="active-selection" class="active-selection" hidden></div>
-          </div>
-        </div>
+        <aside id="translation-panel" class="translation-panel" aria-labelledby="translation-heading" hidden></aside>
       </div>
       <div id="selected-annotation-toolbar" class="selected-annotation-toolbar" role="group" aria-label="已选批注操作" hidden>
         <button id="selected-annotation-copy" class="button button-secondary" type="button" data-i18n="copyQuote">复制引文</button>
