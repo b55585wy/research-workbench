@@ -3,6 +3,7 @@ import { createTaskClient } from "/task-client.js";
 import { createAssistantWindow } from "/assistant-window.js";
 import { isPdfPageSource, onlineDatasetSourceUrl, pdfPageApplicationUrl, renderAssistantAnswer } from "/assistant-answer.js";
 import { createReferencePicker, normalizeResourceReference, resourceReferenceKey, resourceReferencesFromTurn, resourceReferenceWire } from "/assistant-references.js";
+import { createSourcePreparationBridge } from "/source-preparation-bridge.js";
 
 const ACTIVE_STATES = new Set(["queued", "running"]);
 const TERMINAL_STATES = new Set(["waiting_confirmation", "completed", "failed", "cancelled", "interrupted"]);
@@ -782,6 +783,7 @@ export function createAssistant(adapter) {
     form: byId("assistant-form"),
     resourceReferenceHelp: byId("assistant-resource-reference-help"),
     resourceReferences: byId("assistant-resource-references"),
+    sourcePreparation: byId("assistant-source-preparation"),
     noteReferences: byId("assistant-note-references"),
     readerActions: byId("assistant-reader-actions"),
     referenceAdd: byId("assistant-add-references"),
@@ -884,6 +886,13 @@ export function createAssistant(adapter) {
     },
     canEdit: (target) => canEditReferences(target.paperId, target.entry),
     onAdd: addResourceReference
+  });
+
+  let sourcePreparationGeneration = 0;
+  const sourcePreparation = createSourcePreparationBridge({
+    container: elements.sourcePreparation,
+    getModel: sourcePreparationModel,
+    api: adapter.api
   });
 
   function entryFor(documentId) {
@@ -1034,6 +1043,40 @@ export function createAssistant(adapter) {
 
   function canEditReferences(paperId, entry) {
     return isCurrent(paperId, entry) && !entry.loading && !entry.conversationsLoading && !entry.pendingSend && !activeTurn(entry) && !entry.pendingDecision && !hasPendingReferenceAnalysisDecision(entry) && !tasks.isBusy(paperId, entry.conversationId);
+  }
+
+  function sourcePreparationModel() {
+    const { paper, entry } = current();
+    const currentPdf = paper && paper.kind !== "study" ? paper : null;
+    const context = paper ? adapter.getContext() : null;
+    const candidates = [];
+    if (currentPdf) {
+      candidates.push({
+        documentId: currentPdf.id,
+        sourceSha256: currentPdf.sha256,
+        title: currentPdf.title || currentPdf.original_filename || "",
+        pageCount: currentPdf.page_count,
+        initialPage: context?.page || 1
+      });
+    }
+    for (const reference of entry?.resourceRefs || []) {
+      if (reference.kind !== "paper") continue;
+      candidates.push({
+        documentId: reference.document_id,
+        sourceSha256: reference.sha256,
+        title: reference.title,
+        pageCount: reference.page_count,
+        initialPage: 1
+      });
+    }
+    return {
+      language,
+      visible: !elements.panel.hidden,
+      contextKey: `${paper?.id || "none"}:${entry?.conversationId || "fresh"}:${sourcePreparationGeneration}`,
+      editable: Boolean(paper && entry && canEditReferences(paper.id, entry)),
+      papers: candidates,
+      preferredDocumentId: currentPdf?.id || null
+    };
   }
 
   function addResourceReference(target, reference) {
@@ -2247,6 +2290,7 @@ export function createAssistant(adapter) {
     elements.cancel.textContent = t(entry?.cancelling ? "stopping" : "cancel");
     elements.new.disabled = !paper || sending || Boolean(entry?.pendingDecision);
     renderSettings();
+    sourcePreparation.update(sourcePreparationModel());
   }
 
   function stopPolling(entry) {
@@ -2618,12 +2662,16 @@ export function createAssistant(adapter) {
       elements.message.focus();
     } else {
       referencePicker.close();
+      sourcePreparation.reset();
     }
+    sourcePreparation.update(sourcePreparationModel());
   });
   elements.close.addEventListener("click", () => {
     referencePicker.close();
     elements.panel.hidden = true;
     elements.toggle.setAttribute("aria-expanded", "false");
+    sourcePreparation.reset();
+    sourcePreparation.update(sourcePreparationModel());
     elements.toggle.focus();
   });
   document.addEventListener("keydown", (event) => {
@@ -2636,6 +2684,8 @@ export function createAssistant(adapter) {
       referencePicker.close();
       elements.panel.hidden = true;
       elements.toggle.setAttribute("aria-expanded", "false");
+      sourcePreparation.reset();
+      sourcePreparation.update(sourcePreparationModel());
       elements.toggle.focus();
     }
   });
@@ -2652,6 +2702,7 @@ export function createAssistant(adapter) {
     entry.pendingSend = null;
     entry.resourceRefs = [];
     entry.status = null;
+    sourcePreparationGeneration += 1;
     tasks.conversationChanged(paper.id, null);
     render();
     elements.message.focus();
@@ -2664,6 +2715,7 @@ export function createAssistant(adapter) {
     entry.turns = [];
     entry.pendingSend = null;
     entry.resourceRefs = [];
+    sourcePreparationGeneration += 1;
     tasks.conversationChanged(paper.id, entry.conversationId);
     loadConversation(paper.id, entry, entry.conversationId);
   });
@@ -2689,6 +2741,7 @@ export function createAssistant(adapter) {
   });
   elements.settingsForm.addEventListener("submit", saveSettings);
 
+  void sourcePreparation.load();
   loadProvider();
 
   return {
@@ -2738,6 +2791,7 @@ export function createAssistant(adapter) {
     },
     documentChanged() {
       referencePicker.close();
+      sourcePreparationGeneration += 1;
       const { paper, entry } = current();
       if (paper && !entry.loaded && !entry.loading && !entry.conversations.length) loadConversations(paper.id, entry, true);
       tasks.documentChanged();

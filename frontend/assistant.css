@@ -1007,3 +1007,128 @@
     padding: 5px 6px;
   }
 }
+
+#assistant-source-preparation {
+  margin-top: 8px;
+}
+
+.source-preparation {
+  max-width: 100%;
+  border: 1px solid var(--ui-border);
+  border-radius: 4px;
+  background: var(--ui-surface);
+  color: var(--ui-text-soft);
+  font-size: 12px;
+}
+
+.source-preparation > summary {
+  padding: 8px;
+  color: var(--ui-text);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.source-preparation-body {
+  padding: 0 8px 8px;
+}
+
+.source-preparation-help,
+.source-preparation-empty,
+.source-preparation-count,
+.source-preparation-status,
+.source-preparation-warning {
+  margin: 4px 0;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.source-preparation-help,
+.source-preparation-empty,
+.source-preparation-count {
+  color: var(--ui-text-muted);
+}
+
+.source-preparation-field {
+  display: grid;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.source-preparation-field > label {
+  color: var(--ui-text);
+  font-weight: 600;
+}
+
+.source-preparation-field select,
+.source-preparation-field input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  min-height: 32px;
+  padding: 4px 8px;
+  overflow: hidden;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: 4px;
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  text-overflow: ellipsis;
+}
+
+.source-preparation-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.source-preparation-actions .button {
+  min-height: 32px;
+}
+
+.source-preparation-status[data-kind="error"] {
+  color: var(--ui-danger);
+}
+
+.source-preparation-status[data-kind="success"] {
+  color: var(--ui-primary);
+}
+
+.source-preparation-pages {
+  display: grid;
+  gap: 4px;
+  padding: 0;
+  margin: 8px 0 0;
+  list-style: none;
+}
+
+.source-preparation-page {
+  padding: 4px 8px;
+  border: 1px solid var(--ui-border);
+  border-radius: 4px;
+  background: var(--ui-surface-subtle);
+}
+
+.source-preparation-page-heading {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px;
+}
+
+.source-preparation-page[data-status="partial"] strong,
+.source-preparation-page[data-status="unavailable"] strong,
+.source-preparation-page[data-status="missing"] strong {
+  color: var(--ui-text-muted);
+}
+
+@media (max-width: 480px) {
+  .source-preparation-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .source-preparation-actions .button {
+    width: 100%;
+    min-height: 36px;
+  }
+}

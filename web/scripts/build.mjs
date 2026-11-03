@@ -16,7 +16,8 @@ const sourceFiles = [
   "scripts/build.mjs",
   "src/index.tsx",
   "src/translation.tsx",
-  "src/flow-reading.tsx"
+  "src/flow-reading.tsx",
+  "src/source-preparation.tsx"
 ];
 const runtimePackages = ["react", "react-dom", "scheduler"];
 

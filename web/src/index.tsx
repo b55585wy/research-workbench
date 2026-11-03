@@ -16,6 +16,15 @@ export type {
   FlowRect,
   MountFlowReaderOptions
 } from "./flow-reading";
+export { mountSourcePreparation } from "./source-preparation";
+export type {
+  MountSourcePreparationOptions,
+  SourcePreparationCallbacks,
+  SourcePreparationHandle,
+  SourcePreparationLanguage,
+  SourcePreparationModel,
+  SourcePreparationPaper
+} from "./source-preparation";
 
 export type WorkspaceLanguage = "zh" | "en";
 

@@ -629,3 +629,21 @@ There is no automatic preparation, pixel read, persistent index, vector search o
 request by this tool. No lexical match cannot support a negative scientific finding.
 See EVIDENCE-SEARCH.md and the actual backend report for limitations; interactions
 and retrieval quality have not been functionally tested.
+
+
+# v0.49 explicit page preparation in assistant context
+
+No backend/API/schema/grant changes. A React section in the existing assistant
+context area calls v0.47 GET reading-capabilities and document reading-pages only,
+and explicit user preparation calls POST reading-pages/prepare for missing pages.
+Every operation freezes the actual context/source hash and up to5 unique1-based pages;
+client validation precedes requests. Cache reads never imply preparation or sharing.
+Source IDs are restricted in this UI to the bound PDF and explicit pinned papers;
+this convenience filter is not a new authentication or server permission layer.
+
+Responses are checked against source/hash/parser/schema/page sets before display.
+Context/source changes and dismissal invalidate/abort owned work; late responses
+cannot update another chat. Cached page states can survive a missing-page error.
+No automatic message send, translation, whole-document prefetch or POST retry occurs.
+The source cache and retrieval/page-read budgets remain unchanged. See
+ASSISTANT-PAGE-PREPARATION.md for current workflow and unverified interactions.
