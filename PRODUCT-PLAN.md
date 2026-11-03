@@ -1,3 +1,5 @@
+2026-11-03 前端目标已确定为 React；Agent 编排、RAG 文献问答、Python/R 分析为明确建设能力。当前实现、迁移边界和次序见 [ARCHITECTURE.md](ARCHITECTURE.md)。React 先做可用切片，沉浸式翻译保持下一项优先交付功能。
+
 2026-11-03 当前总排序以 [TASK-PLAN.md](TASK-PLAN.md) 为准。v0.43 完成阅读/聊天
 基础体验代码更新；下一轮优先 [沉浸式翻译与手机阅读](TRANSLATION-AND-MOBILE.md)，
 再推进整体产品层级、检索/证据和可编辑 PPT。历史版本与候选能力不等同于已接入。
