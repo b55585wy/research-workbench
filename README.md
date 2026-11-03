@@ -1,3 +1,9 @@
+# research workspace · v0.46.0
+
+v0.46.0 新增原文／双栏／译文覆盖切换，复用已保存结果；不明确的区域保留原文，长译文可展开。手机语义重排仍未实现，交互未验收。见 [OVERLAY-TRANSLATION.md](OVERLAY-TRANSLATION.md)。
+
+按要求未进行功能测试或论文/模型探测；已核对源码、必要生产构建和启动日志。以下保留历史记录。
+
 # research workspace · v0.45.0
 
 新增当前页/指定页双栏翻译：本地 MinerU Flash 提取文字块，沿用已有模型连接翻译，

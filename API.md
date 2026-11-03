@@ -557,3 +557,8 @@ as original markers, not fabricated translations. SQLite schema advances 22 to23
 The trusted local `--translation-runtime` directory contains runtime.json; client
 requests cannot select executables, files, endpoints or parser models.
 See [PAGE-TRANSLATION.md](PAGE-TRANSLATION.md) for limits and verification scope.
+
+
+# v0.46 saved translation presentation
+
+Original / parallel / translated-overlay modes consume the existing source-bound saved translation results. No new endpoints, model calls, parser jobs or schema changes occur when changing mode. Independent worker contention handling now retries claims only, while execution failures reach recovery. No functional acceptance claimed; see OVERLAY-TRANSLATION.md.

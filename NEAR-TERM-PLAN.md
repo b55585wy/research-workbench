@@ -1,5 +1,7 @@
 # research workspace：近期任务计划
 
+v0.46.0 新增原文／双栏／译文覆盖切换，复用已保存结果；不明确的区域保留原文，长译文可展开。手机语义重排仍未实现，交互未验收。见 [OVERLAY-TRANSLATION.md](OVERLAY-TRANSLATION.md)。
+
 本轮记录：v0.45.0 交付 P1/T1 选页双栏翻译的代码、本地解析环境与构建。范围及尚未验证的交互见 [PAGE-TRANSLATION.md](PAGE-TRANSLATION.md)；覆盖/手机重排和其余 React 迁移继续后续推进。
 
 更新于 2026-11-03。v0.44 已交付本地游客标识和首个 React 头部/文献目录切片；PDF、笔记与助手等仍由原控制器处理，整站迁移未完成。必要生产构建已完成，未运行测试或浏览器/模型验证。详见 [REACT-GUEST.md](REACT-GUEST.md)。以下保留原始计划与后续标准。

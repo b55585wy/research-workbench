@@ -15,7 +15,7 @@ from .agent_provider import ModelConnection
 from .analysis_process import WorkerBusy, WorkerLease
 from .store import Store
 from .translation import Translations
-from .translation_process import own_process_tree
+from .translation_process import own_process_tree, transient_storage_error
 from .translation_runtime import TranslationRuntime
 
 
@@ -99,13 +99,18 @@ def main():
                 while not stop.is_set():
                     try:
                         row = service.claim()
-                        if row is not None:
-                            execute_job(service, row, args, stop)
-                        else:
-                            stop.wait(.2)
                     except sqlite3.OperationalError as error:
-                        if not any(word in str(error).lower() for word in ('locked', 'busy')):
+                        # Contention is expected only around claiming, where no job row
+                        # has been touched yet; retrying the claim is therefore safe.
+                        if not transient_storage_error(error):
                             raise
+                        stop.wait(.2)
+                        continue
+                    if row is not None:
+                        # Execution errors must end this worker: the supervisor's
+                        # recovery owns the interrupted row, never a fresh claim.
+                        execute_job(service, row, args, stop)
+                    else:
                         stop.wait(.2)
             finally:
                 service.recover(queued=True)

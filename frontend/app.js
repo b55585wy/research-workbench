@@ -21,6 +21,7 @@ import { createReaderObjectMenu } from "/reader-object-menu.js";
 import { createReaderShapes, shapeBounds } from "/reader-shapes.js";
 import { createWorkspaceShellBridge } from "/workspace-shell-bridge.js";
 import { createTranslationBridge } from "/translation-bridge.js";
+import { createTranslationOverlay } from "/translation-overlay.js";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = "/vendor/pdfjs/build/pdf.worker.mjs";
 
@@ -1152,6 +1153,31 @@ const translation = createTranslationBridge({
   onOpenSettings: openTranslationSettings,
   onMounted: syncTranslationLayout
 });
+let translationPresentationMode = "dual";
+const translationOverlay = createTranslationOverlay({
+  getPageRecords: () => state.readerPages.values(),
+  getIdentity: () => state.document && state.pdf && !isStudy() ? { id: state.document.id, sha256: state.document.sha256 } : null,
+  onPageStatus: (status) => {
+    elements.translationControls.dispatchEvent(new CustomEvent("translation-overlay-status", { detail: status }));
+  }
+});
+elements.translationControls.addEventListener("translation-presentation-change", (event) => {
+  const snapshot = event.detail;
+  const model = translationModel();
+  if (!snapshot) {
+    translationOverlay.clear();
+    syncTranslationLayout();
+    return;
+  }
+  if (!model.reading || !model.document || snapshot.documentId !== model.document.id || snapshot.sourceSha256 !== model.document.sha256) {
+    translationOverlay.clear();
+    return;
+  }
+  translationPresentationMode = ["original", "dual", "translated"].includes(snapshot.mode) ? snapshot.mode : "dual";
+  if (translationPresentationMode === "translated") translationOverlay.setPresentation(snapshot);
+  else translationOverlay.clear();
+  syncTranslationLayout();
+});
 
 function isStudy(document = state.document) {
   return document?.kind === "study";
@@ -1468,9 +1494,11 @@ function translationModel() {
 
 function syncTranslationLayout() {
   const model = translationModel();
-  const visible = Boolean(model.open && model.reading && model.document);
+  const visible = Boolean(model.open && model.reading && model.document && translationPresentationMode === "dual");
   elements.translationLayout.dataset.translationOpen = String(visible);
+  elements.translationLayout.dataset.translationMode = translationPresentationMode;
   elements.translationPanel.hidden = !visible;
+  if (!model.reading) translationOverlay.clear();
 }
 
 function setTranslationOpen(open) {
@@ -3393,6 +3421,7 @@ async function restorePendingReaderProgress() {
 }
 
 function cancelDocumentWork() {
+  translationOverlay.clear();
   readerObjects?.reset();
   readerShapes?.documentChanged();
   closeSelectedAnnotation();
@@ -3661,6 +3690,7 @@ async function openDocument(documentId, options = {}) {
   const requestedMode = options.workspace || (options.noteId || options.imageLink ? "reading" : options.analysisId || options.datasetId || options.chartId || knownTarget?.kind === "study" ? "data" : null);
   const contextChanging = Boolean(state.document && (state.document.id !== documentId || requestedMode && requestedMode !== workspace?.getMode()));
   if (contextChanging && !prepareContextNavigation()) return false;
+  if (state.document?.id !== documentId) translationOverlay.clear();
   const explicitIntent = Boolean(options.explicitIntent || options.noteId || options.imageLink || options.analysisId || options.datasetId || options.chartId);
   if (explicitIntent || state.document && state.document.id !== documentId) cancelReaderProgressRestore();
   let document = state.documents.find((item) => item.id === documentId) || state.studies.find((item) => item.id === documentId);
@@ -4124,6 +4154,7 @@ function ensureReaderPages() {
     current.surface.hidden = false;
     activateReaderPage(current, false);
   }
+  translationOverlay.refresh();
 }
 
 function destroyReaderPages() {
@@ -4143,6 +4174,7 @@ function destroyReaderPages() {
   state.readerPagesContainer = null;
   state.readerPages.clear();
   state.activePageRecord = null;
+  translationOverlay.refresh();
 }
 
 function releaseReaderPage(record) {
@@ -4172,6 +4204,7 @@ function releaseReaderPage(record) {
   record.surface.querySelector(".reader-find-layer")?.replaceChildren();
   record.status.hidden = true;
   setPageEstimate(record);
+  translationOverlay.refresh();
 }
 
 function visibleReaderBounds() {
@@ -4414,6 +4447,7 @@ async function renderReaderPage(record, sequence) {
       state.highlightRevealId = null;
       highlight.scrollIntoView({ block: "nearest", inline: "nearest" });
     }
+    translationOverlay.refresh();
   } catch (error) {
     if (["RenderingCancelledException", "AbortException", "AbortError"].includes(error?.name) || sequence !== state.renderSequence) return;
     record.rendered = false;

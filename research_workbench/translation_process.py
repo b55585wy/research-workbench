@@ -3,6 +3,7 @@ import json
 import os
 from pathlib import Path
 import signal
+import sqlite3
 import subprocess
 import sys
 import threading
@@ -10,6 +11,12 @@ import time
 from uuid import uuid4
 
 from .analysis_process import WorkerBusy, WorkerLease
+
+
+def transient_storage_error(error):
+    """SQLite write contention only; any other statement error stays fatal."""
+    return isinstance(error, sqlite3.OperationalError) and any(
+        word in str(error).lower() for word in ('locked', 'busy'))
 
 
 def own_process_tree():
@@ -67,11 +74,17 @@ class TranslationSupervisor:
         service.supervisor = self
 
     def recover(self, queued=False):
+        """One bounded recovery pass; False means contention still owed retry."""
         try:
             with WorkerLease(self.root / '.lease'):
                 self.service.recover(queued=queued)
         except WorkerBusy:
-            pass
+            return False
+        except sqlite3.OperationalError as error:
+            if not transient_storage_error(error):
+                raise
+            return False
+        return True
 
     def start(self):
         self.recover()
@@ -89,8 +102,10 @@ class TranslationSupervisor:
         while not self.stop.wait(1):
             with self.lock:
                 if self.process is not None and self.process.poll() is not None:
-                    self.recover(queued=True)
-                    self.process = None
+                    # A dead child stays referenced until recovery actually applies;
+                    # transient contention only defers it to the next bounded interval.
+                    if self.recover(queued=True):
+                        self.process = None
 
     def ensure_started(self):
         with self.lock:

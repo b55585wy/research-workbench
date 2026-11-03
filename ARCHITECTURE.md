@@ -1,5 +1,7 @@
 # research workspace：架构决定与实施顺序
 
+v0.46.0 新增原文／双栏／译文覆盖切换，复用已保存结果；不明确的区域保留原文，长译文可展开。手机语义重排仍未实现，交互未验收。见 [OVERLAY-TRANSLATION.md](OVERLAY-TRANSLATION.md)。
+
 v0.45.0 更新：新增独立的选页翻译调度/执行/本地解析进程，结果存入本机 SQLite；React 双栏消费原页绑定的译文。原 PDF 继续由现有阅读器管理。范围和未验收项见 [PAGE-TRANSLATION.md](PAGE-TRANSLATION.md)。
 
 2026-11-03 用户确认前端采用 React，并明确 Agent 编排、RAG 文献问答与 Python/R 分析都会建设。本文固定能力边界和演进方向，不把尚未实施的组件写成当前事实。

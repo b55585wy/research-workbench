@@ -4,6 +4,8 @@ import { createRoot, type Root } from "react-dom/client";
 
 type TranslationLanguage = "zh" | "en";
 type TargetLanguage = "zh" | "en";
+type TranslationMode = "original" | "dual" | "translated";
+type OverlayStatus = { documentId: string; sourceSha256: string; jobId: string; page: number; kind: "partial" | "unavailable" };
 type JobStatus = "queued" | "running" | "completed" | "partial" | "failed" | "cancelled" | "interrupted";
 
 interface TranslationDocument {
@@ -38,7 +40,7 @@ interface TranslationRect {
 
 interface TranslationBlock {
   id: string;
-  kind: "text" | "title" | "caption" | "formula" | "image" | "table" | "other";
+  kind: "text" | "title" | "caption" | "formula" | "image" | "table" | "code" | "other";
   order: number;
   rect: TranslationRect | null;
   source_text: string;
@@ -115,6 +117,16 @@ const strings = {
   zh: {
     translate: "翻译页面",
     translation: "译文",
+    readingMode: "阅读模式",
+    originalMode: "原文",
+    dualMode: "双栏",
+    translatedMode: "译文",
+    showDual: "在双栏中查看",
+    noSavedTranslation: "没有可用的已保存译文。",
+    currentPageAbsent: "当前页不在这条已完成的翻译记录中。",
+    stillTranslating: "翻译仍在进行；已完成的页面可以切换显示。",
+    partialOverlay: "当前页部分内容未覆盖，原文已保留。",
+    unavailableOverlay: "当前页无法安全覆盖，已保留原文。",
     close: "关闭翻译栏",
     currentPage: "当前页",
     selectedPages: "指定页面",
@@ -176,6 +188,16 @@ const strings = {
   en: {
     translate: "Translate pages",
     translation: "Translation",
+    readingMode: "Reading mode",
+    originalMode: "Original",
+    dualMode: "Dual",
+    translatedMode: "Translated",
+    showDual: "View in dual mode",
+    noSavedTranslation: "No saved translation is available.",
+    currentPageAbsent: "The current page is not in this completed translation.",
+    stillTranslating: "Translation is still running; completed pages can be displayed.",
+    partialOverlay: "Some content on this page was not overlaid; the original remains visible.",
+    unavailableOverlay: "This page cannot be safely overlaid; the original remains visible.",
     close: "Close translation panel",
     currentPage: "Current page",
     selectedPages: "Selected pages",
@@ -290,6 +312,16 @@ function jobResults(job: TranslationJob) {
   return Array.isArray(job.result_pages) ? job.result_pages : [];
 }
 
+function frozenCompletedPages(job: TranslationJob) {
+  return Object.freeze(jobResults(job).filter((page) => page.status === "completed").map((page) => Object.freeze({
+    ...page,
+    blocks: Object.freeze((Array.isArray(page.blocks) ? page.blocks : []).map((block) => Object.freeze({
+      ...block,
+      rect: block.rect ? Object.freeze({ ...block.rect }) : null
+    })))
+  })));
+}
+
 function upsertJob(items: TranslationJob[], job: TranslationJob) {
   return [job, ...items.filter((item) => item.id !== job.id)]
     .sort((a, b) => b.created_at.localeCompare(a.created_at))
@@ -369,15 +401,18 @@ function TranslationResults({ job, copy, onSource }: {
   );
 }
 
-function TranslationExperience({ model, callbacks, panelContainer }: {
+function TranslationExperience({ model, callbacks, controlsContainer, panelContainer }: {
   model: TranslationPanelModel;
   callbacks: TranslationPanelCallbacks;
+  controlsContainer: HTMLElement;
   panelContainer: HTMLElement;
 }) {
   const copy = strings[model.language];
   const document = model.document;
   const documentKey = document ? `${document.id}:${document.sha256}` : null;
-  const activeScope = model.open && model.reading && document ? documentKey : null;
+  const [mode, setMode] = useState<TranslationMode>("dual");
+  const [overlayStatus, setOverlayStatus] = useState<OverlayStatus | null>(null);
+  const activeScope = model.reading && document ? documentKey : null;
   const scopeRef = useRef(activeScope);
   scopeRef.current = activeScope;
   const generationRef = useRef(0);
@@ -401,6 +436,8 @@ function TranslationExperience({ model, callbacks, panelContainer }: {
   useEffect(() => {
     generationRef.current += 1;
     scopeControllerRef.current?.abort();
+    setMode("dual");
+    setOverlayStatus(null);
     setCapabilities(null);
     setCapabilitiesError(null);
     setJobs([]);
@@ -414,6 +451,40 @@ function TranslationExperience({ model, callbacks, panelContainer }: {
     setOperationError(null);
     setPollError(false);
   }, [documentKey]);
+
+  useEffect(() => {
+    const handleStatus = (event: Event) => {
+      const detail = (event as CustomEvent<OverlayStatus | null>).detail;
+      if (!detail) {
+        setOverlayStatus(null);
+        return;
+      }
+      if (mode === "translated" && document && visibleJob
+        && detail.documentId === document.id && detail.sourceSha256 === document.sha256
+        && detail.jobId === visibleJob.id && detail.page === model.currentPage
+        && ["partial", "unavailable"].includes(detail.kind)) setOverlayStatus(detail);
+    };
+    controlsContainer.addEventListener("translation-overlay-status", handleStatus);
+    return () => controlsContainer.removeEventListener("translation-overlay-status", handleStatus);
+  }, [controlsContainer, documentKey, visibleJob?.id, model.currentPage, mode]);
+
+  useEffect(() => {
+    setOverlayStatus(null);
+    const snapshot = model.reading && document ? Object.freeze({
+      mode,
+      documentId: document.id,
+      sourceSha256: document.sha256,
+      jobId: mode === "translated" && visibleJob ? visibleJob.id : "",
+      currentPage: model.currentPage,
+      language: model.language,
+      resultPages: mode === "translated" && visibleJob ? frozenCompletedPages(visibleJob) : Object.freeze([])
+    }) : null;
+    controlsContainer.dispatchEvent(new CustomEvent("translation-presentation-change", { detail: snapshot }));
+  }, [controlsContainer, mode, documentKey, visibleJob, model.reading, model.currentPage, model.language]);
+
+  useEffect(() => () => {
+    controlsContainer.dispatchEvent(new CustomEvent("translation-presentation-change", { detail: null }));
+  }, [controlsContainer]);
 
   useEffect(() => {
     const ticket = ++generationRef.current;
@@ -639,10 +710,22 @@ function TranslationExperience({ model, callbacks, panelContainer }: {
     requestAnimationFrame(() => toggleRef.current?.focus({ preventScroll: true }));
   }
 
+  function changeMode(nextMode: TranslationMode) {
+    setOverlayStatus(null);
+    setMode(nextMode);
+    callbacks.onOpenChange(nextMode === "dual");
+  }
+
+  function openSettings() {
+    changeMode("dual");
+    callbacks.onOpenSettings();
+  }
+
   function source(page: number, rect: TranslationRect | null) {
     if (!activeScope || scopeRef.current !== activeScope || !document || !selectedJob || !jobInScope(selectedJob, document)) return;
     const expectedDocumentId = document.id;
     const expectedSourceSha256 = document.sha256;
+    changeMode("original");
     void callbacks.goToSource(page, rect, expectedDocumentId, expectedSourceSha256);
   }
 
@@ -652,16 +735,53 @@ function TranslationExperience({ model, callbacks, panelContainer }: {
       className="button button-secondary translation-toggle"
       type="button"
       aria-controls={panelContainer.id}
-      aria-expanded={model.open && model.reading}
-      aria-pressed={model.open && model.reading}
+      aria-expanded={model.open && mode === "dual" && model.reading}
+      aria-pressed={model.open && mode === "dual" && model.reading}
       disabled={!model.reading || !document}
-      onClick={() => callbacks.onOpenChange(!model.open)}
+      onClick={() => model.open && mode === "dual" ? closePanel() : changeMode("dual")}
     >
       {copy.translate}
     </button>
   );
+  const currentPageCompleted = Boolean(visibleJob && jobResults(visibleJob).some((page) => page.page === model.currentPage && page.status === "completed"));
+  const overlayNotice = !visibleJob
+    ? copy.noSavedTranslation
+    : isActive(visibleJob)
+      ? copy.stillTranslating
+      : !currentPageCompleted
+        ? copy.currentPageAbsent
+        : overlayStatus?.kind === "partial"
+          ? copy.partialOverlay
+          : overlayStatus?.kind === "unavailable"
+            ? copy.unavailableOverlay
+            : null;
+  const controls = (
+    <>
+      {toggle}
+      <div className="translation-mode-control" role="group" aria-label={copy.readingMode}>
+        {(["original", "dual", "translated"] as const).map((item) => (
+          <button
+            className="button button-quiet translation-mode-button"
+            type="button"
+            aria-pressed={mode === item}
+            disabled={!model.reading || !document}
+            onClick={() => changeMode(item)}
+            key={item}
+          >
+            {copy[`${item}Mode`]}
+          </button>
+        ))}
+      </div>
+      {mode === "translated" && overlayNotice && (
+        <div className="translation-mode-notice" role="status">
+          <span>{overlayNotice}</span>
+          <button className="translation-source-link" type="button" onClick={() => changeMode("dual")}>{copy.showDual}</button>
+        </div>
+      )}
+    </>
+  );
 
-  if (!model.open || !model.reading || !document) return toggle;
+  if (!model.open || mode !== "dual" || !model.reading || !document) return controls;
   const maxPages = Math.min(5, capabilities?.max_pages || 5);
   const formDisabled = Boolean(requestDraft) || pendingAction === "start";
   const operationMessage = operationError === "invalid_pages"
@@ -746,7 +866,7 @@ function TranslationExperience({ model, callbacks, panelContainer }: {
       {capabilities && !capabilities.ready && (
         <div className="translation-unavailable" role="status">
           <p>{capabilities.reason || copy.unavailable}</p>
-          {!capabilities.model_ready && <button className="button button-secondary" type="button" onClick={callbacks.onOpenSettings}>{copy.openSettings}</button>}
+          {!capabilities.model_ready && <button className="button button-secondary" type="button" onClick={openSettings}>{copy.openSettings}</button>}
         </div>
       )}
 
@@ -811,12 +931,12 @@ function TranslationExperience({ model, callbacks, panelContainer }: {
     </div>
   );
 
-  return <>{toggle}{createPortal(panel, panelContainer)}</>;
+  return <>{controls}{createPortal(panel, panelContainer)}</>;
 }
 
 function render(registration: TranslationRegistration, model: TranslationPanelModel) {
   registration.root.render(
-    <TranslationExperience model={model} callbacks={registration.callbacks} panelContainer={registration.panelContainer} />
+    <TranslationExperience model={model} callbacks={registration.callbacks} controlsContainer={registration.controlsContainer} panelContainer={registration.panelContainer} />
   );
 }
 
