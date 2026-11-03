@@ -678,3 +678,17 @@ Existing result items, source kinds, chunk identities and final/history checks r
 No new HTTP endpoint, context/submission field, frontend, schema or dependency.
 This remains literal keyword retrieval, not full-text/semantic/OCR verification.
 Functional, browser, HTTP, PDF and model checks were not run at the user's request.
+# v0.51 isolated server guests
+
+Opt-in `--guest-root` starts a separate loopback guest service; the default local
+and existing owner service remain unchanged. Each opaque HttpOnly guest credential
+selects a stable, isolated Store and service graph. Existing document/notes/files/
+search/export/analysis/Agent APIs retain their paths and operate only in that space.
+
+`GET /api/v1/access` returns guest space metadata; credential-gated
+`POST /api/v1/access/recovery-code` returns a newly rotated recovery credential.
+`POST /api/v1/access/recover` accepts only `{recovery_code}` and returns
+`{workspace_id}` plus a rotated Secure HttpOnly cookie. Recovery consumes its code,
+revokes the prior cookie and preserves record IDs. It never registers a person or
+merges spaces. Recovery/access responses are no-store. Invalid API credentials get
+401; invalid homepage credentials redirect to `/recover.html`. See GUEST-SPACES.md.

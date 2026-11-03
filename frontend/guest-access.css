@@ -1,0 +1,175 @@
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-width: 320px;
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", sans-serif;
+  font-size: 14px;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--ui-focus);
+  outline-offset: 2px;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+h1,
+p {
+  margin: 0;
+}
+
+.recovery-page {
+  min-height: 100vh;
+  padding: 40px 16px;
+  display: grid;
+  place-items: start center;
+}
+
+.recovery-shell {
+  width: min(100%, 440px);
+}
+
+.recovery-header {
+  min-height: 40px;
+  padding-bottom: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.recovery-brand {
+  color: var(--ui-text-soft);
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+}
+
+.recovery-language {
+  min-width: 40px;
+  min-height: 36px;
+  padding: 6px 9px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--ui-text-soft);
+  cursor: pointer;
+}
+
+.recovery-language:hover {
+  background: var(--ui-surface-subtle);
+  border-color: var(--ui-control-border);
+}
+
+.recovery-shell h1 {
+  margin-top: 28px;
+  font-size: 20px;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+}
+
+.recovery-intro {
+  margin-top: 10px;
+  color: var(--ui-text-muted);
+  line-height: 1.7;
+}
+
+#recovery-form {
+  margin-top: 24px;
+}
+
+#recovery-code-label {
+  display: block;
+  margin-bottom: 7px;
+  color: var(--ui-text-soft);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+#recovery-code {
+  width: 100%;
+  min-height: 42px;
+  padding: 9px 11px;
+  border: 1px solid var(--ui-input-border);
+  border-radius: 3px;
+  background: var(--ui-input-bg);
+  color: var(--ui-text);
+}
+
+.recovery-warning {
+  margin-top: 14px;
+  padding-left: 10px;
+  border-left: 2px solid var(--ui-warning);
+  color: var(--ui-text-soft);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.recovery-submit {
+  min-height: 40px;
+  margin-top: 20px;
+  padding: 8px 14px;
+  border: 1px solid var(--ui-primary);
+  border-radius: 3px;
+  background: var(--ui-primary);
+  color: var(--ui-on-primary);
+  cursor: pointer;
+}
+
+.recovery-submit:hover:not(:disabled) {
+  border-color: var(--ui-primary-hover);
+  background: var(--ui-primary-hover);
+}
+
+.recovery-status {
+  min-height: 22px;
+  margin-top: 12px;
+  color: var(--ui-text-muted);
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.recovery-status[data-kind="error"] {
+  color: var(--ui-danger);
+}
+
+@media (max-width: 480px) {
+  .recovery-page {
+    padding: 20px 16px;
+  }
+
+  .recovery-shell h1 {
+    margin-top: 24px;
+    font-size: 18px;
+  }
+
+  #recovery-code,
+  .recovery-submit,
+  .recovery-language {
+    min-height: 44px;
+  }
+}

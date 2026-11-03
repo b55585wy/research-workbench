@@ -1,0 +1,29 @@
+# Public guest origin. Keep the existing authenticated IP owner site separate.
+https://itsyiyi.com {
+ route {
+  @unsafe_cross_site expression `{http.request.header.Sec-Fetch-Site} == "cross-site" && ({method} != "GET" || {http.request.header.Sec-Fetch-Mode} != "navigate" || {http.request.header.Sec-Fetch-Dest} != "document")`
+  respond @unsafe_cross_site "Cross-site request refused." 403
+  @foreign_origin {
+   header Origin *
+   not header Origin https://itsyiyi.com
+  }
+  respond @foreign_origin "Origin not accepted." 403
+  reverse_proxy 127.0.0.1:3151 {
+   header_up Host localhost
+   # Validate at the public edge before removing public-origin browser metadata.
+   header_up -Origin
+   header_up -Sec-Fetch-Site
+   header_up -Authorization
+   header_up -Forwarded
+   header_up -X-Forwarded-For
+   header_up -X-Forwarded-Host
+   header_up -X-Forwarded-Proto
+   header_up -X-Forwarded-Port
+   header_up -X-Forwarded-Ssl
+   header_up -X-Real-IP
+   header_up -Front-End-Https
+   header_down Location "^http://localhost(:[0-9]+)?(/.*)?$" "https://itsyiyi.com$2"
+   header_down Location "^http://127[.]0[.]0[.]1(:[0-9]+)?(/.*)?$" "https://itsyiyi.com$2"
+  }
+ }
+}

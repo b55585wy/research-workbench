@@ -1,4 +1,25 @@
-# 个人服务器部署
+# 当前服务器入口（v0.51）
+
+- `https://itsyiyi.com/`：独立游客服务，免注册，每位访客一份服务器资料空间，
+  各自填写 DeepSeek Key。保存恢复码后可在其他浏览器找回原空间。
+- `https://103.149.91.75/`：原个人服务，继续使用原访问凭据及原资料库。
+  不将已有个人资料分给首位匿名访客，也不继承个人模型配置。
+- 新服务 `research-guests.service` 使用 `research-guests` 系统账号，回环端口
+  `3151`；代码链接为 `/opt/research-workspace/guest-current`，复用现有只读运行时。
+- 游客目录 `/var/lib/research-guests` 是新建 2 GiB ext4 镜像文件系统，
+  挂载 `loop,nodev,nosuid,noexec`。服务启动前必须确认已挂载，不能回退到根文件系统。
+  镜像为 `/var/lib/research-guests-data-v1.img`，挂载项保存在 `/etc/fstab`。
+- 游客注册表与各空间位于 `/var/lib/research-guests/spaces`；上限 32 空间，
+  最多加载 2 个应用实例。进程组内存上限 768 MiB。忙碌与存储不足均明确失败。
+
+游客边界与验收见 [GUEST-SPACES.md](GUEST-SPACES.md)，手机布局见
+[MOBILE-LAYOUT.md](MOBILE-LAYOUT.md)。Caddy 仅将域名上游切到 3151，保留原 IP
+站点的认证和 3150 上游。域名允许正常跨站顶层 GET 导航，其他跨站请求仍拒绝。
+恢复原 Caddy 配置可回到个人模式；不得删除游客镜像或资料目录。
+
+以下为 v0.50 初始个人部署记录；其中“域名与 IP 共用资料库”的描述已由上述入口分离替代。
+
+# 原个人服务器部署
 
 本轮运行于用户指定的 CentOS 7，应用 v0.50.0，代码发布包来自
 `5ab1d09f833c03e3fbd4195c78133aaf6b6d38df`。域名为 `itsyiyi.com`，

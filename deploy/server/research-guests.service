@@ -1,0 +1,51 @@
+[Unit]
+Description=Research Workspace isolated guest spaces (loopback only)
+After=network-online.target
+Wants=network-online.target
+RequiresMountsFor=/var/lib/research-guests
+
+[Service]
+Type=simple
+User=research-guests
+Group=research-guests
+WorkingDirectory=/opt/research-workspace/guest-current
+ExecStartPre=/usr/bin/mountpoint -q /var/lib/research-guests
+ExecStart=/opt/research-workspace/runtimes/app-0.50.0/bin/python -m research_workbench --port 3151 --guest-root /var/lib/research-guests/spaces --rscript /opt/research-workspace/runtimes/rstats-4.6.2/lib/R/bin/Rscript --statistics-root /opt/research-workspace/runtimes/rstats-manifest --import-root /opt/research-workspace/runtimes/import-v1 --translation-runtime /opt/research-workspace/runtimes/mineru-flash-v415-linux
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=LANG=C.UTF-8
+Environment=HOME=/var/lib/research-guests
+Environment=XDG_CACHE_HOME=/var/lib/research-guests/.cache
+Environment=OMP_NUM_THREADS=1
+Environment=OPENBLAS_NUM_THREADS=1
+Environment=MKL_NUM_THREADS=1
+Environment=NUMEXPR_NUM_THREADS=1
+Environment=BLIS_NUM_THREADS=1
+Environment=TOKENIZERS_PARALLELISM=false
+Environment=MALLOC_ARENA_MAX=2
+UMask=0077
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+ProtectSystem=full
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ReadOnlyDirectories=/opt/research-workspace/releases
+ReadOnlyDirectories=/opt/research-workspace/runtimes
+InaccessibleDirectories=/var/lib/research-workspace
+ReadWriteDirectories=/var/lib/research-guests
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+SystemCallArchitectures=native
+MemoryLimit=768M
+LimitNPROC=128
+LimitNOFILE=8192
+KillMode=control-group
+Restart=on-failure
+RestartSec=5
+TimeoutStartSec=60
+TimeoutStopSec=45
+StartLimitInterval=60
+StartLimitBurst=5
+
+[Install]
+WantedBy=multi-user.target

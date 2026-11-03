@@ -26,7 +26,12 @@ authentication and tFUS integration use verified external identity mapping/APIs,
 not shared databases, copied passwords or automatic email/name account merges.
 There is no dependency on tFUS identity or release progress.
 This supersedes this workbench's older tFUS-directory-first planning, without
-changing tFUS's own identity policy. Multi-user access is not implemented yet.
+changing tFUS's own identity policy. The default local mode remains single-user.
+2026-11-04 authorization adds a separate opt-in server guest mode: password-free
+per-guest data isolation and recovery, each guest supplies its own model key.
+Keep the local default and existing owner service/data unchanged. Stable guest
+space IDs permit later explicit verified-account binding; no registration or
+fake authenticated actor is introduced now. See GUEST-SPACES.md for acceptance.
 Reuse PDF.js locally; no external CDN, whole ELN deployment, notebook server,
 shared workspace schema or tFUS queue.
 Read API.md and ACCEPTANCE.md. Implement actual persistence, not mocked success.

@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="referrer" content="no-referrer">
+  <title>找回已有空间 · research workspace</title>
+  <link rel="stylesheet" href="/theme-tokens.css">
+  <link rel="stylesheet" href="/guest-access.css">
+  <script src="/guest-recovery.js" defer></script>
+</head>
+<body>
+  <main class="recovery-page">
+    <div class="recovery-shell">
+      <header class="recovery-header">
+        <span class="recovery-brand">research workspace</span>
+        <button id="recovery-language" class="recovery-language" type="button" aria-label="Switch to English">EN</button>
+      </header>
+      <h1 id="recovery-title">找回已有空间</h1>
+      <p id="recovery-intro" class="recovery-intro">输入你保存的恢复码，以在此浏览器中找回原有游客空间。</p>
+      <form id="recovery-form" novalidate>
+        <label id="recovery-code-label" for="recovery-code">恢复码</label>
+        <input id="recovery-code" name="recovery_code" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" required>
+        <p id="recovery-warning" class="recovery-warning">提交后会切换到找回的空间；请先保存当前编辑。此操作不会合并或删除当前空间。</p>
+        <button id="recovery-submit" class="recovery-submit" type="submit">找回空间</button>
+        <p id="recovery-status" class="recovery-status" role="status" aria-live="polite"></p>
+      </form>
+    </div>
+  </main>
+</body>
+</html>

@@ -1,5 +1,6 @@
 import { flushSync } from "react-dom";
 import { createRoot, type Root } from "react-dom/client";
+import { GuestIdentity } from "./guest-access";
 
 export { mountTranslationPanel } from "./translation";
 export type {
@@ -83,30 +84,16 @@ const documentsOwners = new WeakMap<HTMLUListElement, ShellRegistration>();
 
 const strings = {
   zh: {
-    localGuest: "本地游客",
-    localGuestTitle: "无需登录；数据保存在运行此工作台的电脑上。",
     untitled: "未命名文献",
     documentMenu: "文献操作",
     pages: (count: number) => `${count} 页`
   },
   en: {
-    localGuest: "Local guest",
-    localGuestTitle: "No login required; data is saved on the computer running this workspace.",
     untitled: "Untitled paper",
     documentMenu: "Paper actions",
     pages: (count: number) => `${count} pages`
   }
 } as const;
-
-function Identity({ language }: Pick<WorkspaceShellModel, "language">) {
-  const copy = strings[language];
-  return (
-    <>
-      <span className="brand-name">research workspace</span>
-      <span className="local-guest" title={copy.localGuestTitle}>{copy.localGuest}</span>
-    </>
-  );
-}
 
 function DocumentCatalogue({ model, callbacks }: {
   model: WorkspaceShellModel;
@@ -159,7 +146,7 @@ function DocumentCatalogue({ model, callbacks }: {
 }
 
 function render(registration: ShellRegistration, model: WorkspaceShellModel) {
-  registration.identityRoot.render(<Identity language={model.language} />);
+  registration.identityRoot.render(<GuestIdentity language={model.language} />);
   registration.documentsRoot.render(
     <DocumentCatalogue model={model} callbacks={registration.callbacks} />
   );

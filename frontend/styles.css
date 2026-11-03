@@ -96,6 +96,140 @@ textarea:disabled {
   white-space: nowrap;
 }
 
+.guest-space-badge {
+  padding-block: 2px;
+  border-top: 0;
+  border-right: 0;
+  border-bottom: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.guest-space-badge:hover {
+  color: var(--ui-focus);
+}
+
+.guest-access-unavailable {
+  color: var(--ui-danger);
+}
+
+.guest-access-dialog {
+  width: min(440px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  padding: 20px;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: 5px;
+  background: var(--ui-surface);
+  color: var(--ui-text);
+}
+
+.guest-access-dialog::backdrop {
+  background: var(--ui-backdrop);
+}
+
+.guest-access-dialog-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.guest-access-dialog-heading .button {
+  min-height: 32px;
+  padding-block: 4px;
+}
+
+.guest-access-explanation {
+  margin-top: 14px;
+  color: var(--ui-text-soft);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.guest-access-model,
+.guest-access-code-help {
+  margin-top: 10px;
+  color: var(--ui-text-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.guest-access-recovery {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--ui-border);
+}
+
+.guest-access-recovery .guest-access-code-help {
+  margin-top: 0;
+}
+
+.guest-access-code {
+  display: block;
+  margin-top: 12px;
+  padding: 10px;
+  border: 1px solid var(--ui-input-border);
+  border-radius: 3px;
+  background: var(--ui-input-bg);
+  color: var(--ui-text);
+  font-size: 13px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
+.guest-access-code:focus-visible {
+  outline: 2px solid var(--ui-focus);
+  outline-offset: 2px;
+}
+
+.guest-access-actions {
+  margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.guest-access-rotation {
+  margin-top: 12px;
+  padding-left: 10px;
+  border-left: 2px solid var(--ui-warning);
+  color: var(--ui-text-soft);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.guest-access-status {
+  min-height: 20px;
+  margin-top: 10px;
+  color: var(--ui-text-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.guest-access-status[data-kind="error"] {
+  color: var(--ui-danger);
+}
+
+.guest-access-recover-link {
+  display: inline-block;
+  margin-top: 8px;
+  color: var(--ui-focus);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+@media (max-width: 480px) {
+  .guest-access-dialog {
+    padding: 16px;
+  }
+
+  .guest-access-actions .button {
+    min-height: 42px;
+  }
+}
+
 .brand-mark {
   display: inline-grid;
   place-items: center;
