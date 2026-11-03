@@ -240,6 +240,11 @@ const messages = {
     copyFailed: "复制失败。回答内容未更改，请重试。",
     downloadFailed: "下载失败，请重试。",
     tableScroll: "表格，可水平滚动",
+    markdownUnavailable: "富文本组件不可用；以下保留原始 Markdown 文本。",
+    mathUnavailable: "公式组件不可用；公式按原始文本显示。",
+    tableTooLarge: "表格超过 {columns} 列或 {rows} 行上限，已保留原文且禁用导出。",
+    tableMalformed: "表格行列不完整，已保留原文且禁用导出。",
+    contextComputationGrants: "计算权限：{count} 项数据",
     citationNewTab: "在新标签页打开 {ref} 来源：{label}",
     citationOpen: "打开 {ref} 来源：{label}",
     citationUnverified: "未核实的来源引用",
@@ -608,6 +613,11 @@ const messages = {
     copyFailed: "Copy failed. The answer is unchanged; try again.",
     downloadFailed: "Download failed. Try again.",
     tableScroll: "Table; scroll horizontally",
+    markdownUnavailable: "Rich-text components are unavailable; the original Markdown is preserved below.",
+    mathUnavailable: "Math components are unavailable; formulas are shown as source text.",
+    tableTooLarge: "The table exceeds the {columns}-column or {rows}-row limit. Its source is preserved and export is disabled.",
+    tableMalformed: "The table has inconsistent rows or columns. Its source is preserved and export is disabled.",
+    contextComputationGrants: "Computation grants: {count} datasets",
     citationNewTab: "Open {ref} source in a new tab: {label}",
     citationOpen: "Open {ref} source: {label}",
     citationUnverified: "Unverified source citation",
@@ -761,8 +771,11 @@ export function createAssistant(adapter) {
     heading: byId("assistant-heading"),
     history: byId("assistant-history"),
     new: byId("assistant-new"),
+    managementSummary: byId("assistant-management-summary"),
     context: byId("assistant-context"),
     messages: byId("assistant-messages"),
+    sourcesDetails: byId("assistant-sources-details"),
+    sourcesSummary: byId("assistant-sources-summary"),
     sources: byId("assistant-sources"),
     proposals: byId("assistant-proposals"),
     status: byId("assistant-status"),
@@ -944,6 +957,7 @@ export function createAssistant(adapter) {
     const paper = adapter.getDocument();
     if (!paper) {
       elements.context.textContent = t("noDocument");
+      elements.managementSummary.textContent = t("noDocument");
       return;
     }
     const context = adapter.getContext();
@@ -972,8 +986,11 @@ export function createAssistant(adapter) {
       }));
     }
     if (adapter.getActiveAnalysisId?.()) badges.push(t("contextAnalysis"));
-    const resourceRefCount = pendingContext ? pendingContext.resource_refs?.length || 0 : entry?.resourceRefs.length || 0;
-    if (resourceRefCount) badges.push(t("contextResourceReferences", { count: resourceRefCount }));
+    const resourceRefs = pendingContext ? pendingContext.resource_refs || [] : entry?.resourceRefs || [];
+    if (resourceRefs.length) badges.push(t("contextResourceReferences", { count: resourceRefs.length }));
+    const computationGrantCount = resourceRefs.filter((reference) => reference.kind === "dataset" && reference.allow_analysis === true).length;
+    if (computationGrantCount) badges.push(t("contextComputationGrants", { count: computationGrantCount }));
+    elements.managementSummary.textContent = badges.join(" · ");
     for (const label of badges) {
       const badge = document.createElement("span");
       badge.className = "assistant-context-badge";
@@ -1543,16 +1560,18 @@ export function createAssistant(adapter) {
     const expanded = new Set([...elements.sources.querySelectorAll("details[data-source-detail][open]")].map((details) => details.dataset.sourceDetail));
     elements.sources.replaceChildren();
     const sources = (Array.isArray(turn?.sources) ? turn.sources : []).filter((source) => source && typeof source === "object");
-    if (!sources.length) return;
+    elements.sourcesDetails.hidden = !sources.length;
+    elements.sourcesSummary.textContent = `${t("sources")} (${sources.length})`;
+    if (!sources.length) {
+      elements.sourcesDetails.open = false;
+      return;
+    }
     const citedRefs = new Set();
     for (const marker of String(turn.answer || "").matchAll(/\[R\d+(?:\s*,\s*R\d+)*\]/g)) {
       for (const ref of marker[0].matchAll(/R\d+/g)) citedRefs.add(ref[0]);
     }
     const cited = sources.filter((source) => source.ref && citedRefs.has(source.ref));
     const uncited = sources.filter((source) => !source.ref || !citedRefs.has(source.ref));
-    const heading = document.createElement("h3");
-    heading.textContent = t("sources");
-    elements.sources.append(heading);
     if (cited.length) {
       const list = document.createElement("ul");
       list.className = "assistant-cited-sources";

@@ -479,6 +479,49 @@ h3 {
   font-size: 12px;
 }
 
+#documents-list .document-item {
+  height: 58px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+#documents-list .document-open {
+  height: 58px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+#documents-list .document-name,
+#documents-list .document-meta {
+  min-width: 0;
+  overflow: hidden;
+  overflow-wrap: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#documents-list .document-name {
+  line-height: 20px;
+}
+
+#documents-list .document-meta {
+  line-height: 18px;
+}
+
+#documents-list .document-menu-button {
+  height: 40px;
+  min-height: 40px;
+}
+
+#documents-list :is(.document-open, .document-menu-button):focus-visible {
+  outline-offset: -3px;
+}
+
+#review-explainer,
+#study-review-explainer {
+  display: none;
+}
+
 .reader-panel {
   min-width: 0;
   display: flex;
@@ -1964,6 +2007,17 @@ h3 {
   width: 16px;
   height: 16px;
   color: currentColor;
+}
+
+.reader-object-copy-preview {
+  position: absolute;
+  z-index: 5;
+  box-sizing: border-box;
+  border: 2px dashed var(--ui-primary);
+  outline: 2px solid #ffffff;
+  outline-offset: 1px;
+  background: transparent;
+  pointer-events: none;
 }
 
 .reader-object-menu {

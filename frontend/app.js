@@ -438,7 +438,6 @@ const messages = {
     regions_timeout: "表格识别超时，请重试或手动截取。",
     regions_unavailable: "表格识别暂时不可用，请手动截取。",
     regions_failed: "表格识别失败，请重试或手动截取。",
-    navigationSaveOrCancel: "有未保存的批注、截图或正在保存的修改。请先保存或取消，再切换工作区。",
     navigationPendingWrite: "有修改正在保存或处理。请等待保存完成，再切换工作区。",
     navigationDrawing: "有未保存的批注。请先保存或取消当前批注，再切换工作区。",
     navigationScreenshot: "有截图预览尚未处理。请先添加或取消截图，再切换工作区。",
@@ -568,7 +567,7 @@ const messages = {
     saveEdit: "Save changes",
     retryEdit: "Retry saving changes",
     reviewExplainer: "“Source checked” only records that you checked the source; it is not authenticated review or scientific validation.",
-    reviewUnreviewed: "Needs checking",
+    reviewUnreviewed: "Pending source check",
     reviewChecked: "Source checked",
     markChecked: "Mark source checked",
     markUnchecked: "Mark needs checking",
@@ -855,7 +854,6 @@ const messages = {
     regions_timeout: "Table recognition timed out. Retry or capture manually.",
     regions_unavailable: "Table recognition is unavailable. Capture the region manually.",
     regions_failed: "Table recognition failed. Retry or capture manually.",
-    navigationSaveOrCancel: "Unsaved annotations, a capture, or a pending save must be saved or cancelled before changing workspaces.",
     navigationPendingWrite: "Changes are being saved or processed. Wait for saving to finish before changing workspaces.",
     navigationDrawing: "There are unsaved annotations. Save or cancel the current drawing before changing workspaces.",
     navigationScreenshot: "A screenshot preview is waiting. Add or cancel the screenshot before changing workspaces.",
@@ -1193,7 +1191,7 @@ function renderStatus() {
 function applyLanguage() {
   readerObjects?.close();
   document.documentElement.lang = state.language === "zh" ? "zh-CN" : "en";
-  document.title = `${t("pageTitle")} · Synrise Neuro`;
+  document.title = `${t("pageTitle")} · research workspace`;
   document.querySelectorAll("[data-i18n]").forEach((node) => {
     node.textContent = t(node.dataset.i18n);
   });
@@ -1458,6 +1456,7 @@ function renderDocuments() {
     const name = window.document.createElement("span");
     name.className = "document-name";
     name.textContent = document.title || document.original_filename || t("untitled");
+    button.title = name.textContent;
     const meta = window.document.createElement("span");
     meta.className = "document-meta";
     meta.textContent = t("pages", { count: document.page_count });

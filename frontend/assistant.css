@@ -41,12 +41,13 @@
 .assistant-header {
   flex: none;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 4px 8px;
   min-width: 0;
-  min-height: 52px;
-  padding: 8px 12px 8px 16px;
+  min-height: 44px;
+  padding: 6px 8px 6px 12px;
   border-bottom: 1px solid var(--ui-border);
   cursor: move;
   touch-action: none;
@@ -66,62 +67,80 @@
 }
 
 .assistant-header h2 {
+  flex: 1 1 auto;
   min-width: 0;
   overflow-wrap: anywhere;
-  font-size: 16px;
+  font-size: 15px;
 }
 
 .assistant-header-actions {
-  flex: none;
+  flex: 0 1 auto;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 4px;
-}
-
-#assistant-full-page {
-  padding: 5px 8px;
-  font-size: 12px;
-  white-space: nowrap;
-}
-
-#assistant-close {
-  width: 36px;
-  padding: 4px;
-  font-size: 22px;
-}
-
-.assistant-toolbar {
-  flex: none;
-  display: flex;
-  gap: 6px;
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--ui-border);
+  justify-content: flex-end;
+  gap: 3px;
 }
 
 #assistant-history {
-  flex: 1;
-  min-width: 0;
-  min-height: 36px;
-  padding: 6px 8px;
+  flex: 0 1 132px;
+  width: 132px;
+  min-width: 72px;
+  min-height: 30px;
+  padding: 4px 6px;
   border: 1px solid var(--ui-input-border);
   border-radius: 3px;
   background: var(--ui-input-bg);
   color: var(--ui-text);
+  font-size: 11px;
 }
 
-#assistant-new {
-  flex: none;
+#assistant-new,
+#assistant-full-page {
+  min-height: 30px;
+  padding: 3px 6px;
+  font-size: 11px;
   white-space: nowrap;
 }
 
-.assistant-context {
+#assistant-close {
+  width: 30px;
+  min-height: 30px;
+  padding: 2px;
+  font-size: 20px;
+}
+
+.assistant-management {
   flex: none;
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.assistant-management > summary {
+  padding: 6px 12px;
+  overflow: hidden;
+  color: var(--ui-text-soft);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.assistant-management[open] {
+  flex: 0 1 auto;
+  max-height: 45%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.assistant-management-body {
+  padding: 0 12px 8px;
+}
+
+.assistant-context {
   display: flex;
   flex-wrap: wrap;
   gap: 5px;
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--ui-border);
-  background: var(--ui-surface-subtle);
+  padding: 4px 0 8px;
   color: var(--ui-text-soft);
   font-size: 11px;
   line-height: 1.45;
@@ -177,17 +196,24 @@
 }
 
 .assistant-user-message {
+  padding: 6px 9px;
   background: var(--ui-selected);
+  font-size: 12px;
 }
 
 .assistant-answer {
-  margin-top: 8px;
+  margin-top: 6px;
   background: var(--ui-surface-subtle);
+  font-size: 14px;
 }
 
-.assistant-user-message p,
-.assistant-answer p {
-  margin-top: 4px;
+.assistant-answer > strong {
+  color: var(--ui-text-muted);
+  font-size: 11px;
+}
+
+.assistant-user-message p {
+  margin: 3px 0 0;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
 }
@@ -199,12 +225,72 @@
   max-width: 100%;
 }
 
-.assistant-answer-text {
-  margin-bottom: 8px;
+.assistant-answer-content {
+  margin-top: 4px;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
 }
 
-.assistant-answer-text:last-child {
+.assistant-answer-content > :first-child {
+  margin-top: 0;
+}
+
+.assistant-answer-content > :last-child {
   margin-bottom: 0;
+}
+
+.assistant-answer-content p {
+  margin: 0 0 10px;
+  white-space: normal;
+}
+
+.assistant-answer-content :where(h1, h2, h3, h4, h5, h6) {
+  margin: 15px 0 7px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.assistant-answer-content h1 { font-size: 1.4em; }
+.assistant-answer-content h2 { font-size: 1.3em; }
+.assistant-answer-content h3 { font-size: 1.2em; }
+.assistant-answer-content h4 { font-size: 1.1em; }
+.assistant-answer-content h5,
+.assistant-answer-content h6 { font-size: 1em; }
+
+.assistant-answer-content :where(ul, ol) {
+  margin: 0 0 10px;
+  padding-left: 1.7em;
+}
+
+.assistant-answer-content li + li {
+  margin-top: 3px;
+}
+
+.assistant-answer-content li > :where(ul, ol) {
+  margin: 4px 0;
+}
+
+.assistant-answer-content blockquote {
+  margin: 10px 0;
+  padding: 4px 10px;
+  border-left: 3px solid var(--ui-border-strong);
+  background: var(--ui-surface);
+  color: var(--ui-text-soft);
+}
+
+.assistant-answer-content blockquote > :last-child {
+  margin-bottom: 0;
+}
+
+.assistant-answer-content a {
+  color: var(--ui-agent-link, var(--ui-primary));
+}
+
+.assistant-answer-content .assistant-answer-link-disabled {
+  border-bottom: 1px dashed var(--ui-danger);
+  color: var(--ui-text-muted);
+  text-decoration: none;
+  cursor: text;
 }
 
 .assistant-answer-content code {
@@ -213,6 +299,70 @@
   background: var(--ui-agent-pre-bg, var(--ui-surface-muted));
   font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
   font-size: 0.92em;
+}
+
+.assistant-answer-content pre {
+  max-width: 100%;
+  max-height: 320px;
+  margin: 9px 0;
+  padding: 9px 10px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--ui-agent-code-border, var(--ui-border));
+  border-radius: 3px;
+  background: var(--ui-agent-pre-bg, var(--ui-surface-muted));
+  font: 12px/1.55 ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  tab-size: 2;
+  white-space: pre;
+}
+
+.assistant-answer-content pre code {
+  padding: 0;
+  background: transparent;
+  font: inherit;
+}
+
+.assistant-answer-content pre:focus-visible {
+  outline: 2px solid var(--ui-focus);
+  outline-offset: 2px;
+}
+
+.assistant-answer-content .assistant-answer-plain {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.assistant-answer-content .assistant-rendering-notice {
+  margin: 0 0 8px;
+  padding: 6px 8px;
+  border-left: 3px solid var(--ui-border-strong);
+  background: var(--ui-surface);
+  color: var(--ui-text-soft);
+  font-size: 12px;
+}
+
+.assistant-answer-content .katex {
+  font-size: 1em;
+}
+
+.assistant-answer-content :not(.katex-display) > .katex {
+  display: inline-block;
+  max-width: 100%;
+  overflow-x: auto;
+  vertical-align: bottom;
+}
+
+.assistant-answer-content .katex-display {
+  max-width: 100%;
+  max-height: 320px;
+  padding: 3px 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.assistant-answer-content .katex-error {
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .assistant-citation {
@@ -360,6 +510,18 @@
   border-top: 1px solid var(--ui-border);
 }
 
+.assistant-sources-details[hidden] {
+  display: none;
+}
+
+.assistant-sources-details > summary {
+  padding: 8px 12px;
+  color: var(--ui-text-soft);
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
 .assistant-sources,
 .assistant-proposals {
   padding: 0 12px;
@@ -370,7 +532,6 @@
   padding: 0;
 }
 
-.assistant-sources h3,
 .assistant-proposals > h3 {
   padding-top: 10px;
 }
@@ -563,7 +724,8 @@
 
 .assistant-form {
   flex: none;
-  padding: 0 12px 10px;
+  padding: 10px 12px;
+  background: var(--ui-surface);
 }
 
 #assistant-note-references {
@@ -669,11 +831,12 @@
 
 .assistant-settings {
   flex: none;
+  margin-top: 4px;
   border-top: 1px solid var(--ui-border);
 }
 
 #assistant-settings-toggle {
-  padding: 10px 12px;
+  padding: 8px 0;
   color: var(--ui-text-soft);
   font-size: 12px;
   font-weight: 650;
@@ -681,7 +844,7 @@
 }
 
 .assistant-settings-form {
-  padding: 0 12px 12px;
+  padding: 0 0 8px;
 }
 
 #assistant-settings-help {
@@ -737,8 +900,8 @@
 }
 
 .assistant-settings[open] {
-  max-height: 50%;
-  overflow-y: auto;
+  max-height: none;
+  overflow: visible;
 }
 
 .assistant-resize {
@@ -802,10 +965,8 @@
   background: var(--ui-primary);
 }
 
-:root .assistant-panel[data-compact="true"] .assistant-form {
-  flex: 0 1 auto;
-  min-height: 0;
-  overflow-y: auto;
+:root .assistant-panel[data-compact="true"] .assistant-management[open] {
+  max-height: 38%;
 }
 
 :root .assistant-panel[data-compact="true"] #assistant-message {
@@ -813,10 +974,8 @@
 }
 
 @media (max-height: 480px) {
-  .assistant-form {
-    flex: 0 1 auto;
-    min-height: 0;
-    overflow-y: auto;
+  .assistant-management[open] {
+    max-height: 34%;
   }
 
   #assistant-message {

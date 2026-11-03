@@ -80,6 +80,7 @@ export function createReaderObjectMenu({
   let current = null;
   let openSequence = 0;
   let returnFocus = null;
+  let objectPreview = null;
 
   function isCurrent(context) {
     const owner = getDocument();
@@ -93,10 +94,33 @@ export function createReaderObjectMenu({
     );
   }
 
+  function clearObjectPreview() {
+    objectPreview?.remove();
+    objectPreview = null;
+  }
+
+  function showObjectPreview(context) {
+    clearObjectPreview();
+    if (current !== context || !context.object || !["image", "table"].includes(context.object.kind) || !isCurrent(context)) return;
+    const rect = normalizedRect(context.object.rect);
+    const surface = context.record.surface;
+    if (!rect || !surface?.isConnected) return;
+    const preview = document.createElement("div");
+    preview.className = "reader-object-copy-preview";
+    preview.setAttribute("aria-hidden", "true");
+    preview.style.left = `${rect[0] * 100}%`;
+    preview.style.top = `${rect[1] * 100}%`;
+    preview.style.width = `${(rect[2] - rect[0]) * 100}%`;
+    preview.style.height = `${(rect[3] - rect[1]) * 100}%`;
+    surface.append(preview);
+    objectPreview = preview;
+  }
+
   function close(restoreFocus = false) {
     openSequence += 1;
     current?.controller.abort();
     current = null;
+    clearObjectPreview();
     menu.hidden = true;
     if (restoreFocus && returnFocus?.isConnected) returnFocus.focus({ preventScroll: true });
     returnFocus = null;
@@ -172,6 +196,7 @@ export function createReaderObjectMenu({
   }
 
   function renderMenu(context, { loading = false, error = null } = {}) {
+    clearObjectPreview();
     menu.setAttribute("aria-label", t("objectActions"));
     menu.replaceChildren();
     if (loading || error || !context.object) {
@@ -186,6 +211,7 @@ export function createReaderObjectMenu({
       appendAction("captureAddAgent", "agent");
       appendAction("captureAddNote", "note");
       appendAction("objectCopy", "copy");
+      showObjectPreview(context);
     } else if (!loading) {
       appendAction("objectManualCapture", "manual");
     }

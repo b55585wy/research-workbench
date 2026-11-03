@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light">
-  <title>文献与笔记 · Synrise Neuro</title>
+  <title>文献与笔记 · research workspace</title>
   <link rel="stylesheet" href="/theme-tokens.css">
   <link rel="stylesheet" href="/pdf-text-layer.css">
   <link rel="stylesheet" href="/pdf-annotation-layer.css">
@@ -20,6 +20,8 @@
   <link rel="stylesheet" href="/charts.css">
   <link rel="stylesheet" href="/research-record.css">
   <link rel="stylesheet" href="/study.css">
+  <link rel="stylesheet" href="/vendor/assistant-markdown/katex.min.css">
+  <link rel="stylesheet" href="/vendor/assistant-markdown/texmath.css">
   <link rel="stylesheet" href="/assistant.css">
   <link rel="stylesheet" href="/task-client.css">
   <link rel="stylesheet" href="/rich-text.css">
@@ -27,8 +29,8 @@
 </head>
 <body>
   <header class="app-header">
-    <div class="brand" aria-label="Synrise Neuro">
-      <span>Synrise Neuro</span>
+    <div class="brand" aria-label="research workspace">
+      <span>research workspace</span>
     </div>
     <h1 data-i18n="pageTitle">文献与笔记</h1>
     <div class="header-controls">
@@ -797,7 +799,7 @@
         </div>
         <p id="notes-filter-status" class="notes-filter-status" role="status" aria-live="polite"></p>
       </section>
-      <p class="review-explainer" data-i18n="reviewExplainer">“已核对原文”仅表示你检查了来源，不代表身份认证或科学验证。</p>
+      <p id="review-explainer" class="review-explainer" data-i18n="reviewExplainer">“已核对原文”仅表示你检查了来源，不代表身份认证或科学验证。</p>
       <div id="notes-empty" class="notes-empty" data-i18n="emptyNotes">这篇文献还没有笔记。</div>
       <ul id="notes-list" class="notes-list" data-testid="notes-list" aria-label="已保存笔记"></ul>
       <details id="deleted-notes" class="deleted-notes" hidden>
@@ -813,41 +815,65 @@
     <div class="assistant-header" role="group" tabindex="0" aria-label="移动助手窗口" aria-describedby="assistant-window-help" aria-keyshortcuts="ArrowLeft ArrowRight ArrowUp ArrowDown" title="拖动标题栏移动；聚焦后使用方向键移动。">
       <h2 id="assistant-heading">研究助手</h2>
       <div class="assistant-header-actions">
+        <label class="sr-only" for="assistant-history">对话记录</label>
+        <select id="assistant-history" aria-label="对话记录"></select>
+        <button id="assistant-new" class="button button-quiet" type="button">新对话</button>
         <button id="assistant-full-page" class="button button-quiet" type="button" aria-label="全屏" aria-pressed="false" title="全屏">全屏</button>
         <button id="assistant-close" class="button button-quiet" type="button" aria-label="关闭研究助手">×</button>
       </div>
     </div>
     <p id="assistant-window-help" class="sr-only">拖动标题栏空白区域移动窗口。聚焦标题栏后使用方向键移动，按住 Shift 加速。聚焦右下角调整大小手柄后，使用方向键调整宽度和高度。全屏或窄屏时不能手动移动或调整大小。</p>
-    <div class="assistant-toolbar">
-      <label class="sr-only" for="assistant-history">对话记录</label>
-      <select id="assistant-history" aria-label="对话记录"></select>
-      <button id="assistant-new" class="button button-quiet" type="button">新对话</button>
-    </div>
+    <details id="assistant-management" class="assistant-management">
+      <summary id="assistant-management-summary">上下文与设置</summary>
+      <div class="assistant-management-body">
+        <div id="assistant-context" class="assistant-context" aria-live="polite"></div>
+        <section id="assistant-task" class="assistant-task" aria-label="连续任务" hidden>
+          <div id="assistant-task-card" class="assistant-task-card"></div>
+        </section>
+        <label class="assistant-task-option" for="assistant-continue-task">
+          <input id="assistant-continue-task" type="checkbox" aria-describedby="assistant-continue-task-help" disabled>
+          <span>连续完成分析、图表和笔记</span>
+        </label>
+        <p id="assistant-continue-task-help" class="assistant-task-option-help">默认关闭。开启后仍须逐一确认每次分析、图表和笔记写入。</p>
+        <div class="assistant-reference-add-row">
+          <button id="assistant-add-references" class="button button-secondary" type="button" aria-haspopup="dialog" aria-controls="assistant-reference-picker">添加资料</button>
+        </div>
+        <p id="assistant-resource-reference-help" class="assistant-resource-reference-help" hidden>固定的资料会在发送时提供给助手；论文按页读取，数据仅提供字段和少量样本行。</p>
+        <div id="assistant-resource-references" class="assistant-resource-references" aria-label="已加入的资料" aria-live="polite"></div>
+        <div id="assistant-note-references" aria-label="已加入的笔记来源" aria-live="polite"></div>
+        <div id="assistant-reader-actions" class="assistant-reader-actions" aria-label="已加入的原文操作" aria-live="polite"></div>
+        <details id="assistant-settings" class="assistant-settings">
+          <summary id="assistant-settings-toggle">本地模型设置</summary>
+          <form id="assistant-settings-form" class="assistant-settings-form">
+            <p id="assistant-settings-help">设置仅保存在此研究工作台的私有配置中。</p>
+            <label for="assistant-provider-url">API 地址（HTTPS）</label>
+            <input id="assistant-provider-url" type="url" inputmode="url" autocomplete="off" placeholder="https://…">
+            <label for="assistant-provider-model">模型</label>
+            <input id="assistant-provider-model" type="text" maxlength="200" autocomplete="off">
+            <label for="assistant-provider-key">API 密钥</label>
+            <input id="assistant-provider-key" type="password" autocomplete="new-password">
+            <label class="assistant-vision-option" for="assistant-provider-images">
+              <input id="assistant-provider-images" type="checkbox">
+              <span>此模型接受图片输入</span>
+            </label>
+            <div id="assistant-settings-status" class="assistant-settings-status" role="status" aria-live="polite"></div>
+            <button id="assistant-provider-save" class="button button-secondary" type="submit">保存模型设置</button>
+          </form>
+        </details>
+      </div>
+    </details>
     <div id="assistant-scroll" class="assistant-scroll" tabindex="0">
-      <div id="assistant-context" class="assistant-context" aria-live="polite"></div>
-      <section id="assistant-task" class="assistant-task" aria-label="连续任务" hidden>
-        <div id="assistant-task-card" class="assistant-task-card"></div>
-      </section>
       <div id="assistant-messages" class="assistant-messages" aria-live="polite"></div>
       <section class="assistant-results" aria-label="助手结果">
         <div id="assistant-proposals" class="assistant-proposals"></div>
-        <div id="assistant-sources" class="assistant-sources"></div>
+        <details id="assistant-sources-details" class="assistant-sources-details">
+          <summary id="assistant-sources-summary">来源</summary>
+          <div id="assistant-sources" class="assistant-sources"></div>
+        </details>
       </section>
-      <div id="assistant-status" class="assistant-status" role="status" aria-live="polite"></div>
     </div>
+    <div id="assistant-status" class="assistant-status" role="status" aria-live="polite"></div>
     <form id="assistant-form" class="assistant-form">
-      <label class="assistant-task-option" for="assistant-continue-task">
-        <input id="assistant-continue-task" type="checkbox" aria-describedby="assistant-continue-task-help" disabled>
-        <span>连续完成分析、图表和笔记</span>
-      </label>
-      <p id="assistant-continue-task-help" class="assistant-task-option-help">默认关闭。开启后仍须逐一确认每次分析、图表和笔记写入。</p>
-      <div class="assistant-reference-add-row">
-        <button id="assistant-add-references" class="button button-secondary" type="button" aria-haspopup="dialog" aria-controls="assistant-reference-picker">添加资料</button>
-      </div>
-      <p id="assistant-resource-reference-help" class="assistant-resource-reference-help" hidden>固定的资料会在发送时提供给助手；论文按页读取，数据仅提供字段和少量样本行。</p>
-      <div id="assistant-resource-references" class="assistant-resource-references" aria-label="已加入的资料" aria-live="polite"></div>
-      <div id="assistant-note-references" aria-label="已加入的笔记来源" aria-live="polite"></div>
-      <div id="assistant-reader-actions" class="assistant-reader-actions" aria-label="已加入的原文操作" aria-live="polite"></div>
       <label class="sr-only" for="assistant-message">给研究助手的消息</label>
       <textarea id="assistant-message" rows="4" maxlength="8000" placeholder="询问当前页面或已选图片…"></textarea>
       <div class="assistant-send-row">
@@ -855,24 +881,6 @@
         <button id="assistant-send" class="button button-primary" type="submit">发送</button>
       </div>
     </form>
-    <details id="assistant-settings" class="assistant-settings">
-      <summary id="assistant-settings-toggle">本地模型设置</summary>
-      <form id="assistant-settings-form" class="assistant-settings-form">
-        <p id="assistant-settings-help">设置仅保存在此研究工作台的私有配置中。</p>
-        <label for="assistant-provider-url">API 地址（HTTPS）</label>
-        <input id="assistant-provider-url" type="url" inputmode="url" autocomplete="off" placeholder="https://…">
-        <label for="assistant-provider-model">模型</label>
-        <input id="assistant-provider-model" type="text" maxlength="200" autocomplete="off">
-        <label for="assistant-provider-key">API 密钥</label>
-        <input id="assistant-provider-key" type="password" autocomplete="new-password">
-        <label class="assistant-vision-option" for="assistant-provider-images">
-          <input id="assistant-provider-images" type="checkbox">
-          <span>此模型接受图片输入</span>
-        </label>
-        <div id="assistant-settings-status" class="assistant-settings-status" role="status" aria-live="polite"></div>
-        <button id="assistant-provider-save" class="button button-secondary" type="submit">保存模型设置</button>
-      </form>
-    </details>
     <button id="assistant-resize-left" class="assistant-resize-edge assistant-resize-left" type="button" aria-label="从左侧调整助手窗口宽度" aria-describedby="assistant-window-help" aria-keyshortcuts="ArrowLeft ArrowRight" title="拖动或使用左右方向键调整宽度；保持右边缘不动"><span aria-hidden="true"></span></button>
     <button id="assistant-resize-right" class="assistant-resize-edge assistant-resize-right" type="button" aria-label="从右侧调整助手窗口宽度" aria-describedby="assistant-window-help" aria-keyshortcuts="ArrowLeft ArrowRight" title="拖动或使用左右方向键调整宽度；保持左边缘不动"><span aria-hidden="true"></span></button>
     <button id="assistant-resize" class="assistant-resize" type="button" aria-label="调整助手窗口大小" aria-describedby="assistant-window-help" aria-keyshortcuts="ArrowLeft ArrowRight ArrowUp ArrowDown" title="拖动或使用方向键调整窗口大小"><span aria-hidden="true">◢</span></button>
@@ -1053,6 +1061,10 @@
     </form>
   </dialog>
 
+  <script src="/vendor/assistant-markdown/markdown-it.min.js"></script>
+  <script src="/vendor/assistant-markdown/katex.min.js"></script>
+  <script src="/vendor/assistant-markdown/texmath.js"></script>
+  <script src="/vendor/assistant-markdown/purify.min.js"></script>
   <script type="module" src="/app.js"></script>
 </body>
 </html>

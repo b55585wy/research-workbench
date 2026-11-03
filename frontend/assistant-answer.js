@@ -1,3 +1,5 @@
+import { renderAssistantMarkdown } from "/assistant-markdown.js";
+
 const MAX_COLUMNS = 20;
 const MAX_ROWS = 200;
 
@@ -51,14 +53,13 @@ function closingBacktickRun(text, index, length) {
   return -1;
 }
 
-function splitTableRow(line) {
+function tableRowCells(line) {
   const cells = [];
   let cell = "";
-  let hasPipe = false;
   let index = 0;
   while (index < line.length) {
-    if (line[index] === "\\" && line[index + 1] === "|") {
-      cell += "\\|";
+    if (line[index] === "\\" && index + 1 < line.length) {
+      cell += line.slice(index, index + 2);
       index += 2;
       continue;
     }
@@ -75,7 +76,6 @@ function splitTableRow(line) {
       continue;
     }
     if (line[index] === "|") {
-      hasPipe = true;
       cells.push(cell);
       cell = "";
       index += 1;
@@ -86,29 +86,29 @@ function splitTableRow(line) {
   }
   cells.push(cell);
   if (/^\s*\|/.test(line) && cells[0]?.trim() === "") cells.shift();
-  if (/\|\s*$/.test(line) && cells.at(-1)?.trim() === "") cells.pop();
-  return { cells: cells.map((value) => value.trim()), hasPipe };
+  const trailingPipe = /\|\s*$/.test(line) ? line.lastIndexOf("|") : -1;
+  let precedingBackslashes = 0;
+  while (trailingPipe - precedingBackslashes - 1 >= 0 && line[trailingPipe - precedingBackslashes - 1] === "\\") precedingBackslashes += 1;
+  if (trailingPipe >= 0 && precedingBackslashes % 2 === 0 && cells.at(-1)?.trim() === "") cells.pop();
+  return cells;
 }
 
-function parseTable(lines, start) {
-  if (start + 1 >= lines.length) return null;
-  const header = splitTableRow(lines[start]);
-  const separator = splitTableRow(lines[start + 1]);
-  if (!header.hasPipe || !separator.hasPipe || !header.cells.length || header.cells.length !== separator.cells.length) return null;
-  if (!separator.cells.every((cell) => /^:?-{3,}:?$/.test(cell))) return null;
-  const alignments = separator.cells.map((cell) => cell.startsWith(":") && cell.endsWith(":") ? "center" : cell.endsWith(":") ? "right" : cell.startsWith(":") ? "left" : null);
-  const rows = [];
-  let malformed = header.cells.length > MAX_COLUMNS;
-  let end = start + 2;
-  while (end < lines.length && lines[end].trim()) {
-    const row = splitTableRow(lines[end]);
-    if (!row.hasPipe) break;
-    if (row.cells.length !== header.cells.length) malformed = true;
-    rows.push(row.cells);
-    if (rows.length > MAX_ROWS) malformed = true;
-    end += 1;
+function tableProblem(table, rawSource) {
+  const headerRows = [...(table.tHead?.rows || [])];
+  const bodyRows = [...table.tBodies].flatMap((body) => [...body.rows]);
+  const columns = headerRows.length === 1 ? headerRows[0].cells.length : 0;
+  if (columns > MAX_COLUMNS || bodyRows.length > MAX_ROWS) return "tableTooLarge";
+  if (!columns || bodyRows.some((row) => row.cells.length !== columns)) return "tableMalformed";
+  if (rawSource) {
+    const lines = rawSource.split("\n");
+    if (lines.length - 2 > MAX_ROWS) return "tableTooLarge";
+    if (lines.length < 2) return "tableMalformed";
+    const headers = tableRowCells(lines[0]);
+    const separator = tableRowCells(lines[1]);
+    if (headers.length > MAX_COLUMNS) return "tableTooLarge";
+    if (headers.length !== separator.length || lines.slice(2).some((line) => tableRowCells(line).length !== headers.length)) return "tableMalformed";
   }
-  return { headers: header.cells, alignments, rows, malformed, end };
+  return null;
 }
 
 function sourceMap(sources) {
@@ -180,75 +180,91 @@ function appendCitations(container, text, options, usedSources) {
   if (cursor < text.length) container.append(document.createTextNode(text.slice(cursor)));
 }
 
-function appendInline(container, text, options, usedSources) {
-  let plain = "";
-  let index = 0;
-  const flush = () => {
-    if (!plain) return;
-    appendCitations(container, plain, options, usedSources);
-    plain = "";
-  };
-  while (index < text.length) {
-    if (text[index] === "\\" && text[index + 1] === "|") {
-      plain += "|";
-      index += 2;
-      continue;
-    }
-    if (text[index] === "`") {
-      const run = backtickRun(text, index);
-      const closing = closingBacktickRun(text, index + run, run);
-      if (closing >= 0) {
-        flush();
-        const code = document.createElement("code");
-        code.textContent = text.slice(index + run, closing);
-        container.append(code);
-        index = closing + run;
-        continue;
-      }
-    }
-    plain += text[index];
-    index += 1;
+function enhanceCitations(root, options, usedSources, skipTables = false) {
+  const citationLinks = [...root.querySelectorAll("a")].filter((link) => {
+    if (!/^(?:R\d+(?:\s*,\s*R\d+)*|\[R\d+(?:\s*,\s*R\d+)*\])$/.test(link.textContent || "")) return false;
+    if (link.closest("pre, code, .katex, .katex-error, .math, script, style")) return false;
+    return !skipTables || !link.closest("table");
+  });
+  for (const link of citationLinks) {
+    const fragment = document.createDocumentFragment();
+    appendCitationMarker(fragment, link.textContent, options, usedSources);
+    link.replaceWith(fragment);
   }
-  flush();
+  const candidates = [];
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+    acceptNode(node) {
+      if (!node.nodeValue || !/\[R\d+(?:\s*,\s*R\d+)*\]/.test(node.nodeValue)) return NodeFilter.FILTER_REJECT;
+      const parent = node.parentElement;
+      if (!parent || parent.closest("pre, code, a, .katex, .katex-error, .math, script, style")) return NodeFilter.FILTER_REJECT;
+      if (skipTables && parent.closest("table")) return NodeFilter.FILTER_REJECT;
+      return NodeFilter.FILTER_ACCEPT;
+    }
+  });
+  let current = walker.nextNode();
+  while (current) {
+    candidates.push(current);
+    current = walker.nextNode();
+  }
+  for (const node of candidates) {
+    const fragment = document.createDocumentFragment();
+    appendCitations(fragment, node.nodeValue, options, usedSources);
+    node.replaceWith(fragment);
+  }
 }
 
-function plainInline(text) {
-  let result = "";
-  let index = 0;
-  while (index < text.length) {
-    if (text[index] === "\\" && text[index + 1] === "|") {
-      result += "|";
-      index += 2;
-      continue;
-    }
-    if (text[index] === "`") {
-      const run = backtickRun(text, index);
-      const closing = closingBacktickRun(text, index + run, run);
-      if (closing >= 0) {
-        result += text.slice(index + run, closing);
-        index = closing + run;
-        continue;
-      }
-    }
-    result += text[index];
-    index += 1;
+function safeLink(href) {
+  if (!href || href.length > 2048 || /[\u0000-\u001F\u007F]/.test(href)) return null;
+  try {
+    const parsed = new URL(href, window.location.origin);
+    if (!["http:", "https:", "mailto:"].includes(parsed.protocol) || parsed.username || parsed.password) return null;
+    return parsed;
+  } catch {
+    return null;
   }
-  return result;
 }
 
-function appendParagraph(container, lines, options) {
-  const paragraph = document.createElement("p");
-  paragraph.className = "assistant-answer-text";
-  appendInline(paragraph, lines.join("\n"), options, new Set());
-  container.append(paragraph);
+function enhanceLinks(container) {
+  for (const link of container.querySelectorAll("a")) {
+    const parsed = safeLink(link.getAttribute("href") || "");
+    if (!parsed) {
+      link.removeAttribute("href");
+      link.removeAttribute("target");
+      link.removeAttribute("rel");
+      link.classList.add("assistant-answer-link-disabled");
+      continue;
+    }
+    link.href = parsed.href;
+    if (parsed.protocol === "mailto:" || parsed.origin !== window.location.origin) {
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+    } else {
+      link.removeAttribute("target");
+      link.removeAttribute("rel");
+    }
+  }
 }
 
 function sourceUrl(source) {
   return typeof source.url === "string" && source.url ? source.url : pdfPageApplicationUrl(source) || "";
 }
 
+function exportCell(cell) {
+  const clone = cell.cloneNode(true);
+  for (const math of clone.querySelectorAll(".katex")) {
+    const tex = math.querySelector('annotation[encoding="application/x-tex"]')?.textContent;
+    if (tex) math.replaceWith(document.createTextNode(`$${tex}$`));
+    else math.querySelectorAll(".katex-mathml").forEach((element) => element.remove());
+  }
+  for (const breakElement of clone.querySelectorAll("br")) breakElement.replaceWith(document.createTextNode("\n"));
+  return clone.textContent.trim();
+}
+
 function exportRows(table, usedSources, options) {
-  const rows = [table.headers, ...table.rows].map((row) => row.map(plainInline));
+  const rows = [];
+  for (const row of [...(table.tHead?.rows || []), ...[...table.tBodies].flatMap((body) => [...body.rows])]) {
+    rows.push([...row.cells].map(exportCell));
+  }
   if (usedSources.size) {
     rows.push([], [options.t("provenance")], ["Ref", options.t("paper"), options.t("page"), options.t("sourceUrl")]);
     for (const source of usedSources) {
@@ -327,7 +343,33 @@ function appendTableActions(container, table, usedSources, options) {
   container.append(actions);
 }
 
-function appendTable(container, table, options) {
+function appendTableFallback(table, rawSource, problem, options) {
+  const block = document.createElement("div");
+  block.className = "assistant-answer-table-block assistant-answer-table-fallback";
+  const notice = document.createElement("p");
+  notice.className = "assistant-rendering-notice";
+  notice.setAttribute("role", "note");
+  notice.textContent = options.t(problem, { columns: MAX_COLUMNS, rows: MAX_ROWS });
+  const content = document.createElement("pre");
+  content.className = "assistant-answer-plain";
+  content.tabIndex = 0;
+  content.textContent = rawSource || table.textContent;
+  block.append(notice, content);
+  table.replaceWith(block);
+}
+
+function enhanceTable(table, rawSource, options) {
+  const problem = tableProblem(table, rawSource);
+  if (problem) {
+    appendTableFallback(table, rawSource, problem, options);
+    return;
+  }
+  const usedSources = new Set();
+  enhanceCitations(table, options, usedSources);
+  table.classList.add("assistant-answer-table");
+  for (const row of table.tHead?.rows || []) {
+    for (const cell of row.cells) cell.scope = "col";
+  }
   const block = document.createElement("div");
   block.className = "assistant-answer-table-block";
   const scroll = document.createElement("div");
@@ -336,52 +378,20 @@ function appendTable(container, table, options) {
   scroll.setAttribute("role", "region");
   scroll.setAttribute("aria-label", options.t("tableScroll"));
   scroll.setAttribute("aria-keyshortcuts", "ArrowLeft ArrowRight");
-  const element = document.createElement("table");
-  element.className = "assistant-answer-table";
-  const head = document.createElement("thead");
-  const headerRow = document.createElement("tr");
-  const usedSources = new Set();
-  for (const [index, value] of table.headers.entries()) {
-    const cell = document.createElement("th");
-    cell.scope = "col";
-    if (table.alignments[index]) cell.style.textAlign = table.alignments[index];
-    appendInline(cell, value, options, usedSources);
-    headerRow.append(cell);
-  }
-  head.append(headerRow);
-  const body = document.createElement("tbody");
-  for (const row of table.rows) {
-    const rowElement = document.createElement("tr");
-    for (const [index, value] of row.entries()) {
-      const cell = document.createElement("td");
-      if (table.alignments[index]) cell.style.textAlign = table.alignments[index];
-      appendInline(cell, value, options, usedSources);
-      rowElement.append(cell);
-    }
-    body.append(rowElement);
-  }
-  element.append(head, body);
-  scroll.append(element);
+  table.before(block);
+  scroll.append(table);
   block.append(scroll);
   appendTableActions(block, table, usedSources, options);
-  container.append(block);
 }
 
 export function renderAssistantAnswer(container, { answer, sources, language, t, onOpenSource }) {
   const options = { sourceByRef: sourceMap(sources), language, t, onOpenSource };
-  const lines = String(answer).replaceAll("\r\n", "\n").replaceAll("\r", "\n").split("\n");
-  let index = 0;
-  while (index < lines.length) {
-    const table = parseTable(lines, index);
-    if (table) {
-      if (table.malformed) appendParagraph(container, lines.slice(index, table.end), options);
-      else appendTable(container, table, options);
-      index = table.end;
-      continue;
-    }
-    const start = index;
-    index += 1;
-    while (index < lines.length && !parseTable(lines, index)) index += 1;
-    appendParagraph(container, lines.slice(start, index), options);
-  }
+  const normalized = String(answer).replaceAll("\r\n", "\n").replaceAll("\r", "\n");
+  const { fragment, tableSources } = renderAssistantMarkdown(normalized, { t });
+  container.append(fragment);
+  enhanceLinks(container);
+  for (const code of container.querySelectorAll("pre")) code.tabIndex = 0;
+  const tables = [...container.querySelectorAll("table")];
+  tables.forEach((table, index) => enhanceTable(table, tableSources[index] || "", options));
+  enhanceCitations(container, options, new Set(), true);
 }

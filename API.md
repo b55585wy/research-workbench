@@ -1,3 +1,12 @@
+# v0.43 safe answer rendering and image-region preview
+
+No API, schema, grants, source identities or analysis changes. Local browser rendering uses
+markdown-it/texmath/KaTeX/DOMPurify. R-marked Markdown links resolve through server Source
+records, never model-provided hrefs. Original-owner source routing and table CSV/TSV
+provenance/limits remain. Image menu preview uses its existing normalized object rectangle;
+it creates no note, draft or persistence operation. See CHAT-MARKDOWN.md.
+No tests, syntax/import/build/browser/HTTP/model checks were run at the user's request.
+
 # v0.42 frontend organization and paper-association feedback
 
 No new API or schema. POST /api/v1/studies/{id}/papers still accepts {document_id,sha256}
