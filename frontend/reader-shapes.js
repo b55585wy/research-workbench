@@ -76,6 +76,7 @@ export function createReaderShapes(adapter) {
   let interaction = null;
   let drawKind = null;
   let saving = false;
+  let widthMenuOpen = false;
   let clipSequence = 0;
   const layers = new Map();
   const editor = document.getElementById("reader-shape-editor");
@@ -86,6 +87,8 @@ export function createReaderShapes(adapter) {
   const width = document.getElementById("reader-shape-width");
   const widthField = document.getElementById("reader-shape-width-field");
   const widthPicker = editor.querySelector(".reader-shape-width-picker");
+  const widthToggle = document.getElementById("reader-shape-width-toggle");
+  const widthPreview = widthToggle.querySelector("[data-width-preview]");
   const fontSize = document.getElementById("reader-shape-font-size");
   const fontSizeField = document.getElementById("reader-shape-font-size-field");
   const overflow = document.getElementById("reader-shape-overflow");
@@ -129,6 +132,9 @@ export function createReaderShapes(adapter) {
       layer.dataset.drawing = String(Boolean(drawKind && adapter.recordIsCurrent(record)));
       layer.dataset.suspended = String(adapter.isSuspended());
     }
+    const widthDisabled = !interaction || Boolean(interaction.drawing) || saving || adapter.isBusy() || Boolean(interaction.operation) || interaction.shape.kind === "textbox";
+    widthToggle.disabled = widthDisabled;
+    if (widthDisabled) closeWidthMenu();
   }
 
   function positionEditor() {
@@ -196,8 +202,36 @@ export function createReaderShapes(adapter) {
     }
   }
 
+  function handleWidthMenuPointerDown(event) {
+    if (!widthField.contains(event.target)) closeWidthMenu();
+  }
+
+  function closeWidthMenu(returnFocus = false) {
+    const restoreFocus = returnFocus && widthMenuOpen && !widthToggle.disabled;
+    widthMenuOpen = false;
+    widthPicker.hidden = true;
+    widthToggle.setAttribute("aria-expanded", "false");
+    document.removeEventListener("pointerdown", handleWidthMenuPointerDown, true);
+    if (restoreFocus) widthToggle.focus({ preventScroll: true });
+  }
+
+  function openWidthMenu() {
+    if (width.disabled || widthToggle.disabled || widthField.hidden || !interaction || interaction.shape.kind === "textbox") return;
+    widthMenuOpen = true;
+    widthPicker.hidden = false;
+    widthToggle.setAttribute("aria-expanded", "true");
+    document.addEventListener("pointerdown", handleWidthMenuPointerDown, true);
+    const checked = [...widthPicker.querySelectorAll(".reader-shape-width-option")].find((button) => button.dataset.value === width.value);
+    checked?.focus({ preventScroll: true });
+  }
+
   function syncWidthPicker() {
     const groupLabel = adapter.t("shapeLineWidth");
+    const currentLabel = `${groupLabel} ${width.value}`;
+    widthToggle.setAttribute("aria-label", currentLabel);
+    widthToggle.title = currentLabel;
+    widthToggle.disabled = width.disabled || widthField.hidden;
+    widthPreview.setAttribute("stroke-width", width.value);
     widthPicker.setAttribute("aria-label", groupLabel);
     widthPicker.setAttribute("aria-disabled", String(width.disabled));
     for (const option of width.options) {
@@ -233,6 +267,7 @@ export function createReaderShapes(adapter) {
       button.tabIndex = button.dataset.value === width.value ? 0 : -1;
       button.disabled = width.disabled;
     }
+    if (widthToggle.disabled) closeWidthMenu();
   }
 
   function fontControlValid() {
@@ -242,7 +277,10 @@ export function createReaderShapes(adapter) {
   function renderEditor(sync = false) {
     const focusedColor = colorPalette.contains(document.activeElement) ? document.activeElement.dataset.value : null;
     editor.hidden = !interaction || Boolean(interaction.drawing);
-    if (editor.hidden) return;
+    if (editor.hidden) {
+      closeWidthMenu();
+      return;
+    }
     const busy = saving || adapter.isBusy();
     const frozen = Boolean(interaction.operation);
     const textbox = interaction.shape.kind === "textbox";
@@ -453,6 +491,7 @@ export function createReaderShapes(adapter) {
     const note = noteFor(noteId);
     const record = note && adapter.getRecord(note.page);
     if (!note || !record || !adapter.recordIsCurrent(record)) return false;
+    closeWidthMenu();
     if (interaction?.noteId === note.id && interaction.record === record && generationCurrent(interaction)) {
       drawKind = null;
       if (options.focus) description.focus({ preventScroll: true });
@@ -856,9 +895,15 @@ export function createReaderShapes(adapter) {
     width.value = button.dataset.value;
     width.dispatchEvent(new Event("change", { bubbles: true }));
   }
+  widthToggle.addEventListener("click", () => {
+    if (widthMenuOpen) closeWidthMenu(true);
+    else openWidthMenu();
+  });
   widthPicker.addEventListener("click", (event) => {
     const button = event.target.closest(".reader-shape-width-option");
-    if (button) chooseWidth(button);
+    if (!button) return;
+    chooseWidth(button);
+    closeWidthMenu(true);
   });
   widthPicker.addEventListener("keydown", (event) => {
     if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"].includes(event.key)) return;
@@ -868,6 +913,7 @@ export function createReaderShapes(adapter) {
     const index = buttons.indexOf(current);
     if (index < 0 || !buttons.length) return;
     event.preventDefault();
+    event.stopPropagation();
     const previous = event.key === "ArrowLeft" || event.key === "ArrowUp";
     const nextIndex = event.key === "Home" ? 0 : event.key === "End" ? buttons.length - 1 : (index + (previous ? -1 : 1) + buttons.length) % buttons.length;
     const next = buttons[nextIndex];
@@ -901,7 +947,8 @@ export function createReaderShapes(adapter) {
     if (event.key === "Escape") {
       event.preventDefault();
       event.stopPropagation();
-      cancel();
+      if (widthMenuOpen) closeWidthMenu(true);
+      else cancel();
     }
   });
 
