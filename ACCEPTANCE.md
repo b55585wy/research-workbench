@@ -339,3 +339,15 @@ motion are supported. Existing library/PDF error recovery and data paths remain.
 Scoped synthetic browser smoke passed delayed modules/library/PDF, late success,
 script failure and successful explicit reload, server/device completion, English and reduced motion.
 No public services were restarted: user requested batching updates to protect active use.
+
+## v0.55.3 UI release continuity (not deployed)
+
+One running backend can select a compatible immutable frontend without restarting.
+New HTML pins local assets to its release; old assets remain available and rollback
+does not restore or change user data. Backend/device-storage changes reject UI-only
+publication. Corrupt pointers fail entry with503 while API and old assets remain usable.
+Operator commands validate bounded archives, paths, hashes and atomic selection.
+Scoped publishing/HTTP cases and a real browser verified old/new pages, a retained
+unsaved draft, saved note, PDF navigation, device worker/PDF, rollback, and unchanged
+backend PID. No public service was modified. Initial production enablement still
+requires one backend upgrade; backend job handover is a separate unimplemented slice.

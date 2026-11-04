@@ -824,7 +824,7 @@ def create_guest_gateway(guest_root, *, max_spaces=MAX_SPACES, max_active=2,
 
         if request.query_params.get('storage') != 'server':
             from .device_pages import choice_response
-            return choice_response(ROOT / 'frontend')
+            return await run_in_threadpool(choice_response, ROOT / 'frontend')
 
         # The new visitor explicitly selected server storage.
         try:

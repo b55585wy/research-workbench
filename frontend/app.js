@@ -42,7 +42,7 @@ const MAX_DEVICE_PIXEL_RATIO = 2;
 const MAX_FILE_BYTES = 20 * 1024 * 1024;
 const ZOOM_MIN = 0.4;
 const ZOOM_MAX = 3;
-const APP_VERSION = "0.55.2";
+const APP_VERSION = "0.55.3";
 const PDF_RANGE_CHUNK_SIZE = 64 * 1024;
 const PDF_LOADING_HINT_DELAY = 12_000;
 
