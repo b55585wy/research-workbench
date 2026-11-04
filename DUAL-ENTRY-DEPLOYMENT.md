@@ -40,3 +40,16 @@
 服务端摘要：旧机 `/opt/research-workspace/downloads/dual-entry-v055/DEPLOYMENT-STATUS.json`；
 新机 `/opt/research-workspace/downloads/DEPLOYMENT-STATUS.json`。本轮只做发布针对性核对，
 未运行真实模型/分析任务。首次部署与运行环境说明见 [SECOND-SERVER.md](SECOND-SERVER.md)。
+
+## 2026-11-04 · v0.55.1 与发布频率
+
+两个公开入口现已更新到 v0.55.1（6a0a29e）：论文菜单新增“自动更新条目”，
+沿用候选核对、草稿保护与明确保存流程。本机资料模式仍不支持联网查询。
+两边健康接口均200；旧机32个空间/8篇文献、新机3个空间/1篇文献的数量保留，
+schema26不变，旧机owner v0.50服务保持。发布前确认无进行中的助手/分析/翻译任务。
+备份和摘要分别存于各机 /opt/research-workspace/downloads/metadata-menu-v0551/DEPLOYMENT-STATUS.json。
+
+用户要求减少发布对正在使用者的影响：不再为每个小改动立即重启线上服务，合并改动发布，
+不强制刷新已打开的页面。加载提示 v0.55.2 已在本地完成，暂未发布。
+当前仍是单个后端进程的更新方式，重启期间新请求可能短暂失败，不能宣称无中断或热更新。
+前端独立发布、后端健康就绪后切换和旧请求排空尚待实现；不能直接双开任务执行器共享数据库。
