@@ -80,4 +80,4 @@ python -m research_workbench.ui_publish activate PATH_TO_UI_RELEASES RELEASE_ID
 
 v0.55.4补齐[本机离线启动](OFFLINE-START.md)：分发层允许确切的版本化根工作器，离线清单随
 UI包产生；完整校验后才就绪，失败保留旧包。历史静态资源按自身清单校验并继续提供，当前选择
-与激活仍严格绑定后端兼容性。本次首次启用该分发能力需合并一次后端升级，后续兼容UI包继续免重启。
+与激活仍严格绑定后端兼容性。本次首次启用已合并完成一次后端升级，后续兼容UI包继续免重启。
