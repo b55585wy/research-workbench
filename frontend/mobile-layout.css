@@ -473,11 +473,12 @@
   }
 
   .mobile-layout-active #reader-shape-editor .reader-shape-style-row {
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
     gap: 8px;
   }
 
   .mobile-layout-active #reader-shape-editor .reader-shape-color-field {
+    flex: none;
     min-width: 0;
   }
 

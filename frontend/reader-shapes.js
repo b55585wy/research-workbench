@@ -85,6 +85,7 @@ export function createReaderShapes(adapter) {
   const colorPalette = editor.querySelector(".reader-shape-color-palette");
   const width = document.getElementById("reader-shape-width");
   const widthField = document.getElementById("reader-shape-width-field");
+  const widthPicker = editor.querySelector(".reader-shape-width-picker");
   const fontSize = document.getElementById("reader-shape-font-size");
   const fontSizeField = document.getElementById("reader-shape-font-size-field");
   const overflow = document.getElementById("reader-shape-overflow");
@@ -195,6 +196,45 @@ export function createReaderShapes(adapter) {
     }
   }
 
+  function syncWidthPicker() {
+    const groupLabel = adapter.t("shapeLineWidth");
+    widthPicker.setAttribute("aria-label", groupLabel);
+    widthPicker.setAttribute("aria-disabled", String(width.disabled));
+    for (const option of width.options) {
+      let button = widthPicker.querySelector(`[data-value="${option.value}"]`);
+      if (!button) {
+        button = document.createElement("button");
+        button.type = "button";
+        button.className = "reader-shape-width-option";
+        button.dataset.value = option.value;
+        button.setAttribute("role", "radio");
+        const icon = svgElement("svg", {
+          class: "reader-shape-width-icon",
+          viewBox: "0 0 30 12",
+          "aria-hidden": "true",
+          focusable: "false"
+        });
+        icon.append(svgElement("line", {
+          x1: 2,
+          y1: 6,
+          x2: 28,
+          y2: 6,
+          stroke: "currentColor",
+          "stroke-width": option.value,
+          "stroke-linecap": "round"
+        }));
+        button.append(icon);
+        widthPicker.append(button);
+      }
+      const label = `${groupLabel} ${option.value}`;
+      button.setAttribute("aria-label", label);
+      button.title = label;
+      button.setAttribute("aria-checked", String(button.dataset.value === width.value));
+      button.tabIndex = button.dataset.value === width.value ? 0 : -1;
+      button.disabled = width.disabled;
+    }
+  }
+
   function fontControlValid() {
     return Number.isInteger(fontSize.valueAsNumber) && fontSize.valueAsNumber >= 8 && fontSize.valueAsNumber <= 48;
   }
@@ -222,6 +262,7 @@ export function createReaderShapes(adapter) {
     color.disabled = busy || frozen;
     syncColorPalette();
     width.disabled = busy || frozen || textbox;
+    syncWidthPicker();
     fontSize.disabled = busy || frozen || !textbox;
     const blank = textbox && !interaction.text.trim();
     const tooLong = textbox && Array.from(interaction.text).length > 2000;
@@ -805,6 +846,33 @@ export function createReaderShapes(adapter) {
     const next = buttons[nextIndex];
     next.focus({ preventScroll: true });
     chooseColor(next);
+  });
+  function chooseWidth(button) {
+    if (button.disabled) return;
+    if (width.value === button.dataset.value) {
+      syncWidthPicker();
+      return;
+    }
+    width.value = button.dataset.value;
+    width.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+  widthPicker.addEventListener("click", (event) => {
+    const button = event.target.closest(".reader-shape-width-option");
+    if (button) chooseWidth(button);
+  });
+  widthPicker.addEventListener("keydown", (event) => {
+    if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"].includes(event.key)) return;
+    const current = event.target.closest(".reader-shape-width-option");
+    if (!current) return;
+    const buttons = [...widthPicker.querySelectorAll(".reader-shape-width-option")].filter((button) => !button.disabled);
+    const index = buttons.indexOf(current);
+    if (index < 0 || !buttons.length) return;
+    event.preventDefault();
+    const previous = event.key === "ArrowLeft" || event.key === "ArrowUp";
+    const nextIndex = event.key === "Home" ? 0 : event.key === "End" ? buttons.length - 1 : (index + (previous ? -1 : 1) + buttons.length) % buttons.length;
+    const next = buttons[nextIndex];
+    next.focus({ preventScroll: true });
+    chooseWidth(next);
   });
   width.addEventListener("change", () => {
     if (!interaction || interaction.operation || saving || interaction.shape.kind === "textbox") return;

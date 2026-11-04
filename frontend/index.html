@@ -483,9 +483,10 @@
             </select>
             <div class="reader-shape-color-palette" role="radiogroup" data-i18n-aria="annotationColor" aria-label="标注颜色"></div>
           </div>
-          <label id="reader-shape-width-field" for="reader-shape-width"><span data-i18n="shapeLineWidth">线宽</span>
-            <select id="reader-shape-width"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option></select>
-          </label>
+          <div id="reader-shape-width-field"><span class="sr-only" data-i18n="shapeLineWidth">线宽</span>
+            <select id="reader-shape-width" data-i18n-aria="shapeLineWidth" aria-label="线宽" hidden><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option></select>
+            <div class="reader-shape-width-picker" role="radiogroup" data-i18n-aria="shapeLineWidth" aria-label="线宽"></div>
+          </div>
           <label id="reader-shape-font-size-field" for="reader-shape-font-size" hidden><span data-i18n="shapeTextboxFontSize">字号</span>
             <input id="reader-shape-font-size" type="number" min="8" max="48" step="1" value="14" inputmode="numeric">
           </label>
