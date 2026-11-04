@@ -138,6 +138,11 @@ class ProposalConfirmation(BaseModel):
     proposal_sha256: str=Field(pattern='^[a-f0-9]{64}$')
 
 
+class ConversationClear(BaseModel):
+    model_config=ConfigDict(extra='forbid')
+    request_id: UUID
+
+
 class TaskControl(BaseModel):
     model_config=ConfigDict(extra='forbid')
     request_id: UUID

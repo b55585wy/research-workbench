@@ -342,6 +342,7 @@
           </section>
           <div id="reader-empty" class="reader-empty">
             <p data-i18n="emptyReader">从左侧选择一篇文献开始阅读。</p>
+            <a id="reader-open-original" class="reader-open-original button button-secondary" data-i18n="openOriginalPdf" href="#" target="_blank" rel="noopener" hidden>打开原 PDF</a>
           </div>
           <div id="page-surface" class="page-surface" hidden>
             <canvas id="reader-canvas" data-testid="reader-canvas" aria-label="PDF 页面"></canvas>
@@ -837,6 +838,7 @@
         <label class="sr-only" for="assistant-history">对话记录</label>
         <select id="assistant-history" aria-label="对话记录"></select>
         <button id="assistant-new" class="button button-quiet" type="button">新对话</button>
+        <button id="assistant-clear" class="button button-quiet" type="button" aria-haspopup="dialog" aria-controls="assistant-clear-dialog" hidden>清空对话</button>
         <button id="assistant-full-page" class="button button-quiet" type="button" aria-label="全屏" aria-pressed="false" title="全屏">全屏</button>
         <button id="assistant-close" class="button button-quiet" type="button" aria-label="关闭研究助手">×</button>
       </div>
@@ -905,6 +907,19 @@
     <button id="assistant-resize-right" class="assistant-resize-edge assistant-resize-right" type="button" aria-label="从右侧调整助手窗口宽度" aria-describedby="assistant-window-help" aria-keyshortcuts="ArrowLeft ArrowRight" title="拖动或使用左右方向键调整宽度；保持左边缘不动"><span aria-hidden="true"></span></button>
     <button id="assistant-resize" class="assistant-resize" type="button" aria-label="调整助手窗口大小" aria-describedby="assistant-window-help" aria-keyshortcuts="ArrowLeft ArrowRight ArrowUp ArrowDown" title="拖动或使用方向键调整窗口大小"><span aria-hidden="true">◢</span></button>
   </aside>
+
+  <dialog id="assistant-clear-dialog" class="assistant-clear-dialog" aria-labelledby="assistant-clear-heading" aria-describedby="assistant-clear-help assistant-clear-status">
+    <form id="assistant-clear-form">
+      <h2 id="assistant-clear-heading">清空对话</h2>
+      <p id="assistant-clear-conversation" class="assistant-clear-conversation"></p>
+      <p id="assistant-clear-help">只会从对话记录中移除当前对话。未发送的草稿、已保存的笔记、数据和分析结果都会保留。</p>
+      <p id="assistant-clear-status" class="assistant-clear-status" role="status" aria-live="polite"></p>
+      <div class="assistant-clear-actions">
+        <button id="assistant-clear-cancel" class="button button-quiet" type="button">取消</button>
+        <button id="assistant-clear-confirm" class="button button-primary" type="submit">确认清空</button>
+      </div>
+    </form>
+  </dialog>
 
   <dialog id="study-resource-picker" class="study-resource-picker" aria-labelledby="study-resource-picker-heading" aria-describedby="study-resource-picker-help study-resource-candidates-status study-resource-picker-write-status">
     <div class="study-resource-picker-layout">
@@ -1085,7 +1100,7 @@
   <script src="/vendor/assistant-markdown/katex.min.js"></script>
   <script src="/vendor/assistant-markdown/texmath.js"></script>
   <script src="/vendor/assistant-markdown/purify.min.js"></script>
-  <script type="module" src="/app.js"></script>
+  <script type="module" src="/app.js?v=0.52.0"></script>
   <script type="module" src="/mobile-layout.js"></script>
 </body>
 </html>

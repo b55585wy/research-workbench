@@ -5,6 +5,7 @@ from uuid import UUID,uuid5
 
 from .agent_models import AgentSubmission,ReadingContext
 from .agent_store import canonical,digest,now
+from .conversation_lifecycle import is_cleared,reject_cleared
 from .studies import verify_owner as verify_source
 from .models import WorkspaceError
 
@@ -51,9 +52,10 @@ class AgentTasks:
         return result
 
     @staticmethod
-    def row(connection,document_id,identifier):
+    def row(connection,document_id,identifier,allow_closed=False):
         row=connection.execute('SELECT * FROM agent_tasks WHERE id=? AND document_id=?',(identifier,document_id)).fetchone()
         if row is None:raise WorkspaceError('not_found','找不到这项接续任务。',404)
+        if not allow_closed:reject_cleared(connection,row['conversation_id'])
         return dict(row)
 
     def get(self,document_id,identifier):
@@ -66,7 +68,10 @@ class AgentTasks:
                 self.agent_store.conversation(connection,document_id,conversation_id)
                 rows=connection.execute('SELECT * FROM agent_tasks WHERE document_id=? AND conversation_id=? ORDER BY created_at DESC,id DESC LIMIT 20',(document_id,conversation_id))
             else:
-                rows=connection.execute('SELECT * FROM agent_tasks WHERE document_id=? ORDER BY updated_at DESC,id DESC LIMIT 20',(document_id,))
+                rows=connection.execute('''SELECT * FROM agent_tasks WHERE document_id=?
+                    AND NOT EXISTS(SELECT 1 FROM agent_conversation_clears c
+                    WHERE c.conversation_id=agent_tasks.conversation_id)
+                    ORDER BY updated_at DESC,id DESC LIMIT 20''',(document_id,))
             return [self.public(dict(row)) for row in rows]
 
     @staticmethod
@@ -91,6 +96,8 @@ class AgentTasks:
         context={**captured,'task_id':identifier,'task_stage':'analysis','task_generation':0,'task_goal':payload.message}
         with self.store.connection() as connection:
             connection.execute('BEGIN IMMEDIATE')
+            if payload.conversation_id:
+                self.agent_store.conversation(connection,document_id,str(payload.conversation_id))
             if connection.execute('SELECT 1 FROM agent_tasks WHERE id=?',(identifier,)).fetchone():
                 return self.agent_store.submit(document_id,payload,context,connection)
             if payload.conversation_id and connection.execute("SELECT 1 FROM agent_tasks WHERE conversation_id=? AND status!='completed'",(str(payload.conversation_id),)).fetchone():
@@ -315,8 +322,10 @@ class AgentTasks:
 
     def fail(self,document_id,identifier,error):
         with self.store.connection() as connection:
-            connection.execute('BEGIN IMMEDIATE');row=self.row(connection,document_id,identifier)
+            connection.execute('BEGIN IMMEDIATE');row=self.row(connection,document_id,identifier,allow_closed=True)
             if row['status'] not in ACTIVE:return
+            # A closed conversation is never written again, even by a late error.
+            if is_cleared(connection,row['conversation_id']):return
             connection.execute("UPDATE agent_turns SET status='failed',error_json=?,updated_at=? WHERE id=? AND status IN ('queued','running')",
                                (canonical({'code':error.code,'message':error.message}),now(),row['current_turn_id']))
             self.change(connection,row,status='failed',error={'code':error.code,'message':error.message})

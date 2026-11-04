@@ -1,4 +1,4 @@
-import * as pdfjsLib from "/vendor/pdfjs/build/pdf.mjs";
+import * as pdfjsLib from "/pdf-engine.js?v=0.52.0";
 import { createImageLibrary } from "/image-library.js";
 import { createImageViewer } from "/image-viewer.js";
 import { createAnalysis } from "/analysis.js";
@@ -7,7 +7,7 @@ import { createDataImports } from "/data-imports.js";
 import { createCharts } from "/charts.js";
 import { createWorkspace } from "/workspace.js";
 import { createDataNavigation } from "/data-navigation.js";
-import { createAssistant } from "/assistant.js";
+import { createAssistant } from "/assistant.js?v=0.52.0";
 import { createRichText, renderRichHtml } from "/rich-text.js";
 import { createResearchRecord } from "/research-record.js";
 import { createStudy } from "/study.js";
@@ -24,7 +24,7 @@ import { createTranslationBridge } from "/translation-bridge.js";
 import { createTranslationOverlay } from "/translation-overlay.js";
 import { createFlowReadingBridge } from "/flow-reading-bridge.js";
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = "/vendor/pdfjs/build/pdf.worker.mjs";
+pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf-worker-compat.js?v=0.52.0";
 
 const MAX_CANVAS_PIXELS = 8_000_000;
 const MAX_CANVAS_AXIS = 8192;
@@ -109,7 +109,12 @@ const messages = {
     regionInstructions: "在页面上拖动以框选原文位置。",
     selectionTooSmall: "请拖动框选一个更大的区域。",
     missingDocument: "这篇文献不存在或已被删除。请选择另一篇文献。",
-    documentOpenFailed: "无法打开这篇文献，请重试。",
+    documentOpenFailed: "无法打开这篇文献，请重试。也可尝试打开原 PDF。",
+    documentCompatibilityFailed: "当前浏览器缺少打开 PDF 所需的功能。请更新浏览器，或打开原 PDF。",
+    documentInvalidPdf: "此文件不是有效的 PDF，无法在阅读器中打开。可尝试打开原 PDF 检查文件。",
+    documentPasswordRequired: "此 PDF 需要密码。当前阅读器无法打开加密文件，可尝试打开原 PDF。",
+    documentResourceFailed: "PDF 阅读组件或资源未能加载。请重试；也可打开原 PDF。",
+    openOriginalPdf: "打开原 PDF",
     notesLoadFailed: "无法加载笔记，请重试。",
     renderFailed: "无法显示此页面，请重试。",
     network: "无法连接本地服务。请检查服务是否运行，然后重试。",
@@ -448,6 +453,7 @@ const messages = {
     regions_unavailable: "表格识别暂时不可用，请手动截取。",
     regions_failed: "表格识别失败，请重试或手动截取。",
     navigationPendingWrite: "有修改正在保存或处理。请等待保存完成，再切换工作区。",
+    navigationConversationClear: "正在清空当前对话。请等待请求完成，再切换文献或工作区。",
     navigationDrawing: "有未保存的批注。请先保存或取消当前批注，再切换工作区。",
     navigationScreenshot: "有截图预览尚未处理。请先添加或取消截图，再切换工作区。",
     navigationSelection: "正在框选区域。请先完成或取消当前选择，再切换工作区。",
@@ -530,7 +536,12 @@ const messages = {
     regionInstructions: "Drag on the page to select a source region.",
     selectionTooSmall: "Drag to select a larger region.",
     missingDocument: "This paper does not exist or was deleted. Choose another paper.",
-    documentOpenFailed: "The paper could not be opened. Try again.",
+    documentOpenFailed: "The paper could not be opened. Try again, or open the original PDF.",
+    documentCompatibilityFailed: "This browser lacks a feature needed to open the PDF. Update the browser or open the original PDF.",
+    documentInvalidPdf: "This file is not a valid PDF and cannot be opened in the reader. Try opening the original PDF to inspect it.",
+    documentPasswordRequired: "This PDF requires a password. The reader cannot open encrypted files; try opening the original PDF.",
+    documentResourceFailed: "A PDF reader component or resource could not be loaded. Retry, or open the original PDF.",
+    openOriginalPdf: "Open original PDF",
     notesLoadFailed: "Notes could not be loaded. Try again.",
     renderFailed: "This page could not be displayed. Try again.",
     network: "Cannot connect to the local service. Check that it is running, then retry.",
@@ -869,6 +880,7 @@ const messages = {
     regions_unavailable: "Table recognition is unavailable. Capture the region manually.",
     regions_failed: "Table recognition failed. Retry or capture manually.",
     navigationPendingWrite: "Changes are being saved or processed. Wait for saving to finish before changing workspaces.",
+    navigationConversationClear: "The current conversation is being cleared. Wait for the request before changing papers or workspaces.",
     navigationDrawing: "There are unsaved annotations. Save or cancel the current drawing before changing workspaces.",
     navigationScreenshot: "A screenshot preview is waiting. Add or cancel the screenshot before changing workspaces.",
     navigationSelection: "A region is being selected. Finish or cancel the selection before changing workspaces.",
@@ -964,6 +976,7 @@ const elements = {
   translationPanel: $("translation-panel"),
   translationFallback: $("translation-fallback"),
   readerEmpty: $("reader-empty"),
+  readerOpenOriginal: $("reader-open-original"),
   pageSurface: $("page-surface"),
   canvas: $("reader-canvas"),
   textLayer: $("reader-text-layer"),
@@ -1301,6 +1314,10 @@ function applyLanguage() {
   document.querySelector(".reader-toolbar").setAttribute("aria-label", t("readerControls"));
   elements.regionMode.textContent = t(state.regionActive ? "cancelRegion" : "regionMode");
   elements.readerRegionMode.textContent = t(state.regionActive ? "cancelRegion" : "regionMode");
+  if (!elements.readerOpenOriginal.hidden) {
+    const message = elements.readerEmpty.querySelector("p");
+    if (message) message.textContent = t(elements.readerOpenOriginal.dataset.errorKey || "documentOpenFailed");
+  }
   renderDocuments();
   renderSearch();
   renderLibraryTrash();
@@ -2949,7 +2966,7 @@ function renderDocumentDetails() {
   const document = state.document;
   elements.documentTitle.textContent = document ? document.title || document.original_filename || t("untitled") : "";
   elements.pageCount.textContent = document && !isStudy(document) ? t("pageOf", { count: document.page_count }) : "";
-  elements.readerEmpty.hidden = Boolean(document);
+  elements.readerEmpty.hidden = Boolean(document) && elements.readerOpenOriginal.hidden;
   if (!document) elements.pageSurface.hidden = true;
   const hasPdf = Boolean(state.pdf && document);
   elements.pageInput.disabled = !hasPdf;
@@ -3571,6 +3588,7 @@ async function restorePendingReaderProgress() {
 }
 
 function cancelDocumentWork() {
+  hideReaderOpenFallback();
   state.flowActive = false;
   state.flowViewedPage = 1;
   flowReader.update(flowReaderModel());
@@ -3634,6 +3652,7 @@ function prepareContextNavigation() {
     dataImports?.isImportPending?.()
   );
   if (pendingWrite) setStatus("navigationPendingWrite", "info");
+  else if (documentId && assistant?.isClearPending?.(documentId)) setStatus("navigationConversationClear", "info");
   else if (readerShapes?.hasUnsavedChanges?.()) setStatus("navigationDrawing", "error");
   else if (state.regionCapture) setStatus("navigationScreenshot", "error");
   else if (state.selection) setStatus("navigationSelection", "error");
@@ -3970,11 +3989,14 @@ async function openDocument(documentId, options = {}) {
   if (pdfResult.status === "rejected") {
     state.readerProgress.loading = false;
     elements.pageSurface.hidden = true;
-    elements.readerEmpty.hidden = false;
     renderDocumentDetails();
     renderDraft();
-    const key = pdfResult.reason?.name === "AbortError" ? null : pdfResult.reason?.code || "documentOpenFailed";
-    if (key) setStatus(key, "error", {}, () => openDocument(documentId, { force: true }));
+    const key = pdfResult.reason?.name === "AbortError" ? null : pdfOpenErrorKey(pdfResult.reason);
+    if (key) {
+      elements.readerEmpty.hidden = false;
+      showReaderOpenFallback(document, key);
+      setStatus(key, "error", {}, () => openDocument(documentId, { force: true }));
+    }
     return;
   }
 
@@ -4057,6 +4079,34 @@ async function openDocument(documentId, options = {}) {
   } else if (sequence === state.loadSequence && state.status?.key === "loadingDocument") {
     clearStatus();
   }
+}
+
+function pdfOpenErrorKey(error) {
+  if (typeof error?.code === "string") return error.code;
+  if (error?.name === "InvalidPDFException") return "documentInvalidPdf";
+  if (error?.name === "PasswordException") return "documentPasswordRequired";
+  if (["MissingPDFException", "UnexpectedResponseException"].includes(error?.name)) return "documentResourceFailed";
+  const message = typeof error?.message === "string" ? error.message : "";
+  if (error?.name === "TypeError" && message.includes("Promise.withResolvers")) return "documentCompatibilityFailed";
+  if (/worker|fake worker|dynamically imported module/i.test(message)) return "documentResourceFailed";
+  return "documentOpenFailed";
+}
+
+function hideReaderOpenFallback() {
+  elements.readerOpenOriginal.hidden = true;
+  elements.readerOpenOriginal.removeAttribute("href");
+  delete elements.readerOpenOriginal.dataset.errorKey;
+  const message = elements.readerEmpty.querySelector("p");
+  if (message) message.textContent = t("emptyReader");
+}
+
+function showReaderOpenFallback(document, key) {
+  if (!document || isStudy(document) || state.document?.id !== document.id) return;
+  elements.readerOpenOriginal.href = `/api/v1/documents/${encodeURIComponent(document.id)}/file`;
+  elements.readerOpenOriginal.dataset.errorKey = key;
+  elements.readerOpenOriginal.hidden = false;
+  const message = elements.readerEmpty.querySelector("p");
+  if (message) message.textContent = t(key);
 }
 
 async function loadPdf(document, sequence, signal) {

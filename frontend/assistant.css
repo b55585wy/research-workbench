@@ -96,6 +96,7 @@
 }
 
 #assistant-new,
+#assistant-clear,
 #assistant-full-page {
   min-height: 30px;
   padding: 3px 6px;
@@ -973,6 +974,55 @@
   min-height: 64px;
 }
 
+.assistant-clear-dialog {
+  width: min(400px, calc(100vw - 32px));
+  padding: 20px;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: 6px;
+  background: var(--ui-surface);
+  color: var(--ui-text);
+}
+
+.assistant-clear-dialog::backdrop {
+  background: rgb(0 0 0 / 35%);
+}
+
+#assistant-clear-form {
+  display: grid;
+  gap: 12px;
+}
+
+#assistant-clear-heading {
+  font-size: 17px;
+}
+
+.assistant-clear-conversation {
+  overflow-wrap: anywhere;
+  font-weight: 650;
+}
+
+#assistant-clear-help,
+.assistant-clear-status {
+  color: var(--ui-text-soft);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.assistant-clear-status {
+  min-height: 20px;
+}
+
+.assistant-clear-status[data-kind="error"] {
+  color: var(--ui-danger);
+}
+
+.assistant-clear-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 @media (max-height: 480px) {
   .assistant-management[open] {
     max-height: 34%;
@@ -1005,6 +1055,11 @@
   .assistant-answer-table td {
     min-width: 5.5rem;
     padding: 5px 6px;
+  }
+
+  #assistant-clear,
+  .assistant-clear-actions .button {
+    min-height: 44px;
   }
 }
 

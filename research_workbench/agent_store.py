@@ -4,6 +4,7 @@ import json
 from uuid import uuid4
 
 from .models import WorkspaceError
+from .conversation_lifecycle import is_cleared,reject_cleared
 
 ACTIVE=('queued','running','waiting_confirmation')
 TERMINAL=('completed','failed','cancelled','interrupted')
@@ -33,15 +34,19 @@ class AgentStore:
     def __init__(self,store):
         self.store=store
 
-    def conversation(self,connection,document_id,identifier):
+    def conversation(self,connection,document_id,identifier,allow_closed=False):
         row=connection.execute('SELECT * FROM agent_conversations WHERE id=? AND document_id=?',(identifier,document_id)).fetchone()
         if row is None:raise WorkspaceError('not_found','找不到这段对话。',404)
+        if not allow_closed:reject_cleared(connection,identifier)
         return dict(row)
 
     def conversations(self,document_id):
         self.store.get_document(document_id)
         with self.store.connection() as connection:
-            return [dict(r) for r in connection.execute('SELECT * FROM agent_conversations WHERE document_id=? ORDER BY updated_at DESC,id DESC',(document_id,))]
+            return [dict(r) for r in connection.execute('''SELECT * FROM agent_conversations
+                WHERE document_id=? AND NOT EXISTS(SELECT 1 FROM agent_conversation_clears c
+                WHERE c.conversation_id=agent_conversations.id)
+                ORDER BY updated_at DESC,id DESC''',(document_id,))]
 
     def history(self,document_id,identifier):
         with self.store.connection() as connection:
@@ -53,6 +58,7 @@ class AgentStore:
     def read(self,connection,document_id,identifier):
         row=connection.execute('SELECT * FROM agent_turns WHERE document_id=? AND id=?',(document_id,identifier)).fetchone()
         if row is None:raise WorkspaceError('not_found','找不到这次助手请求。',404)
+        reject_cleared(connection,row['conversation_id'])
         result={key:value for key,value in dict(row).items() if key not in ('request_hash','context_json','sources_json','error_json')}
         result.update(context=json.loads(row['context_json']),sources=json.loads(row['sources_json']),error=json.loads(row['error_json']) if row['error_json'] else None)
         result['events']=[dict(r) for r in connection.execute('SELECT id,kind,title,status,summary,created_at FROM agent_events WHERE turn_id=? ORDER BY rowid',(identifier,))]
@@ -80,6 +86,7 @@ class AgentStore:
         fingerprint=submission_hash(document_id,payload)
         previous=connection.execute('SELECT * FROM agent_turns WHERE id=?',(request_id,)).fetchone()
         if previous is not None:
+            reject_cleared(connection,previous['conversation_id'])
             if previous['request_hash']!=fingerprint:raise WorkspaceError('idempotency_conflict','这次助手请求与已有记录冲突。',409)
             return self.read(connection,document_id,request_id)
         conversation_id=str(payload.conversation_id) if payload.conversation_id else str(uuid4())
@@ -145,7 +152,9 @@ class AgentStore:
     def next_turn(self):
         with self.store.connection() as connection:
             connection.execute('BEGIN IMMEDIATE')
-            row=connection.execute("SELECT id,document_id FROM agent_turns WHERE status='queued' ORDER BY rowid LIMIT 1").fetchone()
+            row=connection.execute("""SELECT id,document_id FROM agent_turns WHERE status='queued'
+                AND NOT EXISTS(SELECT 1 FROM agent_conversation_clears c
+                WHERE c.conversation_id=agent_turns.conversation_id) ORDER BY rowid LIMIT 1""").fetchone()
             if row is None:return None
             connection.execute("UPDATE agent_turns SET status='running',updated_at=? WHERE id=?",(now(),row['id']))
             return self.read(connection,row['document_id'],row['id'])

@@ -3,7 +3,7 @@ from uuid import UUID
 from fastapi import APIRouter,File,Form,Request,UploadFile
 from fastapi.responses import FileResponse,JSONResponse
 
-from .agent_models import AgentSubmission,ImageNoteCreate,ModelSettings,ProposalConfirmation,TaskControl
+from .agent_models import AgentSubmission,ConversationClear,ImageNoteCreate,ModelSettings,ProposalConfirmation,TaskControl
 
 router=APIRouter(prefix='/api/v1')
 
@@ -61,6 +61,11 @@ def conversations(document_id:UUID,request:Request):
 @router.get('/documents/{document_id}/agent/conversations/{conversation_id}')
 def conversation(document_id:UUID,conversation_id:UUID,request:Request):
     return request.app.state.agent.store.history(str(document_id),str(conversation_id))
+
+
+@router.post('/documents/{document_id}/agent/conversations/{conversation_id}/clear')
+def clear_conversation(document_id:UUID,conversation_id:UUID,payload:ConversationClear,request:Request):
+    return request.app.state.agent.clear_conversation(str(document_id),str(conversation_id),payload)
 
 
 @router.post('/documents/{document_id}/agent/turns',status_code=202)

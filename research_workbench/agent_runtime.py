@@ -8,6 +8,7 @@ from .agent_proposals import Proposals
 from .agent_store import AgentStore,canonical,digest,TERMINAL,submission_hash
 from .agent_tools import ReadingTools,bounded
 from .agent_tasks import AgentTasks
+from .conversation_lifecycle import ConversationClears
 from .models import WorkspaceError
 from .agent_reading_budget import ReadingBudget, MAX_PAGE_READS, READING_SECONDS, read_page
 
@@ -174,6 +175,7 @@ class ReadingAgent:
         self.proposals.charts=charts
         self.tasks=AgentTasks(self.workspace,self.store)
         self.proposals.task_guard=self.tasks.guard_proposal
+        self.conversation_clears=ConversationClears(store)
         self.max_steps=max_steps
         self.stop=threading.Event()
         self.wake=threading.Event()
@@ -191,7 +193,12 @@ class ReadingAgent:
         if self.thread:self.thread.join(timeout=1)
 
     def status(self):
-        return {**self.provider.status(),'tools':ReadingTools.manifest()}
+        # Explicit capability flag: an older server omits it, so the UI hides or
+        # disables Clear instead of guessing.  It never requires a model key.
+        return {**self.provider.status(),'conversation_clear':True,'tools':ReadingTools.manifest()}
+
+    def clear_conversation(self,document_id,conversation_id,payload):
+        return self.conversation_clears.clear(document_id,conversation_id,payload)
 
     def submit(self,document_id,payload):
         fingerprint=submission_hash(document_id,payload)
@@ -200,6 +207,9 @@ class ReadingAgent:
             if row is not None:
                 if row['request_hash']!=fingerprint:raise WorkspaceError('idempotency_conflict','助手请求编号已用于其他内容。',409)
                 return self.store.read(connection,document_id,str(payload.request_id))
+            # A stale tab must not send to a closed conversation even before the
+            # model check; the transactional guard still runs inside submit().
+            if payload.conversation_id:self.store.conversation(connection,document_id,str(payload.conversation_id))
         status=self.provider.status()
         if not status['configured']:raise WorkspaceError('agent_not_configured','尚未连接模型，请展开研究助手连接设置。',409)
         if payload.continue_task and payload.context.resource_refs:

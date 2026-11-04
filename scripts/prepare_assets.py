@@ -24,8 +24,10 @@ def prepare_pdfjs():
         raise ValueError('PDF.js archive failed its pinned integrity check')
     target = ROOT / 'frontend/vendor/pdfjs'
     allowed = ('package/build/pdf.mjs', 'package/build/pdf.worker.mjs',
+               'package/legacy/build/pdf.mjs', 'package/legacy/build/pdf.worker.mjs',
                'package/cmaps/', 'package/standard_fonts/', 'package/wasm/',
                'package/LICENSE', 'package/package.json')
+    copied = set()
     with tarfile.open(fileobj=io.BytesIO(archive), mode='r:gz') as source:
         for member in source.getmembers():
             if member.isfile() and any(member.name == p or p.endswith('/') and member.name.startswith(p) for p in allowed):
@@ -35,6 +37,10 @@ def prepare_pdfjs():
                 output = target.joinpath(*relative.parts)
                 output.parent.mkdir(parents=True, exist_ok=True)
                 output.write_bytes(source.extractfile(member).read())
+                copied.add(relative.as_posix())
+    required_legacy = {'legacy/build/pdf.mjs', 'legacy/build/pdf.worker.mjs'}
+    if not required_legacy.issubset(copied):
+        raise ValueError('Pinned PDF.js archive is missing a required legacy build file')
     (target / 'upstream.json').write_text(json.dumps({
         'package': 'pdfjs-dist', 'version': VERSION,
         'source': url, 'integrity': 'sha512-' + INTEGRITY,
