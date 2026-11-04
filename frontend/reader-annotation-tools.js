@@ -50,3 +50,41 @@ if (drawMenu) {
   observer.observe(drawMenu, { attributes: true, subtree: true, attributeFilter: ["disabled", "aria-pressed"] });
   syncState();
 }
+
+const selectedAnnotationToolbar = document.getElementById("selected-annotation-toolbar");
+
+if (selectedAnnotationToolbar) {
+  const kindSelect = document.getElementById("selected-annotation-kind");
+  const colorSelect = document.getElementById("selected-annotation-color");
+  const kindButtons = Array.from(selectedAnnotationToolbar.querySelectorAll("[data-selected-annotation-kind]"));
+  const colorButtons = Array.from(selectedAnnotationToolbar.querySelectorAll("[data-selected-annotation-color]"));
+
+  function syncSelectedAnnotationControls() {
+    for (const button of kindButtons) {
+      button.setAttribute("aria-pressed", String(button.dataset.selectedAnnotationKind === kindSelect.value));
+    }
+    for (const button of colorButtons) {
+      button.setAttribute("aria-pressed", String(button.dataset.selectedAnnotationColor === colorSelect.value));
+    }
+  }
+
+  selectedAnnotationToolbar.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-selected-annotation-kind], [data-selected-annotation-color]");
+    if (!button || button.disabled) return;
+    const isKind = button.hasAttribute("data-selected-annotation-kind");
+    const select = isKind ? kindSelect : colorSelect;
+    const value = isKind ? button.dataset.selectedAnnotationKind : button.dataset.selectedAnnotationColor;
+    if (select.value !== value) {
+      select.value = value;
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    syncSelectedAnnotationControls();
+  });
+  selectedAnnotationToolbar.addEventListener("selected-annotation-render", syncSelectedAnnotationControls);
+  kindSelect.addEventListener("change", syncSelectedAnnotationControls);
+  colorSelect.addEventListener("change", syncSelectedAnnotationControls);
+
+  const observer = new MutationObserver(syncSelectedAnnotationControls);
+  observer.observe(selectedAnnotationToolbar, { attributes: true, subtree: true, attributeFilter: ["disabled"] });
+  syncSelectedAnnotationControls();
+}

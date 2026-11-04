@@ -741,3 +741,18 @@ Device-only POST `/api/v1/device/backups` imports its own v1 ZIP after bounds,
 SHA/reference checks and commits once. Existing IDs with divergent content return
 409 without overwrite. This is not a server backup-import API. See
 LOCAL-STORAGE-PLAN.md and DEVICE-STORAGE-ACCEPTANCE.md for actual scope and limits.
+
+# v0.55.5 selected-text translation
+
+POST `/api/v1/documents/{document_id}/selection-translation` accepts only
+`{request_id, source_sha256, pages, text, target_language}`. UUID and SHA identify
+the frozen request/source; pages are1..20 ascending unique actual PDF pages,
+text is nonblank and at most3000 characters, target language is `zh|en`.
+The200 response is `{request_id,document_id,source_sha256,pages,target_language,translated_text}`.
+No rectangle, model, credentials or endpoint can be supplied by the client.
+Source/guest ownership and bounds are checked before and after the single model
+attempt. No Agent turn, PDF parsing, schema migration or note save is implied.
+Pending/conflicting request IDs return409; another in-flight selection returns429.
+A bounded in-memory receipt can replay completed/failed results without another
+call; this guarantee ends on eviction/expiry/restart. Local device mode does not
+call the endpoint. See [selection translation](SELECTION-TRANSLATION.md).

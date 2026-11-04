@@ -27,6 +27,7 @@ import { isDeviceMode, mapDeviceAssetUrl } from "/device-context.js";
 import { createDeviceUI, applyDeviceCapabilities } from "/device-ui.js";
 import { offlineSupport } from "/offline-client.js";
 import { collectPdfTextSelection, formatSelectionQuote, sourceSegmentsFor } from "/cross-page-selection.js";
+import { createSelectionTranslation } from "/selection-translation.js";
 
 window.workbenchStartup?.stage("workspace");
 pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf-worker-compat.js?v=0.52.0";
@@ -265,6 +266,31 @@ const messages = {
     textSelectionNote: "加入笔记",
     askSelection: "提问",
     translateSelection: "翻译",
+    selectionTranslationHeading: "划线翻译",
+    selectionTranslationTarget: "译为",
+    selectionTranslationChinese: "中文",
+    selectionTranslationEnglish: "英文",
+    selectionTranslationLoading: "翻译中…",
+    selectionTranslationLoadingStatus: "正在翻译所选文字…",
+    selectionTranslationReady: "翻译完成。",
+    selectionTranslationExplicit: "点击“翻译”使用所选目标语言。",
+    selectionTranslationLength: "第 {pages} 页 · {count} 字",
+    selectionTranslationSource: "查看原文（第 {pages} 页）",
+    selectionTranslationCopy: "复制译文",
+    selectionTranslationCopied: "译文已复制。",
+    selectionTranslationCopyFailed: "复制失败，请手动选择译文。",
+    selectionTranslationTooLong: "选中文字超过 3000 字，请缩小选择范围。",
+    selectionTranslationPages: "一次最多翻译 20 页内的选区，请缩小范围。",
+    selectionTranslationEmpty: "没有可翻译的所选文字。",
+    selectionTranslationUnavailable: "当前选区不可用，请重新选择。",
+    selectionTranslationDeviceUnavailable: "本机存储模式暂不支持划线翻译。",
+    selectionTranslationSourceChanged: "原文或选区已变化，请重新选择。",
+    selectionTranslationAgentNotConfigured: "请先在助手设置中配置模型。",
+    selectionTranslationPending: "上一项翻译仍在处理，请稍后重试。",
+    selectionTranslationBusy: "翻译服务正忙，请稍后重试。",
+    selectionTranslationConflict: "翻译请求发生冲突，请重试。",
+    selectionTranslationNetwork: "无法连接翻译服务，请稍后重试。",
+    selectionTranslationFailed: "翻译未完成，请重试。",
     selectTextFirst: "请先在当前页选中文字。若页面没有可选择文字，请使用“截取图片”。",
     textSelectionTooLong: "选中文字超过 10000 字，请缩小选择范围。",
     noTextLayer: "此页没有可选择的文字。可改用“截取图片”。",
@@ -708,6 +734,31 @@ const messages = {
     textSelectionNote: "Add to note",
     askSelection: "Ask",
     translateSelection: "Translate",
+    selectionTranslationHeading: "Translate selection",
+    selectionTranslationTarget: "Translate to",
+    selectionTranslationChinese: "Chinese",
+    selectionTranslationEnglish: "English",
+    selectionTranslationLoading: "Translating…",
+    selectionTranslationLoadingStatus: "Translating the selected text…",
+    selectionTranslationReady: "Translation ready.",
+    selectionTranslationExplicit: "Click Translate to use the selected target language.",
+    selectionTranslationLength: "Pages {pages} · {count} characters",
+    selectionTranslationSource: "View source (pages {pages})",
+    selectionTranslationCopy: "Copy translation",
+    selectionTranslationCopied: "Translation copied.",
+    selectionTranslationCopyFailed: "Copy failed. Select and copy the translation manually.",
+    selectionTranslationTooLong: "The selected text exceeds 3,000 characters. Select a smaller passage.",
+    selectionTranslationPages: "Select text across at most 20 pages for one translation.",
+    selectionTranslationEmpty: "There is no selected text to translate.",
+    selectionTranslationUnavailable: "This selection is unavailable. Select the text again.",
+    selectionTranslationDeviceUnavailable: "Selection translation is unavailable in device storage mode.",
+    selectionTranslationSourceChanged: "The source or selection changed. Select the text again.",
+    selectionTranslationAgentNotConfigured: "Configure a model in Agent settings first.",
+    selectionTranslationPending: "The previous translation is still pending. Try again later.",
+    selectionTranslationBusy: "The translation service is busy. Try again later.",
+    selectionTranslationConflict: "The translation request conflicted. Try again.",
+    selectionTranslationNetwork: "Could not connect to the translation service. Try again later.",
+    selectionTranslationFailed: "Translation was not completed. Try again.",
     selectTextFirst: "Select text on the current page first. If the page has no selectable text, use “Capture image”.",
     textSelectionTooLong: "The selected text exceeds 10,000 characters. Select a smaller passage.",
     noTextLayer: "This page has no selectable text. Use “Capture image” instead.",
@@ -989,6 +1040,7 @@ const elements = {
   selectedAnnotationCopy: $("selected-annotation-copy"),
   selectedAnnotationNote: $("selected-annotation-note"),
   selectedAnnotationAgent: $("selected-annotation-agent"),
+  selectedAnnotationTranslate: $("selected-annotation-translate"),
   selectedAnnotationEdit: $("selected-annotation-edit"),
   selectedAnnotationKind: $("selected-annotation-kind"),
   selectedAnnotationColor: $("selected-annotation-color"),
@@ -1204,6 +1256,7 @@ let richText = null;
 let researchRecord = null;
 let study = null;
 let readerFind = null;
+let selectionTranslation = null;
 let readerObjects = null;
 let readerShapes = null;
 let lastReadingDocumentId = null;
@@ -1451,6 +1504,7 @@ function applyLanguage() {
   study?.applyLanguage(state.language);
   readerFind?.applyLanguage();
   readerShapes?.applyLanguage();
+  selectionTranslation?.applyLanguage();
   deviceUI?.render();
 }
 
@@ -3170,6 +3224,7 @@ function renderDocumentDetails() {
   elements.annotationRedo.disabled = !hasPdf || !historyCounts.redo || annotationDisabled || shapeUnsaved;
   readerNavigation?.update();
   renderSelectedAnnotationToolbar();
+  selectionTranslation?.contextChanged();
   readerShapes?.updateControls();
   readerShapes?.positionEditor();
   elements.textSelectionNote.disabled = annotationDisabled;
@@ -3793,6 +3848,7 @@ function cancelDocumentWork() {
   state.loadSequence += 1;
   state.noteNavigationSequence += 1;
   state.renderSequence += 1;
+  selectionTranslation?.contextChanged();
   for (const entry of state.metadata.values()) entry.lookup?.controller.abort();
   cancelTextLayer();
   cancelPdfDocumentAttempt();
@@ -5275,10 +5331,12 @@ function resetTextAnnotationToolbar() {
 function updateTextAnnotationToolbar() {
   if (readerShapes?.isInteracting()) {
     state.capturedTextSelection = null;
+    selectionTranslation?.selectionChanged(null);
     resetTextAnnotationToolbar();
     return;
   }
   const selected = readPdfTextSelection();
+  selectionTranslation?.selectionChanged(selected);
   if (selected) closeSelectedAnnotation();
   state.capturedTextSelection = selected;
   if (!selected || state.pendingSaves > 0 || state.pendingMutations.size > 0) {
@@ -5360,6 +5418,7 @@ function shapeSourceProvenance(capture) {
 
 function clearPdfTextSelection() {
   state.capturedTextSelection = null;
+  selectionTranslation?.selectionChanged(null);
   window.getSelection()?.removeAllRanges();
   resetTextAnnotationToolbar();
 }
@@ -5661,6 +5720,7 @@ function selectedAnnotation() {
 function closeSelectedAnnotation() {
   state.selectedAnnotationId = null;
   elements.selectedAnnotationToolbar.hidden = true;
+  selectionTranslation?.contextChanged();
 }
 
 function renderSelectedAnnotationToolbar() {
@@ -5677,6 +5737,7 @@ function renderSelectedAnnotationToolbar() {
   for (const control of toolbar.querySelectorAll("button, select")) control.disabled = locked;
   elements.selectedAnnotationKind.value = note.annotation.kind;
   elements.selectedAnnotationColor.value = note.annotation.color;
+  toolbar.dispatchEvent(new Event("selected-annotation-render"));
   const rect = note.rect || [0, 0, 1, 1];
   const surface = record.surface.getBoundingClientRect();
   const anchor = { left: surface.left + rect[0] * surface.width, right: surface.left + rect[2] * surface.width, top: surface.top + rect[1] * surface.height, bottom: surface.top + rect[3] * surface.height };
@@ -5698,6 +5759,7 @@ function selectTextAnnotation(note, options = {}) {
   state.highlightRevealId = null;
   state.selectedAnnotationId = note.id;
   state.capturedTextSelection = null;
+  selectionTranslation?.contextChanged();
   resetTextAnnotationToolbar();
   drawHighlight();
   renderSelectedAnnotationToolbar();
@@ -6807,6 +6869,7 @@ async function deleteNote(document, note) {
   if (failed?.action === "delete" && !failed.conflicted) return runMutation(failed);
   if (failed?.conflicted) state.failedMutations.delete(key);
   if (!window.confirm(t("deleteConfirm"))) return null;
+  if (state.selectedAnnotationId === note.id) selectionTranslation?.close({ restoreFocus: false });
   const operation = makeLifecycleMutation(document, note, "delete");
   return operation ? runMutation(operation) : null;
 }
@@ -7389,6 +7452,9 @@ elements.selectedAnnotationAgent.addEventListener("click", () => {
   const note = selectedAnnotation();
   if (note) assistant?.addNoteReference(note.document_id, note);
 });
+elements.selectedAnnotationTranslate.addEventListener("click", () => {
+  selectionTranslation?.openAnnotation(selectedAnnotation(), elements.selectedAnnotationTranslate);
+});
 elements.selectedAnnotationEdit.addEventListener("click", () => {
   const note = selectedAnnotation();
   if (note) startEditNote(state.document, note);
@@ -7512,7 +7578,7 @@ elements.textSelectionNote.addEventListener("mousedown", (event) => {
 });
 elements.textSelectionNote.addEventListener("click", addTextSelectionToNote);
 elements.textSelectionAsk.addEventListener("click", () => prepareTextReaderAction("ask"));
-elements.textSelectionTranslate.addEventListener("click", () => prepareTextReaderAction("translate"));
+elements.textSelectionTranslate.addEventListener("click", () => selectionTranslation?.openSelection(elements.textSelectionTranslate));
 elements.textAnnotationToolbar.addEventListener("pointerdown", (event) => {
   if (event.button !== 0 || !event.target.closest("button, input, label")) return;
   event.preventDefault();
@@ -7525,6 +7591,7 @@ elements.readerStage.addEventListener("scroll", () => {
   if (elements.textAnnotationToolbar.dataset.contextual === "true") updateTextAnnotationToolbar();
   readerNavigation?.update();
   renderSelectedAnnotationToolbar();
+  selectionTranslation?.position();
   readerShapes?.positionEditor();
   handleContinuousScroll();
   scheduleReaderProgressCapture();
@@ -8133,6 +8200,7 @@ workspace = createWorkspace({
   modeRendered: (mode) => {
     dataNavigation?.setMode(mode);
     if (mode !== "reading" && state.flowActive) deactivateFlow();
+    selectionTranslation?.contextChanged();
     syncTranslationLayout();
     translation.update(translationModel());
     syncFlowLayout();
@@ -8150,6 +8218,38 @@ workspace = createWorkspace({
   },
   chartsSelected: (documentId) => charts?.reload(documentId),
   navigationChanged: () => researchRecord?.navigationChanged()
+});
+
+selectionTranslation = createSelectionTranslation({
+  api,
+  t,
+  getLanguage: () => state.language,
+  currentSelection: currentPdfTextSelection,
+  sourceSegmentsFor,
+  selectionRequired: () => setStatus("selectTextFirst", "error"),
+  isAnnotationCurrent: (noteId) => selectedAnnotation()?.id === noteId,
+  getContext: () => ({
+    documentId: state.document?.id || "",
+    sourceSha256: state.document?.sha256 || "",
+    pageCount: state.document?.page_count || 0,
+    page: state.page,
+    loadSequence: state.loadSequence,
+    mode: workspace?.getMode() || null,
+    scope: `${deviceMode ? "device" : "server"}:${window.location.pathname}`,
+    selectedAnnotationId: state.selectedAnnotationId,
+    hasPdf: Boolean(state.pdf),
+    isPaper: Boolean(state.document && !isStudy()),
+    deviceMode
+  }),
+  goToSource: (source) => {
+    const rect = source.rect;
+    return goToTranslationSource(source.page, rect ? {
+      x: rect[0],
+      y: rect[1],
+      width: rect[2] - rect[0],
+      height: rect[3] - rect[1]
+    } : null, source.documentId, source.sourceSha256);
+  }
 });
 
 richText = createRichText({

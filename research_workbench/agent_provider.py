@@ -76,6 +76,14 @@ class ModelConnection:
             raise WorkspaceError('agent_invalid_provider','请填写有效的 HTTPS 模型地址、模型名称和密钥。',422)
 
     def complete(self,messages,tools):
+        """Existing multi-caller path: one retry of the transport on network loss."""
+        return self._complete(messages,tools,retry=True)
+
+    def complete_once(self,messages,tools):
+        """Bounded one-shot path for a single user action; no transport retry."""
+        return self._complete(messages,tools,retry=False)
+
+    def _complete(self,messages,tools,retry):
         config,_=self.config()
         if not config.get('api_key'):
             raise WorkspaceError('agent_not_configured','尚未连接模型，请先配置研究助手连接。',409)
@@ -89,7 +97,7 @@ class ModelConnection:
             headers={'Authorization':'Bearer '+config['api_key'],'Content-Type':'application/json'},method='POST')
         try:
             self.connection_state='connecting'
-            raw=self.request(request)
+            raw=self.request(request) if retry else self.request_once(request)
             if len(raw)>256*1024:raise ValueError()
             choice=json.loads(raw)['choices'][0]
             message=choice['message']
@@ -118,3 +126,8 @@ class ModelConnection:
             except (urllib.error.URLError,TimeoutError,OSError):
                 if attempt:raise
                 time.sleep(.2)
+
+    def request_once(self,request):
+        """One transport attempt only; callers never replay a user action."""
+        with self.opener.open(request,timeout=35) as response:
+            return response.read(256*1024+1)

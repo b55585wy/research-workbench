@@ -161,6 +161,9 @@ def create_app(data_root=None, validator=None, renderer=None, *, agent_provider=
     translations = Translations(store, provider, TranslationRuntime(translation_root))
     translation_supervisor = TranslationSupervisor(translations, translation_root,
         agent_config or os.environ.get('RESEARCH_AGENT_CONFIG')) if translation_autostart else None
+    from .selection_translation import SelectionTranslation
+    from .selection_translation_api import router as selection_translation_router
+    selection_translation = SelectionTranslation(store, provider)
     # Model-free paragraph reading reuses the resolved translation runtime root
     # for its pinned local parser; it never reads model configuration.
     from .reading_pages import ReadingPages
@@ -223,6 +226,8 @@ def create_app(data_root=None, validator=None, renderer=None, *, agent_provider=
     app.state.reader_errors = ReaderErrorReporter(store)
     app.state.translations = translations
     app.include_router(translation_router)
+    app.state.selection_translation = selection_translation
+    app.include_router(selection_translation_router)
     app.state.reading_pages = reading_pages
     app.include_router(reading_page_router)
     app.state.excerpts = Excerpts(store, renderer)

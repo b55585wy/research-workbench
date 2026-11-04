@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="color-scheme" content="light">
+  <script src="/theme-init.js"></script>
   <title>文献与笔记 · research workspace</title>
   <link rel="stylesheet" href="/startup.css?v=0.55.2">
   <link rel="stylesheet" href="/theme-tokens.css">
@@ -30,6 +31,7 @@
   <link rel="stylesheet" href="/mobile-layout.css?v=0.55.0">
   <link rel="stylesheet" href="/reader-mobile-tools.css?v=0.53.0">
   <link rel="stylesheet" href="/reader-annotation-tools.css">
+  <link rel="stylesheet" href="/selection-translation.css">
   <link rel="stylesheet" href="/device-ui.css">
   <link rel="stylesheet" href="/offline-ui.css">
   <link rel="stylesheet" href="/status-notice.css">
@@ -290,8 +292,14 @@
               <svg class="reader-annotation-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 3h14v18H5zM9 3v18M12 8h4M12 12h4"/></svg>
               <span class="sr-only" data-i18n="textSelectionNote">加入笔记</span>
             </button>
-            <button id="text-selection-ask" class="button button-secondary" type="button" data-i18n="askSelection" disabled>提问</button>
-            <button id="text-selection-translate" class="button button-secondary" type="button" data-i18n="translateSelection" disabled>翻译</button>
+            <button id="text-selection-ask" class="button button-secondary reader-annotation-icon-button" type="button" data-i18n-aria="askSelection" aria-label="提问" title="提问" disabled>
+              <svg class="reader-annotation-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M20 15a3 3 0 0 1-3 3H9l-5 3v-6a3 3 0 0 1-1-2V7a3 3 0 0 1 3-3h11a3 3 0 0 1 3 3z"/><path d="M9.5 9a2.5 2.5 0 0 1 5 .2c0 1.8-2.5 2-2.5 3.8M12 15h.01"/></svg>
+              <span class="sr-only" data-i18n="askSelection">提问</span>
+            </button>
+            <button id="text-selection-translate" class="button button-secondary reader-annotation-icon-button" type="button" data-i18n-aria="translateSelection" aria-label="翻译" title="翻译" disabled>
+              <svg class="reader-annotation-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 5h8M7 3v2M5 5c.5 4 2.5 7 6 9M10 5c-.8 4-3.2 7-7 9M13 20l3.5-9 3.5 9M14.5 16h4"/></svg>
+              <span class="sr-only" data-i18n="translateSelection">翻译</span>
+            </button>
             <button id="text-annotation-highlight" class="button button-secondary reader-annotation-icon-button" type="button" data-action="annotation-kind" data-kind="highlight" data-i18n-aria="annotationHighlight" aria-label="保存高亮" title="保存高亮" disabled>
               <svg class="reader-annotation-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m9 15-4 4 1 1 4-4M10 5l9 9-5 5-9-9zM3 22h10"/></svg>
               <span class="sr-only" data-i18n="annotationHighlight">保存高亮</span>
@@ -421,13 +429,48 @@
         <aside id="translation-panel" class="translation-panel" aria-labelledby="translation-heading" hidden></aside>
       </div>
       <div id="selected-annotation-toolbar" class="selected-annotation-toolbar" role="group" aria-label="已选批注操作" hidden>
-        <button id="selected-annotation-copy" class="button button-secondary" type="button" data-i18n="copyQuote">复制引文</button>
-        <button id="selected-annotation-note" class="button button-secondary" type="button" data-i18n="textSelectionNote">加入笔记</button>
-        <button id="selected-annotation-agent" class="button button-secondary" type="button" data-i18n="addToAssistant">加入助手</button>
-        <button id="selected-annotation-edit" class="button button-quiet" type="button" data-i18n="editNote">编辑</button>
-        <label><span class="sr-only" data-i18n="annotationKind">标注类型</span><select id="selected-annotation-kind" data-i18n-aria="annotationKind" aria-label="标注类型"><option value="highlight" data-i18n="annotationKindHighlight">高亮</option><option value="underline" data-i18n="annotationKindUnderline">下划线</option></select></label>
-        <label><span class="sr-only" data-i18n="annotationColor">标注颜色</span><select id="selected-annotation-color" data-i18n-aria="annotationColor" aria-label="标注颜色"><option value="yellow" data-i18n="colorYellow">黄色</option><option value="green" data-i18n="colorGreen">绿色</option><option value="blue" data-i18n="colorBlue">蓝色</option><option value="pink" data-i18n="colorPink">粉色</option></select></label>
-        <button id="selected-annotation-delete" class="button button-quiet" type="button" data-i18n="deleteNote">删除</button>
+        <button id="selected-annotation-copy" class="button button-secondary reader-annotation-icon-button" type="button" data-i18n-aria="copyQuote" aria-label="复制引文" title="复制引文">
+          <svg class="reader-annotation-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>
+          <span class="sr-only" data-i18n="copyQuote">复制引文</span>
+        </button>
+        <button id="selected-annotation-note" class="button button-secondary reader-annotation-icon-button" type="button" data-i18n-aria="textSelectionNote" aria-label="加入笔记" title="加入笔记">
+          <svg class="reader-annotation-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 3h14v18H5zM9 3v18M12 8h4M12 12h4"/></svg>
+          <span class="sr-only" data-i18n="textSelectionNote">加入笔记</span>
+        </button>
+        <button id="selected-annotation-agent" class="button button-secondary reader-annotation-icon-button" type="button" data-i18n-aria="addToAssistant" aria-label="加入助手" title="加入助手">
+          <svg class="reader-annotation-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M20 15a3 3 0 0 1-3 3H9l-5 3v-6a3 3 0 0 1-1-2V7a3 3 0 0 1 3-3h11a3 3 0 0 1 3 3z"/><path d="M9 11h6M12 8v6"/></svg>
+          <span class="sr-only" data-i18n="addToAssistant">加入助手</span>
+        </button>
+        <button id="selected-annotation-translate" class="button button-secondary reader-annotation-icon-button" type="button" data-i18n-aria="translateSelection" aria-label="翻译" title="翻译">
+          <svg class="reader-annotation-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 5h8M7 3v2M5 5c.5 4 2.5 7 6 9M10 5c-.8 4-3.2 7-7 9M13 20l3.5-9 3.5 9M14.5 16h4"/></svg>
+          <span class="sr-only" data-i18n="translateSelection">翻译</span>
+        </button>
+        <button id="selected-annotation-edit" class="button button-quiet reader-annotation-icon-button" type="button" data-i18n-aria="editNote" aria-label="编辑" title="编辑">
+          <svg class="reader-annotation-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m4 20 4.5-1 10-10a2.1 2.1 0 0 0-3-3l-10 10L4 20ZM13.5 8l3 3"/></svg>
+          <span class="sr-only" data-i18n="editNote">编辑</span>
+        </button>
+        <label class="selected-annotation-native-control" hidden><span class="sr-only" data-i18n="annotationKind">标注类型</span><select id="selected-annotation-kind" data-i18n-aria="annotationKind" aria-label="标注类型"><option value="highlight" data-i18n="annotationKindHighlight">高亮</option><option value="underline" data-i18n="annotationKindUnderline">下划线</option></select></label>
+        <div class="selected-annotation-kind-controls" role="group" data-i18n-aria="annotationKind" aria-label="标注类型">
+          <button class="button button-quiet reader-annotation-icon-button" type="button" data-selected-annotation-kind="highlight" data-i18n-aria="annotationKindHighlight" aria-label="高亮" title="高亮" aria-pressed="true">
+            <svg class="reader-annotation-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m9 15-4 4 1 1 4-4M10 5l9 9-5 5-9-9zM3 22h10"/></svg>
+            <span class="sr-only" data-i18n="annotationKindHighlight">高亮</span>
+          </button>
+          <button class="button button-quiet reader-annotation-icon-button" type="button" data-selected-annotation-kind="underline" data-i18n-aria="annotationKindUnderline" aria-label="下划线" title="下划线" aria-pressed="false">
+            <svg class="reader-annotation-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 3v7a6 6 0 0 0 12 0V3M5 21h14"/></svg>
+            <span class="sr-only" data-i18n="annotationKindUnderline">下划线</span>
+          </button>
+        </div>
+        <label class="selected-annotation-native-control" hidden><span class="sr-only" data-i18n="annotationColor">标注颜色</span><select id="selected-annotation-color" data-i18n-aria="annotationColor" aria-label="标注颜色"><option value="yellow" data-i18n="colorYellow">黄色</option><option value="green" data-i18n="colorGreen">绿色</option><option value="blue" data-i18n="colorBlue">蓝色</option><option value="pink" data-i18n="colorPink">粉色</option></select></label>
+        <div class="selected-annotation-color-controls" role="group" data-i18n-aria="annotationColor" aria-label="标注颜色">
+          <button class="button button-quiet reader-annotation-icon-button selected-annotation-color-button" type="button" data-selected-annotation-color="yellow" data-i18n-aria="colorYellow" aria-label="黄色" title="黄色" aria-pressed="true"><span class="selected-annotation-color-swatch" aria-hidden="true"></span><span class="sr-only" data-i18n="colorYellow">黄色</span></button>
+          <button class="button button-quiet reader-annotation-icon-button selected-annotation-color-button" type="button" data-selected-annotation-color="green" data-i18n-aria="colorGreen" aria-label="绿色" title="绿色" aria-pressed="false"><span class="selected-annotation-color-swatch" aria-hidden="true"></span><span class="sr-only" data-i18n="colorGreen">绿色</span></button>
+          <button class="button button-quiet reader-annotation-icon-button selected-annotation-color-button" type="button" data-selected-annotation-color="blue" data-i18n-aria="colorBlue" aria-label="蓝色" title="蓝色" aria-pressed="false"><span class="selected-annotation-color-swatch" aria-hidden="true"></span><span class="sr-only" data-i18n="colorBlue">蓝色</span></button>
+          <button class="button button-quiet reader-annotation-icon-button selected-annotation-color-button" type="button" data-selected-annotation-color="pink" data-i18n-aria="colorPink" aria-label="粉色" title="粉色" aria-pressed="false"><span class="selected-annotation-color-swatch" aria-hidden="true"></span><span class="sr-only" data-i18n="colorPink">粉色</span></button>
+        </div>
+        <button id="selected-annotation-delete" class="button button-quiet reader-annotation-icon-button" type="button" data-i18n-aria="deleteNote" aria-label="删除" title="删除">
+          <svg class="reader-annotation-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v5m4-5v5"/></svg>
+          <span class="sr-only" data-i18n="deleteNote">删除</span>
+        </button>
       </div>
       <section id="reader-shape-editor" class="reader-shape-editor" aria-label="图形批注" hidden>
         <label for="reader-shape-description"><span id="reader-shape-description-label" data-i18n="shapeDescription">批注说明</span>

@@ -169,3 +169,89 @@
     }
   }
 }
+
+.selected-annotation-toolbar {
+  gap: 2px;
+  padding: 4px;
+}
+
+.selected-annotation-toolbar .reader-annotation-icon-button {
+  display: inline-flex;
+  flex: 0 0 36px;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
+  min-height: 36px;
+  padding: 0;
+}
+
+.selected-annotation-toolbar .reader-annotation-icon {
+  display: block;
+  width: 19px;
+  height: 19px;
+  pointer-events: none;
+}
+
+.selected-annotation-kind-controls,
+.selected-annotation-color-controls {
+  display: flex;
+  flex: none;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 2px;
+}
+
+.selected-annotation-kind-controls {
+  padding-inline: 4px;
+  border-inline: 1px solid var(--ui-border);
+}
+
+.selected-annotation-toolbar [data-selected-annotation-kind][aria-pressed="true"] {
+  background: var(--ui-selected);
+  color: var(--ui-primary);
+}
+
+.selected-annotation-color-swatch {
+  display: block;
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.selected-annotation-color-button[aria-pressed="true"] .selected-annotation-color-swatch {
+  border-color: var(--ui-primary);
+  box-shadow: 0 0 0 2px var(--ui-surface), 0 0 0 4px var(--ui-primary);
+}
+
+[data-selected-annotation-color="yellow"] .selected-annotation-color-swatch { background: #ffe069; }
+[data-selected-annotation-color="green"] .selected-annotation-color-swatch { background: #91dab1; }
+[data-selected-annotation-color="blue"] .selected-annotation-color-swatch { background: #91c8f6; }
+[data-selected-annotation-color="pink"] .selected-annotation-color-swatch { background: #efa9cf; }
+
+.selected-annotation-native-control[hidden] {
+  display: none;
+}
+
+.selected-annotation-toolbar .reader-annotation-icon-button:focus-visible {
+  outline: 2px solid var(--ui-focus);
+  outline-offset: 2px;
+}
+
+@media (pointer: coarse) {
+  .selected-annotation-toolbar .reader-annotation-icon-button {
+    flex-basis: 44px;
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+    min-height: 44px;
+  }
+
+  .selected-annotation-color-swatch {
+    width: 24px;
+    height: 24px;
+  }
+}
