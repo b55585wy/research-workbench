@@ -207,3 +207,13 @@ Kimi实现控件，Codex核对并调整手机换行；JS语法及隔离示例PDF
 旧UI`ui-0.57.0-42d8535a6c94bdfa`保留；指针备份位于各机
 `/opt/research-workspace/downloads/shape-width-visual/pointer-before-1793831557.json`（旧机）及
 `pointer-before-1793831520.json`（新机）。这轮回退只需切换兼容前端指针，不恢复旧数据库备份。
+
+同日按用户进一步确认，线宽改为单图标点击展开四档、选后收起，源码`ef920cc`；
+UI为`ui-0.57.0-0dc273886edea89a`，包SHA256
+`6e2e26aff0e1b33f459dc23234d6be5f6937ce92787ba1e5362de0139c7f9ae0`。
+核对默认收起、点选更新图标、外部/Esc关闭、键盘选择确认、保存重开及320/390px选项可点击且无溢出；
+使用隔离示例PDF，未运行全量回归或模型调用。Kimi实现，Codex审查和交付，无额度回退。
+两域名选中新UI，公开脚本/样式与包内哈希相符。guest/代理/旧机owner PID保持23545/13133/13400、21862/2710；
+无后端重启、资料迁移或强制刷新。上版`ui-0.57.0-13af2df606cf3ee7`保留，指针备份为
+`/opt/research-workspace/downloads/shape-width-menu/pointer-before-1793832349.json`（旧机）和
+`pointer-before-1793832351.json`（新机）。
