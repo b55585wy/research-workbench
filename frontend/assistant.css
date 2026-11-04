@@ -2,7 +2,7 @@
   position: fixed;
   right: 20px;
   bottom: 20px;
-  z-index: 30;
+  z-index: 40;
   box-shadow: 0 3px 14px rgb(0 0 0 / 18%);
 }
 
