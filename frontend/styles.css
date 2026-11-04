@@ -841,6 +841,19 @@ h3 {
   text-align: center;
 }
 
+.reader-open-original {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  margin-top: 12px;
+  text-decoration: none;
+}
+
+.reader-open-original[hidden] {
+  display: none;
+}
+
 .page-surface {
   position: relative;
   flex: none;

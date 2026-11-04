@@ -427,6 +427,12 @@ SCHEMA = SCHEMA.replace('COMMIT;', TRANSLATION_SCHEMA + '\nPRAGMA user_version=2
 # earlier layers stay exactly as deployed.
 from .reading_page_schema import SCHEMA as READING_PAGE_SCHEMA
 SCHEMA = SCHEMA[:SCHEMA.rindex('COMMIT;')] + READING_PAGE_SCHEMA + '\nPRAGMA user_version=24;\nCOMMIT;'
+# Version 25 adds ONE additive tombstone table for cleared assistant
+# conversations.  No existing table/column is rewritten: original turn ids,
+# request hashes, grants, events and execution receipts stay in place, and an
+# older build must refuse to reopen this file rather than expose closed chats.
+from .conversation_lifecycle import SCHEMA as CONVERSATION_CLEAR_SCHEMA
+SCHEMA = SCHEMA[:SCHEMA.rindex('COMMIT;')] + CONVERSATION_CLEAR_SCHEMA + '\nPRAGMA user_version=25;\nCOMMIT;'
 
 
 def timestamp():
@@ -453,7 +459,7 @@ class Store:
         self.exports.mkdir(exist_ok=True)
         self.database = self.root / 'workspace.sqlite3'
         with self.connection() as connection:
-            if connection.execute('PRAGMA user_version').fetchone()[0] > 24:
+            if connection.execute('PRAGMA user_version').fetchone()[0] > 25:
                 raise RuntimeError('Database requires a newer application')
             from .study_migration import install
             install(connection,SCHEMA)

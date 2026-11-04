@@ -678,6 +678,17 @@ Existing result items, source kinds, chunk identities and final/history checks r
 No new HTTP endpoint, context/submission field, frontend, schema or dependency.
 This remains literal keyword retrieval, not full-text/semantic/OCR verification.
 Functional, browser, HTTP, PDF and model checks were not run at the user's request.
+# v0.52 PDF compatibility and conversation clearing
+
+`GET /api/v1/agent/status` returns `conversation_clear: true`, including when no model key is configured.
+`POST /api/v1/documents/{document_id}/agent/conversations/{conversation_id}/clear` accepts only
+`{request_id: UUID}` and returns `{id, document_id, cleared: true, cleared_at}`. Retrying the same
+request returns the same receipt. Wrong document/space returns 404; active turns/tasks or a
+conflicting request ID return 409. Cleared history, turns, proposals and task operations return 410.
+Saved research assets and unsent drafts remain. Storage schema 25 closes cleared conversation IDs;
+the next send starts a new conversation. Restore matching data backups when rolling back to v0.51.
+See [PDF-CHAT-IMPROVEMENTS.md](PDF-CHAT-IMPROVEMENTS.md).
+
 # v0.51 isolated server guests
 
 Opt-in `--guest-root` starts a separate loopback guest service; the default local

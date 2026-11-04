@@ -1,6 +1,10 @@
 Server deployment and current status: [SERVER-DEPLOYMENT.md](SERVER-DEPLOYMENT.md).
 
-# research workspace · v0.51.0
+# research workspace · v0.52.0
+
+修复缺少新 Promise 接口的浏览器打不开 PDF：使用同版 PDF.js legacy 及本地兼容资源，
+加载失败时可打开原 PDF。助手新增「清空对话」，保留草稿和已保存研究资料；
+已清空对话不能重新读取或继续执行。说明与接口见 [PDF-CHAT-IMPROVEMENTS.md](PDF-CHAT-IMPROVEMENTS.md)。
 
 新增免注册服务器游客空间：每位访客独立保存论文、笔记、聊天、数据与模型设置，
 可保存恢复码后在其他浏览器找回；以后再显式绑定注册账号。原个人服务及本地模式

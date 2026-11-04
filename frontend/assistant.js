@@ -306,6 +306,19 @@ const messages = {
     cancelFailed: "停止请求未完成，请重试。",
     decisionFailed: "决定未保存，原提案仍保留。请重试。",
     newConversation: "新对话",
+    clear: "清空对话",
+    clearingConversation: "正在清空对话…",
+    clearConversation: "清空对话",
+    clearConversationConfirm: "确认清空",
+    clearDialogCancel: "取消",
+    clearConversationHelp: "只会从对话记录中移除当前对话。未发送的草稿、已保存的笔记、数据和分析结果都会保留。",
+    clearConversationBusy: "当前对话仍在处理。请先停止当前响应，并等待任务或决定完成。",
+    clearConversationNoTarget: "没有可清空的已保存对话。",
+    conversationCleared: "对话已清空。草稿和研究数据已保留。",
+    conversationClosed: "此对话已在其他位置清空，已从记录中移除。草稿和研究数据已保留。",
+    clearFailed: "清空对话未完成，请按原请求重试。",
+    agent_conversation_busy: "当前对话仍在处理。请先停止当前响应，并等待任务或决定完成。",
+    agent_conversation_cleared: "此对话已在其他位置清空，已从记录中移除。草稿和研究数据已保留。",
     conversation: "对话 {date}",
     noteReferences: "已加入的笔记来源",
     noteReferencePrompt: "请结合已加入的笔记来源回答问题，并引用相应出处。",
@@ -679,6 +692,19 @@ const messages = {
     cancelFailed: "The stop request was not completed. Try again.",
     decisionFailed: "The decision was not saved. The original proposal is retained; try again.",
     newConversation: "New conversation",
+    clear: "Clear chat",
+    clearingConversation: "Clearing chat…",
+    clearConversation: "Clear chat",
+    clearConversationConfirm: "Clear chat",
+    clearDialogCancel: "Cancel",
+    clearConversationHelp: "Only this conversation will be removed from history. Your unsent draft, saved notes, data, and analysis results will be retained.",
+    clearConversationBusy: "This conversation is still active. Stop the current response and wait for any task or decision to finish first.",
+    clearConversationNoTarget: "There is no saved conversation to clear.",
+    conversationCleared: "Conversation cleared. Your draft and research data were retained.",
+    conversationClosed: "This conversation was cleared elsewhere and removed from history. Your draft and research data were retained.",
+    clearFailed: "The conversation was not cleared. Retry the exact request.",
+    agent_conversation_busy: "This conversation is still active. Stop the current response and wait for any task or decision to finish first.",
+    agent_conversation_cleared: "This conversation was cleared elsewhere and removed from history. Your draft and research data were retained.",
     conversation: "Conversation {date}",
     noteReferences: "Pinned note sources",
     noteReferencePrompt: "Answer using the pinned note sources and cite the relevant sources.",
@@ -772,6 +798,15 @@ export function createAssistant(adapter) {
     heading: byId("assistant-heading"),
     history: byId("assistant-history"),
     new: byId("assistant-new"),
+    clear: byId("assistant-clear"),
+    clearDialog: byId("assistant-clear-dialog"),
+    clearForm: byId("assistant-clear-form"),
+    clearHeading: byId("assistant-clear-heading"),
+    clearConversation: byId("assistant-clear-conversation"),
+    clearHelp: byId("assistant-clear-help"),
+    clearStatus: byId("assistant-clear-status"),
+    clearCancel: byId("assistant-clear-cancel"),
+    clearConfirm: byId("assistant-clear-confirm"),
     managementSummary: byId("assistant-management-summary"),
     context: byId("assistant-context"),
     messages: byId("assistant-messages"),
@@ -822,6 +857,7 @@ export function createAssistant(adapter) {
   let providerStatus = { key: "loading", kind: "info" };
   let settingsPending = false;
   let settingsStatus = null;
+  let clearDialogOperation = null;
 
   function t(key, values = {}) {
     let text = messages[language][key] || messages.en[key] || key;
@@ -915,6 +951,7 @@ export function createAssistant(adapter) {
         readerActions: [],
         explicitNoteContext: false,
         pendingDecision: null,
+        clearing: null,
         chartPreviews: new Map(),
         cancelling: null,
         status: null,
@@ -1042,7 +1079,21 @@ export function createAssistant(adapter) {
   }
 
   function canEditReferences(paperId, entry) {
-    return isCurrent(paperId, entry) && !entry.loading && !entry.conversationsLoading && !entry.pendingSend && !activeTurn(entry) && !entry.pendingDecision && !hasPendingReferenceAnalysisDecision(entry) && !tasks.isBusy(paperId, entry.conversationId);
+    return isCurrent(paperId, entry) && !entry.loading && !entry.conversationsLoading && !entry.pendingSend && !entry.clearing && !activeTurn(entry) && !entry.pendingDecision && !hasPendingReferenceAnalysisDecision(entry) && !tasks.isBusy(paperId, entry.conversationId);
+  }
+
+  function hasPendingConversationDecision(entry) {
+    return entry.turns.some((turn) => turn.status === "waiting_confirmation");
+  }
+
+  function canClearConversation(paperId, entry) {
+    return provider.conversation_clear === true && Boolean(entry?.conversationId) && !entry.loading && !entry.conversationsLoading && !entry.pendingSend?.pending && !entry.clearing?.pending && !activeTurn(entry) && !entry.pollController && !entry.pollTimer && !entry.pendingDecision && !entry.cancelling && !hasPendingConversationDecision(entry) && !tasks.isBusy(paperId, entry.conversationId);
+  }
+
+  function conversationTitle(entry, conversationId) {
+    const conversation = entry.conversations.find((item) => item.id === conversationId);
+    const date = String(conversation?.updated_at || latestTurn(entry)?.created_at || "").slice(0, 10);
+    return conversation?.title || t("conversation", { date });
   }
 
   function sourcePreparationModel() {
@@ -1441,7 +1492,7 @@ export function createAssistant(adapter) {
       elements.history.append(option);
     }
     elements.history.value = entry?.conversationId || "";
-    elements.history.disabled = !entry?.conversations.length || entry.loading || Boolean(entry.pendingSend?.pending) || Boolean(entry.pendingDecision);
+    elements.history.disabled = !entry?.conversations.length || entry.loading || Boolean(entry.pendingSend?.pending) || Boolean(entry.pendingDecision) || Boolean(entry.clearing);
   }
 
   function openTurnSource(source) {
@@ -2262,6 +2313,27 @@ export function createAssistant(adapter) {
     elements.providerSave.textContent = t(settingsPending ? "savingSettings" : "saveSettings");
   }
 
+  function renderClearDialog(paper, entry) {
+    elements.clear.hidden = provider.conversation_clear !== true;
+    elements.clear.disabled = !paper || !canClearConversation(paper.id, entry);
+    elements.clear.textContent = t(entry?.clearing?.pending ? "clearingConversation" : "clear");
+    elements.clear.title = entry?.clearing?.pending
+      ? t("clearingConversation")
+      : entry?.conversationId && !elements.clear.disabled
+        ? ""
+        : entry?.conversationId ? t("clearConversationBusy") : t("clearConversationNoTarget");
+    const operation = entry?.clearing;
+    if (!operation || clearDialogOperation !== operation) return;
+    elements.clearConversation.textContent = operation.title;
+    elements.clearStatus.dataset.kind = operation.error ? "error" : "info";
+    elements.clearStatus.textContent = operation.pending
+      ? t("clearingConversation")
+      : operation.error ? errorText(operation.error) : "";
+    elements.clearCancel.disabled = operation.pending;
+    elements.clearConfirm.disabled = operation.pending || !canClearConversation(paper.id, entry);
+    elements.clearConfirm.textContent = t(operation.pending ? "clearingConversation" : "clearConversationConfirm");
+  }
+
   function render() {
     const { paper, entry } = current();
     renderContext(entry);
@@ -2283,12 +2355,13 @@ export function createAssistant(adapter) {
     const sending = Boolean(entry?.pendingSend?.pending);
     const taskBusy = Boolean(paper && entry && tasks.isBusy(paper.id, entry.conversationId));
     const continuationReferenceConflict = Boolean(paper && entry && hasContinuationReferenceConflict(paper.id, entry));
-    elements.send.disabled = !paper || Boolean(entry?.loading) || Boolean(entry?.conversationsLoading) || sending || Boolean(active) || taskBusy || continuationReferenceConflict || Boolean(entry?.pendingDecision) || (!entry?.draft.trim() && !adapter.getChatImages(paper?.id).length && !entry?.noteRefs.length && !entry?.pendingSend);
+    elements.send.disabled = !paper || Boolean(entry?.loading) || Boolean(entry?.conversationsLoading) || sending || Boolean(entry?.clearing) || Boolean(active) || taskBusy || continuationReferenceConflict || Boolean(entry?.pendingDecision) || (!entry?.draft.trim() && !adapter.getChatImages(paper?.id).length && !entry?.noteRefs.length && !entry?.pendingSend);
     elements.send.textContent = t(entry?.pendingSend ? "retry" : "send");
     elements.cancel.hidden = !active;
     elements.cancel.disabled = !active || Boolean(entry?.cancelling);
     elements.cancel.textContent = t(entry?.cancelling ? "stopping" : "cancel");
-    elements.new.disabled = !paper || sending || Boolean(entry?.pendingDecision);
+    elements.new.disabled = !paper || sending || Boolean(entry?.pendingDecision) || Boolean(entry?.clearing);
+    renderClearDialog(paper, entry);
     renderSettings();
     sourcePreparation.update(sourcePreparationModel());
   }
@@ -2301,9 +2374,139 @@ export function createAssistant(adapter) {
     entry.pollController = null;
   }
 
+  function resetClearedConversation(paperId, entry, conversationId, statusKey) {
+    entry.conversations = entry.conversations.filter((conversation) => conversation.id !== conversationId);
+    entry.conversationsLoadSequence += 1;
+    entry.conversationsLoading = false;
+    if (entry.conversationId !== conversationId) {
+      if (isCurrent(paperId, entry)) render();
+      return false;
+    }
+    stopPolling(entry);
+    entry.loadSequence += 1;
+    entry.loadController?.abort();
+    entry.loadController = null;
+    entry.loading = false;
+    entry.conversationId = null;
+    entry.turns = [];
+    entry.fresh = true;
+    entry.pendingSend = null;
+    entry.pendingDecision = null;
+    entry.cancelling = null;
+    entry.resourceRefs = [];
+    entry.status = { key: statusKey, kind: statusKey === "conversationCleared" ? "success" : "info" };
+    sourcePreparationGeneration += 1;
+    tasks.conversationChanged(paperId, null);
+    if (isCurrent(paperId, entry)) render();
+    return true;
+  }
+
+  function handleConversationCleared(paperId, entry, conversationId) {
+    if (!conversationId) return;
+    const operation = entry.clearing;
+    if (operation?.conversationId === conversationId) {
+      entry.clearing = null;
+      if (clearDialogOperation === operation) {
+        clearDialogOperation = null;
+        if (elements.clearDialog.open) elements.clearDialog.close();
+      }
+    }
+    if (resetClearedConversation(paperId, entry, conversationId, "conversationClosed")) {
+      void loadConversations(paperId, entry, false);
+    }
+  }
+
+  function closeClearDialog(paperId, entry) {
+    if (entry.clearing?.pending) return;
+    const operation = entry.clearing;
+    if (operation && !operation.started) entry.clearing = null;
+    if (clearDialogOperation === operation) {
+      clearDialogOperation = null;
+      if (elements.clearDialog.open) elements.clearDialog.close();
+    }
+    if (isCurrent(paperId, entry)) render();
+  }
+
+  function openClearDialog(paperId, entry) {
+    if (!canClearConversation(paperId, entry)) {
+      entry.status = { key: entry.conversationId ? "clearConversationBusy" : "clearConversationNoTarget", kind: "error" };
+      render();
+      return;
+    }
+    const conversationId = entry.conversationId;
+    let operation = entry.clearing;
+    if (!operation) {
+      operation = {
+        paperId,
+        conversationId,
+        requestId: crypto.randomUUID(),
+        title: conversationTitle(entry, conversationId),
+        started: false,
+        pending: false,
+        error: null
+      };
+      entry.clearing = operation;
+    }
+    clearDialogOperation = operation;
+    elements.clearDialog.showModal();
+    render();
+    elements.clearConfirm.focus();
+  }
+
+  function finishClearRequest(paperId, entry, operation, statusKey) {
+    if (entry.clearing !== operation) return;
+    resetClearedConversation(paperId, entry, operation.conversationId, statusKey);
+    operation.pending = false;
+    entry.clearing = null;
+    if (clearDialogOperation === operation) {
+      clearDialogOperation = null;
+      if (elements.clearDialog.open) elements.clearDialog.close();
+    }
+    if (isCurrent(paperId, entry)) render();
+  }
+
+  async function clearConversation(paperId, entry) {
+    const operation = entry.clearing;
+    if (!operation || operation.pending || provider.conversation_clear !== true) return;
+    if (entry.conversationId !== operation.conversationId || !canClearConversation(paperId, entry)) {
+      operation.error = { key: "clearConversationBusy", kind: "error" };
+      entry.status = operation.error;
+      render();
+      return;
+    }
+    operation.started = true;
+    operation.pending = true;
+    operation.error = null;
+    entry.status = { key: "clearingConversation", kind: "info" };
+    render();
+    try {
+      const body = await adapter.api(`/api/v1/documents/${encodeURIComponent(paperId)}/agent/conversations/${encodeURIComponent(operation.conversationId)}/clear`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ request_id: operation.requestId })
+      });
+      if (entry.clearing !== operation) return;
+      if (body?.id !== operation.conversationId || body?.document_id !== paperId || body?.cleared !== true || typeof body?.cleared_at !== "string" || !body.cleared_at) {
+        throw new Error("Invalid clear response");
+      }
+      finishClearRequest(paperId, entry, operation, "conversationCleared");
+    } catch (error) {
+      if (entry.clearing !== operation) return;
+      if (error.code === "agent_conversation_cleared") {
+        finishClearRequest(paperId, entry, operation, "conversationClosed");
+        return;
+      }
+      operation.pending = false;
+      operation.error = { key: error.code || "clearFailed", kind: "error" };
+      entry.status = operation.error;
+      if (isCurrent(paperId, entry)) render();
+    }
+  }
+
   function startPolling(paperId, entry, turnId) {
     stopPolling(entry);
     const token = entry.pollToken;
+    const conversationId = entry.conversationId;
     const poll = async () => {
       if (token !== entry.pollToken) return;
       const controller = new AbortController();
@@ -2322,6 +2525,10 @@ export function createAssistant(adapter) {
         entry.pollTimer = setTimeout(poll, 750);
       } catch (error) {
         if (error?.name === "AbortError" || token !== entry.pollToken) return;
+        if (error.code === "agent_conversation_cleared") {
+          handleConversationCleared(paperId, entry, conversationId);
+          return;
+        }
         entry.status = {
           key: error.code || "network",
           kind: "error",
@@ -2359,6 +2566,10 @@ export function createAssistant(adapter) {
       if (active) startPolling(paperId, entry, active.id);
     } catch (error) {
       if (error?.name === "AbortError" || sequence !== entry.loadSequence) return;
+      if (error.code === "agent_conversation_cleared") {
+        handleConversationCleared(paperId, entry, conversationId);
+        return;
+      }
       entry.status = { key: error.code || "loadFailed", kind: "error", retry: () => loadConversation(paperId, entry, conversationId) };
     } finally {
       if (sequence === entry.loadSequence) {
@@ -2370,6 +2581,7 @@ export function createAssistant(adapter) {
   }
 
   async function loadConversations(paperId, entry, openLatest = true) {
+    if (entry.clearing) return;
     const sequence = ++entry.conversationsLoadSequence;
     entry.conversationsLoading = true;
     if (isCurrent(paperId, entry)) render();
@@ -2392,7 +2604,7 @@ export function createAssistant(adapter) {
   }
 
   async function send(paperId, entry) {
-    if (entry.loading || entry.conversationsLoading || entry.pendingSend?.pending || activeTurn(entry)) return;
+    if (entry.loading || entry.conversationsLoading || entry.clearing || entry.pendingSend?.pending || activeTurn(entry)) return;
     if (!entry.pendingSend && tasks.isBusy(paperId, entry.conversationId)) {
       entry.status = { key: "agent_task_busy", kind: "error" };
       render();
@@ -2481,6 +2693,10 @@ export function createAssistant(adapter) {
       if (ACTIVE_STATES.has(turn.status)) startPolling(paperId, entry, turn.id);
     } catch (error) {
       operation.pending = false;
+      if (error.code === "agent_conversation_cleared") {
+        handleConversationCleared(paperId, entry, operation.payload.conversation_id);
+        return;
+      }
       let code = operation.payload.context.note_refs?.length && error.code === "not_found" ? "noteReferenceUnavailable" : error.code || "network";
       if (operation.payload.context.resource_refs?.length) {
         if (["source_changed", "dataset_changed", "reference_changed", "agent_reference_changed", "agent_reference_source_changed"].includes(error.code)) code = "resourceReferenceChanged";
@@ -2508,6 +2724,10 @@ export function createAssistant(adapter) {
       entry.status = null;
       if (TERMINAL_STATES.has(updated.status)) stopPolling(entry);
     } catch (error) {
+      if (error.code === "agent_conversation_cleared") {
+        handleConversationCleared(paperId, entry, turn.conversation_id || entry.conversationId);
+        return;
+      }
       entry.status = { key: error.code || "cancelFailed", kind: "error", retry: () => cancelTurn(paperId, entry) };
     } finally {
       entry.cancelling = null;
@@ -2575,13 +2795,21 @@ export function createAssistant(adapter) {
         if (proposal.kind === "create_dataset_selection") await acceptDatasetSelectionResult(paperId, entry, proposal, result);
       }
     } catch (error) {
+      if (error.code === "agent_conversation_cleared") {
+        handleConversationCleared(paperId, entry, turn.conversation_id || entry.conversationId);
+        return;
+      }
       let retry = () => decideProposal(paperId, entry, turnId, proposal, approved);
       if (approved && ["revision_conflict", "source_changed", "note_deleted", "dataset_changed", "recipe_changed", "preview_changed", "selection_preview_changed", "selection_source_changed", "engine_unavailable", "analysis_busy", "analysis_quota", "reference_analysis_not_allowed", "reference_analysis_source_changed", "reference_analysis_dataset_changed", "reference_analysis_dataset_mismatch", "reference_analysis_unsupported_method", "reference_analysis_method_unsupported", "unsupported_method"].includes(error.code)) {
         try {
           const updated = await adapter.api(`/api/v1/documents/${encodeURIComponent(paperId)}/agent/turns/${encodeURIComponent(turnId)}`);
           upsertTurn(entry, updated);
           retry = null;
-        } catch {
+        } catch (refreshError) {
+          if (refreshError.code === "agent_conversation_cleared") {
+            handleConversationCleared(paperId, entry, turn.conversation_id || entry.conversationId);
+            return;
+          }
           // Keep the exact-decision retry when the conflict state cannot be loaded.
         }
       }
@@ -2676,7 +2904,7 @@ export function createAssistant(adapter) {
   });
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && !elements.panel.hidden) {
-      if (referencePicker.isOpen()) return;
+      if (elements.clearDialog.open || referencePicker.isOpen()) return;
       if (windowControls.exitFullPage()) {
         event.preventDefault();
         return;
@@ -2689,9 +2917,27 @@ export function createAssistant(adapter) {
       elements.toggle.focus();
     }
   });
+  elements.clear.addEventListener("click", () => {
+    const { paper, entry } = current();
+    if (paper) openClearDialog(paper.id, entry);
+  });
+  elements.clearCancel.addEventListener("click", () => {
+    const { paper, entry } = current();
+    if (paper) closeClearDialog(paper.id, entry);
+  });
+  elements.clearDialog.addEventListener("cancel", (event) => {
+    event.preventDefault();
+    const { paper, entry } = current();
+    if (paper) closeClearDialog(paper.id, entry);
+  });
+  elements.clearForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const { paper, entry } = current();
+    if (paper) void clearConversation(paper.id, entry);
+  });
   elements.new.addEventListener("click", () => {
     const { paper, entry } = current();
-    if (!paper) return;
+    if (!paper || entry.clearing) return;
     referencePicker.close();
     stopPolling(entry);
     entry.loadSequence += 1;
@@ -2709,7 +2955,7 @@ export function createAssistant(adapter) {
   });
   elements.history.addEventListener("change", () => {
     const { paper, entry } = current();
-    if (!paper || !elements.history.value) return;
+    if (!paper || entry.clearing || !elements.history.value) return;
     referencePicker.close();
     entry.conversationId = elements.history.value;
     entry.turns = [];
@@ -2763,6 +3009,9 @@ export function createAssistant(adapter) {
         help: t("windowHelp")
       });
       elements.new.textContent = t("new");
+      elements.clearHeading.textContent = t("clearConversation");
+      elements.clearHelp.textContent = t("clearConversationHelp");
+      elements.clearCancel.textContent = t("clearDialogCancel");
       elements.message.setAttribute("aria-label", t("messageLabel"));
       elements.message.placeholder = t("placeholder");
       elements.settingsToggle.textContent = t("settings");
@@ -2789,10 +3038,19 @@ export function createAssistant(adapter) {
       elements.message.focus();
       return true;
     },
+    isClearPending(documentId) {
+      return Boolean(papers.get(documentId)?.clearing?.pending);
+    },
     documentChanged() {
       referencePicker.close();
       sourcePreparationGeneration += 1;
       const { paper, entry } = current();
+      if (clearDialogOperation && entry?.clearing !== clearDialogOperation) {
+        const oldEntry = entryFor(clearDialogOperation.paperId);
+        if (!clearDialogOperation.started && oldEntry.clearing === clearDialogOperation) oldEntry.clearing = null;
+        clearDialogOperation = null;
+        if (elements.clearDialog.open) elements.clearDialog.close();
+      }
       if (paper && !entry.loaded && !entry.loading && !entry.conversations.length) loadConversations(paper.id, entry, true);
       tasks.documentChanged();
       render();
