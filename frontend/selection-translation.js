@@ -1,3 +1,5 @@
+import { createDeviceAIBridge } from "/device-ai.js";
+
 const MAX_SOURCE_CHARACTERS = 3000;
 const MAX_TRANSLATED_CHARACTERS = 12000;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -142,10 +144,14 @@ export function createSelectionTranslation(adapter) {
   sourceButton.type = "button";
   sourceButton.className = "button button-quiet selection-translation-source";
   actions.append(retryButton, copyButton, sourceButton);
-  root.append(header, controls, meta, status, result, actions);
+  const deviceHost = document.createElement("div");
+  deviceHost.className = "selection-translation-device";
+  deviceHost.hidden = true;
+  root.append(header, deviceHost, controls, meta, status, result, actions);
 
   let active = null;
   let generation = 0;
+  const deviceAI = createDeviceAIBridge({ getLanguage: () => adapter.getLanguage() });
 
   function t(key, values) {
     return adapter.t(key, values);
@@ -169,7 +175,7 @@ export function createSelectionTranslation(adapter) {
   function contextIsCurrent(operation) {
     const context = currentContext();
     return contextKey(context) === operation.contextKey
-      && context.deviceMode !== true
+      && context.deviceMode === operation.deviceMode
       && context.hasPdf === true
       && context.isPaper === true
       && context.mode === "reading"
@@ -184,9 +190,13 @@ export function createSelectionTranslation(adapter) {
   }
 
   function freezeSource(value, kind, context, trigger) {
-    if (!value || (context.deviceMode !== true && (!context.hasPdf || !context.isPaper || context.mode !== "reading"))) return { error: "selectionTranslationUnavailable" };
-    if (context.deviceMode === true) return { error: "selectionTranslationDeviceUnavailable" };
-    if (value.documentId !== context.documentId || (kind === "selection" && value.sequence !== context.loadSequence)) return { error: "selectionTranslationSourceChanged" };
+    if (!value || !context.hasPdf || !context.isPaper || context.mode !== "reading") return { error: "selectionTranslationUnavailable" };
+    const documentId = kind === "annotation" ? value.document_id : value.documentId;
+    if (documentId !== context.documentId
+      || (kind === "selection" && value.sequence !== context.loadSequence)
+      || (kind === "annotation" && value.annotation?.source_sha256 !== context.sourceSha256)) {
+      return { error: "selectionTranslationSourceChanged" };
+    }
     if (!UUID.test(context.documentId || "") || !SHA256.test(context.sourceSha256 || "")) return { error: "selectionTranslationSourceChanged" };
 
     const storedSegments = (adapter.sourceSegmentsFor(value) || []).map((segment) => ({
@@ -205,7 +215,7 @@ export function createSelectionTranslation(adapter) {
       return { error: "selectionTranslationPages" };
     }
     if (segments.some((segment) => segment.rects.some((rect) => !rect))) return { error: "selectionTranslationUnavailable" };
-    if (typeof text !== "string" || !text.trim()) return { error: "selectionTranslationEmpty" };
+    if (typeof text !== "string" || !text.trim() || text.includes("\0")) return { error: "selectionTranslationEmpty" };
     if (text.length > MAX_SOURCE_CHARACTERS) return { error: "selectionTranslationTooLong" };
 
     const firstSegment = segments.find((segment) => segment.page === pages[0]);
@@ -231,7 +241,10 @@ export function createSelectionTranslation(adapter) {
 
   function render() {
     const operation = active;
+    const device = operation?.deviceMode === true;
+    const deviceReady = device && Boolean(operation.source);
     root.dataset.language = adapter.getLanguage();
+    root.dataset.mode = device ? "device" : "server";
     heading.textContent = t("selectionTranslationHeading");
     closeButton.setAttribute("aria-label", t("close"));
     closeButton.title = t("close");
@@ -242,7 +255,15 @@ export function createSelectionTranslation(adapter) {
     retryButton.textContent = t("retry");
     copyButton.setAttribute("aria-label", t("selectionTranslationCopy"));
     copyButton.title = t("selectionTranslationCopy");
-    if (!operation) return;
+    deviceHost.hidden = !deviceReady;
+    controls.hidden = device;
+    meta.hidden = device;
+    status.hidden = deviceReady;
+    actions.hidden = device;
+    if (!operation) {
+      result.hidden = true;
+      return;
+    }
 
     languageSelect.value = operation.targetLanguage;
     languageSelect.disabled = operation.status === "loading";
@@ -261,7 +282,7 @@ export function createSelectionTranslation(adapter) {
     else if (operation.notice) status.textContent = t(operation.notice);
     else if (operation.status === "success") status.textContent = t("selectionTranslationReady");
     else status.textContent = t("selectionTranslationExplicit");
-    result.hidden = !operation.translatedText;
+    result.hidden = device || !operation.translatedText;
     result.textContent = operation.translatedText;
   }
 
@@ -299,6 +320,7 @@ export function createSelectionTranslation(adapter) {
 
   function close(options = {}) {
     const operation = active;
+    deviceAI.close();
     if (!operation) return;
     generation += 1;
     operation.controller?.abort();
@@ -313,7 +335,7 @@ export function createSelectionTranslation(adapter) {
 
   async function requestTranslation() {
     const operation = active;
-    if (!operation?.source || operation.status === "loading") return;
+    if (!operation?.source || operation.deviceMode || operation.status === "loading") return;
     if (!contextIsCurrent(operation)) {
       close({ restoreFocus: false });
       return;
@@ -367,6 +389,7 @@ export function createSelectionTranslation(adapter) {
       kind,
       source: frozen.source || null,
       contextKey: contextKey(context),
+      deviceMode: context.deviceMode === true,
       trigger,
       generation: generation + 1,
       targetLanguage: adapter.getLanguage() === "en" ? "en" : "zh",
@@ -387,7 +410,32 @@ export function createSelectionTranslation(adapter) {
     position();
     root.tabIndex = -1;
     root.focus({ preventScroll: true });
-    if (!frozen.error) void requestTranslation();
+    if (operation.deviceMode && operation.source) {
+      deviceAI.show({
+        container: deviceHost,
+        source: operation.source,
+        callbacks: {
+          isCurrent: () => operationIsCurrent(operation),
+          onClose: () => {
+            if (active === operation) close({ restoreFocus: false });
+          },
+          onSource: (source) => {
+            if (!operationIsCurrent(operation)) return;
+            close({ restoreFocus: false });
+            void adapter.goToSource(source);
+          },
+          onLayout: () => {
+            if (active === operation) position();
+          },
+          saveNote: (save) => {
+            if (!operationIsCurrent(operation)) throw new Error("source_changed");
+            return adapter.saveDeviceNote(save);
+          }
+        }
+      });
+    } else if (!operation.deviceMode && !frozen.error) {
+      void requestTranslation();
+    }
   }
 
   closeButton.addEventListener("click", () => close());
@@ -470,6 +518,7 @@ export function createSelectionTranslation(adapter) {
     },
     applyLanguage() {
       if (active) render();
+      deviceAI.applyLanguage();
     },
     position,
     close

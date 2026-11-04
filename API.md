@@ -1,3 +1,12 @@
+# v0.56.1 explicit device selection translation
+
+POST /device/ai/selection-translation is outside guest workspace dispatch. It
+forwards explicitly confirmed selected text through a fixed official provider
+using the user's transient Bearer key. It allocates no guest space, inherits no
+credentials, stores no files and leaves schema27 unchanged. Source IDs, hashes,
+page coordinates and PDF bytes stay browser-side. The response is transient
+until saved as an ordinary source-linked device note. See [contract](DEVICE-AI.md).
+
 # v0.56 continuous translation runs
 
 Additive schema27 persists explicitly authorized page ranges and control receipts.

@@ -907,6 +907,11 @@ def create_guest_gateway(guest_root, *, max_spaces=MAX_SPACES, max_active=2,
             return error
         return _error('not_found', '找不到接口。', 404)
 
+    # The explicit device translation relay sits outside the credential-gated
+    # /api dispatcher and allocates no guest space or cookie.
+    from .device_ai import install_device_ai_routes
+    install_device_ai_routes(app)
+
     # Static frontend (including Kimi-owned recover.html/guest-recovery.js) is
     # served without a session and without allocating a space.  API paths are
     # matched above and cannot fall through to this HTML mount.

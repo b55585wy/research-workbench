@@ -6596,6 +6596,50 @@ function revealSavedNote(noteId) {
   }
 }
 
+async function saveDeviceTranslationNote({ requestId, source, text, signal }) {
+  const document = state.document;
+  if (!deviceMode || !state.pdf || document?.id !== source.documentId || document.sha256 !== source.sourceSha256) {
+    throw new ApiError("source_changed");
+  }
+  if (typeof text !== "string" || !text.trim() || text.length > 10000 || !Array.isArray(source.segments) || !source.segments.length) {
+    throw new ApiError("validation_error");
+  }
+  const note = await api(`/api/v1/documents/${encodeURIComponent(document.id)}/notes`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      request_id: requestId,
+      page: source.page,
+      rect: null,
+      text,
+      source_segments: source.segments.map((segment) => ({
+        page: segment.page,
+        quote: segment.quote,
+        rects: segment.rects.map((rect) => [...rect])
+      }))
+    }),
+    signal
+  });
+  if (!note || note.id !== requestId || note.document_id !== document.id || note.text !== text.trim()) {
+    throw new ApiError("request_failed");
+  }
+  if (state.document?.id === document.id && state.document.sha256 === document.sha256) {
+    state.notes = [note, ...state.notes.filter((item) => item.id !== note.id)];
+    const noteState = noteStateFor(note.id) || {
+      ...note,
+      revision: 1,
+      review_status: "unreviewed",
+      reviewed_at: null,
+      review_provenance: null,
+      updated_at: note.created_at,
+      deleted_at: null
+    };
+    state.noteStates = [noteState, ...state.noteStates.filter((item) => item.id !== note.id)];
+    renderNotes();
+  }
+  return note;
+}
+
 async function submitSave(includeExcerpt = false) {
   if (!state.document || state.pendingSaves > 0 || state.pendingMutations.size > 0) return;
   if (state.editDrafts.has(state.document.id)) {
@@ -8249,7 +8293,8 @@ selectionTranslation = createSelectionTranslation({
       width: rect[2] - rect[0],
       height: rect[3] - rect[1]
     } : null, source.documentId, source.sourceSha256);
-  }
+  },
+  saveDeviceNote: saveDeviceTranslationNote
 });
 
 richText = createRichText({

@@ -26,6 +26,17 @@ export type {
   SourcePreparationModel,
   SourcePreparationPaper
 } from "./source-preparation";
+export { mountDeviceAI } from "./device-ai";
+export type {
+  DeviceAICallbacks,
+  DeviceAIHandle,
+  DeviceAILanguage,
+  DeviceAIModel,
+  DeviceAINoteSave,
+  DeviceAISource,
+  DeviceAISourceSegment,
+  MountDeviceAIOptions
+} from "./device-ai";
 
 export type WorkspaceLanguage = "zh" | "en";
 

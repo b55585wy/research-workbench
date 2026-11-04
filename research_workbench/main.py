@@ -258,6 +258,8 @@ def create_app(data_root=None, validator=None, renderer=None, *, agent_provider=
     app.include_router(data_import_router)
     app.add_middleware(LocalBoundary)
     install_image_annotation_routes(app,image_annotations)
+    from .device_ai import install_device_ai_routes
+    install_device_ai_routes(app)
 
     @app.exception_handler(WorkspaceError)
     async def workspace_error(request, error):

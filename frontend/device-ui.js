@@ -282,7 +282,7 @@ export function applyDeviceCapabilities() {
     "#workspace-mode-controls", "#data-navigation", "#project-library", "#analysis-panel",
     "#charts-panel", "#assistant-toggle", "#assistant-panel", "#translation-controls",
     "#research-record-open", ".annotated-pdf-export", "#metadata-lookup", "#document-metadata-lookup",
-    "#text-selection-ask", "#text-selection-translate", "#region-add-agent",
+    "#text-selection-ask", "#region-add-agent",
     "#selected-annotation-agent", "#notes-batch-agent"
   ]) {
     const node = document.querySelector(selector);
