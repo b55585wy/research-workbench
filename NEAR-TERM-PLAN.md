@@ -52,8 +52,8 @@ tFUS 的可信身份/结果接口继续保留。美国/香港分工和远程执�
 
 ## 执行与核对
 
-OMP 当前 profile 为 `all-codex`：Codex 默认负责前后端实现与验收，DeepSeek official 仅按
-既定额度回退/明确选择使用；Kimi 需明确选择。已启动旧规则候选保留原历史，不改写实施者。
+OMP 当前 profile 为 `deepseek-kimi`：DeepSeek official 默认实现后端，Kimi 默认实现前端；
+Codex 负责架构、工程拆解、协调与验收，额度回退按全局策略执行。历史实施者记录保留。
 每轮一份明确成果、唯一文件写入者、有界冒烟和如实的未验收项；本轮不运行全套回归或真实模型任务。
 
 相关记录：[设备存储](LOCAL-STORAGE-PLAN.md)、[本轮验收](DEVICE-STORAGE-ACCEPTANCE.md)、
