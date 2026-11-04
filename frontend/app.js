@@ -2880,6 +2880,21 @@ function renderMetadata() {
   renderMetadataLatest(entry);
 }
 
+async function updateDocumentMetadata(documentId) {
+  closeDocumentMenu();
+  if (deviceMode) return;
+  const opening = openDocument(documentId, { workspace: "reading", explicitIntent: true });
+  const intent = workspaceModeIntent;
+  const opened = await opening;
+  if (opened === false || intent !== workspaceModeIntent || state.document?.id !== documentId) return;
+  elements.metadataPanel.open = true;
+  if (window.matchMedia("(max-width: 820px)").matches) {
+    document.querySelector('#mobile-primary-navigation [data-mobile-pane="reader"]')?.click();
+  }
+  elements.metadataPanel.scrollIntoView({ block: "nearest" });
+  await lookupMetadata(documentId);
+}
+
 async function lookupMetadata(documentId) {
   const entry = ensureMetadata(documentId);
   if (entry.lookup || state.pendingMetadata.has(documentId)) return;
@@ -7102,6 +7117,7 @@ elements.documentMenu.addEventListener("click", (event) => {
   const documentId = state.documentMenu?.documentId;
   if (!documentId) return;
   if (action === "rename-document") void openRenameDialog(documentId);
+  else if (action === "update-document-metadata") void updateDocumentMetadata(documentId);
   else if (action === "trash-document") void trashDocument(documentId);
 });
 document.addEventListener("pointerdown", (event) => {

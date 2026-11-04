@@ -317,3 +317,14 @@ S01–S03 bounded overview, actual coverage, empty/failed/provider/cancel/source
 unchanged task approvals; V01 meaningful collapsed history, lazy cited/uncited evidence,
 tables/proposals/partial errors/language/polling; C01 v0.30 compatibility, schema/material/tFUS.
 Synthetic-only; no full regression. Evidence: E:/research-workbench-pilot-20261030/reader-experience-v2.
+
+## v0.55.1 bibliography menu
+
+The paper menu exposes Update bibliography in server mode, beside Rename and Trash.
+It opens the clicked paper through guarded navigation, reveals bibliography on desktop
+and mobile, then reuses lookup's unsaved draft and explicit Save flow. No API/schema change.
+Device mode keeps network lookup unavailable; no implicit file upload is introduced.
+Scoped browser smoke used two synthetic PDFs and intercepted lookup responses: current
+and other-paper targeting, manual field preservation, explicit save persistence, query
+failure/retry, blocked navigation with an unsaved drawing, mobile/English, and device
+network isolation passed. No live DOI provider/model/analysis or full regression run.
