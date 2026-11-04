@@ -1,7 +1,7 @@
 import * as pdfjsLib from "/pdf-engine.js?v=0.52.0";
 import { createImageLibrary } from "/image-library.js";
 import { createImageViewer } from "/image-viewer.js";
-import { createAnalysis } from "/analysis.js?v=0.54.0";
+import { createAnalysis } from "/analysis.js?integration=tfus-source-v1";
 import { createDatasetSelection } from "/dataset-selection.js";
 import { createDataImports } from "/data-imports.js";
 import { createCharts } from "/charts.js";
@@ -32,6 +32,9 @@ const MAX_DEVICE_PIXEL_RATIO = 2;
 const MAX_FILE_BYTES = 20 * 1024 * 1024;
 const ZOOM_MIN = 0.4;
 const ZOOM_MAX = 3;
+const APP_VERSION = "0.54.0";
+const PDF_RANGE_CHUNK_SIZE = 64 * 1024;
+const PDF_LOADING_HINT_DELAY = 12_000;
 
 const messages = {
   zh: {
@@ -93,6 +96,12 @@ const messages = {
     pages: "{count} 页",
     loadingDocuments: "正在加载文献…",
     loadingDocument: "正在打开文献…",
+    documentLoading: "正在加载 PDF…",
+    documentLoadingBytes: "正在加载 PDF：{loaded} / {total}（{percent}%）",
+    documentLoadingBytesUnknown: "正在加载 PDF：已接收 {loaded}",
+    documentPreparing: "正在解析 PDF 并准备页面…",
+    documentStillLoading: "仍在加载。大型或复杂 PDF 可能需要更长时间。",
+    readerErrorReference: "错误参考：{reference}",
     loadingNotes: "正在加载笔记…",
     excerptsLoadFailed: "无法加载图片摘录，请重试。",
     rendering: "正在显示页面…",
@@ -114,6 +123,8 @@ const messages = {
     documentInvalidPdf: "此文件不是有效的 PDF，无法在阅读器中打开。可尝试打开原 PDF 检查文件。",
     documentPasswordRequired: "此 PDF 需要密码。当前阅读器无法打开加密文件，可尝试打开原 PDF。",
     documentResourceFailed: "PDF 阅读组件或资源未能加载。请重试；也可打开原 PDF。",
+    documentNetworkFailed: "PDF 下载连接中断。请检查网络后重试；也可打开原 PDF。",
+    documentUnauthorized: "当前空间无权打开这篇文献。请恢复空间访问后重试。",
     openOriginalPdf: "打开原 PDF",
     notesLoadFailed: "无法加载笔记，请重试。",
     renderFailed: "无法显示此页面，请重试。",
@@ -361,8 +372,8 @@ const messages = {
     shapeNewLabel: "新图形批注",
     shapeEditLabel: "编辑图形批注",
     shapeDescription: "批注说明",
-    shapeLineWidth: "线宽（PDF 单位）",
-    shapeSave: "保存批注",
+    shapeLineWidth: "线宽",
+    shapeSave: "保存",
     shapeCancel: "取消",
     shapeDefaultRectangle: "矩形批注",
     shapeDefaultArrow: "箭头批注",
@@ -520,6 +531,12 @@ const messages = {
     pages: "{count} pages",
     loadingDocuments: "Loading papers…",
     loadingDocument: "Opening paper…",
+    documentLoading: "Loading PDF…",
+    documentLoadingBytes: "Loading PDF: {loaded} / {total} ({percent}%)",
+    documentLoadingBytesUnknown: "Loading PDF: {loaded} received",
+    documentPreparing: "Parsing the PDF and preparing pages…",
+    documentStillLoading: "Still loading. A large or complex PDF may take longer.",
+    readerErrorReference: "Error reference: {reference}",
     loadingNotes: "Loading notes…",
     excerptsLoadFailed: "Image excerpts could not be loaded. Try again.",
     rendering: "Rendering page…",
@@ -541,6 +558,8 @@ const messages = {
     documentInvalidPdf: "This file is not a valid PDF and cannot be opened in the reader. Try opening the original PDF to inspect it.",
     documentPasswordRequired: "This PDF requires a password. The reader cannot open encrypted files; try opening the original PDF.",
     documentResourceFailed: "A PDF reader component or resource could not be loaded. Retry, or open the original PDF.",
+    documentNetworkFailed: "The PDF download was interrupted. Check the connection and retry, or open the original PDF.",
+    documentUnauthorized: "This space cannot open the paper. Restore access to the space, then retry.",
     openOriginalPdf: "Open original PDF",
     notesLoadFailed: "Notes could not be loaded. Try again.",
     renderFailed: "This page could not be displayed. Try again.",
@@ -788,8 +807,8 @@ const messages = {
     shapeNewLabel: "New shape annotation",
     shapeEditLabel: "Edit shape annotation",
     shapeDescription: "Annotation description",
-    shapeLineWidth: "Line width (PDF units)",
-    shapeSave: "Save annotation",
+    shapeLineWidth: "Width",
+    shapeSave: "Save",
     shapeCancel: "Cancel",
     shapeDefaultRectangle: "Rectangle annotation",
     shapeDefaultArrow: "Arrow annotation",
@@ -977,6 +996,13 @@ const elements = {
   translationFallback: $("translation-fallback"),
   readerEmpty: $("reader-empty"),
   readerOpenOriginal: $("reader-open-original"),
+  readerLoading: $("reader-loading"),
+  readerLoadingText: $("reader-loading-text"),
+  readerLoadingProgress: $("reader-loading-progress"),
+  readerLoadingHint: $("reader-loading-hint"),
+  readerLoadingRetry: $("reader-loading-retry"),
+  readerLoadingOriginal: $("reader-loading-original"),
+  readerErrorReference: $("reader-error-reference"),
   pageSurface: $("page-surface"),
   canvas: $("reader-canvas"),
   textLayer: $("reader-text-layer"),
@@ -1049,6 +1075,8 @@ const state = {
   document: null,
   pdf: null,
   pdfTask: null,
+  pdfAttempt: null,
+  pdfLoading: null,
   page: 1,
   viewMode: readViewMode(),
   flowActive: false,
@@ -1318,6 +1346,8 @@ function applyLanguage() {
     const message = elements.readerEmpty.querySelector("p");
     if (message) message.textContent = t(elements.readerOpenOriginal.dataset.errorKey || "documentOpenFailed");
   }
+  if (state.pdfLoading) renderPdfLoading(state.pdfLoading);
+  if (state.pdfAttempt?.reportId) showReaderErrorReference(state.pdfAttempt);
   renderDocuments();
   renderSearch();
   renderLibraryTrash();
@@ -3612,6 +3642,7 @@ function cancelDocumentWork() {
   state.renderSequence += 1;
   for (const entry of state.metadata.values()) entry.lookup?.controller.abort();
   cancelTextLayer();
+  cancelPdfDocumentAttempt();
   state.loadController?.abort();
   state.loadController = null;
   if (state.renderTask) {
@@ -4035,6 +4066,7 @@ async function openDocument(documentId, options = {}) {
   if (!studyOwner) {
     await requestRender();
     if (sequence === state.loadSequence && state.document?.id === documentId) {
+      finishPdfLoading(documentId, sequence);
       if (state.readerProgress.pending) await restorePendingReaderProgress();
       else state.readerProgress.loading = false;
     }
@@ -4086,10 +4118,18 @@ function pdfOpenErrorKey(error) {
   if (typeof error?.code === "string") return error.code;
   if (error?.name === "InvalidPDFException") return "documentInvalidPdf";
   if (error?.name === "PasswordException") return "documentPasswordRequired";
-  if (["MissingPDFException", "UnexpectedResponseException"].includes(error?.name)) return "documentResourceFailed";
+  if (error?.name === "UnexpectedResponseException") {
+    if ([401, 403].includes(error.status)) return "documentUnauthorized";
+    if (error.status === 404) return "not_found";
+    if (error.status === 409) return "document_revision_conflict";
+    if (error.status === 410) return "file_missing";
+    return "documentResourceFailed";
+  }
+  if (error?.name === "MissingPDFException") return "documentResourceFailed";
   const message = typeof error?.message === "string" ? error.message : "";
-  if (error?.name === "TypeError" && message.includes("Promise.withResolvers")) return "documentCompatibilityFailed";
+  if (/Promise\.(?:withResolvers|try)|structuredClone|OffscreenCanvas|ImageDecoder|DOMMatrix|ReadableStream|ArrayBuffer.*transfer/i.test(message)) return "documentCompatibilityFailed";
   if (/worker|fake worker|dynamically imported module/i.test(message)) return "documentResourceFailed";
+  if (error?.name === "TypeError" && /failed to fetch|networkerror|load failed/i.test(message)) return "documentNetworkFailed";
   return "documentOpenFailed";
 }
 
@@ -4097,6 +4137,8 @@ function hideReaderOpenFallback() {
   elements.readerOpenOriginal.hidden = true;
   elements.readerOpenOriginal.removeAttribute("href");
   delete elements.readerOpenOriginal.dataset.errorKey;
+  elements.readerErrorReference.hidden = true;
+  elements.readerErrorReference.textContent = "";
   const message = elements.readerEmpty.querySelector("p");
   if (message) message.textContent = t("emptyReader");
 }
@@ -4110,25 +4152,243 @@ function showReaderOpenFallback(document, key) {
   if (message) message.textContent = t(key);
 }
 
-async function loadPdf(document, sequence, signal) {
-  const response = await checkedFetch(`/api/v1/documents/${encodeURIComponent(document.id)}/file`, { signal });
-  const bytes = await response.arrayBuffer();
-  if (sequence !== state.loadSequence) throw new DOMException("Stale request", "AbortError");
-  const task = pdfjsLib.getDocument({
-    data: bytes,
-    cMapUrl: "/vendor/pdfjs/cmaps/",
-    cMapPacked: true,
-    standardFontDataUrl: "/vendor/pdfjs/standard_fonts/",
-    wasmUrl: "/vendor/pdfjs/wasm/"
-  });
-  state.pdfTask = task;
-  const pdf = await task.promise;
-  if (sequence !== state.loadSequence || state.document?.id !== document.id) {
-    await task.destroy();
-    throw new DOMException("Stale document", "AbortError");
+function isPdfAttemptCurrent(attempt) {
+  return Boolean(attempt && state.pdfAttempt === attempt && attempt.sequence === state.loadSequence && state.document?.id === attempt.documentId);
+}
+
+function isPdfAbortError(error, signal) {
+  return Boolean(signal?.aborted || ["AbortError", "AbortException"].includes(error?.name));
+}
+
+function formatPdfBytes(value) {
+  const units = ["B", "KiB", "MiB", "GiB"];
+  let amount = Math.max(0, Number(value) || 0);
+  let unit = 0;
+  while (amount >= 1024 && unit < units.length - 1) {
+    amount /= 1024;
+    unit += 1;
   }
-  state.pdfTask = null;
-  return pdf;
+  return `${new Intl.NumberFormat(state.language === "zh" ? "zh-CN" : "en", { maximumFractionDigits: unit ? 1 : 0 }).format(amount)} ${units[unit]}`;
+}
+
+function renderPdfLoading(attempt) {
+  if (!isPdfAttemptCurrent(attempt) || state.pdfLoading !== attempt) return;
+  const progress = elements.readerLoadingProgress;
+  let text = t("documentLoading");
+  if (attempt.phase === "preparing" || attempt.totalBytes > 0 && attempt.loadedBytes >= attempt.totalBytes) {
+    attempt.phase = "preparing";
+    text = t("documentPreparing");
+    progress.removeAttribute("value");
+  } else if (attempt.totalBytes > 0) {
+    const percent = Math.max(0, Math.min(99, Math.floor(attempt.loadedBytes / attempt.totalBytes * 100)));
+    progress.value = percent;
+    text = t("documentLoadingBytes", {
+      loaded: formatPdfBytes(attempt.loadedBytes),
+      total: formatPdfBytes(attempt.totalBytes),
+      percent
+    });
+  } else {
+    progress.removeAttribute("value");
+    if (attempt.loadedBytes > 0) text = t("documentLoadingBytesUnknown", { loaded: formatPdfBytes(attempt.loadedBytes) });
+  }
+  progress.setAttribute("aria-label", text);
+  elements.readerLoadingText.textContent = text;
+}
+
+function beginPdfLoading(attempt, url) {
+  state.pdfAttempt = attempt;
+  state.pdfLoading = attempt;
+  elements.readerLoading.hidden = false;
+  elements.readerLoadingHint.hidden = true;
+  elements.readerLoadingOriginal.href = url;
+  elements.readerLoadingRetry.onclick = () => {
+    if (isPdfAttemptCurrent(attempt)) void openDocument(attempt.documentId, { force: true });
+  };
+  elements.readerErrorReference.hidden = true;
+  elements.readerErrorReference.textContent = "";
+  renderPdfLoading(attempt);
+  attempt.idleTimer = window.setTimeout(() => {
+    if (isPdfAttemptCurrent(attempt) && state.pdfLoading === attempt) elements.readerLoadingHint.hidden = false;
+  }, PDF_LOADING_HINT_DELAY);
+}
+
+function destroyPdfAttempt(attempt) {
+  if (!attempt || attempt.destroyRequested) return;
+  attempt.destroyRequested = true;
+  if (attempt.task) {
+    attempt.task.onProgress = null;
+    void attempt.task.destroy().catch(() => {});
+  }
+}
+
+function cleanupPdfAttempt(attempt) {
+  if (!attempt) return;
+  if (attempt.idleTimer !== null) window.clearTimeout(attempt.idleTimer);
+  attempt.idleTimer = null;
+  if (attempt.abortListener) attempt.signal.removeEventListener("abort", attempt.abortListener);
+  attempt.abortListener = null;
+  if (attempt.task) attempt.task.onProgress = null;
+  if (state.pdfLoading === attempt) {
+    elements.readerLoading.hidden = true;
+    elements.readerLoadingHint.hidden = true;
+    elements.readerLoadingRetry.onclick = null;
+    elements.readerLoadingOriginal.removeAttribute("href");
+    state.pdfLoading = null;
+  }
+}
+
+function finishPdfLoading(documentId, sequence) {
+  const attempt = state.pdfAttempt;
+  if (!isPdfAttemptCurrent(attempt) || attempt.documentId !== documentId || attempt.sequence !== sequence) return;
+  attempt.phase = "ready";
+  cleanupPdfAttempt(attempt);
+}
+
+function cancelPdfDocumentAttempt() {
+  const attempt = state.pdfAttempt;
+  if (!attempt) return;
+  if (!state.pdf) destroyPdfAttempt(attempt);
+  cleanupPdfAttempt(attempt);
+  if (state.pdfTask === attempt.task) state.pdfTask = null;
+  state.pdfAttempt = null;
+}
+
+async function resolvePdfLoadError(error, url, signal) {
+  if (error?.name !== "UnexpectedResponseException" || ![401, 403, 404, 409, 410].includes(error.status)) return error;
+  try {
+    const response = await fetch(url, { headers: { Range: "bytes=0-0" }, signal });
+    if (response.ok) return error;
+    let code = [401, 403].includes(response.status) ? "documentUnauthorized" : response.status === 404 ? "not_found" : response.status === 409 ? "document_revision_conflict" : response.status === 410 ? "file_missing" : "request_failed";
+    try {
+      const body = await response.json();
+      if (typeof body?.detail?.code === "string") code = body.detail.code;
+    } catch {
+      // Status-specific labels remain available when the response has no JSON detail.
+    }
+    return new ApiError(code);
+  } catch (resolutionError) {
+    if (resolutionError?.name === "AbortError") throw resolutionError;
+    return error;
+  }
+}
+
+function boundedReaderText(value, fallback, limit) {
+  const text = typeof value === "string" && value ? value : fallback;
+  return String(text).replace(/(?:\b[a-z][a-z\d+.-]*:\/\/|\bwww\.)[^\s<>"']+/gi, "[URL]").replace(/[\u0000-\u001f\u007f]/g, " ").trim().slice(0, limit);
+}
+
+function readerErrorFeatures() {
+  return {
+    with_resolvers: typeof Promise.withResolvers === "function",
+    promise_try: typeof Promise.try === "function",
+    structured_clone: typeof structuredClone === "function",
+    worker: typeof Worker === "function",
+    offscreen_canvas: typeof OffscreenCanvas === "function",
+    image_decoder: typeof ImageDecoder === "function",
+    dom_matrix: typeof DOMMatrix === "function",
+    readable_stream: typeof ReadableStream === "function",
+    array_buffer_transfer: typeof ArrayBuffer === "function" && typeof ArrayBuffer.prototype.transfer === "function"
+  };
+}
+
+function showReaderErrorReference(attempt) {
+  if (!isPdfAttemptCurrent(attempt) || !attempt.reportId) return;
+  elements.readerErrorReference.textContent = t("readerErrorReference", { reference: attempt.reportId.slice(0, 8) });
+  elements.readerErrorReference.hidden = false;
+}
+
+async function reportReaderError(attempt, stage, error) {
+  if (!isPdfAttemptCurrent(attempt) || attempt.reported || attempt.signal.aborted || isPdfAbortError(error) || !["document", "render"].includes(stage)) return;
+  attempt.reported = true;
+  const totalBytes = Number.isFinite(attempt.totalBytes) && attempt.totalBytes >= 0 ? Math.trunc(attempt.totalBytes) : null;
+  const payload = {
+    stage,
+    error_name: boundedReaderText(error?.name, "UnknownError", 60),
+    message: boundedReaderText(error?.message, error?.name || "Unknown reader error", 300),
+    user_agent: boundedReaderText(navigator.userAgent, "", 300),
+    app_version: APP_VERSION,
+    pdfjs_version: boundedReaderText(pdfjsLib.version, "", 24),
+    elapsed_ms: Math.max(0, Math.min(3_600_000, Math.round(Date.now() - attempt.startedAt))),
+    loaded_bytes: Math.max(0, Math.trunc(Number(attempt.loadedBytes) || 0)),
+    total_bytes: totalBytes,
+    features: readerErrorFeatures()
+  };
+  try {
+    const response = await fetch(`/api/v1/documents/${encodeURIComponent(attempt.documentId)}/reader-errors`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) return;
+    const body = await response.json();
+    if (typeof body?.report_id !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(body.report_id)) return;
+    attempt.reportId = body.report_id;
+    showReaderErrorReference(attempt);
+  } catch {
+    // Diagnostics are optional and never replace the reader's original fallback.
+  }
+}
+
+async function loadPdf(document, sequence, signal) {
+  const url = `/api/v1/documents/${encodeURIComponent(document.id)}/file`;
+  const attempt = {
+    documentId: document.id,
+    sequence,
+    signal,
+    startedAt: Date.now(),
+    task: null,
+    phase: "loading",
+    loadedBytes: 0,
+    totalBytes: null,
+    idleTimer: null,
+    abortListener: null,
+    destroyRequested: false,
+    reported: false,
+    reportId: null
+  };
+  beginPdfLoading(attempt, url);
+  attempt.abortListener = () => {
+    if (isPdfAttemptCurrent(attempt)) destroyPdfAttempt(attempt);
+  };
+  signal.addEventListener("abort", attempt.abortListener, { once: true });
+  try {
+    if (signal.aborted) throw new DOMException("Document load aborted", "AbortError");
+    const task = pdfjsLib.getDocument({
+      url,
+      rangeChunkSize: PDF_RANGE_CHUNK_SIZE,
+      disableRange: false,
+      disableAutoFetch: true,
+      disableStream: true,
+      cMapUrl: "/vendor/pdfjs/cmaps/",
+      cMapPacked: true,
+      standardFontDataUrl: "/vendor/pdfjs/standard_fonts/",
+      wasmUrl: "/vendor/pdfjs/wasm/"
+    });
+    attempt.task = task;
+    state.pdfTask = task;
+    task.onProgress = ({ loaded, total }) => {
+      if (!isPdfAttemptCurrent(attempt) || state.pdfLoading !== attempt || attempt.task !== task) return;
+      attempt.loadedBytes = Math.max(attempt.loadedBytes, Number.isFinite(loaded) ? Math.max(0, loaded) : 0);
+      attempt.totalBytes = Number.isFinite(total) && total > 0 ? total : null;
+      renderPdfLoading(attempt);
+    };
+    const pdf = await task.promise;
+    if (!isPdfAttemptCurrent(attempt) || signal.aborted) throw new DOMException("Stale document", "AbortError");
+    attempt.phase = "preparing";
+    if (state.pdfTask === task) state.pdfTask = null;
+    renderPdfLoading(attempt);
+    return pdf;
+  } catch (error) {
+    destroyPdfAttempt(attempt);
+    cleanupPdfAttempt(attempt);
+    if (state.pdfTask === attempt.task) state.pdfTask = null;
+    if (!isPdfAttemptCurrent(attempt) || isPdfAbortError(error, signal)) throw new DOMException("Document load aborted", "AbortError");
+    const resolvedError = await resolvePdfLoadError(error, url, signal);
+    if (!isPdfAttemptCurrent(attempt) || isPdfAbortError(resolvedError, signal)) throw new DOMException("Document load aborted", "AbortError");
+    attempt.phase = "failed";
+    if (pdfOpenErrorKey(resolvedError) === "documentOpenFailed") void reportReaderError(attempt, "document", resolvedError);
+    throw resolvedError;
+  }
 }
 
 async function loadNotes(document, sequence, signal) {
@@ -4655,8 +4915,10 @@ async function renderReaderPage(record, sequence) {
     translationOverlay.refresh();
   } catch (error) {
     if (["RenderingCancelledException", "AbortException", "AbortError"].includes(error?.name) || sequence !== state.renderSequence) return;
+    if (state.pdf !== pdf || state.document?.id !== documentId || state.readerPages.get(record.pageNumber) !== record) return;
     record.rendered = false;
     setReaderPageError(record);
+    void reportReaderError(state.pdfAttempt, "render", error);
     if (state.activePageRecord === record) setStatus("renderFailed", "error", {}, () => requestRender());
   }
 }

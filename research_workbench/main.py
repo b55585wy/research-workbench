@@ -33,6 +33,7 @@ from .analyses import Analyses
 from .analysis_process import AnalysisSupervisor
 from .analysis_recipes import RuntimeCatalog
 from .analysis_api import router as analysis_router
+from .reader_diagnostics import ReaderErrorReporter, router as reader_errors_router
 
 ROOT = Path(__file__).resolve().parents[1]
 SECURITY_HEADERS = {'X-Content-Type-Options': 'nosniff', 'X-Frame-Options': 'DENY',
@@ -220,6 +221,7 @@ def create_app(data_root=None, validator=None, renderer=None, *, agent_provider=
 
     app = FastAPI(title='Research workbench', version=__version__, docs_url=None, redoc_url=None,lifespan=lifespan)
     app.state.store, app.state.validator = store, validator
+    app.state.reader_errors = ReaderErrorReporter(store)
     app.state.translations = translations
     app.include_router(translation_router)
     app.state.reading_pages = reading_pages
@@ -377,6 +379,7 @@ def create_app(data_root=None, validator=None, renderer=None, *, agent_provider=
                               headers={'Cache-Control': 'no-store'})
 
     app.include_router(agent_router)
+    app.include_router(reader_errors_router)
     app.include_router(agent_reference_router)
     app.include_router(analysis_router)
     app.mount('/', StaticFiles(directory=ROOT / 'frontend', html=True), name='reader')

@@ -42,4 +42,4 @@ Current user testing instruction (2026-11-02): default to scoped smoke tests for
 the changed workflow. Historical full-regression matrices are reference only;
 do not routinely run the full suites. Report the actual verification scope.
 
-2026-11-04 integration candidate0.54 adds a passive source summary for the selected one-row tFUS CSV, within the existing analysis preview. All source fields are unverified file claims; no source access, identity mapping, fetch, Agent sharing or analysis action is inferred. Keep the original CSV/table, null/zero, units/scoring timing and owner-bound lifecycle. This slice does not overwrite other workspaces or public services. See TFUS-INTEGRATION.md.
+2026-11-04 integration slice based on main0.54 adds a passive source summary for the selected one-row tFUS CSV, within the existing analysis preview. All source fields are unverified file claims; no source access, identity mapping, fetch, Agent sharing or analysis action is inferred. Keep the original CSV/table, null/zero, units/scoring timing and owner-bound lifecycle. This slice does not overwrite other workspaces or public services. See TFUS-INTEGRATION.md.

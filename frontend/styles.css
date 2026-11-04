@@ -8,11 +8,17 @@ html {
   color: var(--ui-text);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", sans-serif;
   font-size: 14px;
+  line-height: 1.5;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 body {
   margin: 0;
   min-height: 100vh;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.5;
 }
 
 button,
@@ -76,13 +82,16 @@ textarea:disabled {
   align-items: center;
   gap: 8px;
   color: var(--ui-text-soft);
-  font-size: 13px;
-  font-weight: 650;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
   letter-spacing: 0.02em;
 }
 
 .brand-name {
   min-width: 0;
+  font-size: 14px;
+  font-weight: 600;
 }
 
 .local-guest {
@@ -249,19 +258,22 @@ p {
 }
 
 h1 {
-  font-size: 18px;
-  font-weight: 650;
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.35;
   letter-spacing: 0.01em;
 }
 
 h2 {
-  font-size: 14px;
-  font-weight: 650;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.4;
 }
 
 h3 {
-  font-size: 13px;
-  font-weight: 650;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.45;
 }
 
 .header-controls {
@@ -830,6 +842,52 @@ h3 {
 .reader-stage[data-view-mode="continuous"],
 .reader-stage[data-reader-layout-locked="true"] {
   overflow-anchor: none;
+}
+
+.reader-loading {
+  align-self: center;
+  width: min(360px, 100%);
+  padding: 40px 16px;
+  color: var(--ui-text-soft);
+  font-size: 14px;
+  line-height: 1.55;
+  text-align: center;
+}
+
+.reader-loading-progress {
+  display: block;
+  width: 100%;
+  height: 8px;
+  margin-top: 14px;
+  accent-color: var(--ui-primary);
+}
+
+.reader-loading-hint {
+  margin-top: 16px;
+  color: var(--ui-text-muted);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+.reader-loading-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 12px;
+  margin-top: 8px;
+}
+
+.reader-loading-actions .button {
+  text-decoration: none;
+}
+
+.reader-error-reference {
+  padding: 6px 16px;
+  color: var(--ui-text-muted);
+  font-size: 13px;
+  line-height: 1.5;
+  text-align: center;
 }
 
 .reader-empty {
@@ -2326,6 +2384,48 @@ h3 {
   gap: 4px;
   color: var(--ui-text-soft);
   font-size: 12px;
+}
+
+.reader-shape-color-palette {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.reader-shape-color-swatch {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  flex: none;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.reader-shape-color-swatch::before {
+  content: "";
+  position: absolute;
+  inset: 12px;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: 50%;
+  background: var(--reader-shape-swatch-color);
+}
+
+.reader-shape-color-swatch[aria-checked="true"]::before {
+  box-shadow: 0 0 0 2px var(--ui-surface), 0 0 0 4px var(--ui-focus);
+}
+
+.reader-shape-color-swatch:focus-visible {
+  outline: 2px solid var(--ui-focus);
+  outline-offset: 1px;
+}
+
+.reader-shape-color-swatch:disabled {
+  opacity: 0.45;
+  cursor: default;
 }
 
 .reader-shape-editor select,

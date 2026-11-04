@@ -82,6 +82,7 @@ export function createReaderShapes(adapter) {
   const description = document.getElementById("reader-shape-description");
   const descriptionLabel = document.getElementById("reader-shape-description-label");
   const color = document.getElementById("reader-shape-color");
+  const colorPalette = editor.querySelector(".reader-shape-color-palette");
   const width = document.getElementById("reader-shape-width");
   const widthField = document.getElementById("reader-shape-width-field");
   const fontSize = document.getElementById("reader-shape-font-size");
@@ -163,11 +164,34 @@ export function createReaderShapes(adapter) {
     const textbox = kind === "textbox";
     const colors = textbox ? TEXTBOX_COLORS : COLORS;
     color.replaceChildren();
+    colorPalette.replaceChildren();
     for (const value of Object.keys(colors)) {
       const option = document.createElement("option");
       option.value = value;
       option.textContent = adapter.t(`${textbox ? "textboxColor" : "color"}${value[0].toUpperCase()}${value.slice(1)}`);
       color.append(option);
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "reader-shape-color-swatch";
+      button.dataset.value = value;
+      button.setAttribute("role", "radio");
+      button.setAttribute("aria-checked", "false");
+      button.setAttribute("aria-label", option.textContent);
+      button.title = option.textContent;
+      button.tabIndex = -1;
+      button.style.setProperty("--reader-shape-swatch-color", colors[value]);
+      colorPalette.append(button);
+    }
+  }
+
+  function syncColorPalette() {
+    const buttons = [...colorPalette.querySelectorAll(".reader-shape-color-swatch")];
+    const selected = buttons.find((button) => button.dataset.value === color.value) || null;
+    colorPalette.setAttribute("aria-disabled", String(color.disabled));
+    for (const button of buttons) {
+      button.setAttribute("aria-checked", String(button === selected));
+      button.tabIndex = button === selected ? 0 : -1;
+      button.disabled = color.disabled;
     }
   }
 
@@ -176,6 +200,7 @@ export function createReaderShapes(adapter) {
   }
 
   function renderEditor(sync = false) {
+    const focusedColor = colorPalette.contains(document.activeElement) ? document.activeElement.dataset.value : null;
     editor.hidden = !interaction || Boolean(interaction.drawing);
     if (editor.hidden) return;
     const busy = saving || adapter.isBusy();
@@ -195,6 +220,7 @@ export function createReaderShapes(adapter) {
     fontSizeField.hidden = !textbox;
     description.disabled = busy || frozen;
     color.disabled = busy || frozen;
+    syncColorPalette();
     width.disabled = busy || frozen || textbox;
     fontSize.disabled = busy || frozen || !textbox;
     const blank = textbox && !interaction.text.trim();
@@ -218,6 +244,11 @@ export function createReaderShapes(adapter) {
     agentButton.disabled = busy || dirty() || blank || tooLong || overflowing;
     editor.setAttribute("aria-label", adapter.t(interaction.noteId ? "shapeEditLabel" : "shapeNewLabel"));
     positionEditor();
+    if (focusedColor && !color.disabled) {
+      const buttons = [...colorPalette.querySelectorAll(".reader-shape-color-swatch")];
+      const target = buttons.find((button) => button.dataset.value === focusedColor) || buttons.find((button) => button.dataset.value === color.value);
+      target?.focus({ preventScroll: true });
+    }
   }
 
   function appendShape(layer, record, shape, noteId, selected, body = "") {
@@ -747,6 +778,33 @@ export function createReaderShapes(adapter) {
     if (!Object.hasOwn(colors, color.value)) return;
     interaction.shape.color = color.value;
     render();
+  });
+  function chooseColor(button) {
+    if (button.disabled) return;
+    if (color.value === button.dataset.value) {
+      syncColorPalette();
+      return;
+    }
+    color.value = button.dataset.value;
+    color.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+  colorPalette.addEventListener("click", (event) => {
+    const button = event.target.closest(".reader-shape-color-swatch");
+    if (button) chooseColor(button);
+  });
+  colorPalette.addEventListener("keydown", (event) => {
+    if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"].includes(event.key)) return;
+    const current = event.target.closest(".reader-shape-color-swatch");
+    if (!current) return;
+    const buttons = [...colorPalette.querySelectorAll(".reader-shape-color-swatch")].filter((button) => !button.disabled);
+    const index = buttons.indexOf(current);
+    if (index < 0 || !buttons.length) return;
+    event.preventDefault();
+    const previous = event.key === "ArrowLeft" || event.key === "ArrowUp";
+    const nextIndex = event.key === "Home" ? 0 : event.key === "End" ? buttons.length - 1 : (index + (previous ? -1 : 1) + buttons.length) % buttons.length;
+    const next = buttons[nextIndex];
+    next.focus({ preventScroll: true });
+    chooseColor(next);
   });
   width.addEventListener("change", () => {
     if (!interaction || interaction.operation || saving || interaction.shape.kind === "textbox") return;
