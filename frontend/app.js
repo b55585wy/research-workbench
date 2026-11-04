@@ -8,7 +8,7 @@ import { createCharts } from "/charts.js";
 import { createWorkspace } from "/workspace.js";
 import { createDataNavigation } from "/data-navigation.js";
 import { createAssistant } from "/assistant.js?v=0.52.0";
-import { createRichText, renderRichHtml } from "/rich-text.js";
+import { createRichText, renderRichHtml } from "/rich-text.js?v=0.53.0";
 import { createResearchRecord } from "/research-record.js";
 import { createStudy } from "/study.js";
 import { createReaderFind } from "/reader-find.js";
@@ -2978,6 +2978,7 @@ function renderDocumentDetails() {
   elements.zoomIn.disabled = !hasPdf || state.effectiveScale >= ZOOM_MAX;
   elements.zoomOut.disabled = !hasPdf || state.effectiveScale <= ZOOM_MIN;
   elements.zoomFit.disabled = !hasPdf;
+  elements.zoomFit.setAttribute("aria-pressed", String(state.zoomMode === "fit"));
   elements.zoomFitPage.disabled = !hasPdf;
   elements.readerFullscreen.disabled = !hasPdf;
   const annotationDisabled = !hasPdf || state.pendingSaves > 0 || state.pendingMutations.size > 0;

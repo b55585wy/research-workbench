@@ -1,6 +1,9 @@
 Server deployment and current status: [SERVER-DEPLOYMENT.md](SERVER-DEPLOYMENT.md).
 
-# research workspace · v0.52.0
+# research workspace · v0.53.0
+
+手机阅读工具改用紧凑图标，批注、视图与导出按需展开，为 PDF 正文留出空间。
+桌面操作与已保存资料保持原有行为。见 [MOBILE-TOOLS.md](MOBILE-TOOLS.md)。
 
 修复缺少新 Promise 接口的浏览器打不开 PDF：使用同版 PDF.js legacy 及本地兼容资源，
 加载失败时可打开原 PDF。助手新增「清空对话」，保留草稿和已保存研究资料；

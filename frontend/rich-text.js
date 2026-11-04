@@ -14,7 +14,7 @@ let editorStylesPromise = null;
 const messages = {
   zh: {
     plain: "转为纯文本",
-    draftHelp: "可直接在侧栏编辑。原文文字或截图会插入上次光标位置，保存后才会写入。",
+    draftHelp: "文字和截图会插入上次光标位置，保存后生效。",
     loading: "正在加载格式编辑器…",
     placeholder: "记录你的想法…",
     empty: "笔记内容不能为空。",
@@ -46,7 +46,7 @@ const messages = {
   },
   en: {
     plain: "Convert to plain text",
-    draftHelp: "Edit directly in the sidebar. Selected text or captures insert at the last caret and are not saved until you save.",
+    draftHelp: "Text and images use your last cursor position. Save to keep changes.",
     loading: "Loading the formatting editor…",
     placeholder: "Write your thoughts…",
     empty: "Note text cannot be empty.",
