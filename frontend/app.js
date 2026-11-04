@@ -27,6 +27,7 @@ import { isDeviceMode, mapDeviceAssetUrl } from "/device-context.js";
 import { createDeviceUI, applyDeviceCapabilities } from "/device-ui.js";
 import { collectPdfTextSelection, formatSelectionQuote, sourceSegmentsFor } from "/cross-page-selection.js";
 
+window.workbenchStartup?.stage("workspace");
 pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf-worker-compat.js?v=0.52.0";
 
 const deviceMode = isDeviceMode();
@@ -41,7 +42,7 @@ const MAX_DEVICE_PIXEL_RATIO = 2;
 const MAX_FILE_BYTES = 20 * 1024 * 1024;
 const ZOOM_MIN = 0.4;
 const ZOOM_MAX = 3;
-const APP_VERSION = "0.55.0";
+const APP_VERSION = "0.55.2";
 const PDF_RANGE_CHUNK_SIZE = 64 * 1024;
 const PDF_LOADING_HINT_DELAY = 12_000;
 
@@ -4540,6 +4541,7 @@ async function renderDeviceExcerpt({ document_id, page, rect, source_sha256 }) {
 }
 
 async function loadPdf(document, sequence, signal) {
+  window.workbenchStartup?.stage("document");
   const url = mapDeviceAssetUrl(`/api/v1/documents/${encodeURIComponent(document.id)}/file`);
   const attempt = {
     documentId: document.id,
@@ -8309,10 +8311,12 @@ applyLanguage();
 
 async function startApplication() {
   if (deviceMode) {
+    window.workbenchStartup?.stage("device");
     try {
       await prepareDeviceRepository();
     } catch {
       setStatus("storage_unavailable", "error", {}, startApplication);
+      window.workbenchStartup?.ready();
       return;
     }
   } else {
@@ -8326,6 +8330,8 @@ async function startApplication() {
       syncTranslationLayout();
     });
   }
+  window.workbenchStartup?.stage("library");
   await loadDocuments();
+  window.workbenchStartup?.ready();
 }
-void startApplication();
+void startApplication().catch(() => window.workbenchStartup?.fail());

@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="color-scheme" content="light">
   <title>文献与笔记 · research workspace</title>
+  <link rel="stylesheet" href="/startup.css?v=0.55.2">
   <link rel="stylesheet" href="/theme-tokens.css">
   <link rel="stylesheet" href="/pdf-text-layer.css">
   <link rel="stylesheet" href="/pdf-annotation-layer.css">
@@ -34,6 +35,16 @@
   <link rel="stylesheet" href="/sidebar-navigation.css">
 </head>
 <body>
+  <section id="startup-status" class="startup-status" role="status" aria-live="polite" aria-atomic="true" data-state="loading">
+    <span class="startup-spinner" aria-hidden="true"></span>
+    <div class="startup-copy">
+      <strong id="startup-title">正在打开工作台</strong>
+      <p id="startup-detail">正在加载阅读器和笔记工具，首次打开可能稍慢。</p>
+      <noscript>请启用 JavaScript 后重新加载页面。</noscript>
+    </div>
+    <button id="startup-retry" class="startup-retry" type="button" hidden>重新加载</button>
+  </section>
+  <script src="/startup.js?v=0.55.2"></script>
   <header class="app-header">
     <div id="workspace-identity" class="brand" aria-label="research workspace">
       <span class="brand-name">research workspace</span>
@@ -1152,7 +1163,7 @@
   <script src="/vendor/assistant-markdown/katex.min.js"></script>
   <script src="/vendor/assistant-markdown/texmath.js"></script>
   <script src="/vendor/assistant-markdown/purify.min.js"></script>
-  <script type="module" src="/app.js?v=0.55.1"></script>
+  <script type="module" src="/app.js?v=0.55.2"></script>
   <script type="module" src="/mobile-layout.js?v=0.53.0"></script>
   <script type="module" src="/reader-mobile-tools.js?v=0.53.0"></script>
   <script type="module" src="/reader-annotation-tools.js"></script>

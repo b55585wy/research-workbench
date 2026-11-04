@@ -328,3 +328,14 @@ Scoped browser smoke used two synthetic PDFs and intercepted lookup responses: c
 and other-paper targeting, manual field preservation, explicit save persistence, query
 failure/retry, blocked navigation with an unsaved drawing, mobile/English, and device
 network isolation passed. No live DOI provider/model/analysis or full regression run.
+
+## v0.55.2 startup feedback (not deployed)
+
+A static status precedes the main app module, with a small independent script and
+same-origin stylesheet. Actual initialization reports tools/workspace/library/paper
+stages. Success hides it; 20s waiting offers explicit reload without forcing navigation.
+Script failure offers retry. Saved English, keyboard access, phone layout and reduced
+motion are supported. Existing library/PDF error recovery and data paths remain.
+Scoped synthetic browser smoke passed delayed modules/library/PDF, late success,
+script failure and successful explicit reload, server/device completion, English and reduced motion.
+No public services were restarted: user requested batching updates to protect active use.
