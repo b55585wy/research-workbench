@@ -8576,4 +8576,8 @@ async function startApplication() {
   await loadDocuments();
   window.workbenchStartup?.ready();
 }
-void startApplication().catch(() => window.workbenchStartup?.fail());
+void startApplication()
+  .catch(() => window.workbenchStartup?.fail())
+  .finally(() => {
+    if (!deviceMode) offlineSupport.schedule();
+  });

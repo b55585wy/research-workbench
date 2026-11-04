@@ -8,6 +8,10 @@ const copy = {
     offlinePreparing: "正在准备离线阅读",
     offlineFailed: "离线准备未完成",
     offlineUnsupported: "此浏览器不支持离线启动",
+    offlineServerReady: "离线程序已准备",
+    offlineServerPreparing: "正在准备离线程序",
+    offlineServerFailed: "离线程序准备未完成",
+    offlineServerNote: "离线阅读仅打开本机资料；服务器资料仍需联网。",
     offlineRetry: "重试准备",
     device: "本机资料",
     server: "服务器资料",
@@ -32,6 +36,10 @@ const copy = {
     offlinePreparing: "Preparing offline reading",
     offlineFailed: "Offline preparation did not finish",
     offlineUnsupported: "Offline startup is not supported by this browser",
+    offlineServerReady: "Offline program is ready",
+    offlineServerPreparing: "Preparing the offline program",
+    offlineServerFailed: "Offline program preparation did not finish",
+    offlineServerNote: "Offline reading opens device materials; server materials still require a network connection.",
     offlineRetry: "Retry preparation",
     device: "On this device",
     server: "On server",
@@ -80,13 +88,13 @@ export function createDeviceUI(adapter) {
     return copy[adapter.getLanguage()]?.[key] || copy.en[key];
   }
 
-  function offlineText() {
+  function offlineText(device) {
     const key = {
-      ready: "offlineReady",
-      preparing: "offlinePreparing",
-      failed: "offlineFailed",
+      ready: device ? "offlineReady" : "offlineServerReady",
+      preparing: device ? "offlinePreparing" : "offlineServerPreparing",
+      failed: device ? "offlineFailed" : "offlineServerFailed",
       unsupported: "offlineUnsupported"
-    }[offlineState.status] || "offlinePreparing";
+    }[offlineState.status] || (device ? "offlinePreparing" : "offlineServerPreparing");
     const label = text(key);
     return offlineState.status === "preparing" && offlineState.total > 0
       ? `${label} ${offlineState.completed}/${offlineState.total}`
@@ -95,7 +103,7 @@ export function createDeviceUI(adapter) {
 
   function renderOffline() {
     const device = isDeviceMode();
-    const offlineLabel = device ? offlineText() : "";
+    const offlineLabel = offlineText(device);
     const summary = root.querySelector(".device-storage-summary");
     if (summary) {
       summary.setAttribute("aria-label", device ? `${text("storage")}: ${offlineLabel}` : text("storage"));
@@ -104,7 +112,7 @@ export function createDeviceUI(adapter) {
       if (icon) icon.dataset.state = offlineState.status;
     }
     const offline = root.querySelector(".offline-status");
-    if (!device || !offline) return;
+    if (!offline) return;
     offline.replaceChildren();
     const offlineRow = window.document.createElement("div");
     offlineRow.className = "offline-status-row";
@@ -125,9 +133,15 @@ export function createDeviceUI(adapter) {
     if (offlineState.status === "preparing" && offlineState.total > 0) {
       const progress = window.document.createElement("progress");
       progress.max = offlineState.total;
-      progress.value = offlineState.completed;
+      progress.value = Math.min(Math.max(offlineState.completed, 0), offlineState.total);
       progress.setAttribute("aria-label", offlineLabel);
       offline.append(progress);
+    }
+    if (!device) {
+      const note = window.document.createElement("p");
+      note.className = "device-storage-note";
+      note.textContent = text("offlineServerNote");
+      offline.append(note);
     }
   }
 
@@ -180,10 +194,10 @@ export function createDeviceUI(adapter) {
       help.className = "device-storage-note";
       help.textContent = text("localOnly");
       panel.append(actions, help);
-      const offline = window.document.createElement("div");
-      offline.className = "offline-status";
-      panel.append(offline);
     }
+    const offline = window.document.createElement("div");
+    offline.className = "offline-status";
+    panel.append(offline);
     if (status) {
       const message = window.document.createElement("p");
       message.className = "device-storage-status";

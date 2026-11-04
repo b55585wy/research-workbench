@@ -6,7 +6,16 @@ const ROOT_PATH_PATTERN = /^\/(?:_ui\/ui-[a-zA-Z0-9][a-zA-Z0-9._-]{0,95}\/)?offl
 
 let state = { status: "preparing", release: null, completed: 0, total: 0, loadedBytes: 0, totalBytes: 0 };
 let starting = null;
+let scheduled = null;
 const listeners = new Set();
+
+function schedule() {
+  if (starting || scheduled !== null) return;
+  scheduled = window.setTimeout(() => {
+    scheduled = null;
+    void start().catch(() => {});
+  }, 1000);
+}
 
 function pathOf(worker) {
   try {
@@ -208,6 +217,10 @@ function waitForRootActive(registration) {
 }
 
 async function start() {
+  if (scheduled !== null) {
+    window.clearTimeout(scheduled);
+    scheduled = null;
+  }
   if (starting) return starting;
   starting = (async () => {
     if (!("serviceWorker" in navigator) || !("caches" in window) || !("MessageChannel" in window)) {
@@ -275,6 +288,7 @@ export const offlineSupport = {
     return () => listeners.delete(listener);
   },
   start,
+  schedule,
   async ensureDeviceController() {
     if (!("serviceWorker" in navigator)) throw new Error("Service workers unavailable");
     const root = await readyRoot();
