@@ -1,5 +1,9 @@
 Server deployment and current status: [SERVER-DEPLOYMENT.md](SERVER-DEPLOYMENT.md).
 
+## tFUS 首版资料接入（2026-11-04）
+
+tFUS v0.33.0 提供跳转本工作台的入口，以及旧 RMS 评分报告的 CSV 导出；本工作台复用现有资料上传、保存与课题关联，见[接入约定](TFUS-INTEGRATION.md)。本分支仅文档，应用及公网服务保持。文件来源声明不替代身份验证；账号适配、显式空间绑定与在线引用仍待后续，不自动认领游客历史。
+
 # research workspace · v0.51.0
 
 新增免注册服务器游客空间：每位访客独立保存论文、笔记、聊天、数据与模型设置，
