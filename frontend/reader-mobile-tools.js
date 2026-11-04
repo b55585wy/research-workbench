@@ -102,7 +102,7 @@ if (readerPanel && toolbar) {
   }
 
   function ensureNativeIcon(native, name) {
-    if (!native.querySelector(`:scope > svg[data-reader-mobile-icon="${name}"]`)) native.append(icon(name));
+    if (!native.querySelector(":scope > svg")) native.append(icon(name));
   }
 
   const nativeIcons = new Map([

@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="/pdf-text-layer.css">
   <link rel="stylesheet" href="/pdf-annotation-layer.css">
   <link rel="stylesheet" href="/pdf-layer-rotation.css">
-  <link rel="stylesheet" href="/styles.css?v=0.54.0">
+  <link rel="stylesheet" href="/styles.css?v=0.55.0">
   <link rel="stylesheet" href="/workspace.css">
   <link rel="stylesheet" href="/image-library.css">
   <link rel="stylesheet" href="/analysis.css">
@@ -24,10 +24,14 @@
   <link rel="stylesheet" href="/vendor/assistant-markdown/texmath.css">
   <link rel="stylesheet" href="/assistant.css">
   <link rel="stylesheet" href="/task-client.css">
-  <link rel="stylesheet" href="/rich-text.css?v=0.54.0">
+  <link rel="stylesheet" href="/rich-text.css?v=0.55.0">
   <link rel="stylesheet" href="/doraemon-theme.css">
-  <link rel="stylesheet" href="/mobile-layout.css?v=0.54.0">
+  <link rel="stylesheet" href="/mobile-layout.css?v=0.55.0">
   <link rel="stylesheet" href="/reader-mobile-tools.css?v=0.53.0">
+  <link rel="stylesheet" href="/reader-annotation-tools.css">
+  <link rel="stylesheet" href="/device-ui.css">
+  <link rel="stylesheet" href="/status-notice.css">
+  <link rel="stylesheet" href="/sidebar-navigation.css">
 </head>
 <body>
   <header class="app-header">
@@ -36,6 +40,8 @@
       <span class="local-guest" title="正在打开空间…">正在打开空间…</span>
     </div>
     <h1 data-i18n="pageTitle">文献与笔记</h1>
+    <div id="device-storage-ui" class="device-storage-ui" aria-label="资料存储位置"></div>
+    <input id="device-backup-input" type="file" accept="application/zip,.zip" hidden>
     <div class="header-controls">
       <label class="theme-control" for="theme-select">
         <span data-i18n="themeLabel">主题</span>
@@ -48,9 +54,11 @@
     </div>
   </header>
 
-  <div id="app-status" class="app-status" data-testid="app-status" role="status" aria-live="polite" hidden>
+  <div id="app-status" class="app-status" data-testid="app-status" role="status" aria-live="polite" aria-atomic="true" hidden>
+    <span class="status-notice-icon" aria-hidden="true"></span>
     <span id="status-text"></span>
     <button id="status-retry" class="status-retry" type="button" hidden data-i18n="retry">重试</button>
+    <button id="status-close" class="status-notice-close" type="button" data-i18n-aria="close" aria-label="关闭" title="关闭"><span aria-hidden="true">×</span></button>
   </div>
 
   <nav class="workspace-modebar" aria-label="工作区">
@@ -81,7 +89,9 @@
         </div>
         <div id="library-search-results" class="library-search-results" data-testid="library-search-results" aria-label="搜索结果" hidden></div>
         <details id="paper-library" class="paper-library" open>
-          <summary class="paper-library-summary">
+          <summary class="paper-library-summary sidebar-group-summary">
+            <svg class="sidebar-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+            <svg class="sidebar-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M12 5v15M3 4.5c3-1 6-.5 9 1.5 3-2 6-2.5 9-1.5V19c-3-1-6-.5-9 1.5C9 18.5 6 18 3 19Z"/></svg>
             <h2 id="documents-heading" data-i18n="documents">文献</h2>
           </summary>
           <div class="panel-heading paper-library-actions">
@@ -93,17 +103,25 @@
             <button id="sample-open" class="button button-secondary" type="button" data-testid="sample-open" data-i18n="sample">试读示例</button>
           </div>
           <ul id="documents-list" class="documents-list" data-testid="documents-list" aria-label="已保存文献"></ul>
-        </details>
-        <details id="library-trash" class="library-trash">
-          <summary><span data-i18n="libraryTrash">文献回收站</span><span id="library-trash-count" class="notes-count"></span></summary>
+        <details id="library-trash" class="library-trash sidebar-subgroup">
+          <summary class="sidebar-subgroup-summary">
+            <svg class="sidebar-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+            <svg class="sidebar-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v5m4-5v5"/></svg>
+            <span data-i18n="libraryTrash">文献回收站</span><span id="library-trash-count" class="notes-count"></span>
+          </summary>
           <p class="library-trash-help" data-i18n="libraryTrashHelp">回收站中的文献可恢复。彻底删除会清理原文及关联资料，无法撤销。</p>
           <div id="library-trash-status" class="library-trash-status" role="status" aria-live="polite"></div>
           <ul id="library-trash-list" class="documents-list" aria-label="回收站中的文献"></ul>
         </details>
+        </details>
       </div>
       <section id="data-navigation" class="data-navigation" aria-labelledby="data-navigation-heading" hidden></section>
       <details id="project-library" class="study-library" aria-labelledby="study-library-heading">
-        <summary class="study-library-summary"><span id="study-library-heading" role="heading" aria-level="2">项目</span></summary>
+        <summary class="study-library-summary sidebar-group-summary">
+          <svg class="sidebar-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+          <svg class="sidebar-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M3 7V5h7l2 2h9v13H3ZM3 10h18"/></svg>
+          <span id="study-library-heading" role="heading" aria-level="2">项目</span>
+        </summary>
         <div class="panel-heading study-library-heading">
           <button id="study-new" class="button button-secondary" type="button" aria-controls="study-create-form" aria-expanded="false">新建研究</button>
         </div>
@@ -256,20 +274,35 @@
         </div>
         <div class="reader-source-controls" aria-label="原文操作">
           <div id="text-annotation-toolbar" class="text-annotation-toolbar" role="group" aria-label="选中文字操作">
-            <button id="text-selection-note" class="button button-secondary" type="button" data-i18n="textSelectionNote" disabled>加入笔记</button>
+            <button id="text-selection-note" class="button button-secondary reader-annotation-icon-button" type="button" data-i18n-aria="textSelectionNote" aria-label="加入笔记" title="加入笔记" disabled>
+              <svg class="reader-annotation-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 3h14v18H5zM9 3v18M12 8h4M12 12h4"/></svg>
+              <span class="sr-only" data-i18n="textSelectionNote">加入笔记</span>
+            </button>
             <button id="text-selection-ask" class="button button-secondary" type="button" data-i18n="askSelection" disabled>提问</button>
             <button id="text-selection-translate" class="button button-secondary" type="button" data-i18n="translateSelection" disabled>翻译</button>
-            <button id="text-annotation-highlight" class="button button-secondary" type="button" data-action="annotation-kind" data-kind="highlight" data-i18n="annotationHighlight" disabled>保存高亮</button>
-            <button id="text-annotation-underline" class="button button-secondary" type="button" data-action="annotation-kind" data-kind="underline" data-i18n="annotationUnderline" disabled>保存下划线</button>
+            <button id="text-annotation-highlight" class="button button-secondary reader-annotation-icon-button" type="button" data-action="annotation-kind" data-kind="highlight" data-i18n-aria="annotationHighlight" aria-label="保存高亮" title="保存高亮" disabled>
+              <svg class="reader-annotation-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m9 15-4 4 1 1 4-4M10 5l9 9-5 5-9-9zM3 22h10"/></svg>
+              <span class="sr-only" data-i18n="annotationHighlight">保存高亮</span>
+            </button>
+            <button id="text-annotation-underline" class="button button-secondary reader-annotation-icon-button" type="button" data-action="annotation-kind" data-kind="underline" data-i18n-aria="annotationUnderline" aria-label="保存下划线" title="保存下划线" disabled>
+              <svg class="reader-annotation-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 3v7a6 6 0 0 0 12 0V3M5 21h14"/></svg>
+              <span class="sr-only" data-i18n="annotationUnderline">保存下划线</span>
+            </button>
             <fieldset class="text-annotation-colors">
               <legend class="sr-only" data-i18n="annotationColor">标注颜色</legend>
-              <label><input type="radio" name="annotation-color" value="yellow" data-annotation-color="yellow" checked><span data-i18n="colorYellow">黄色</span></label>
-              <label><input type="radio" name="annotation-color" value="green" data-annotation-color="green"><span data-i18n="colorGreen">绿色</span></label>
-              <label><input type="radio" name="annotation-color" value="blue" data-annotation-color="blue"><span data-i18n="colorBlue">蓝色</span></label>
-              <label><input type="radio" name="annotation-color" value="pink" data-annotation-color="pink"><span data-i18n="colorPink">粉色</span></label>
+              <label><input type="radio" name="annotation-color" value="yellow" data-annotation-color="yellow" checked><span class="sr-only" data-i18n="colorYellow">黄色</span></label>
+              <label><input type="radio" name="annotation-color" value="green" data-annotation-color="green"><span class="sr-only" data-i18n="colorGreen">绿色</span></label>
+              <label><input type="radio" name="annotation-color" value="blue" data-annotation-color="blue"><span class="sr-only" data-i18n="colorBlue">蓝色</span></label>
+              <label><input type="radio" name="annotation-color" value="pink" data-annotation-color="pink"><span class="sr-only" data-i18n="colorPink">粉色</span></label>
             </fieldset>
           </div>
-          <div class="reader-shape-tools" role="group" aria-label="图形批注">
+          <details id="reader-draw-menu" class="reader-shape-tools reader-draw-menu">
+            <summary class="button button-secondary reader-draw-summary" data-i18n-aria="drawTools" aria-label="绘图" title="绘图">
+              <svg data-reader-draw-icon viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m3 17 3.5-.8L16 6.7a1.8 1.8 0 0 0-2.5-2.5L4 13.7 3 17Z"/><path d="m11.8 5.8 2.5 2.5"/></svg>
+              <span data-i18n="drawTools">绘图</span>
+              <svg class="reader-draw-chevron" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 8 4 4 4-4"/></svg>
+            </summary>
+            <div class="reader-shape-tool-menu" role="group" data-i18n-aria="shapeTools" aria-label="图形批注">
             <button id="reader-shape-rectangle" class="button button-secondary" type="button" aria-pressed="false" disabled>
               <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" focusable="false"><rect x="3" y="4" width="14" height="12" stroke="currentColor" stroke-width="1.5"></rect></svg>
               <span data-i18n="shapeRectangle">矩形</span>
@@ -294,8 +327,12 @@
               <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" focusable="false"><rect x="3" y="4" width="14" height="12" stroke="currentColor" stroke-width="1.5"></rect><path d="M6 8h8M6 12h5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg>
               <span data-i18n="shapeTextbox">文本框</span>
             </button>
-          </div>
-          <button id="reader-region-mode" class="button button-secondary" type="button" data-i18n="regionMode" disabled>截取图片</button>
+            </div>
+          </details>
+          <button id="reader-region-mode" class="button button-secondary reader-annotation-icon-button" type="button" data-i18n-aria="regionMode" aria-label="截取图片" title="截取图片" disabled>
+            <svg class="reader-annotation-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M8 3H3v5M16 3h5v5M21 16v5h-5M8 21H3v-5M8 8h8v8H8z"/></svg>
+            <span class="sr-only" data-reader-action-label>截取图片</span>
+          </button>
         </div>
         <button id="export-reading-record" class="button button-secondary export-reading-record" type="button" data-testid="export-reading-record" data-i18n="exportReadingRecord" disabled>导出阅读记录</button>
         <div class="annotated-pdf-export">
@@ -1114,8 +1151,9 @@
   <script src="/vendor/assistant-markdown/katex.min.js"></script>
   <script src="/vendor/assistant-markdown/texmath.js"></script>
   <script src="/vendor/assistant-markdown/purify.min.js"></script>
-  <script type="module" src="/app.js?v=0.54.0"></script>
+  <script type="module" src="/app.js?v=0.55.0"></script>
   <script type="module" src="/mobile-layout.js?v=0.53.0"></script>
   <script type="module" src="/reader-mobile-tools.js?v=0.53.0"></script>
+  <script type="module" src="/reader-annotation-tools.js"></script>
 </body>
 </html>

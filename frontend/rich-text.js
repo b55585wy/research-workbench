@@ -1,3 +1,5 @@
+import { mapDeviceAssetUrl } from "/device-context.js";
+
 const ALLOWED_TAGS = ["p", "h1", "h2", "strong", "em", "u", "ul", "ol", "li", "br", "a", "img"];
 const ALLOWED_ATTR = ["href", "rel", "target", "src", "alt"];
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -179,7 +181,7 @@ function registerResearchImage(Quill) {
       const image = validResearchImage(value);
       if (!image) throw new Error("Invalid research image");
       const node = super.create();
-      node.setAttribute("src", imagePreviewPath(image.document_id, image.image_id));
+      node.setAttribute("src", mapDeviceAssetUrl(imagePreviewPath(image.document_id, image.image_id)));
       node.setAttribute("alt", image.alt);
       node.dataset.documentId = image.document_id;
       node.dataset.imageId = image.image_id;
@@ -270,6 +272,7 @@ export async function renderRichHtml(container, { html, text, language = "zh" })
         continue;
       }
       image.removeAttribute("srcset");
+      image.src = mapDeviceAssetUrl(source);
       image.loading = "lazy";
       image.decoding = "async";
     }

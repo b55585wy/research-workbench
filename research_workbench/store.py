@@ -433,6 +433,8 @@ SCHEMA = SCHEMA[:SCHEMA.rindex('COMMIT;')] + READING_PAGE_SCHEMA + '\nPRAGMA use
 # older build must refuse to reopen this file rather than expose closed chats.
 from .conversation_lifecycle import SCHEMA as CONVERSATION_CLEAR_SCHEMA
 SCHEMA = SCHEMA[:SCHEMA.rindex('COMMIT;')] + CONVERSATION_CLEAR_SCHEMA + '\nPRAGMA user_version=25;\nCOMMIT;'
+from .source_segments import SCHEMA as SOURCE_SEGMENT_SCHEMA
+SCHEMA = SCHEMA[:SCHEMA.rindex('COMMIT;')] + SOURCE_SEGMENT_SCHEMA + '\nPRAGMA user_version=26;\nCOMMIT;'
 
 
 def timestamp():
@@ -459,7 +461,7 @@ class Store:
         self.exports.mkdir(exist_ok=True)
         self.database = self.root / 'workspace.sqlite3'
         with self.connection() as connection:
-            if connection.execute('PRAGMA user_version').fetchone()[0] > 25:
+            if connection.execute('PRAGMA user_version').fetchone()[0] > 26:
                 raise RuntimeError('Database requires a newer application')
             from .study_migration import install
             install(connection,SCHEMA)
@@ -526,6 +528,8 @@ class Store:
         reject_purged(connection, identifier, str(payload.request_id))
         owner=read_metadata(connection,identifier)
         annotation = creation_json(payload, owner.get('sha256'))
+        from .source_segments import creation_json as segment_json
+        segments = segment_json(payload)
         shape = shape_creation_json(payload, owner.get('sha256'))
         if shape is not None:
             if owner.get('kind')=='study':raise WorkspaceError('source_has_no_pdf','形状批注需要实际PDF原文，请打开关联文献绘制。',409)
@@ -541,7 +545,9 @@ class Store:
             raise WorkspaceError('not_found', '找不到这份资料，请重新选择。', 404)
         if payload.page > document['page_count']:
             raise WorkspaceError('invalid_page', '笔记页码超出了这份资料的范围。')
-        if payload.annotation is not None:
+        if payload.source_segments and payload.source_segments[-1].page > document['page_count']:
+            raise WorkspaceError('invalid_page', '选区页码超出了这份资料的范围。')
+        if payload.annotation is not None or segments is not None:
             from .excerpts import verify_source
             verify_source(self, owner)
         existing = connection.execute('SELECT * FROM notes WHERE id=?', (note['id'],)).fetchone()
@@ -552,6 +558,9 @@ class Store:
             old_annotation = connection.execute('SELECT original_json FROM note_text_annotations WHERE note_id=?', (note['id'],)).fetchone()
             if (old_annotation[0] if old_annotation else None) != annotation:
                 raise WorkspaceError('idempotency_conflict', '文字批注与原保存请求不一致。', 409)
+            old_segments = connection.execute('SELECT segments_json FROM note_source_segments WHERE note_id=?', (note['id'],)).fetchone()
+            if (old_segments[0] if old_segments else None) != segments:
+                raise WorkspaceError('idempotency_conflict', '分页出处与原保存请求不一致。', 409)
             body=connection.execute('SELECT original_json FROM note_rich_content WHERE note_id=?',(note['id'],)).fetchone()
             original=body['original_json'] if body is not None else None
             proposed=canonical(payload.rich_content) if payload.rich_content is not None else None
@@ -564,6 +573,8 @@ class Store:
         connection.execute('INSERT INTO notes VALUES (?,?,?,?,?,?)', tuple(note.values()))
         if annotation is not None:
             connection.execute('INSERT INTO note_text_annotations VALUES (?,?,?)', (note['id'], annotation, annotation))
+        if segments is not None:
+            connection.execute('INSERT INTO note_source_segments VALUES (?,?,?)', (note['id'], owner['sha256'], segments))
         if shape is not None:
             connection.execute('INSERT INTO note_shape_annotations VALUES (?,?,?)', (note['id'], shape, shape))
         if payload.rich_content is not None:
@@ -571,7 +582,10 @@ class Store:
             connection.execute('INSERT INTO note_rich_content VALUES (?,?,?)',(note['id'],body,body))
             from .rich_images import sync_note_images
             sync_note_images(self,connection,identifier,note['id'],None,payload.rich_content)
-        return note_record(note), True
+        result = note_record(note)
+        if segments is not None:
+            result['source_segments'] = json.loads(segments)
+        return result, True
 
     def get_note(self, identifier, note_id):
         self.get_document(identifier)

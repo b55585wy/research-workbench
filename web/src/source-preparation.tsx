@@ -121,13 +121,13 @@ const owners = new WeakMap<HTMLElement, SourcePreparationRegistration>();
 
 const strings = {
   zh: {
-    title: "准备论文页面",
-    help: "选择论文和页码，已有页面可以直接复用。",
+    title: "可选全文检索准备",
+    help: "普通问答可直接按页阅读原文。仅在需要全文检索时准备页面；每批最多 5 页，不是整篇论文的页数上限。",
     empty: "请先打开论文，或用“添加资料”加入论文。",
     source: "论文来源",
     sourcePages: (count: number) => `共 ${count} 页`,
     untitled: "未命名论文",
-    pagesLabel: "页码（最多 5 页）",
+    pagesLabel: "页码（每批最多 5 页）",
     pagesPlaceholder: "例如 1-3,7",
     selectedCount: (count: number) => `已选择 ${count} 页`,
     check: "检查已准备页面",
@@ -142,7 +142,6 @@ const strings = {
     readySameChat: "所选页面已处理，可在当前对话中继续提问。",
     waitingCancelled: "已取消等待",
     prepareIncomplete: "部分页面尚未准备；可按相同范围重试。",
-    preparedMeaning: "准备后的原文页面可用于助手检索。",
     completed: "已准备",
     partial: "部分可用",
     unavailable: "无可用文字",
@@ -165,13 +164,13 @@ const strings = {
     requestFailed: "请求未完成；已显示的缓存结果保留，可按相同范围重试。"
   },
   en: {
-    title: "Prepare paper pages",
-    help: "Select a paper and pages. Prepared pages can be reused.",
+    title: "Optional full-text search preparation",
+    help: "Normal Q&A can read paper pages directly. Prepare pages only for full-text search; each batch has at most 5 pages, not a whole-paper limit.",
     empty: "Open a paper or add one with Add references.",
     source: "Paper source",
     sourcePages: (count: number) => `${count} pages`,
     untitled: "Untitled paper",
-    pagesLabel: "Pages (up to 5)",
+    pagesLabel: "Pages (at most 5 per batch)",
     pagesPlaceholder: "For example, 1-3,7",
     selectedCount: (count: number) => `${count} selected`,
     check: "Check prepared pages",
@@ -186,7 +185,6 @@ const strings = {
     readySameChat: "The selected pages have been processed. Continue asking in this chat.",
     waitingCancelled: "Waiting cancelled",
     prepareIncomplete: "Some pages are not prepared. Retry the same scope if appropriate.",
-    preparedMeaning: "Prepared source pages can be searched by the assistant.",
     completed: "Prepared",
     partial: "Partial",
     unavailable: "No usable text",
@@ -624,6 +622,8 @@ function SourcePreparationSection({ model, callbacks, registration }: {
   const parsed = selectedPaper ? parsePages(pageInput, selectedPaper.pageCount) : null;
   const selectedCount = parsed?.ok ? parsed.pages.length : null;
   const controlsDisabled = Boolean(busy) || !model.editable;
+  const statusKey = error || phase || notice || (capabilitiesState === "loading" ? "capabilitiesLoading" : null);
+  const statusKind = error ? "error" : !phase && notice ? "success" : "info";
 
   return (
     <details
@@ -672,7 +672,7 @@ function SourcePreparationSection({ model, callbacks, registration }: {
                 autoComplete="off"
                 placeholder={copy.pagesPlaceholder}
                 disabled={controlsDisabled}
-                aria-describedby="source-preparation-page-count source-preparation-page-meaning"
+                aria-describedby="source-preparation-page-count"
                 onChange={(event) => {
                   pageInputRef.current = event.target.value;
                   setPageInput(event.target.value);
@@ -684,7 +684,9 @@ function SourcePreparationSection({ model, callbacks, registration }: {
               />
             </div>
             <p id="source-preparation-page-count" className="source-preparation-count" aria-live="polite">
-              {parsed?.ok ? copy.selectedCount(parsed.pages.length) : copy[parsed && !parsed.ok ? parsed.error : "pagesEmpty"]}
+              {parsed?.ok
+                ? copy.selectedCount(parsed.pages.length)
+                : parsed && !parsed.ok && pageInput.trim() ? copy[parsed.error] : ""}
             </p>
             <div className="source-preparation-actions">
               <button className="button button-secondary" type="button" disabled={controlsDisabled || !parsed?.ok} onClick={() => void run("check")}>
@@ -700,11 +702,11 @@ function SourcePreparationSection({ model, callbacks, registration }: {
                 </button>
               )}
             </div>
-            {capabilitiesState === "loading" && <p className="source-preparation-status" role="status">{copy.capabilitiesLoading}</p>}
-            {capabilitiesState === "unavailable" && <p className="source-preparation-status" data-kind="error" role="status">{copy.runtimeUnavailable}</p>}
-            {phase && <p className="source-preparation-status" role="status">{copy[phase]}</p>}
-            {notice && <p className="source-preparation-status" data-kind="success" role="status">{copy[notice]}</p>}
-            {error && <p className="source-preparation-status" data-kind="error" role="alert">{copy[error]}</p>}
+            {statusKey && (
+              <p className="source-preparation-status" data-kind={statusKind} role={error ? "alert" : "status"}>
+                {copy[statusKey]}
+              </p>
+            )}
             {pageStates.length > 0 && (
               <ul className="source-preparation-pages" aria-label={copy.title}>
                 {pageStates.map((page) => (
@@ -718,7 +720,6 @@ function SourcePreparationSection({ model, callbacks, registration }: {
                 ))}
               </ul>
             )}
-            <p id="source-preparation-page-meaning" className="source-preparation-help">{copy.preparedMeaning}</p>
           </>
         )}
       </div>

@@ -11,11 +11,13 @@ from .text_annotations import add_record as add_annotation_record
 NOTE_FIELDS = ('id', 'document_id', 'page', 'rect', 'text', 'created_at')
 STATE_QUERY = '''SELECT n.id,n.document_id,n.page,n.rect,s.current_text AS text,
     n.created_at,s.revision,s.review_status,s.reviewed_at,s.updated_at,s.deleted_at,r.current_json,a.source_json,t.current_json AS annotation_json,
-    q.original_json AS shape_original_json,q.current_json AS shape_current_json
+    q.original_json AS shape_original_json,q.current_json AS shape_current_json,
+    g.segments_json,g.source_sha256 AS segment_source_sha256
     FROM notes n JOIN note_states s ON s.note_id=n.id
     LEFT JOIN note_rich_content r ON r.note_id=n.id LEFT JOIN study_note_sources a ON a.note_id=n.id
     LEFT JOIN note_text_annotations t ON t.note_id=n.id
-    LEFT JOIN note_shape_annotations q ON q.note_id=n.id'''
+    LEFT JOIN note_shape_annotations q ON q.note_id=n.id
+    LEFT JOIN note_source_segments g ON g.note_id=n.id'''
 
 
 def state_record(row):
@@ -23,6 +25,8 @@ def state_record(row):
     result['rect'] = json.loads(result['rect']) if result['rect'] else None
     add_shape_record(result, result.pop('shape_original_json', None), result.pop('shape_current_json', None))
     add_annotation_record(result, result.pop('annotation_json', None))
+    from .source_segments import add_record as add_segments
+    add_segments(result, result.pop('segments_json'), result.pop('segment_source_sha256'))
     source=result.pop('source_json')
     if source is not None:result['source']=json.loads(source)
     result['review_provenance'] = 'self_reported' if result['review_status'] == 'source_checked' else None
@@ -38,7 +42,11 @@ def state_record(row):
 
 
 def base_note(state):
-    return {**{key: state[key] for key in NOTE_FIELDS},**({'source':state['source']} if 'source' in state else {})}
+    result = {key: state[key] for key in NOTE_FIELDS}
+    for key in ('source', 'source_segments'):
+        if key in state:
+            result[key] = state[key]
+    return result
 
 
 def read_state(connection, identifier, note_id):

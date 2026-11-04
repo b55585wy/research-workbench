@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="doraemon-blue">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="referrer" content="no-referrer">
+  <title>选择资料保存位置 · research workspace</title>
+  <link rel="stylesheet" href="/theme-tokens.css">
+  <link rel="stylesheet" href="/doraemon-theme.css">
+  <link rel="stylesheet" href="/storage-choice.css">
+</head>
+<body>
+  <main class="storage-choice-page">
+    <div class="storage-choice-shell">
+      <header class="storage-choice-header">
+        <span class="storage-choice-brand">research workspace</span>
+      </header>
+
+      <section class="storage-choice-intro" aria-labelledby="storage-choice-title">
+        <h1 id="storage-choice-title">选择资料保存位置</h1>
+        <p>选择本次研究工作区使用的存储位置。</p>
+      </section>
+
+      <nav class="storage-options" aria-label="资料保存位置">
+        <a class="storage-option" href="/device/">
+          <span class="storage-option-title">本机资料</span>
+          <span class="storage-option-description">PDF、图片和笔记保存在当前浏览器；请导出备份，清理浏览器会丢失资料。</span>
+          <span class="storage-option-action" aria-hidden="true">进入本机资料 <span class="storage-option-arrow">→</span></span>
+        </a>
+
+        <a class="storage-option" href="/?storage=server">
+          <span class="storage-option-title">服务器资料</span>
+          <span class="storage-option-description">资料保存在服务器，可使用在线研究助手和分析；每位访客独立空间。</span>
+          <span class="storage-option-action" aria-hidden="true">进入服务器资料 <span class="storage-option-arrow">→</span></span>
+        </a>
+      </nav>
+
+      <footer class="storage-choice-footer">
+        <p class="storage-choice-note">切换存储位置不会迁移、移动或删除已有资料。</p>
+        <a class="storage-recovery-link" href="/recover.html">已有服务器资料？使用恢复码</a>
+      </footer>
+    </div>
+  </main>
+</body>
+</html>

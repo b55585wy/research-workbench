@@ -1,3 +1,5 @@
+import { isDeviceMode, mapDeviceAssetUrl } from "/device-context.js";
+
 const MAX_FRAME_BYTES = 8 * 1024 * 1024;
 const MAX_FRAME_AXIS = 2048;
 const MAX_FRAME_PIXELS = 4_000_000;
@@ -538,7 +540,10 @@ export function createImageViewer(adapter) {
     elements.retry.hidden = !session.retryable || pending;
     elements.original.hidden = !session.source;
     if (session.source) {
-      elements.original.href = session.source.original_url;
+      const originalPath = isDeviceMode() && session.kind === "user_upload"
+        ? session.source.original_url.replace(/\/file$/, "/original")
+        : session.source.original_url;
+      elements.original.href = mapDeviceAssetUrl(originalPath);
       elements.original.download = session.source.original_filename || `excerpt-${session.sourceId}.png`;
     }
     elements.parent.hidden = session.kind !== "pdf_excerpt" || !session.source;

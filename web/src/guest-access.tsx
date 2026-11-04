@@ -14,8 +14,14 @@ interface GuestAccess {
 type AccessState =
   | { kind: "loading" }
   | { kind: "local" }
+  | { kind: "device" }
   | { kind: "guest"; access: GuestAccess }
   | { kind: "unavailable" };
+
+function isDeviceStorage() {
+  return window.location.pathname.startsWith("/device/")
+    || document.documentElement.dataset.storageMode === "device";
+}
 
 type DialogStatus = {
   kind: "info" | "error";
@@ -104,7 +110,7 @@ function parseGuestAccess(value: unknown): GuestAccess | null {
 
 export function GuestIdentity({ language }: { language: GuestLanguage }) {
   const copy = guestStrings[language];
-  const [accessState, setAccessState] = useState<AccessState>({ kind: "loading" });
+  const [accessState, setAccessState] = useState<AccessState>(() => ({ kind: isDeviceStorage() ? "device" : "loading" }));
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [recoveryCode, setRecoveryCode] = useState<string | null>(null);
@@ -115,6 +121,10 @@ export function GuestIdentity({ language }: { language: GuestLanguage }) {
   const generationRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
+    if (isDeviceStorage()) {
+      setAccessState({ kind: "device" });
+      return;
+    }
     const controller = new AbortController();
     let active = true;
 
@@ -249,6 +259,11 @@ export function GuestIdentity({ language }: { language: GuestLanguage }) {
   return (
     <>
       <span className="brand-name">research workspace</span>
+      {accessState.kind === "device" && (
+        <span className="local-guest" title={language === "zh" ? "资料仅保存在此浏览器中。" : "Papers are stored only in this browser."}>
+          {language === "zh" ? "本机资料" : "On this device"}
+        </span>
+      )}
       {accessState.kind === "local" && (
         <span className="local-guest" title={copy.localGuestTitle}>{copy.localGuest}</span>
       )}

@@ -25,7 +25,6 @@ from urllib.parse import urlsplit
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, RedirectResponse, Response
-from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from starlette.concurrency import run_in_threadpool
 
@@ -805,7 +804,7 @@ def create_guest_gateway(guest_root, *, max_spaces=MAX_SPACES, max_active=2,
 
     @app.get('/')
     async def root(request: Request):
-        # Only GET / may allocate a new persistent space.
+        # Only an explicit server choice may allocate a persistent space.
         if request.scope['method'] != 'GET':
             return _error('method_not_allowed', '请使用 GET 打开工作台。', 405)
 
@@ -823,7 +822,11 @@ def create_guest_gateway(guest_root, *, max_spaces=MAX_SPACES, max_active=2,
         if read_guest_hint(request.scope['headers']):
             return _recovery_redirect()
 
-        # A browser with no guest marker at all is a new visitor.
+        if request.query_params.get('storage') != 'server':
+            from .device_pages import choice_response
+            return choice_response(ROOT / 'frontend')
+
+        # The new visitor explicitly selected server storage.
         try:
             can_open = await manager.can_open()
         except Exception:
@@ -883,7 +886,9 @@ def create_guest_gateway(guest_root, *, max_spaces=MAX_SPACES, max_active=2,
     # Static frontend (including Kimi-owned recover.html/guest-recovery.js) is
     # served without a session and without allocating a space.  API paths are
     # matched above and cannot fall through to this HTML mount.
-    app.mount('/', StaticFiles(directory=ROOT / 'frontend', html=True),
+    from .device_pages import FrontendFiles, install_device_pages
+    install_device_pages(app, ROOT / 'frontend')
+    app.mount('/', FrontendFiles(directory=ROOT / 'frontend', html=True),
               name='guest-frontend')
     return app
 

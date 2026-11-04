@@ -716,3 +716,28 @@ search/export/analysis/Agent APIs retain their paths and operate only in that sp
 revokes the prior cookie and preserves record IDs. It never registers a person or
 merges spaces. Recovery/access responses are no-store. Invalid API credentials get
 401; invalid homepage credentials redirect to `/recover.html`. See GUEST-SPACES.md.
+
+# v0.55 explicit device storage and paginated quotation sources
+
+`/device/` runs the same reader with a bounded IndexedDB repository and a scoped
+file Service Worker, not server API interception. `/storage` offers a location
+choice. New visitors at `/` allocate no server space; `/?storage=server` is the
+explicit opt-in. Existing guest cookies/recovery semantics remain unchanged.
+
+GET `/api/v1/reader-capabilities` adds `{source_segments:true,storage:'server'}`.
+Device transport reports storage:'device' and never uploads to these APIs.
+
+NoteCreate optionally accepts immutable `source_segments:[{page,quote,rects}]`:
+1..20 ascending unique pages within the actual PDF, <=256 normalized positive
+rectangles per page, <=10000 quotation characters total and bounded serialized
+source data. Primary page/rect match the first source; a text annotation's
+quote/rects match that source. Shapes/study anchors cannot carry page sources.
+Absent new fields are omitted during serialization, preserving old fingerprints.
+Updates cannot replace sources; edits/styles/delete/restore keep them. Saved
+note/state responses carry sources, PDF export projects each page separately.
+Schema26 adds one source table; older25 builds refuse it. No existing rows change.
+
+Device-only POST `/api/v1/device/backups` imports its own v1 ZIP after bounds,
+SHA/reference checks and commits once. Existing IDs with divergent content return
+409 without overwrite. This is not a server backup-import API. See
+LOCAL-STORAGE-PLAN.md and DEVICE-STORAGE-ACCEPTANCE.md for actual scope and limits.

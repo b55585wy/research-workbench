@@ -1,3 +1,5 @@
+import { isDeviceMode, mapDeviceAssetUrl } from "/device-context.js";
+
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 
 const messages = {
@@ -118,7 +120,8 @@ export function createImageLibrary(adapter) {
   }
 
   function imageUrl(paperId, imageId, kind) {
-    return `/api/v1/documents/${encodeURIComponent(paperId)}/images/${encodeURIComponent(imageId)}/${kind}`;
+    const assetKind = isDeviceMode() && kind === "file" ? "original" : kind;
+    return mapDeviceAssetUrl(`/api/v1/documents/${encodeURIComponent(paperId)}/images/${encodeURIComponent(imageId)}/${assetKind}`);
   }
 
   function viewButton(paperId, imageId) {

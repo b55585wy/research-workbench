@@ -1,0 +1,191 @@
+.app-status {
+  position: fixed;
+  z-index: 90;
+  top: 76px;
+  right: 16px;
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto 32px;
+  align-items: start;
+  gap: 8px;
+  width: fit-content;
+  max-width: min(420px, calc(100vw - 24px));
+  min-height: 0;
+  margin: 0;
+  padding: 8px;
+  border: 1px solid var(--ui-border);
+  border-radius: 8px;
+  background: var(--ui-surface, #fff);
+  box-shadow: 0 6px 20px rgb(0 0 0 / 12%);
+  color: var(--ui-text);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.45;
+  animation: status-notice-enter 140ms ease-out;
+}
+
+.app-status[hidden] {
+  display: none;
+}
+
+.app-status[data-kind="error"],
+.app-status[data-kind="success"] {
+  border-color: var(--ui-border);
+  background: var(--ui-surface, #fff);
+  color: var(--ui-text);
+}
+
+.app-status #status-text {
+  min-width: 0;
+  padding-top: 5px;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.status-notice-icon {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 28px;
+  color: var(--ui-text-muted);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.status-notice-icon::before {
+  content: "i";
+}
+
+.app-status[data-kind="success"] .status-notice-icon {
+  color: var(--ui-success);
+}
+
+.app-status[data-kind="success"] .status-notice-icon::before {
+  content: "✓";
+}
+
+.app-status[data-kind="error"] .status-notice-icon {
+  color: var(--ui-danger);
+}
+
+.app-status[data-kind="error"] .status-notice-icon::before {
+  content: "!";
+}
+
+.app-status .status-retry {
+  align-self: center;
+  min-height: 32px;
+  padding: 4px 6px;
+  border: 0;
+  background: transparent;
+  color: var(--ui-text);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.status-notice-close {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ui-text-muted);
+  font: inherit;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.app-status :is(.status-retry, .status-notice-close):hover {
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text);
+}
+
+.app-status :is(.status-retry, .status-notice-close):focus-visible {
+  outline: 2px solid var(--ui-primary);
+  outline-offset: 1px;
+}
+
+@keyframes status-notice-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 820px) {
+  .mobile-layout-active .app-status {
+    top: auto;
+    right: 12px;
+    bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+    left: 12px;
+    grid-template-columns: 18px minmax(0, 1fr) auto 44px;
+    width: auto;
+    max-width: calc(100% - 24px);
+    max-height: none;
+    padding: 8px;
+    justify-content: initial;
+    animation-name: status-notice-enter-mobile;
+  }
+
+  .mobile-layout-active .app-status #status-text {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    white-space: normal;
+  }
+
+  .mobile-layout-active .app-status .status-retry {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .mobile-layout-active .app-status .status-notice-close {
+    width: 44px;
+    height: 44px;
+    margin: -6px -4px -6px 0;
+  }
+}
+
+@media (pointer: coarse) {
+  .app-status {
+    grid-template-columns: 18px minmax(0, 1fr) auto 44px;
+  }
+
+  .app-status .status-retry {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .app-status .status-notice-close {
+    width: 44px;
+    height: 44px;
+    margin: -6px -4px -6px 0;
+  }
+}
+
+@keyframes status-notice-enter-mobile {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-status {
+    animation: none;
+  }
+}

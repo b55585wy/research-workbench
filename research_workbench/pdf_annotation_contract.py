@@ -176,7 +176,10 @@ def snapshot(document, notes):
         raise SnapshotTooLarge('Note count exceeded')
     source = {'id': identifier(document.get('id')), 'sha256': document['sha256'],
               'byte_size': document['byte_size'], 'page_count': document['page_count']}
-    values = [saved_note(note, source) for note in notes]
+    from .source_segments import pdf_notes
+    values = [saved_note(note, source) for note in pdf_notes(notes)]
+    if len(values) > MAX_NOTES:
+        raise SnapshotTooLarge('Expanded note count exceeded')
     if len({note['id'] for note in values}) != len(values):
         raise InvalidSnapshot('Duplicate note identity')
     if sum(len(n['annotation']['rects']) if n['annotation'] else int(n['rect'] is not None) for n in values) > MAX_RECTS:

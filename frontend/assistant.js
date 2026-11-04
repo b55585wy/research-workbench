@@ -188,6 +188,8 @@ const messages = {
     correlation_alternative_greater: "正相关（相关系数大于零）",
     correlation_alternative_less: "负相关（相关系数小于零）",
     noDocument: "选择一篇文献后可向助手提问。",
+    advanced: "高级选项",
+    deviceUnavailable: "本机模式不提供助手服务；本机文件不会上传。",
     emptyChat: "发送一条消息开始。助手会保留来源、工具进度和待确认操作。",
     you: "你",
     assistantAnswer: "助手",
@@ -276,11 +278,11 @@ const messages = {
     savingSettings: "正在保存模型设置…",
     settingsSaved: "模型设置已保存。",
     settingsInvalid: "请输入不含凭据、查询或片段的 HTTPS 地址和模型名称。",
-    notConfigured: "尚未配置本地模型。可在下方设置；阅读、上传和笔记仍可使用。",
+    notConfigured: "尚未配置远程模型。请在“高级选项 → 本地模型设置”中保存连接；阅读、上传和笔记仍可使用。",
     configured: "模型：{model} · 图片输入：{vision}",
     visionOn: "支持",
     visionOff: "不支持或未确认",
-    agent_not_configured: "尚未配置模型。请先在“本地模型设置”中保存连接。",
+    agent_not_configured: "尚未配置远程模型。请先在“高级选项 → 本地模型设置”中保存连接。",
     agent_vision_disabled: "当前模型未确认支持图片。请移除图片或调整模型设置；消息草稿已保留。",
     agent_image_limit: "每次最多向助手提供 4 张图片。请明确移除多余图片后再发送。",
     agent_busy: "此对话已有正在处理的任务，请等待或停止后再发送。",
@@ -574,6 +576,8 @@ const messages = {
     correlation_alternative_greater: "Positive correlation (coefficient greater than zero)",
     correlation_alternative_less: "Negative correlation (coefficient less than zero)",
     noDocument: "Choose a paper before asking the assistant.",
+    advanced: "Advanced options",
+    deviceUnavailable: "Assistant is unavailable in device mode. Local files are not uploaded.",
     emptyChat: "Send a message to start. Sources, tool progress, and pending actions are retained.",
     you: "You",
     assistantAnswer: "Assistant",
@@ -662,11 +666,11 @@ const messages = {
     savingSettings: "Saving model settings…",
     settingsSaved: "Model settings saved.",
     settingsInvalid: "Enter an HTTPS URL without credentials, query, or fragment, and a model name.",
-    notConfigured: "No local model is configured. Configure one below; reading, uploads, and notes remain available.",
+    notConfigured: "No remote model is configured. Save a connection under “Advanced options → Local model settings”; reading, uploads, and notes remain available.",
     configured: "Model: {model} · Image input: {vision}",
     visionOn: "supported",
     visionOff: "unsupported or unconfirmed",
-    agent_not_configured: "No model is configured. Save a connection under “Local model settings” first.",
+    agent_not_configured: "No remote model is configured. Save a connection under “Advanced options → Local model settings” first.",
     agent_vision_disabled: "This model has not confirmed image support. Remove the images or change settings; your draft is retained.",
     agent_image_limit: "Provide at most 4 images per request. Explicitly remove extra images before sending.",
     agent_busy: "This conversation already has an active task. Wait or stop it before sending.",
@@ -850,6 +854,44 @@ export function createAssistant(adapter) {
     providerSave: byId("assistant-provider-save"),
     settingsStatus: byId("assistant-settings-status")
   };
+  const deviceMode = document.documentElement.dataset.storageMode === "device" || window.location.pathname === "/device/";
+  const management = byId("assistant-management");
+  const managementBody = management.querySelector(".assistant-management-body");
+  const referenceAddRow = elements.referenceAdd.closest(".assistant-reference-add-row");
+  elements.form.before(referenceAddRow);
+  const continueTaskLabel = managementBody.querySelector('label[for="assistant-continue-task"]');
+  const continueTaskHelp = byId("assistant-continue-task-help");
+  elements.panel.insertBefore(elements.context, management);
+  byId("assistant-task").after(continueTaskLabel, continueTaskHelp, elements.sourcePreparation);
+  management.open = false;
+  management.classList.add("assistant-advanced");
+  elements.new.classList.add("assistant-icon-button");
+  elements.clear.classList.add("assistant-icon-button");
+
+  function setIconButton(button, icon, label) {
+    button.setAttribute("aria-label", label);
+    button.title = label;
+    if (button.dataset.icon !== icon) {
+      const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      svg.setAttribute("viewBox", "0 0 24 24");
+      svg.setAttribute("aria-hidden", "true");
+      svg.setAttribute("focusable", "false");
+      const paths = icon === "new"
+        ? ["M12 5v14", "M5 12h14"]
+        : ["M4 7h16", "M10 11v6", "M14 11v6", "M6 7l1 13h10l1-13", "M9 7V4h6v3"];
+      for (const data of paths) {
+        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        path.setAttribute("d", data);
+        svg.append(path);
+      }
+      const text = document.createElement("span");
+      text.className = "sr-only";
+      button.replaceChildren(svg, text);
+      button.dataset.icon = icon;
+    }
+    button.querySelector(".sr-only").textContent = label;
+  }
+
   const papers = new Map();
   const analysisRecipes = new Map();
   let language = adapter.getLanguage();
@@ -1001,9 +1043,9 @@ export function createAssistant(adapter) {
   function renderContext(entry) {
     elements.context.replaceChildren();
     const paper = adapter.getDocument();
+    elements.managementSummary.textContent = t("advanced");
     if (!paper) {
       elements.context.textContent = t("noDocument");
-      elements.managementSummary.textContent = t("noDocument");
       return;
     }
     const context = adapter.getContext();
@@ -1036,13 +1078,10 @@ export function createAssistant(adapter) {
     if (resourceRefs.length) badges.push(t("contextResourceReferences", { count: resourceRefs.length }));
     const computationGrantCount = resourceRefs.filter((reference) => reference.kind === "dataset" && reference.allow_analysis === true).length;
     if (computationGrantCount) badges.push(t("contextComputationGrants", { count: computationGrantCount }));
-    elements.managementSummary.textContent = badges.join(" · ");
-    for (const label of badges) {
-      const badge = document.createElement("span");
-      badge.className = "assistant-context-badge";
-      badge.textContent = label;
-      elements.context.append(badge);
-    }
+    const summary = document.createElement("span");
+    summary.className = "assistant-context-badge assistant-context-summary";
+    summary.textContent = badges.join(" · ");
+    elements.context.append(summary);
     const activeChart = adapter.getActiveChart?.(paper.id);
     if (activeChart) {
       const badge = document.createElement("span");
@@ -1122,9 +1161,9 @@ export function createAssistant(adapter) {
     }
     return {
       language,
-      visible: !elements.panel.hidden,
+      visible: !deviceMode && !elements.panel.hidden,
       contextKey: `${paper?.id || "none"}:${entry?.conversationId || "fresh"}:${sourcePreparationGeneration}`,
-      editable: Boolean(paper && entry && canEditReferences(paper.id, entry)),
+      editable: !deviceMode && Boolean(paper && entry && canEditReferences(paper.id, entry)),
       papers: candidates,
       preferredDocumentId: currentPdf?.id || null
     };
@@ -1504,6 +1543,7 @@ export function createAssistant(adapter) {
   function renderMessages(entry) {
     const expandedTools = new Set([...elements.messages.querySelectorAll("details.assistant-tools[data-turn-id][open]")].map((details) => details.dataset.turnId));
     elements.messages.replaceChildren();
+    if (deviceMode) return;
     if (!entry?.turns.length) {
       const empty = document.createElement("p");
       empty.className = "assistant-empty";
@@ -2278,6 +2318,7 @@ export function createAssistant(adapter) {
   }
 
   function derivedStatus(paper, entry) {
+    if (deviceMode) return { key: "deviceUnavailable", kind: "info" };
     if (!paper) return { key: "noDocument", kind: "info" };
     if (hasContinuationReferenceConflict(paper.id, entry)) return { key: "referenceContinueTask", kind: "error" };
     if (entry.status) return entry.status;
@@ -2314,13 +2355,13 @@ export function createAssistant(adapter) {
   }
 
   function renderClearDialog(paper, entry) {
-    elements.clear.hidden = provider.conversation_clear !== true;
-    elements.clear.disabled = !paper || !canClearConversation(paper.id, entry);
-    elements.clear.textContent = t(entry?.clearing?.pending ? "clearingConversation" : "clear");
+    elements.clear.hidden = deviceMode || provider.conversation_clear !== true;
+    elements.clear.disabled = deviceMode || !paper || !canClearConversation(paper.id, entry);
+    setIconButton(elements.clear, "clear", t(entry?.clearing?.pending ? "clearingConversation" : "clear"));
     elements.clear.title = entry?.clearing?.pending
       ? t("clearingConversation")
       : entry?.conversationId && !elements.clear.disabled
-        ? ""
+        ? t("clear")
         : entry?.conversationId ? t("clearConversationBusy") : t("clearConversationNoTarget");
     const operation = entry?.clearing;
     if (!operation || clearDialogOperation !== operation) return;
@@ -2336,6 +2377,12 @@ export function createAssistant(adapter) {
 
   function render() {
     const { paper, entry } = current();
+    management.hidden = deviceMode;
+    referenceAddRow.hidden = deviceMode;
+    elements.context.hidden = deviceMode;
+    elements.history.hidden = deviceMode;
+    elements.new.hidden = deviceMode;
+    elements.form.hidden = deviceMode;
     renderContext(entry);
     renderResourceReferences(entry);
     renderNoteReferences(entry);
@@ -2344,23 +2391,24 @@ export function createAssistant(adapter) {
     renderMessages(entry);
     const turn = latestTurn(entry || { turns: [] });
     renderSources(turn);
-    if (paper && entry) renderProposals(paper, entry, turn);
+    if (!deviceMode && paper && entry) renderProposals(paper, entry, turn);
     else elements.proposals.replaceChildren();
     tasks.render();
     referencePicker.render();
     renderStatus(paper, entry);
     if (entry && elements.message.value !== entry.draft) elements.message.value = entry.draft;
-    elements.message.disabled = !paper || Boolean(entry?.pendingSend?.pending);
+    elements.message.disabled = deviceMode || !paper || Boolean(entry?.pendingSend?.pending);
     const active = entry ? activeTurn(entry) : null;
     const sending = Boolean(entry?.pendingSend?.pending);
     const taskBusy = Boolean(paper && entry && tasks.isBusy(paper.id, entry.conversationId));
     const continuationReferenceConflict = Boolean(paper && entry && hasContinuationReferenceConflict(paper.id, entry));
-    elements.send.disabled = !paper || Boolean(entry?.loading) || Boolean(entry?.conversationsLoading) || sending || Boolean(entry?.clearing) || Boolean(active) || taskBusy || continuationReferenceConflict || Boolean(entry?.pendingDecision) || (!entry?.draft.trim() && !adapter.getChatImages(paper?.id).length && !entry?.noteRefs.length && !entry?.pendingSend);
+    elements.send.disabled = deviceMode || !paper || Boolean(entry?.loading) || Boolean(entry?.conversationsLoading) || sending || Boolean(entry?.clearing) || Boolean(active) || taskBusy || continuationReferenceConflict || Boolean(entry?.pendingDecision) || (!entry?.draft.trim() && !adapter.getChatImages(paper?.id).length && !entry?.noteRefs.length && !entry?.pendingSend);
     elements.send.textContent = t(entry?.pendingSend ? "retry" : "send");
     elements.cancel.hidden = !active;
     elements.cancel.disabled = !active || Boolean(entry?.cancelling);
     elements.cancel.textContent = t(entry?.cancelling ? "stopping" : "cancel");
-    elements.new.disabled = !paper || sending || Boolean(entry?.pendingDecision) || Boolean(entry?.clearing);
+    elements.new.disabled = deviceMode || !paper || sending || Boolean(entry?.pendingDecision) || Boolean(entry?.clearing);
+    setIconButton(elements.new, "new", t("new"));
     renderClearDialog(paper, entry);
     renderSettings();
     sourcePreparation.update(sourcePreparationModel());
@@ -2543,6 +2591,7 @@ export function createAssistant(adapter) {
   }
 
   async function loadConversation(paperId, entry, conversationId, options = {}) {
+    if (deviceMode) return;
     stopPolling(entry);
     const sequence = ++entry.loadSequence;
     entry.loadController?.abort();
@@ -2581,7 +2630,7 @@ export function createAssistant(adapter) {
   }
 
   async function loadConversations(paperId, entry, openLatest = true) {
-    if (entry.clearing) return;
+    if (deviceMode || entry.clearing) return;
     const sequence = ++entry.conversationsLoadSequence;
     entry.conversationsLoading = true;
     if (isCurrent(paperId, entry)) render();
@@ -2604,7 +2653,7 @@ export function createAssistant(adapter) {
   }
 
   async function send(paperId, entry) {
-    if (entry.loading || entry.conversationsLoading || entry.clearing || entry.pendingSend?.pending || activeTurn(entry)) return;
+    if (deviceMode || entry.loading || entry.conversationsLoading || entry.clearing || entry.pendingSend?.pending || activeTurn(entry)) return;
     if (!entry.pendingSend && tasks.isBusy(paperId, entry.conversationId)) {
       entry.status = { key: "agent_task_busy", kind: "error" };
       render();
@@ -2821,6 +2870,12 @@ export function createAssistant(adapter) {
   }
 
   async function loadProvider() {
+    if (deviceMode) {
+      provider = { loaded: true, configured: false, model: "", image_input: false };
+      providerStatus = null;
+      render();
+      return;
+    }
     providerStatus = { key: "loading", kind: "info" };
     try {
       provider = { ...(await adapter.api("/api/v1/agent/status")), loaded: true };
@@ -2987,7 +3042,7 @@ export function createAssistant(adapter) {
   });
   elements.settingsForm.addEventListener("submit", saveSettings);
 
-  void sourcePreparation.load();
+  if (!deviceMode) void sourcePreparation.load();
   loadProvider();
 
   return {
@@ -3008,7 +3063,7 @@ export function createAssistant(adapter) {
         resizeEdgeHelp: t("resizeEdgeHelp"),
         help: t("windowHelp")
       });
-      elements.new.textContent = t("new");
+      setIconButton(elements.new, "new", t("new"));
       elements.clearHeading.textContent = t("clearConversation");
       elements.clearHelp.textContent = t("clearConversationHelp");
       elements.clearCancel.textContent = t("clearDialogCancel");

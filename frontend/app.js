@@ -23,8 +23,17 @@ import { createWorkspaceShellBridge } from "/workspace-shell-bridge.js";
 import { createTranslationBridge } from "/translation-bridge.js";
 import { createTranslationOverlay } from "/translation-overlay.js";
 import { createFlowReadingBridge } from "/flow-reading-bridge.js";
+import { isDeviceMode, mapDeviceAssetUrl } from "/device-context.js";
+import { createDeviceUI, applyDeviceCapabilities } from "/device-ui.js";
+import { collectPdfTextSelection, formatSelectionQuote, sourceSegmentsFor } from "/cross-page-selection.js";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf-worker-compat.js?v=0.52.0";
+
+const deviceMode = isDeviceMode();
+if (deviceMode) document.documentElement.dataset.storageMode = "device";
+let deviceRepository = null;
+let deviceReadyPromise = null;
+let deviceUI = null;
 
 const MAX_CANVAS_PIXELS = 8_000_000;
 const MAX_CANVAS_AXIS = 8192;
@@ -32,7 +41,7 @@ const MAX_DEVICE_PIXEL_RATIO = 2;
 const MAX_FILE_BYTES = 20 * 1024 * 1024;
 const ZOOM_MIN = 0.4;
 const ZOOM_MAX = 3;
-const APP_VERSION = "0.54.0";
+const APP_VERSION = "0.55.0";
 const PDF_RANGE_CHUNK_SIZE = 64 * 1024;
 const PDF_LOADING_HINT_DELAY = 12_000;
 
@@ -114,6 +123,7 @@ const messages = {
     noteSavedImageFailed: "笔记已保存，图片摘录未完成。请重试。",
     excerptCreated: "图片摘录已生成。",
     uploaded: "文献已上传。",
+    addedOnDevice: "文献已添加到本机。",
     selectSource: "请先框选原文位置或引用整页。",
     regionInstructions: "在页面上拖动以框选原文位置。",
     selectionTooSmall: "请拖动框选一个更大的区域。",
@@ -331,6 +341,8 @@ const messages = {
     annotationHighlight: "保存高亮",
     annotationUnderline: "保存下划线",
     annotationTools: "保存文字标注",
+    drawTools: "绘图",
+    shapeTools: "图形批注",
     annotationKindHighlight: "高亮",
     annotationKindUnderline: "下划线",
     annotationColor: "标注颜色",
@@ -412,7 +424,8 @@ const messages = {
     findScanned: "其中 {count} 页没有可检索文字；未进行 OCR。",
     findFailed: "有 {count} 页文字读取失败，结果不完整。请重试。",
     findRetry: "查找未完成，请重试。",
-    crossPageSelection: "不支持跨页选择；请在一页内重新选择文字。",
+    crossPageSelection: "当前服务器不支持保存跨页来源；请在一页内重新选择，或改用支持跨页来源的存储。",
+    crossPageSelectionLimit: "跨页来源最多包含 20 页，请缩小选择范围。",
     pageRenderRetry: "此页显示失败。",
     notesFilterText: "筛选笔记",
     notesFilterPlaceholder: "搜索正文或原始引文",
@@ -549,6 +562,7 @@ const messages = {
     noteSavedImageFailed: "Note saved, but the image was not completed. Try again.",
     excerptCreated: "Image excerpt created.",
     uploaded: "Paper uploaded.",
+    addedOnDevice: "Paper added on this device.",
     selectSource: "Select a source region or reference the whole page first.",
     regionInstructions: "Drag on the page to select a source region.",
     selectionTooSmall: "Drag to select a larger region.",
@@ -766,6 +780,8 @@ const messages = {
     annotationHighlight: "Save highlight",
     annotationUnderline: "Save underline",
     annotationTools: "Save text annotation",
+    drawTools: "Draw",
+    shapeTools: "Shape annotations",
     annotationKindHighlight: "Highlight",
     annotationKindUnderline: "Underline",
     annotationColor: "Annotation color",
@@ -847,7 +863,8 @@ const messages = {
     findScanned: "{count} pages had no searchable text; OCR was not performed.",
     findFailed: "Text could not be read on {count} pages, so results are incomplete. Try again.",
     findRetry: "Find did not finish. Try again.",
-    crossPageSelection: "Cross-page selection is not supported. Select text within one page.",
+    crossPageSelection: "This server cannot save cross-page sources. Select within one page or use storage that supports them.",
+    crossPageSelectionLimit: "A cross-page source can include at most 20 pages. Select a smaller passage.",
     pageRenderRetry: "This page could not be displayed.",
     notesFilterText: "Filter notes",
     notesFilterPlaceholder: "Search note text or original quote",
@@ -1285,6 +1302,27 @@ function t(key, values = {}) {
   return text;
 }
 
+let renderedStatus = null;
+let statusTimer = null;
+let statusTimerStatus = null;
+const statusClose = $("status-close");
+
+function cancelStatusTimer() {
+  if (statusTimer !== null) window.clearTimeout(statusTimer);
+  statusTimer = null;
+  statusTimerStatus = null;
+}
+
+function dismissStatus(status) {
+  if (state.status !== status) return;
+  state.status = null;
+  renderStatus();
+}
+
+statusClose.addEventListener("click", () => {
+  if (state.status) dismissStatus(state.status);
+});
+
 function setStatus(key, kind = "info", values = {}, retry = null, retryLabel = "retry") {
   state.status = { key, kind, values, retry, retryLabel };
   renderStatus();
@@ -1296,16 +1334,46 @@ function clearStatus() {
 }
 
 function renderStatus() {
-  if (!state.status) {
+  const status = state.status;
+  const changed = renderedStatus !== status;
+  if (statusTimerStatus !== status) cancelStatusTimer();
+  if (!status) {
     elements.status.hidden = true;
     elements.statusRetry.hidden = true;
+    if (changed) elements.statusText.textContent = "";
+    renderedStatus = null;
     return;
   }
   elements.status.hidden = false;
-  elements.status.dataset.kind = state.status.kind;
-  elements.statusText.textContent = t(state.status.key, state.status.values);
-  elements.statusRetry.hidden = typeof state.status.retry !== "function";
-  elements.statusRetry.textContent = t(state.status.retryLabel || "retry");
+  if (changed) {
+    const isError = status.kind === "error";
+    elements.status.dataset.kind = status.kind;
+    elements.status.setAttribute("role", isError ? "alert" : "status");
+    elements.status.setAttribute("aria-live", isError ? "assertive" : "polite");
+  }
+  const key = deviceMode && status.key === "uploaded" ? "addedOnDevice" : status.key;
+  const message = t(key, status.values);
+  if (elements.statusText.textContent !== message) elements.statusText.textContent = message;
+  const retryLabel = t(status.retryLabel || "retry");
+  if (elements.statusRetry.textContent !== retryLabel) elements.statusRetry.textContent = retryLabel;
+  elements.statusRetry.hidden = typeof status.retry !== "function";
+  const closeLabel = t("close");
+  if (statusClose.getAttribute("aria-label") !== closeLabel) statusClose.setAttribute("aria-label", closeLabel);
+  if (statusClose.title !== closeLabel) statusClose.title = closeLabel;
+  if (status.kind === "success" && typeof status.retry !== "function" && statusTimerStatus !== status) {
+    statusTimerStatus = status;
+    statusTimer = window.setTimeout(() => dismissStatus(status), 4000);
+  }
+  renderedStatus = status;
+}
+
+function renderReaderActionLabel(button, key) {
+  const label = t(key);
+  const text = button.querySelector("[data-reader-action-label]");
+  if (text) text.textContent = label;
+  else button.textContent = label;
+  button.setAttribute("aria-label", label);
+  button.title = label;
 }
 
 function applyLanguage() {
@@ -1340,8 +1408,8 @@ function applyLanguage() {
   elements.textLayer.setAttribute("aria-label", t("pdfPage"));
   elements.textAnnotationToolbar.setAttribute("aria-label", t("annotationTools"));
   document.querySelector(".reader-toolbar").setAttribute("aria-label", t("readerControls"));
-  elements.regionMode.textContent = t(state.regionActive ? "cancelRegion" : "regionMode");
-  elements.readerRegionMode.textContent = t(state.regionActive ? "cancelRegion" : "regionMode");
+  renderReaderActionLabel(elements.regionMode, state.regionActive ? "cancelRegion" : "regionMode");
+  renderReaderActionLabel(elements.readerRegionMode, state.regionActive ? "cancelRegion" : "regionMode");
   if (!elements.readerOpenOriginal.hidden) {
     const message = elements.readerEmpty.querySelector("p");
     if (message) message.textContent = t(elements.readerOpenOriginal.dataset.errorKey || "documentOpenFailed");
@@ -1372,6 +1440,7 @@ function applyLanguage() {
   study?.applyLanguage(state.language);
   readerFind?.applyLanguage();
   readerShapes?.applyLanguage();
+  deviceUI?.render();
 }
 
 class ApiError extends Error {
@@ -1381,13 +1450,62 @@ class ApiError extends Error {
   }
 }
 
+async function waitForDeviceController() {
+  const current = navigator.serviceWorker.controller;
+  if (current && new URL(current.scriptURL).pathname === "/device-sw.js") return;
+  await new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      navigator.serviceWorker.removeEventListener("controllerchange", changed);
+      reject(new Error("Device worker did not take control"));
+    }, 15000);
+    function changed() {
+      const controller = navigator.serviceWorker.controller;
+      if (!controller || new URL(controller.scriptURL).pathname !== "/device-sw.js") return;
+      clearTimeout(timer);
+      navigator.serviceWorker.removeEventListener("controllerchange", changed);
+      resolve();
+    }
+    navigator.serviceWorker.addEventListener("controllerchange", changed);
+    changed();
+  });
+}
+
+async function prepareDeviceRepository() {
+  if (!deviceMode) return null;
+  if (deviceRepository) return deviceRepository;
+  if (deviceReadyPromise) return deviceReadyPromise;
+  deviceReadyPromise = (async () => {
+    if (!navigator.serviceWorker) throw new Error("Service workers unavailable");
+    await navigator.serviceWorker.register("/device-sw.js?v=0.55.0", { type: "module", scope: "/device/" });
+    const registration = await navigator.serviceWorker.ready;
+    if (!registration.scope.endsWith("/device/")) throw new Error("Device worker scope mismatch");
+    await waitForDeviceController();
+    const { createDeviceRepository } = await import("/device-repository.js");
+    const repository = createDeviceRepository({
+      pdfjsLib,
+      renderExcerpt: renderDeviceExcerpt,
+      readProgress: (document) => readReaderProgress(document).record,
+      restoreProgress: (document, record) => writeReaderProgress(document, record.page, record.center_fraction)
+    });
+    await repository.ready();
+    deviceRepository = repository;
+    return repository;
+  })().catch((error) => {
+    deviceReadyPromise = null;
+    throw error;
+  });
+  return deviceReadyPromise;
+}
+
 async function checkedFetch(path, options = {}) {
   let response;
   try {
-    response = await fetch(path, options);
+    response = deviceMode && String(path).startsWith("/api/")
+      ? await (await prepareDeviceRepository()).request(path, options)
+      : await fetch(path, options);
   } catch (error) {
     if (error?.name === "AbortError") throw error;
-    throw new ApiError("network");
+    throw new ApiError(deviceMode && String(path).startsWith("/api/") ? "storage_unavailable" : "network");
   }
   if (response.ok) return response;
 
@@ -1408,6 +1526,32 @@ async function api(path, options = {}) {
   } catch {
     throw new ApiError("request_failed");
   }
+}
+
+let readerCapabilitiesPromise = null;
+let serverSourceSegments = false;
+async function supportsSourceSegments() {
+  if (deviceMode || serverSourceSegments) return true;
+  if (!readerCapabilitiesPromise) {
+    readerCapabilitiesPromise = api("/api/v1/reader-capabilities").then((body) => {
+      serverSourceSegments = body?.source_segments === true;
+      return serverSourceSegments;
+    }).catch(() => false).finally(() => {
+      readerCapabilitiesPromise = null;
+    });
+  }
+  return readerCapabilitiesPromise;
+}
+
+async function addSourceSegments(payload, segments) {
+  if (!segments?.length) return true;
+  if (!await supportsSourceSegments()) return false;
+  payload.source_segments = segments.map((segment) => ({
+    page: segment.page,
+    quote: segment.quote,
+    rects: segment.rects.map((rect) => [...rect])
+  }));
+  return true;
 }
 
 function setOwnerInUrl(url, documentId, studyOwner = isStudy()) {
@@ -1490,6 +1634,7 @@ function makeEmptyDraft() {
     richContent: null,
     page: null,
     rect: null,
+    sourceSegments: null,
     requestId: null,
     saveFailed: false,
     imageFailed: false,
@@ -1528,12 +1673,13 @@ function invalidateRequestId(draft) {
   draft.imageFailed = false;
 }
 
-function highlightDraft(documentId, page, rect) {
+function highlightDraft(documentId, page, rect, sourceSegments = null) {
   state.highlight = {
     id: `draft-source-${documentId}`,
     document_id: documentId,
     page,
-    rect: rect ? [...rect] : null
+    rect: rect ? [...rect] : null,
+    source_segments: sourceSegments?.length ? sourceSegments : null
   };
   state.highlightRevealId = null;
   drawHighlight();
@@ -1778,10 +1924,14 @@ function renderLegacyIdentity() {
   brand.textContent = "research workspace";
   const guest = window.document.createElement("span");
   guest.className = "local-guest";
-  guest.textContent = state.language === "zh" ? "本地游客" : "Local guest";
-  guest.title = state.language === "zh"
-    ? "无需登录；数据保存在运行此工作台的电脑上。"
-    : "No login required; data is saved on the computer running this workspace.";
+  guest.textContent = deviceMode
+    ? (state.language === "zh" ? "本机资料" : "On this device")
+    : (state.language === "zh" ? "本地游客" : "Local guest");
+  guest.title = deviceMode
+    ? (state.language === "zh" ? "资料仅保存在此浏览器中。" : "Papers are stored only in this browser.")
+    : state.language === "zh"
+      ? "无需登录；数据保存在运行此工作台的电脑上。"
+      : "No login required; data is saved on the computer running this workspace.";
   elements.identity.replaceChildren(brand, guest);
 }
 
@@ -3047,6 +3197,7 @@ function renderDocumentDetails() {
   syncTranslationLayout();
   translation.update(translationModel());
   syncFlowLayout();
+  deviceUI?.render();
 }
 
 function renderRegionCapture() {
@@ -3328,7 +3479,7 @@ function renderNotes() {
       const image = window.document.createElement("img");
       image.className = "excerpt-image";
       image.dataset.testid = "excerpt-image";
-      image.src = excerpt.image_url;
+      image.src = mapDeviceAssetUrl(excerpt.image_url);
       image.alt = t("excerptImageAlt", { page: note.page });
       preview.append(image);
 
@@ -3336,7 +3487,7 @@ function renderNotes() {
       excerptActions.className = "note-excerpt-actions";
       const download = window.document.createElement("a");
       download.className = "excerpt-download";
-      download.href = excerpt.image_url;
+      download.href = mapDeviceAssetUrl(excerpt.image_url);
       download.download = `page-${note.page}-excerpt-${note.id}.png`;
       download.textContent = t("downloadImage");
       const view = window.document.createElement("button");
@@ -4145,7 +4296,7 @@ function hideReaderOpenFallback() {
 
 function showReaderOpenFallback(document, key) {
   if (!document || isStudy(document) || state.document?.id !== document.id) return;
-  elements.readerOpenOriginal.href = `/api/v1/documents/${encodeURIComponent(document.id)}/file`;
+  elements.readerOpenOriginal.href = mapDeviceAssetUrl(`/api/v1/documents/${encodeURIComponent(document.id)}/file`);
   elements.readerOpenOriginal.dataset.errorKey = key;
   elements.readerOpenOriginal.hidden = false;
   const message = elements.readerEmpty.querySelector("p");
@@ -4298,7 +4449,7 @@ function showReaderErrorReference(attempt) {
 }
 
 async function reportReaderError(attempt, stage, error) {
-  if (!isPdfAttemptCurrent(attempt) || attempt.reported || attempt.signal.aborted || isPdfAbortError(error) || !["document", "render"].includes(stage)) return;
+  if (deviceMode || !isPdfAttemptCurrent(attempt) || attempt.reported || attempt.signal.aborted || isPdfAbortError(error) || !["document", "render"].includes(stage)) return;
   attempt.reported = true;
   const totalBytes = Number.isFinite(attempt.totalBytes) && attempt.totalBytes >= 0 ? Math.trunc(attempt.totalBytes) : null;
   const payload = {
@@ -4329,8 +4480,52 @@ async function reportReaderError(attempt, stage, error) {
   }
 }
 
+async function renderDeviceExcerpt({ document_id, page, rect, source_sha256 }) {
+  if (!Array.isArray(rect) || rect.length !== 4 || !rect.every(Number.isFinite) || rect[0] < 0 || rect[1] < 0 || rect[2] > 1 || rect[3] > 1 || rect[2] <= rect[0] || rect[3] <= rect[1]) {
+    throw new ApiError("validation_error");
+  }
+  if (state.document?.id === document_id && state.document.sha256 !== source_sha256) throw new ApiError("source_changed");
+  let task = null;
+  let pdf = state.document?.id === document_id && state.document.sha256 === source_sha256 ? state.pdf : null;
+  if (!pdf) {
+    task = pdfjsLib.getDocument({
+      url: mapDeviceAssetUrl(`/api/v1/documents/${encodeURIComponent(document_id)}/file`),
+      rangeChunkSize: PDF_RANGE_CHUNK_SIZE,
+      disableRange: false,
+      disableAutoFetch: true,
+      disableStream: true,
+      cMapUrl: "/vendor/pdfjs/cmaps/",
+      cMapPacked: true,
+      standardFontDataUrl: "/vendor/pdfjs/standard_fonts/",
+      wasmUrl: "/vendor/pdfjs/wasm/"
+    });
+    pdf = await task.promise;
+  }
+  try {
+    const pdfPage = await pdf.getPage(page);
+    const viewport = pdfPage.getViewport({ scale: 2 });
+    const left = rect[0] * viewport.width;
+    const top = rect[1] * viewport.height;
+    const width = Math.max(1, Math.ceil((rect[2] - rect[0]) * viewport.width));
+    const height = Math.max(1, Math.ceil((rect[3] - rect[1]) * viewport.height));
+    const canvas = window.document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext("2d", { alpha: false });
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, width, height);
+    context.translate(-left, -top);
+    await pdfPage.render({ canvas, canvasContext: context, viewport, background: "#ffffff" }).promise;
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+    if (!blob) throw new ApiError("renderer_failed");
+    return { blob, width, height };
+  } finally {
+    if (task) await task.destroy().catch(() => {});
+  }
+}
+
 async function loadPdf(document, sequence, signal) {
-  const url = `/api/v1/documents/${encodeURIComponent(document.id)}/file`;
+  const url = mapDeviceAssetUrl(`/api/v1/documents/${encodeURIComponent(document.id)}/file`);
   const attempt = {
     documentId: document.id,
     sequence,
@@ -4723,14 +4918,15 @@ function desiredContinuousPages() {
   });
   records.sort((a, b) => Number(b.visible) - Number(a.visible) || a.distance - b.distance || a.record.pageNumber - b.record.pageNumber);
   const selected = records.filter((item) => item.visible || item.distance <= bounds.height * 1.5).slice(0, 5);
-  const include = (record) => {
+  const include = (record, pin = false) => {
     if (!record || selected.some((item) => item.record === record)) return;
-    if (selected.length >= 5) selected.pop();
+    if (selected.length >= 5 && !pin) selected.pop();
     selected.push({ record });
   };
   include(state.activePageRecord);
   include(readerShapes?.getInteractingRecord());
   include(state.selection?.record || state.readerPages.get(state.pointerDragPage));
+  for (const page of state.capturedTextSelection?.selectionPages || []) include(state.readerPages.get(page), true);
   return selected.map((item) => item.record);
 }
 
@@ -5037,47 +5233,27 @@ function cancelTextLayer() {
 
 function readPdfTextSelection() {
   const selection = window.getSelection();
-  if (!selection || selection.isCollapsed || !selection.rangeCount) return null;
+  if (!selection || selection.isCollapsed || !selection.rangeCount || !state.document) return null;
   const layerForNode = (node) => {
     const element = node?.nodeType === Node.ELEMENT_NODE ? node : node?.parentElement;
     return element?.closest(".textLayer") || null;
   };
-  const textLayer = layerForNode(selection.anchorNode);
+  const anchorLayer = layerForNode(selection.anchorNode);
   const focusLayer = layerForNode(selection.focusNode);
-  if (textLayer !== focusLayer && (textLayer || focusLayer)) {
-    if (elements.readerStage.contains(textLayer || focusLayer)) setStatus("crossPageSelection", "error");
-    return null;
-  }
-  if (!textLayer || !elements.readerStage.contains(textLayer) || !textLayer.contains(selection.anchorNode) || !textLayer.contains(selection.focusNode)) return null;
-  const pageNumber = Number(textLayer.dataset.page);
-  const record = state.readerPages.get(pageNumber);
-  if (!record || textLayer.dataset.documentId !== state.document?.id) return null;
-  if (state.activePageRecord !== record) activateReaderPage(record);
-  const text = selection.toString().trim();
-  if (!text) return null;
-  const geometry = pdfSelectionGeometry(selection, textLayer);
-  if (!geometry) return null;
-  const { rects, clientRects: clippedClientRects } = geometry;
-  const union = [
-    Math.min(...rects.map((rect) => rect[0])),
-    Math.min(...rects.map((rect) => rect[1])),
-    Math.max(...rects.map((rect) => rect[2])),
-    Math.max(...rects.map((rect) => rect[3]))
-  ];
-  return {
+  if (!anchorLayer || !focusLayer || !elements.readerStage.contains(anchorLayer) || !elements.readerStage.contains(focusLayer)) return null;
+  const collected = collectPdfTextSelection({
+    selection,
+    records: state.readerPages.values(),
     documentId: state.document.id,
-    page: pageNumber,
     sequence: state.loadSequence,
-    text,
-    rect: union,
-    rects,
-    clientRect: {
-      left: Math.min(...clippedClientRects.map((rect) => rect.left)),
-      top: Math.min(...clippedClientRects.map((rect) => rect.top)),
-      right: Math.max(...clippedClientRects.map((rect) => rect.right)),
-      bottom: Math.max(...clippedClientRects.map((rect) => rect.bottom))
-    }
-  };
+    geometry: pdfSelectionGeometry,
+    toolbarPage: state.page
+  });
+  if (collected && !collected.source_segments) {
+    const record = state.readerPages.get(collected.page);
+    if (record && state.activePageRecord !== record) activateReaderPage(record);
+  }
+  return collected;
 }
 
 function currentPdfTextSelection() {
@@ -5120,7 +5296,7 @@ function updateTextAnnotationToolbar() {
 }
 
 function readerSourceUrl(documentId, page) {
-  const url = new URL("/", window.location.origin);
+  const url = new URL(deviceMode ? "/device/" : "/", window.location.origin);
   url.searchParams.set("document", documentId);
   url.searchParams.set("page", String(page));
   url.searchParams.set("workspace", "reading");
@@ -5191,7 +5367,14 @@ function anchorNewDraftAfterInsertion(documentId, source, shouldAnchor) {
   if (draft.page !== null) return;
   draft.page = source.page;
   draft.rect = source.rect ? [...source.rect] : null;
+  draft.sourceSegments = source.source_segments || null;
   draft.includeExcerpt = false;
+}
+
+function selectionLimitError(selected) {
+  if (selected?.source_segments?.length > 20) return "crossPageSelectionLimit";
+  if (selected?.text.length > 10000) return "textSelectionTooLong";
+  return null;
 }
 
 function addTextSelectionToNote() {
@@ -5201,31 +5384,34 @@ function addTextSelectionToNote() {
     setStatus("selectTextFirst", "error");
     return;
   }
-  if (selected.text.length > 10000) {
-    setStatus("textSelectionTooLong", "error");
+  const limitError = selectionLimitError(selected);
+  if (limitError) {
+    setStatus(limitError, "error");
     return;
   }
   const draft = state.editDrafts.get(state.document.id) || ensureDraft(state.document.id);
   const shouldAnchor = !state.editDrafts.has(state.document.id) && !draft.text.trim() && draft.page === null;
-  const insertion = `“${selected.text}”\n`;
+  const insertion = `“${formatSelectionQuote(selected, state.language)}”\n`;
   captureCurrentDraft();
   workspace?.showNotes();
   const bookmark = richText?.getBookmark();
   if (shouldAnchor) {
     draft.page = selected.page;
     draft.rect = [...selected.rect];
+    draft.sourceSegments = selected.source_segments || null;
   }
   if (!richText?.insertText(bookmark, insertion, readerSourceProvenance(selected))) {
     if (shouldAnchor) {
       draft.page = null;
       draft.rect = null;
+      draft.sourceSegments = null;
       renderDraft();
     }
     setStatus("readerActionUnavailable", "error");
     return;
   }
   anchorNewDraftAfterInsertion(state.document.id, selected, shouldAnchor);
-  highlightDraft(state.document.id, selected.page, selected.rect);
+  highlightDraft(state.document.id, selected.page, selected.rect, selected.source_segments);
   clearPdfTextSelection();
   renderDraft();
   setStatus("textDraftReady", "success");
@@ -5257,6 +5443,11 @@ function prepareTextReaderAction(kind) {
     setStatus("selectTextFirst", "error");
     return;
   }
+  const limitError = selectionLimitError(selected);
+  if (limitError) {
+    setStatus(limitError, "error");
+    return;
+  }
   if (!assistant?.prepareReaderAction) {
     setStatus("readerActionUnavailable", "error");
     return;
@@ -5265,7 +5456,7 @@ function prepareTextReaderAction(kind) {
     kind,
     page: selected.page,
     rect: [...selected.rect],
-    quote: selected.text
+    quote: formatSelectionQuote(selected, state.language)
   });
   if (result !== "added") {
     setStatus(readerActionFailureStatus(result), "error");
@@ -5280,21 +5471,26 @@ function renderTextAnnotations() {
   if (!state.document || !state.pdf) return;
   for (const note of state.noteStates) {
     const annotation = note.annotation;
-    const record = state.readerPages.get(note.page);
-    if (!record || note.deleted_at || note.purged || note.document_id !== state.document.id || !annotation) continue;
-    if (!["highlight", "underline"].includes(annotation.kind) || !["yellow", "green", "blue", "pink"].includes(annotation.color) || !Array.isArray(annotation.rects)) continue;
-    for (const rect of annotation.rects.slice(0, 256)) {
-      if (!Array.isArray(rect) || rect.length !== 4 || !rect.every(Number.isFinite) || rect[0] < 0 || rect[1] < 0 || rect[2] > 1 || rect[3] > 1 || rect[2] <= rect[0] || rect[3] <= rect[1]) continue;
-      const markup = window.document.createElement("div");
-      markup.className = "text-annotation";
-      markup.dataset.annotationId = note.id;
-      markup.dataset.kind = annotation.kind;
-      markup.dataset.color = annotation.color;
-      markup.style.left = `${rect[0] * 100}%`;
-      markup.style.top = `${rect[1] * 100}%`;
-      markup.style.width = `${(rect[2] - rect[0]) * 100}%`;
-      markup.style.height = `${(rect[3] - rect[1]) * 100}%`;
-      record.textAnnotationsLayer.append(markup);
+    if (note.deleted_at || note.purged || note.document_id !== state.document.id || !annotation) continue;
+    if (!["highlight", "underline"].includes(annotation.kind) || !["yellow", "green", "blue", "pink"].includes(annotation.color)) continue;
+    const storedSegments = sourceSegmentsFor(note);
+    const segments = storedSegments.length ? storedSegments : [{ page: note.page, rects: annotation.rects }];
+    for (const segment of segments) {
+      const record = state.readerPages.get(segment.page);
+      if (!record || !Array.isArray(segment.rects)) continue;
+      for (const rect of segment.rects.slice(0, 256)) {
+        if (!Array.isArray(rect) || rect.length !== 4 || !rect.every(Number.isFinite) || rect[0] < 0 || rect[1] < 0 || rect[2] > 1 || rect[3] > 1 || rect[2] <= rect[0] || rect[3] <= rect[1]) continue;
+        const markup = window.document.createElement("div");
+        markup.className = "text-annotation";
+        markup.dataset.annotationId = note.id;
+        markup.dataset.kind = annotation.kind;
+        markup.dataset.color = annotation.color;
+        markup.style.left = `${rect[0] * 100}%`;
+        markup.style.top = `${rect[1] * 100}%`;
+        markup.style.width = `${(rect[2] - rect[0]) * 100}%`;
+        markup.style.height = `${(rect[3] - rect[1]) * 100}%`;
+        record.textAnnotationsLayer.append(markup);
+      }
     }
   }
 }
@@ -5354,7 +5550,7 @@ async function copySelectedAnnotation() {
   const note = selectedAnnotation();
   if (!note) return;
   try {
-    await navigator.clipboard.writeText(note.annotation.quote);
+    await navigator.clipboard.writeText(formatSelectionQuote({ ...note, text: note.text }, state.language));
     setStatus("quoteCopied", "success");
   } catch {
     setStatus("copyFailed", "error");
@@ -5367,16 +5563,17 @@ function addSelectedAnnotationToNote() {
   const documentId = note.document_id;
   const draft = state.editDrafts.get(documentId) || ensureDraft(documentId);
   const shouldAnchor = !state.editDrafts.has(documentId) && !draft.text.trim() && draft.page === null;
-  const source = { documentId, page: note.page, rect: note.rect };
+  const source = { documentId, page: note.page, rect: note.rect, source_segments: sourceSegmentsFor(note), text: note.text };
   captureCurrentDraft();
   workspace?.showNotes();
   const bookmark = richText?.getBookmark();
   if (shouldAnchor) {
     draft.page = note.page;
     draft.rect = note.rect ? [...note.rect] : null;
+    draft.sourceSegments = source.source_segments.length ? source.source_segments : null;
   }
-  if (!richText?.insertText(bookmark, `“${note.annotation.quote}”\n`, readerSourceProvenance(source))) {
-    if (shouldAnchor) { draft.page = null; draft.rect = null; }
+  if (!richText?.insertText(bookmark, `“${formatSelectionQuote(source, state.language)}”\n`, readerSourceProvenance(source))) {
+    if (shouldAnchor) { draft.page = null; draft.rect = null; draft.sourceSegments = null; }
     renderDraft();
     setStatus("readerActionUnavailable", "error");
     return;
@@ -5414,8 +5611,13 @@ function openTextAnnotationAtPoint(event) {
     if (state.regionActive || !window.getSelection()?.isCollapsed || state.document?.id !== documentId || !target.isConnected || !surface.isConnected || !surface.contains(target) || record?.surface !== surface || !record.rendered) return;
     for (const note of state.noteStates) {
       const annotation = note.annotation;
-      if (note.deleted_at || note.purged || note.document_id !== documentId || note.page !== pageNumber || !Array.isArray(annotation?.rects)) continue;
-      if (annotation.rects.some((rect) => Array.isArray(rect) && rect.length === 4 && x >= rect[0] && x <= rect[2] && y >= rect[1] - 0.004 && y <= rect[3] + 0.004)) {
+      if (note.deleted_at || note.purged || note.document_id !== documentId) continue;
+      const storedSegments = sourceSegmentsFor(note);
+      const segment = storedSegments.length
+        ? storedSegments.find((item) => item.page === pageNumber)
+        : note.page === pageNumber ? { rects: annotation?.rects } : null;
+      if (!Array.isArray(segment?.rects)) continue;
+      if (segment.rects.some((rect) => Array.isArray(rect) && rect.length === 4 && x >= rect[0] && x <= rect[2] && y >= rect[1] - 0.004 && y <= rect[3] + 0.004)) {
         selectTextAnnotation(note);
         return;
       }
@@ -5548,7 +5750,7 @@ async function runTextAnnotationSave(operation) {
       selectTextAnnotation(savedState);
     }
     if (state.annotationSaves.get(documentId) === operation) state.annotationSaves.delete(documentId);
-    if (state.capturedTextSelection?.documentId === documentId && state.capturedTextSelection.sequence === operation.selectionSequence && state.capturedTextSelection.text === operation.payload.annotation.quote) {
+    if (state.capturedTextSelection?.documentId === documentId && state.capturedTextSelection.sequence === operation.selectionSequence && state.capturedTextSelection.text === operation.selectionText) {
       state.capturedTextSelection = null;
       window.getSelection()?.removeAllRanges();
       resetTextAnnotationToolbar();
@@ -5569,7 +5771,7 @@ async function retryTextAnnotationSave(operation) {
   await runTextAnnotationSave(operation);
 }
 
-function submitTextAnnotation(kind) {
+async function submitTextAnnotation(kind) {
   if (!state.document || !state.pdf || state.pendingSaves > 0 || state.pendingMutations.size > 0) return;
   const existing = state.annotationSaves.get(state.document.id);
   if (existing) {
@@ -5581,11 +5783,13 @@ function submitTextAnnotation(kind) {
     setStatus("selectTextFirst", "error");
     return;
   }
-  if (selected.text.length > 10000) {
-    setStatus("textSelectionTooLong", "error");
+  const limitError = selectionLimitError(selected);
+  if (limitError) {
+    setStatus(limitError, "error");
     return;
   }
-  if (!selected.rects.length || selected.rects.length > 256) {
+  const segments = selected.source_segments || [];
+  if (!selected.rects.length || selected.rects.length > 256 || segments.some((segment) => !segment.rects.length || segment.rects.length > 256)) {
     setStatus("annotationTooManyRects", "error");
     return;
   }
@@ -5593,6 +5797,7 @@ function submitTextAnnotation(kind) {
   const operation = {
     documentId: selected.documentId,
     selectionSequence: selected.sequence,
+    selectionText: selected.text,
     pending: false,
     payload: {
       request_id: crypto.randomUUID(),
@@ -5602,11 +5807,15 @@ function submitTextAnnotation(kind) {
       annotation: {
         kind,
         color,
-        quote: selected.text,
+        quote: segments[0]?.quote || selected.text,
         rects: selected.rects.map((rect) => [...rect])
       }
     }
   };
+  if (!await addSourceSegments(operation.payload, segments)) {
+    setStatus("crossPageSelection", "error");
+    return;
+  }
   void runTextAnnotationSave(operation);
 }
 
@@ -5672,33 +5881,51 @@ function clearHighlights() {
 function drawHighlight() {
   clearHighlights();
   const note = state.highlight;
-  const record = note ? state.readerPages.get(note.page) : null;
-  if (!note || !record || !state.document || note.document_id !== state.document.id) return null;
-  const highlight = window.document.createElement("div");
-  highlight.className = "source-highlight";
-  highlight.dataset.noteId = note.id;
-  const rect = note.rect || [0, 0, 1, 1];
-  highlight.dataset.wholePage = String(!note.rect);
-  highlight.style.left = `${rect[0] * 100}%`;
-  highlight.style.top = `${rect[1] * 100}%`;
-  highlight.style.width = `${(rect[2] - rect[0]) * 100}%`;
-  highlight.style.height = `${(rect[3] - rect[1]) * 100}%`;
+  if (!note || !state.document || note.document_id !== state.document.id) return null;
   const annotation = noteStateFor(note.id)?.annotation || note.annotation;
-  if (note.rect && Array.isArray(annotation?.rects)) {
-    highlight.dataset.textAnnotation = "true";
-    for (const lineRect of annotation.rects.slice(0, 256)) {
-      if (!Array.isArray(lineRect) || lineRect.length !== 4 || !lineRect.every(Number.isFinite) || lineRect[2] <= lineRect[0] || lineRect[3] <= lineRect[1]) continue;
-      const line = window.document.createElement("div");
-      line.className = "source-highlight-line";
-      line.style.left = `${((lineRect[0] - rect[0]) / (rect[2] - rect[0])) * 100}%`;
-      line.style.top = `${((lineRect[1] - rect[1]) / (rect[3] - rect[1])) * 100}%`;
-      line.style.width = `${((lineRect[2] - lineRect[0]) / (rect[2] - rect[0])) * 100}%`;
-      line.style.height = `${((lineRect[3] - lineRect[1]) / (rect[3] - rect[1])) * 100}%`;
-      highlight.append(line);
+  const storedSegments = sourceSegmentsFor(note);
+  const targets = storedSegments.length ? storedSegments : [{
+    page: note.page,
+    rect: note.rect,
+    rects: annotation?.rects
+  }];
+  let primary = null;
+  for (const target of targets) {
+    const record = state.readerPages.get(target.page);
+    if (!record) continue;
+    const lineRects = Array.isArray(target.rects) ? target.rects : [];
+    const rect = target.rect || (lineRects.length ? [
+      Math.min(...lineRects.map((line) => line[0])),
+      Math.min(...lineRects.map((line) => line[1])),
+      Math.max(...lineRects.map((line) => line[2])),
+      Math.max(...lineRects.map((line) => line[3]))
+    ] : [0, 0, 1, 1]);
+    const highlight = window.document.createElement("div");
+    highlight.className = "source-highlight";
+    highlight.dataset.noteId = note.id;
+    highlight.dataset.page = String(target.page);
+    highlight.dataset.wholePage = String(!target.rect && !lineRects.length);
+    highlight.style.left = `${rect[0] * 100}%`;
+    highlight.style.top = `${rect[1] * 100}%`;
+    highlight.style.width = `${(rect[2] - rect[0]) * 100}%`;
+    highlight.style.height = `${(rect[3] - rect[1]) * 100}%`;
+    if (lineRects.length && rect[2] > rect[0] && rect[3] > rect[1]) {
+      highlight.dataset.textAnnotation = "true";
+      for (const lineRect of lineRects.slice(0, 256)) {
+        if (!Array.isArray(lineRect) || lineRect.length !== 4 || !lineRect.every(Number.isFinite) || lineRect[2] <= lineRect[0] || lineRect[3] <= lineRect[1]) continue;
+        const line = window.document.createElement("div");
+        line.className = "source-highlight-line";
+        line.style.left = `${((lineRect[0] - rect[0]) / (rect[2] - rect[0])) * 100}%`;
+        line.style.top = `${((lineRect[1] - rect[1]) / (rect[3] - rect[1])) * 100}%`;
+        line.style.width = `${((lineRect[2] - lineRect[0]) / (rect[2] - rect[0])) * 100}%`;
+        line.style.height = `${((lineRect[3] - lineRect[1]) / (rect[3] - rect[1])) * 100}%`;
+        highlight.append(line);
+      }
     }
+    record.overlay.append(highlight);
+    if (target.page === note.page && !primary) primary = highlight;
   }
-  record.overlay.append(highlight);
-  return highlight;
+  return primary;
 }
 
 async function openNote(noteId, options = {}) {
@@ -5760,9 +5987,9 @@ function setRegionMode(active) {
   state.regionActive = Boolean(active && state.pdf && state.document);
   readerShapes?.updateControls();
   elements.regionMode.setAttribute("aria-pressed", String(state.regionActive));
-  elements.regionMode.textContent = t(state.regionActive ? "cancelRegion" : "regionMode");
+  renderReaderActionLabel(elements.regionMode, state.regionActive ? "cancelRegion" : "regionMode");
   elements.readerRegionMode.setAttribute("aria-pressed", String(state.regionActive));
-  elements.readerRegionMode.textContent = t(state.regionActive ? "cancelRegion" : "regionMode");
+  renderReaderActionLabel(elements.readerRegionMode, state.regionActive ? "cancelRegion" : "regionMode");
   elements.readerStage.querySelectorAll(".region-overlay").forEach((overlay) => {
     overlay.dataset.active = String(state.regionActive);
   });
@@ -6182,6 +6409,10 @@ async function submitSave(includeExcerpt = false) {
     rect: draft.rect ? [...draft.rect] : null,
     text: draft.text.trim()
   };
+  if (!await addSourceSegments(payload, draft.sourceSegments)) {
+    setStatus("crossPageSelection", "error");
+    return;
+  }
   if (draft.richContent) payload.rich_content = JSON.parse(JSON.stringify(draft.richContent));
   if (imageIds.length) payload.image_ids = imageIds;
   let noteSaved = false;
@@ -6491,6 +6722,7 @@ function applyMutationState(operation, savedState) {
       document_id: savedState.document_id,
       page: savedState.page,
       rect: savedState.rect,
+      source_segments: savedState.source_segments || null,
       text: savedState.text,
       created_at: savedState.created_at
     };
@@ -7146,6 +7378,7 @@ elements.pageNote.addEventListener("click", () => {
   const draft = ensureDraft(state.document.id);
   draft.page = state.page;
   draft.rect = null;
+  draft.sourceSegments = null;
   draft.includeExcerpt = false;
   invalidateRequestId(draft);
   setRegionMode(false);
@@ -7727,7 +7960,7 @@ function convertRichDraftToPlain() {
   elements.noteText.focus();
 }
 
-dataNavigation = createDataNavigation({
+if (!deviceMode) dataNavigation = createDataNavigation({
   api,
   getLanguage: () => state.language,
   openCatalogItem,
@@ -7803,6 +8036,7 @@ imageViewer = createImageViewer({
   }
 });
 
+if (!deviceMode) {
 analysis = createAnalysis({
   api,
   checkedFetch,
@@ -7964,6 +8198,7 @@ assistant = createAssistant({
   reviewResearchRecord: (source) => researchRecord.reviewSource(source),
   refreshAfterAgent
 });
+}
 
 readerFind = createReaderFind({
   t,
@@ -7976,7 +8211,7 @@ readerFind = createReaderFind({
   getPageSurface: (page) => state.page === page ? elements.pageSurface : elements.readerStage.querySelector(`[data-reader-page="${page}"]`)
 });
 
-readerObjects = createReaderObjectMenu({
+if (!deviceMode) readerObjects = createReaderObjectMenu({
   stage: elements.readerStage,
   api,
   t,
@@ -8042,15 +8277,39 @@ readerNavigation = createReaderNavigation({
 
 elements.translationFallback.addEventListener("click", () => setStatus("translationUnavailable", "error"));
 
+deviceUI = createDeviceUI({
+  checkedFetch,
+  getDocument: () => state.document,
+  getLanguage: () => state.language,
+  async imported(result) {
+    await refreshActiveLibrary();
+    const documentId = result?.document?.id || result?.document_id || result?.id;
+    if (documentId) await openDocument(documentId, { force: true, explicitIntent: true });
+  }
+});
+applyDeviceCapabilities();
 applyTheme();
 applyLanguage();
-void workspaceShell.load();
-void translation.load().then((available) => {
-  if (available) return;
-  state.translationUnavailable = true;
-  if (!elements.translationFallback.isConnected) elements.translationControls.replaceChildren(elements.translationFallback);
-  elements.translationFallback.disabled = false;
-  elements.translationFallback.textContent = t("translationUnavailable");
-  syncTranslationLayout();
-});
-loadDocuments();
+
+async function startApplication() {
+  if (deviceMode) {
+    try {
+      await prepareDeviceRepository();
+    } catch {
+      setStatus("storage_unavailable", "error", {}, startApplication);
+      return;
+    }
+  } else {
+    void workspaceShell.load();
+    void translation.load().then((available) => {
+      if (available) return;
+      state.translationUnavailable = true;
+      if (!elements.translationFallback.isConnected) elements.translationControls.replaceChildren(elements.translationFallback);
+      elements.translationFallback.disabled = false;
+      elements.translationFallback.textContent = t("translationUnavailable");
+      syncTranslationLayout();
+    });
+  }
+  await loadDocuments();
+}
+void startApplication();

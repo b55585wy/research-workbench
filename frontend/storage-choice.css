@@ -1,0 +1,189 @@
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-width: 320px;
+  background: var(--ui-bg);
+  color: var(--ui-text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", sans-serif;
+  font-size: 14px;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  min-height: 100svh;
+}
+
+h1,
+p {
+  margin: 0;
+}
+
+.storage-choice-page {
+  min-height: 100vh;
+  min-height: 100svh;
+  padding: 40px 20px;
+  display: grid;
+  place-items: center;
+}
+
+.storage-choice-shell {
+  width: min(100%, 640px);
+}
+
+.storage-choice-header {
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.storage-choice-brand {
+  color: var(--ui-text-soft);
+  font-size: 14px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+}
+
+.storage-choice-intro {
+  margin-top: 28px;
+}
+
+.storage-choice-intro h1 {
+  font-size: 24px;
+  font-weight: 650;
+  line-height: 1.35;
+  letter-spacing: 0.01em;
+}
+
+.storage-choice-intro p {
+  margin-top: 8px;
+  color: var(--ui-text-muted);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.storage-options {
+  margin-top: 24px;
+  display: grid;
+  gap: 14px;
+}
+
+.storage-option {
+  min-height: 156px;
+  padding: 20px 22px;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: 4px;
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  text-decoration: none;
+  transition: border-color 140ms ease, background-color 140ms ease, box-shadow 140ms ease;
+}
+
+.storage-option:hover {
+  border-color: var(--ui-primary);
+  background: var(--ui-surface-subtle);
+  box-shadow: 0 3px 10px var(--ui-primary-ambient);
+}
+
+.storage-option:active {
+  background: var(--ui-selected);
+}
+
+.storage-option:focus-visible,
+.storage-recovery-link:focus-visible {
+  outline: 3px solid var(--ui-focus);
+  outline-offset: 3px;
+}
+
+.storage-option-title {
+  font-size: 16px;
+  font-weight: 650;
+  line-height: 1.5;
+}
+
+.storage-option-description {
+  max-width: 540px;
+  margin-top: 7px;
+  color: var(--ui-text-soft);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.storage-option-action {
+  margin-top: 16px;
+  color: var(--ui-primary);
+  font-size: 14px;
+  font-weight: 650;
+  line-height: 1.5;
+}
+
+.storage-option-arrow {
+  display: inline-block;
+  margin-left: 4px;
+  transition: transform 140ms ease;
+}
+
+.storage-option:hover .storage-option-arrow {
+  transform: translateX(3px);
+}
+
+.storage-choice-footer {
+  margin-top: 22px;
+  padding-top: 16px;
+  border-top: 1px solid var(--ui-border);
+}
+
+.storage-choice-note {
+  color: var(--ui-text-muted);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.storage-recovery-link {
+  min-height: 44px;
+  margin-top: 8px;
+  display: inline-flex;
+  align-items: center;
+  color: var(--ui-primary);
+  font-size: 14px;
+  line-height: 1.5;
+  text-underline-offset: 3px;
+}
+
+.storage-recovery-link:hover {
+  color: var(--ui-primary-hover);
+}
+
+@media (max-width: 480px) {
+  .storage-choice-page {
+    padding: 24px 16px;
+    place-items: start center;
+  }
+
+  .storage-choice-intro {
+    margin-top: 24px;
+  }
+
+  .storage-options {
+    margin-top: 20px;
+  }
+
+  .storage-option {
+    min-height: 160px;
+    padding: 18px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .storage-option,
+  .storage-option-arrow {
+    transition: none;
+  }
+
+  .storage-option:hover .storage-option-arrow {
+    transform: none;
+  }
+}

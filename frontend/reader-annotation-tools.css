@@ -1,0 +1,171 @@
+@media (min-width: 821px) {
+  .reader-source-controls {
+    row-gap: 4px;
+  }
+
+  .reader-annotation-icon-button {
+    display: inline-flex;
+    flex: 0 0 36px;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    min-width: 36px;
+    height: 36px;
+    min-height: 36px;
+    padding: 0;
+  }
+
+  .reader-annotation-icon {
+    display: block;
+    width: 20px;
+    height: 20px;
+    pointer-events: none;
+  }
+
+  .text-annotation-colors {
+    flex-wrap: nowrap;
+    gap: 4px;
+  }
+
+  .text-annotation-colors label {
+    position: relative;
+    justify-content: center;
+    width: 36px;
+    min-width: 36px;
+    height: 36px;
+    min-height: 36px;
+    padding: 0;
+  }
+
+  .text-annotation-colors input {
+    width: 20px;
+    height: 20px;
+    margin: 0;
+    border: 1px solid var(--ui-border-strong);
+    border-radius: 50%;
+    appearance: none;
+    cursor: pointer;
+  }
+
+  .text-annotation-colors input:focus-visible {
+    outline: 2px solid var(--ui-focus);
+    outline-offset: 3px;
+  }
+
+  .text-annotation-colors input:checked {
+    border-color: var(--ui-primary);
+    box-shadow: 0 0 0 2px var(--ui-surface), 0 0 0 4px var(--ui-primary);
+  }
+
+  .text-annotation-colors input[value="yellow"] { background: #ffe069; }
+  .text-annotation-colors input[value="green"] { background: #91dab1; }
+  .text-annotation-colors input[value="blue"] { background: #91c8f6; }
+  .text-annotation-colors input[value="pink"] { background: #efa9cf; }
+
+  .text-annotation-toolbar[data-contextual="false"] + .reader-draw-menu {
+    margin-inline-start: 4px;
+    padding-inline-start: 4px;
+    border-inline-start: 1px solid var(--ui-border);
+  }
+
+  .reader-draw-menu {
+    position: relative;
+    flex-wrap: nowrap;
+  }
+
+  .reader-draw-summary {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 36px;
+    min-height: 36px;
+    padding: 0 8px;
+    list-style: none;
+    white-space: nowrap;
+  }
+
+  .reader-draw-summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .reader-draw-summary::marker {
+    content: "";
+  }
+
+  .reader-draw-summary > svg {
+    width: 18px;
+    height: 18px;
+    flex: none;
+  }
+
+  .reader-draw-summary > .reader-draw-chevron {
+    width: 14px;
+    height: 14px;
+  }
+
+  .reader-draw-summary[aria-disabled="true"] {
+    cursor: default;
+    opacity: 0.55;
+  }
+
+  .reader-draw-summary:focus-visible,
+  .reader-shape-tool-menu .button:focus-visible,
+  .reader-annotation-icon-button:focus-visible {
+    outline: 2px solid var(--ui-focus);
+    outline-offset: 2px;
+  }
+
+  .reader-shape-tool-menu {
+    position: absolute;
+    z-index: 60;
+    inset-block-start: calc(100% + 4px);
+    inset-inline-start: 4px;
+    display: grid;
+    min-width: 156px;
+    padding: 4px;
+    border: 1px solid var(--ui-border-strong);
+    border-radius: 4px;
+    background: var(--ui-surface);
+    box-shadow: 0 6px 22px rgb(0 0 0 / 20%);
+  }
+
+  .reader-draw-menu:not([open]) > .reader-shape-tool-menu {
+    display: none;
+  }
+
+  .reader-shape-tool-menu .button {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 8px;
+    min-height: 36px;
+    padding: 4px 8px;
+    text-align: start;
+  }
+
+  .reader-shape-tool-menu .button[aria-pressed="true"] {
+    background: var(--ui-selected);
+    color: var(--ui-primary);
+  }
+
+  .reader-shape-tool-menu .button[aria-pressed="true"]::after {
+    margin-inline-start: auto;
+    content: "✓";
+  }
+
+  @media (pointer: coarse) {
+    .reader-annotation-icon-button,
+    .text-annotation-colors label {
+      flex-basis: 44px;
+      width: 44px;
+      min-width: 44px;
+      height: 44px;
+      min-height: 44px;
+    }
+
+    .reader-draw-summary,
+    .reader-shape-tool-menu .button {
+      min-height: 44px;
+    }
+  }
+}

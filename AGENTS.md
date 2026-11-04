@@ -2,10 +2,13 @@
 
 This is our own research application, separate from workbench-web. User authorized
 the PDF reading / source-linked notes slice on 2026-10-30. ChatGPT plans; Codex owns
-engineering tasks, contracts, integration and acceptance; DeepSeek implements specified
-backend logic; actual Kimi via OMP owns frontend HTML/JS/CSS. Follow the global policy
+engineering tasks, contracts, integration, backend/frontend implementation and acceptance.
+OMP's selected profile is all-codex: Codex is the default backend and frontend
+client; DeepSeek official is the quota backup. Kimi requires explicit selection
+or the saved codex-kimi profile. Read C:/Users/wangyi/.omp/agent/role-routing.json
+before dispatch. Follow the global policy
 in C:/Users/wangyi/.codex/AGENTS.md, including authorized quota fallback:
-backend DeepSeek official -> Codex; frontend Kimi -> DeepSeek official.
+backend Codex -> DeepSeek official; frontend Codex/Kimi -> DeepSeek official.
 Do not modify tFUS source, staging, live services, user data or global routing.
 
 Frontend target is React + TypeScript + Vite, explicitly chosen by the user on
@@ -18,7 +21,12 @@ Agent orchestration, RAG literature QA and Python/R analysis are committed produ
 capabilities, not optional add-ons. See ARCHITECTURE.md for current versus target.
 The latest user decision is standalone-first, single-machine with a default local
 guest workspace. No registration/login or password/user tables in the first slice;
-formal data stays in the local backend's SQLite/files, not solely browser cache.
+The original standalone mode stores formal data in its backend's SQLite/files.
+The 2026-11-04 cost decision adds a true browser-device storage mode: IndexedDB
+for formal PDF/image/note records, explicit local/server choice, no silent file
+uploads or data moves. Existing backend/server records remain accessible and
+unchanged. Device storage is not a fake authenticated actor. This supersedes
+the older backend-only local-storage restriction. See LOCAL-STORAGE-PLAN.md.
 Guest means unverified local context, never an authenticated actor or fake token.
 Multi-account management comes later; preserve source IDs and explicitly migrate
 guest ownership without assigning all history to the first account. Later isolated

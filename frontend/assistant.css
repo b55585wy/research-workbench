@@ -723,6 +723,12 @@
   color: var(--ui-success);
 }
 
+.assistant-panel > .assistant-reference-add-row {
+  flex: none;
+  padding: 8px 12px 0;
+  background: var(--ui-surface);
+}
+
 .assistant-form {
   flex: none;
   padding: 10px 12px;
@@ -1184,6 +1190,114 @@
 
   .source-preparation-actions .button {
     width: 100%;
-    min-height: 36px;
+    min-height: 44px;
+  }
+}
+
+.assistant-header,
+.assistant-header-actions {
+  flex-wrap: nowrap;
+}
+
+#assistant-history,
+#assistant-new,
+#assistant-clear,
+#assistant-full-page,
+#assistant-close {
+  min-height: 44px;
+}
+
+#assistant-new,
+#assistant-clear {
+  width: 44px;
+  min-width: 44px;
+  padding: 10px;
+}
+
+#assistant-full-page,
+#assistant-close {
+  min-width: 44px;
+}
+
+#assistant-close {
+  width: 44px;
+}
+
+.assistant-icon-button {
+  display: inline-grid;
+  place-items: center;
+}
+
+.assistant-icon-button[hidden] {
+  display: none;
+}
+
+.assistant-icon-button svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.assistant-context {
+  align-items: center;
+  gap: 4px 8px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.assistant-context-summary {
+  flex: 1 1 180px;
+  display: -webkit-box;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  background: transparent;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.assistant-context > .button {
+  min-height: 44px;
+}
+
+.assistant-advanced > summary {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+}
+
+.source-preparation > summary,
+.source-preparation-field select,
+.source-preparation-field input,
+.source-preparation-actions .button {
+  min-height: 44px;
+}
+
+.source-preparation-count:empty {
+  display: none;
+}
+
+@media (max-width: 480px) {
+  .assistant-header {
+    gap: 4px;
+    padding: 4px 6px;
+  }
+
+  .assistant-header h2 {
+    display: none;
+  }
+
+  .assistant-header-actions {
+    width: 100%;
+    gap: 3px;
+  }
+
+  #assistant-history {
+    flex: 1 1 auto;
+    width: auto;
   }
 }

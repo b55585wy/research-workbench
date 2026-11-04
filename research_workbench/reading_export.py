@@ -50,6 +50,7 @@ def reading_documents(document, notes, excerpts, exported_at,annotation_groups=N
         identifier = str(UUID(note['id']))
         image = by_note.get(identifier)
         source_link = f"source.pdf#page={note['page']}"
+        segments = note.get('source_segments') or []
         markdown.extend([f"## {index}. 第 {note['page']} 页 / Page {note['page']}", '',
                          f'[查看原文 / View source]({source_link})', ''])
         checked = note.get('review_status') == 'source_checked'
@@ -71,6 +72,13 @@ def reading_documents(document, notes, excerpts, exported_at,annotation_groups=N
             body = shape_annotation_markup(note) + body
         section = f'<section><h2>{index}. 第 {note["page"]} 页 / Page {note["page"]}</h2>'
         section += f'<p><a href="{source_link}">查看原文 / View source</a></p><p class="review-status">{review_label}</p>'+body
+        if len(segments) > 1:
+            for segment in segments:
+                link = f"source.pdf#page={segment['page']}"
+                quote = html.escape(segment['quote']).replace('\n', '<br>')
+                section += f'<p><a href="{link}">第 {segment["page"]} 页 / Page {segment["page"]}</a></p><blockquote>{quote}</blockquote>'
+                markdown.extend(['', f'[Page {segment["page"]}]({link})', ''])
+                markdown.extend('> ' + markdown_text(line) for line in segment['quote'].splitlines())
         image_path = f'images/{identifier}.png' if image else None
         if image:
             markdown.extend(['', f'![第 {note["page"]} 页图表摘录]({image_path})'])

@@ -7,6 +7,7 @@ from .rich_content import validate_content,plaintext
 from .shape_annotations import (MAX_TEXTBOX_BODY, ShapeAnnotation, ShapeAnnotationInput,
                                 TextboxAnnotation, TextboxRecord)
 from .text_annotations import AnnotationCreate, AnnotationStyle
+from .source_segments import SourceSegment, validate_anchor
 
 MAX_FILE_BYTES = 20 * 1024 * 1024
 MAX_PAGES = 200
@@ -35,6 +36,7 @@ class NoteCreate(BaseModel):
     rich_content: dict | None = None
     annotation: AnnotationCreate | None = None
     shape_annotation: Optional[ShapeAnnotationInput] = None
+    source_segments: list[SourceSegment] | None = Field(default=None, min_length=1, max_length=20)
 
     @model_serializer(mode='wrap')
     def compatible_serialization(self, handler):
@@ -43,6 +45,8 @@ class NoteCreate(BaseModel):
             value.pop('annotation', None)
         if value.get('shape_annotation') is None:
             value.pop('shape_annotation', None)
+        if value.get('source_segments') is None:
+            value.pop('source_segments', None)
         return value
 
     @field_validator('rich_content')
@@ -54,8 +58,12 @@ class NoteCreate(BaseModel):
     def consistent_rich_content(self):
         if self.rich_content is not None and plaintext(self.rich_content)!=self.text:
             raise ValueError('Rich and plain text must match')
+        if self.source_segments is not None:
+            if self.source is not None or self.shape_annotation is not None:
+                raise ValueError('Selected page sources require a PDF text note')
+            validate_anchor(self.source_segments, self.page, self.rect, self.annotation)
         if self.annotation is not None:
-            if self.page is None or self.rect is None or self.source is not None or self.text != self.annotation.quote:
+            if self.page is None or self.rect is None or self.source is not None or (self.source_segments is None and self.text != self.annotation.quote):
                 raise ValueError('A text annotation requires its selected quote and PDF page anchor')
             if any(abs(a-b) > 1e-6 for a, b in zip(self.annotation.bounds(), self.rect)):
                 raise ValueError('Annotation union must match the legacy note rectangle')

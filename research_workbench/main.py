@@ -11,7 +11,6 @@ from uuid import UUID, uuid4
 from fastapi import FastAPI, File, Form, Query, UploadFile
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
-from fastapi.staticfiles import StaticFiles
 from starlette.datastructures import Headers
 from starlette.exceptions import HTTPException
 
@@ -276,6 +275,10 @@ def create_app(data_root=None, validator=None, renderer=None, *, agent_provider=
     def health():
         return {'status': 'ok', 'version': __version__}
 
+    @app.get('/api/v1/reader-capabilities')
+    def reader_capabilities():
+        return {'source_segments': True, 'storage': 'server'}
+
     @app.get('/api/v1/documents')
     def documents():
         return {'items': store.list_documents()}
@@ -382,5 +385,7 @@ def create_app(data_root=None, validator=None, renderer=None, *, agent_provider=
     app.include_router(reader_errors_router)
     app.include_router(agent_reference_router)
     app.include_router(analysis_router)
-    app.mount('/', StaticFiles(directory=ROOT / 'frontend', html=True), name='reader')
+    from .device_pages import FrontendFiles, install_device_pages
+    install_device_pages(app, ROOT / 'frontend')
+    app.mount('/', FrontendFiles(directory=ROOT / 'frontend', html=True), name='reader')
     return app
