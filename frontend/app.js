@@ -468,7 +468,7 @@ const messages = {
     notesVisibleCount: "显示 {visible} / {total} 条",
     notesNoMatch: "没有符合筛选条件的笔记。",
     notesSelectedCount: "已选择 {count} 条",
-    notesBatchLimit: "最多向助手加入 8 条唯一笔记（包含已有引用）；请减少选择。",
+    notesBatchLimit: deviceMode ? "最多向本机助手加入 4 份资料，且笔记合计不超过 6000 字；请减少选择。" : "最多向助手加入 8 条唯一笔记（包含已有引用）；请减少选择。",
     notesBatchAdded: "已将 {count} 条笔记加入助手，尚未发送。",
     notesBatchInvalid: "所选笔记已变化或不可用，未加入任何引用。请刷新选择。",
     readerProgressRestored: "已恢复上次阅读位置。",
@@ -936,7 +936,7 @@ const messages = {
     notesVisibleCount: "Showing {visible} of {total}",
     notesNoMatch: "No notes match these filters.",
     notesSelectedCount: "{count} selected",
-    notesBatchLimit: "Add at most 8 unique notes to the assistant, including existing references. Select fewer notes.",
+    notesBatchLimit: deviceMode ? "Add at most 4 materials to the device assistant, with no more than 6,000 characters of notes. Select fewer notes." : "Add at most 8 unique notes to the assistant, including existing references. Select fewer notes.",
     notesBatchAdded: "Added {count} notes to the assistant. Nothing was sent.",
     notesBatchInvalid: "Selected notes changed or are unavailable. No references were added; refresh your selection.",
     readerProgressRestored: "Restored your last reading position.",
@@ -3581,8 +3581,10 @@ function renderNotes() {
     const actions = window.document.createElement("div");
     actions.className = "note-actions";
     if (annotation || shape) actions.append(makeNoteAction("annotation-actions", t("annotationAction"), () => showAnnotationFromNote(document, note), actionsLocked || !noteState));
+    if (!deviceMode || !shape) actions.append(
+      makeNoteAction("annotation-agent", t("addToAssistant"), () => shape ? shareShapeFromNote(document, noteState, "agent") : assistant?.addNoteReference(document.id, noteState), actionsLocked || !noteState)
+    );
     actions.append(
-      makeNoteAction("annotation-agent", t("addToAssistant"), () => shape ? shareShapeFromNote(document, noteState, "agent") : assistant?.addNoteReference(document.id, noteState), actionsLocked || !noteState),
       makeNoteAction("edit-note", t("editNote"), () => shape ? showAnnotationFromNote(document, note) : startEditNote(document, note), actionsLocked || !noteState),
       makeNoteAction("review-note", t(reviewStatus === "source_checked" ? "markUnchecked" : "markChecked"), () => reviewNote(document, note), actionsLocked || !noteState),
       makeNoteAction("delete-note", t("deleteNote"), () => deleteNote(document, note), actionsLocked || !noteState)
@@ -5518,7 +5520,13 @@ function prepareTextReaderAction(kind) {
     kind,
     page: selected.page,
     rect: [...selected.rect],
-    quote: formatSelectionQuote(selected, state.language)
+    quote: formatSelectionQuote(selected, state.language),
+    ...(deviceMode ? {
+      text: selected.text,
+      rects: selected.rects.map((rect) => [...rect]),
+      sourceSha256: state.document.sha256,
+      sourceSegments: selected.source_segments || null
+    } : {})
   });
   if (result !== "added") {
     setStatus(readerActionFailureStatus(result), "error");
@@ -6628,6 +6636,98 @@ async function saveDeviceTranslationNote({ requestId, source, text, signal }) {
     const noteState = noteStateFor(note.id) || {
       ...note,
       revision: 1,
+      review_status: "unreviewed",
+      reviewed_at: null,
+      review_provenance: null,
+      updated_at: note.created_at,
+      deleted_at: null
+    };
+    state.noteStates = [noteState, ...state.noteStates.filter((item) => item.id !== note.id)];
+    renderNotes();
+  }
+  return note;
+}
+
+function deviceAssistantOwner() {
+  const document = state.document;
+  if (!deviceMode || !document || isStudy()) return null;
+  return {
+    documentId: document.id,
+    sourceSha256: document.sha256,
+    title: document.title || document.original_filename || t("untitled"),
+    page: state.page,
+    pageCount: document.page_count
+  };
+}
+
+function deviceAssistantOwnerIsCurrent(owner) {
+  const current = deviceAssistantOwner();
+  if (!owner) return current === null;
+  return Boolean(current && current.documentId === owner.documentId && current.sourceSha256 === owner.sourceSha256);
+}
+
+async function revalidateDeviceAssistant(owner, materials, signal) {
+  if (!deviceAssistantOwnerIsCurrent(owner)) throw new ApiError("source_changed");
+  if (!owner) return;
+  const document = await api(`/api/v1/documents/${encodeURIComponent(owner.documentId)}`, { signal });
+  if (document.id !== owner.documentId || document.sha256 !== owner.sourceSha256 || !deviceAssistantOwnerIsCurrent(owner)) {
+    throw new ApiError("source_changed");
+  }
+  for (const material of materials) {
+    if (material.documentId !== owner.documentId || material.sourceSha256 !== owner.sourceSha256) throw new ApiError("source_changed");
+    if (!material.noteId) continue;
+    const note = await api(`/api/v1/documents/${encodeURIComponent(owner.documentId)}/notes/${encodeURIComponent(material.noteId)}/state`, { signal });
+    if (note.id !== material.noteId || note.document_id !== owner.documentId || note.deleted_at || note.purged
+      || note.revision !== material.revision || note.text !== material.text) {
+      throw new ApiError("source_changed");
+    }
+  }
+  if (!deviceAssistantOwnerIsCurrent(owner)) throw new ApiError("source_changed");
+}
+
+async function saveDeviceAssistantNote({ requestId, owner, page, rect, segments, text, signal }) {
+  if (!deviceAssistantOwnerIsCurrent(owner) || !owner || typeof text !== "string" || !text.trim() || text.length > 10000) {
+    throw new ApiError("source_changed");
+  }
+  if (!Number.isInteger(page) || page < 1 || page > owner.pageCount || !Array.isArray(segments)) {
+    throw new ApiError("validation_error");
+  }
+  let notePage = page;
+  let noteRect = rect ? [...rect] : null;
+  if (segments.length) {
+    const first = segments[0];
+    const rects = first.rects || [];
+    if (!rects.length) throw new ApiError("validation_error");
+    notePage = first.page;
+    noteRect = [
+      Math.min(...rects.map((item) => item[0])),
+      Math.min(...rects.map((item) => item[1])),
+      Math.max(...rects.map((item) => item[2])),
+      Math.max(...rects.map((item) => item[3]))
+    ];
+  }
+  const payload = { request_id: requestId, page: notePage, rect: noteRect, text };
+  if (segments.length) {
+    payload.source_segments = segments.map((segment) => ({
+      page: segment.page,
+      quote: segment.quote,
+      rects: segment.rects.map((item) => [...item])
+    }));
+  }
+  const note = await api(`/api/v1/documents/${encodeURIComponent(owner.documentId)}/notes`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+    signal
+  });
+  if (!note || note.id !== requestId || note.document_id !== owner.documentId || note.text !== text.trim()) {
+    throw new ApiError("request_failed");
+  }
+  if (deviceAssistantOwnerIsCurrent(owner)) {
+    state.notes = [note, ...state.notes.filter((item) => item.id !== note.id)];
+    const noteState = noteStateFor(note.id) || {
+      ...note,
+      revision: note.revision || 1,
       review_status: "unreviewed",
       reviewed_at: null,
       review_provenance: null,
@@ -8502,6 +8602,26 @@ assistant = createAssistant({
   reviewResearchRecord: (source) => researchRecord.reviewSource(source),
   refreshAfterAgent
 });
+}
+
+if (deviceMode) {
+  const { createDeviceAssistant } = await import("/device-assistant.js");
+  assistant = await createDeviceAssistant({
+    getLanguage: () => state.language,
+    getOwner: deviceAssistantOwner,
+    isCurrent: deviceAssistantOwnerIsCurrent,
+    revalidate: revalidateDeviceAssistant,
+    saveNote: saveDeviceAssistantNote,
+    onSource: (source) => {
+      const rect = source.rect;
+      return goToTranslationSource(source.page, rect ? {
+        x: rect[0],
+        y: rect[1],
+        width: rect[2] - rect[0],
+        height: rect[3] - rect[1]
+      } : null, source.documentId, source.sourceSha256);
+    }
+  });
 }
 
 readerFind = createReaderFind({

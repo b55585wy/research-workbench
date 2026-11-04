@@ -269,12 +269,18 @@ class DeviceAiRelay:
         else:
             self.active_by_credential.pop(digest, None)
 
-    # ----------------------------------------------------------------- result
-    def translate(self, credential, payload):
+    # ------------------------------------------------------------------ result
+    def execute(self, credential, key, identity, run, failure=None):
+        """Shared admission, receipt and release hook for device operations.
+
+        ``key`` must be unique per operation domain as well as per credential
+        and request id, so one operation can never return another operation's
+        receipt.  ``identity`` fingerprints the exact confirmed input, and
+        ``run`` performs exactly one provider attempt and returns a plain
+        response dict.  ``failure`` is the detail-free fallback used when
+        ``run`` raises an unexpected exception.
+        """
         digest = _credential_digest(credential)
-        request_id = str(payload.request_id)
-        identity = request_identity(payload)
-        key = (digest, request_id)
         now = self.clock()
         with self.lock:
             self._prune(now)
@@ -298,15 +304,16 @@ class DeviceAiRelay:
             receipt = _Receipt(identity=identity, status='pending', created_at=now)
             self.receipts[key] = receipt
         try:
-            response = self._translate_once(credential, payload, request_id)
+            response = run()
         except WorkspaceError as error:
             self._finish_failed(key, receipt, digest,
                                 (error.code, error.message, error.status))
             raise
         except Exception:
-            self._finish_failed(key, receipt, digest,
-                                (FAILED_CODE, FAILED_MESSAGE, 502))
-            raise _failure(FAILED_CODE, FAILED_MESSAGE, 502) from None
+            code, message, status = failure or (
+                FAILED_CODE, FAILED_MESSAGE, 502)
+            self._finish_failed(key, receipt, digest, (code, message, status))
+            raise _failure(code, message, status) from None
         with self.lock:
             receipt.status = 'completed'
             receipt.response = response
@@ -315,6 +322,14 @@ class DeviceAiRelay:
             self._release(digest)
             self._prune(receipt.created_at)
         return dict(response)
+
+    # ------------------------------------------------------------ translation
+    def translate(self, credential, payload):
+        digest = _credential_digest(credential)
+        request_id = str(payload.request_id)
+        return self.execute(
+            credential, (digest, request_id), request_identity(payload),
+            lambda: self._translate_once(credential, payload, request_id))
 
     def _finish_failed(self, key, receipt, digest, error):
         with self.lock:
@@ -367,17 +382,18 @@ def _error(code, message, status, headers=None):
 
 
 class DeviceAiBoundary:
-    """Force no-store on every response for the device translation path.
+    """Force no-store on every response for the device relay paths.
 
     The middleware only injects cache headers; loopback, origin, method and
     body limits stay with the existing ``LocalBoundary`` and route.
     """
 
-    def __init__(self, app):
+    def __init__(self, app, paths=None):
         self.app = app
+        self.paths = frozenset(paths or (DEVICE_AI_PATH,))
 
     async def __call__(self, scope, receive, send):
-        if scope['type'] != 'http' or scope.get('path') != DEVICE_AI_PATH:
+        if scope['type'] != 'http' or scope.get('path') not in self.paths:
             return await self.app(scope, receive, send)
 
         async def wrapped_send(message):
@@ -414,12 +430,12 @@ def json_media_type(request):
     return raw.split(';', 1)[0].strip().lower() == 'application/json'
 
 
-async def _read_bounded_body(request):
+async def _read_bounded_body(request, limit=MAX_BODY_BYTES):
     """Read the request body with a hard byte bound, ignoring a false length."""
     raw_length = request.headers.get('content-length')
     if raw_length is not None:
         length = raw_length.strip()
-        if not length.isdecimal() or int(length) > MAX_BODY_BYTES:
+        if not length.isdecimal() or int(length) > limit:
             raise _failure(BODY_CODE, BODY_MESSAGE, 413)
     body = bytearray()
     async for chunk in request.stream():
@@ -427,7 +443,7 @@ async def _read_bounded_body(request):
             continue
         # Check the bound before extending so one oversized ASGI chunk cannot
         # force a second large body allocation.
-        if len(body) + len(chunk) > MAX_BODY_BYTES:
+        if len(body) + len(chunk) > limit:
             raise _failure(BODY_CODE, BODY_MESSAGE, 413)
         body.extend(chunk)
     return bytes(body)
@@ -462,14 +478,24 @@ def _method_not_allowed():
 
 
 def install_device_ai_routes(app, relay=None):
-    """Install the shared device translation route before the static mount."""
+    """Install the shared device relay routes before the static mount.
+
+    One relay instance serves both the selected-text translation endpoint and
+    the explicit question endpoint, so their admission slots and terminal
+    receipts are shared.
+    """
+    from .device_question import (
+        DEVICE_QUESTION_PATH, install_device_question_route)
+
     relay = relay or DeviceAiRelay()
     app.state.device_ai = relay
-    app.add_middleware(DeviceAiBoundary)
+    app.add_middleware(
+        DeviceAiBoundary, paths=(DEVICE_AI_PATH, DEVICE_QUESTION_PATH))
     app.add_api_route(DEVICE_AI_PATH, _endpoint(relay), methods=['POST'],
                       include_in_schema=False)
     app.add_api_route(
         DEVICE_AI_PATH, _method_not_allowed,
         methods=['GET', 'HEAD', 'OPTIONS', 'PUT', 'PATCH', 'DELETE'],
         include_in_schema=False)
+    install_device_question_route(app, relay)
     return relay

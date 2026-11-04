@@ -1,32 +1,19 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { createRoot, type Root } from "react-dom/client";
+import {
+  clearDeviceModelConnection,
+  readDeviceModelConnection,
+  rememberDeviceModelSubmission,
+  subscribeDeviceModelConnection
+} from "./device-model-connection";
 
 const MAX_MODEL_CHARACTERS = 120;
 const MAX_CREDENTIAL_CHARACTERS = 512;
 const MAX_TRANSLATED_CHARACTERS = 6000;
 const MAX_NOTE_CHARACTERS = 10000;
-const DEFAULT_MODEL = "deepseek-flash";
 const VISIBLE_ASCII = /^[\x21-\x7E]+$/;
 const SHA256 = /^[0-9a-f]{64}$/;
-
-const pageConnection = (() => {
-  let credential = "";
-  let model = DEFAULT_MODEL;
-  return {
-    read() {
-      return { credential, model };
-    },
-    rememberSubmission(nextCredential: string, nextModel: string) {
-      credential = nextCredential;
-      model = nextModel;
-    },
-    clear() {
-      credential = "";
-      model = DEFAULT_MODEL;
-    }
-  };
-})();
 
 export type DeviceAILanguage = "zh" | "en";
 
@@ -216,7 +203,7 @@ function DeviceAIConfirmation({ model, callbacks }: {
   const saveController = useRef<AbortController | null>(null);
   const translationSubmissionPending = useRef(false);
   const saveSubmissionPending = useRef(false);
-  const [initialConnection] = useState(() => pageConnection.read());
+  const [initialConnection] = useState(() => readDeviceModelConnection());
   const [targetLanguage, setTargetLanguage] = useState<DeviceAILanguage>(model.language);
   const [modelName, setModelName] = useState(initialConnection.model);
   const [credential, setCredential] = useState(initialConnection.credential);
@@ -229,9 +216,15 @@ function DeviceAIConfirmation({ model, callbacks }: {
   useEffect(() => {
     mounted.current = true;
     const updateOnline = () => setOnline(navigator.onLine);
+    const unsubscribe = subscribeDeviceModelConnection(() => {
+      const connection = readDeviceModelConnection();
+      setCredential(connection.credential);
+      setModelName(connection.model);
+    });
     window.addEventListener("online", updateOnline);
     window.addEventListener("offline", updateOnline);
     return () => {
+      unsubscribe();
       mounted.current = false;
       requestGeneration.current += 1;
       requestController.current?.abort();
@@ -272,7 +265,7 @@ function DeviceAIConfirmation({ model, callbacks }: {
     }
 
     translationSubmissionPending.current = true;
-    pageConnection.rememberSubmission(credential, trimmedModel);
+    rememberDeviceModelSubmission(credential, trimmedModel);
     const requestId = crypto.randomUUID();
     const noteId = crypto.randomUUID();
     const generation = ++requestGeneration.current;
@@ -388,9 +381,7 @@ function DeviceAIConfirmation({ model, callbacks }: {
 
   function clearConnection() {
     if (translationSubmissionPending.current || saveSubmissionPending.current || requestController.current || saveController.current) return;
-    pageConnection.clear();
-    setCredential("");
-    setModelName(DEFAULT_MODEL);
+    clearDeviceModelConnection();
   }
 
   async function copyTranslation() {

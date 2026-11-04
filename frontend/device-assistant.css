@@ -1,0 +1,351 @@
+:root[data-storage-mode="device"] .assistant-toggle,
+.assistant-panel[data-device-assistant="true"] .assistant-header-actions .button {
+  min-height: 44px;
+}
+
+.assistant-panel[data-device-assistant="true"] #assistant-close {
+  width: 44px;
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.assistant-panel[data-device-assistant="true"] #assistant-new {
+  width: 44px;
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.device-assistant-host {
+  padding: 12px;
+}
+
+.device-assistant,
+.device-assistant-editor,
+.device-assistant-options,
+.device-assistant-settings-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.device-assistant :where(h3, h4, p) {
+  margin: 0;
+}
+
+.device-assistant h3 {
+  font-size: 14px;
+}
+
+.device-assistant h4 {
+  margin-top: 4px;
+  font-size: 12px;
+}
+
+.device-assistant-memory,
+.device-assistant-context,
+.device-assistant-turn-owner,
+.device-assistant-owner-warning,
+.device-assistant-options > p,
+.device-assistant-settings-body > p {
+  color: var(--ui-text-soft);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.device-assistant-memory {
+  padding: 8px 10px;
+  border-left: 3px solid var(--ui-border-strong);
+  background: var(--ui-surface-subtle);
+}
+
+.device-assistant-context {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+}
+
+.device-assistant-context span,
+.device-assistant-turn-owner {
+  overflow-wrap: anywhere;
+}
+
+.device-assistant-turn-owner {
+  margin-bottom: 5px;
+}
+
+.device-assistant-turns {
+  min-width: 0;
+}
+
+.device-assistant-sent-materials,
+.device-assistant-material-text,
+.device-assistant-settings {
+  min-width: 0;
+  border: 1px solid var(--ui-border);
+  border-radius: 4px;
+  background: var(--ui-surface);
+}
+
+.device-assistant-sent-materials,
+.device-assistant-settings {
+  margin-top: 8px;
+  padding: 8px;
+}
+
+.device-assistant-sent-materials > summary,
+.device-assistant-material-text > summary,
+.device-assistant-settings > summary {
+  min-height: 32px;
+  color: var(--ui-text-soft);
+  font-size: 12px;
+  line-height: 32px;
+  cursor: pointer;
+}
+
+.device-assistant-sent-materials > p {
+  margin: 4px 0 8px;
+  color: var(--ui-text-soft);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.device-assistant-source-card,
+.device-assistant-material,
+.device-assistant-preview-material,
+.device-assistant-preview-history {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid var(--ui-border);
+  border-radius: 4px;
+  background: var(--ui-surface-subtle);
+}
+
+.device-assistant-source-card + .device-assistant-source-card,
+.device-assistant-material + .device-assistant-material,
+.device-assistant-preview-material + .device-assistant-preview-material,
+.device-assistant-preview-history + .device-assistant-preview-history {
+  margin-top: 8px;
+}
+
+.device-assistant-material {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.device-assistant-material > div:first-child {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+}
+
+.device-assistant-material > div:first-child span {
+  color: var(--ui-text-soft);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.device-assistant-material-text pre,
+.device-assistant-preview pre {
+  max-height: 220px;
+  margin: 4px 0 0;
+  padding: 8px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--ui-border);
+  border-radius: 3px;
+  background: var(--ui-input-bg);
+  color: var(--ui-text);
+  font: 12px/1.55 inherit;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.device-assistant-material-actions,
+.device-assistant-preview-actions,
+.device-assistant-save-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.device-assistant-save-row {
+  margin-top: 8px;
+}
+
+.device-assistant-material-actions {
+  justify-content: flex-end;
+}
+
+.device-assistant-question,
+.device-assistant-options > label:not(.device-assistant-history-option),
+.device-assistant-settings-body > label {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  color: var(--ui-text-soft);
+  font-size: 12px;
+}
+
+.device-assistant textarea,
+.device-assistant input:not([type="checkbox"]),
+.device-assistant select {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  border: 1px solid var(--ui-input-border);
+  border-radius: 4px;
+  background: var(--ui-input-bg);
+  color: var(--ui-text);
+  font: 14px/1.5 inherit;
+}
+
+.device-assistant textarea {
+  min-height: 104px;
+  resize: vertical;
+}
+
+.device-assistant-count {
+  justify-self: end;
+  color: var(--ui-text-muted);
+  font-size: 11px;
+}
+
+.device-assistant-history-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  min-height: 44px;
+  color: var(--ui-text);
+  font-size: 13px;
+  line-height: 1.5;
+  cursor: pointer;
+}
+
+.device-assistant-history-option input {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin: 10px 0 0;
+}
+
+.device-assistant-history-option input:disabled + span {
+  color: var(--ui-text-muted);
+}
+
+.device-assistant-settings-body {
+  padding-top: 8px;
+}
+
+.device-assistant-fee {
+  padding: 9px 10px;
+  border: 1px solid var(--ui-border);
+  border-radius: 4px;
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text-soft);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.device-assistant-preview {
+  display: grid;
+  gap: 9px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: 5px;
+  background: var(--ui-surface-subtle);
+}
+
+.device-assistant-preview > p {
+  color: var(--ui-text-soft);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.device-assistant-preview-actions {
+  justify-content: flex-end;
+}
+
+.device-assistant-review {
+  align-self: flex-start;
+}
+
+.device-assistant-stop {
+  align-self: flex-start;
+}
+
+.device-assistant-status,
+.device-assistant-offline,
+.device-assistant-fallback {
+  min-height: 20px;
+  color: var(--ui-text-soft);
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.device-assistant-status[data-kind="error"],
+.device-assistant-offline {
+  color: var(--ui-danger);
+}
+
+.device-assistant-status[data-kind="success"],
+.device-assistant-saved {
+  color: var(--ui-success);
+}
+
+.device-assistant-saved,
+.device-assistant-owner-warning {
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.device-assistant .button,
+.device-assistant .button.button-quiet,
+.device-assistant .button.button-secondary,
+.device-assistant .button.button-primary {
+  min-height: 44px;
+}
+
+.device-assistant :where(button, input, textarea, select, summary, pre):focus-visible,
+.device-assistant-host:focus-visible {
+  outline: 2px solid var(--ui-focus);
+  outline-offset: 2px;
+}
+
+.device-assistant [hidden],
+.assistant-panel[data-device-assistant="true"] [hidden] {
+  display: none !important;
+}
+
+@media (max-width: 640px) {
+  .device-assistant-host {
+    padding: 10px;
+  }
+
+  .device-assistant-preview-actions,
+  .device-assistant-preview-actions .button,
+  .device-assistant-review {
+    width: 100%;
+  }
+
+  .device-assistant-preview-actions .button {
+    flex: 1 1 auto;
+  }
+}
+
+@media (pointer: coarse) {
+  .device-assistant-sent-materials > summary,
+  .device-assistant-material-text > summary,
+  .device-assistant-settings > summary {
+    min-height: 44px;
+    line-height: 44px;
+  }
+}

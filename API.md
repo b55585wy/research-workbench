@@ -775,3 +775,17 @@ Pending/conflicting request IDs return409; another in-flight selection returns42
 A bounded in-memory receipt can replay completed/failed results without another
 call; this guarantee ends on eviction/expiry/restart. Local device mode does not
 call the endpoint. See [selection translation](SELECTION-TRANSLATION.md).
+
+# v0.57 explicit device question
+
+POST `/device/ai/question` is outside guest dispatch and creates no space/cookie.
+Only `{request_id,question,materials,history,answer_language,model,confirmed:true}`
+is accepted. Materials use sequential anonymous M1..M4 labels and text, never
+document/note IDs, titles, file hashes, pages, rectangles, paths or endpoints.
+History is empty or the previous user/assistant pair. Bearer carries the user's
+page-memory model credential; provider URL and no-tool single attempt are fixed.
+The response is `{request_id,payload_sha256,model,answer}`. Fingerprint is SHA256
+of compact UTF-8 recursively sorted JSON over question/materials/history/
+answer_language/model only. Responses are no-store; no CORS widening or storage
+migration. Admission is shared with device selection translation, receipts are
+domain-separated. See [device AI](DEVICE-AI.md) for exact limits and actual checks.

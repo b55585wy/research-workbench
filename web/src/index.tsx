@@ -37,6 +37,21 @@ export type {
   DeviceAISourceSegment,
   MountDeviceAIOptions
 } from "./device-ai";
+export { mountDeviceAssistant } from "./device-assistant";
+export type {
+  DeviceAssistantCallbacks,
+  DeviceAssistantHandle,
+  DeviceAssistantLanguage,
+  DeviceAssistantMaterial,
+  DeviceAssistantModel,
+  DeviceAssistantNote,
+  DeviceAssistantNoteSave,
+  DeviceAssistantOwner,
+  DeviceAssistantReaderAction,
+  DeviceAssistantResult,
+  DeviceAssistantSourceSegment,
+  MountDeviceAssistantOptions
+} from "./device-assistant";
 
 export type WorkspaceLanguage = "zh" | "en";
 
