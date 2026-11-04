@@ -1,6 +1,14 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { flushSync } from "react-dom";
 import { createRoot, type Root } from "react-dom/client";
+import {
+  defaultFlowReadingPreferences,
+  flowReadingWidths,
+  readFlowReadingPreferences,
+  writeFlowReadingPreferences,
+  type FlowReadingPreferences,
+  type FlowReadingWidth
+} from "./flow-preferences";
 import { runInScope, type TranslationRun } from "./translation-runs";
 
 type FlowLanguage = "zh" | "en";
@@ -136,10 +144,34 @@ const strings = {
     heading: "段落阅读",
     original: "原文",
     translated: "已存译文",
+    textModeLabel: "阅读文本",
     previous: "上一批",
     next: "下一批",
     returnPdf: "返回 PDF",
     openPage: "查看原页",
+    settings: "阅读设置",
+    find: "查找已加载页面",
+    fontSize: "字号",
+    lineHeight: "行距",
+    readingWidth: "阅读宽度",
+    narrow: "窄（640px）",
+    normal: "标准（760px）",
+    wide: "宽（可用宽度）",
+    resetDefaults: "恢复默认",
+    jumpToPage: "跳转页码",
+    pageTotal: (count: number) => `共 ${count} 页`,
+    goToPage: "跳转",
+    currentPage: (page: number) => `当前第 ${page} 页`,
+    invalidPage: (count: number) => `请输入 1 至 ${count} 的整数页码。`,
+    findPlaceholder: "查找当前文本",
+    findAction: "查找",
+    findScope: "仅查找当前已加载或已准备页面，不是全文检索。",
+    findEmpty: "请输入查找内容。",
+    findTooLong: "查找内容不能超过 200 个字符。",
+    findNone: "当前已加载页面没有匹配。",
+    findCount: (current: number, total: number) => `第 ${current} / ${total} 个匹配`,
+    previousMatch: "上一个匹配",
+    nextMatch: "下一个匹配",
     page: (page: number) => `第 ${page} 页`,
     batch: (start: number, end: number) => `第 ${start}–${end} 页`,
     loadingCache: "正在读取已准备的原文…",
@@ -172,10 +204,34 @@ const strings = {
     heading: "Paragraph reading",
     original: "Original",
     translated: "Saved translation",
+    textModeLabel: "Reading text",
     previous: "Previous batch",
     next: "Next batch",
     returnPdf: "Return to PDF",
     openPage: "Open original page",
+    settings: "Reading settings",
+    find: "Find in loaded pages",
+    fontSize: "Font size",
+    lineHeight: "Line spacing",
+    readingWidth: "Reading width",
+    narrow: "Narrow (640px)",
+    normal: "Normal (760px)",
+    wide: "Wide (available width)",
+    resetDefaults: "Reset defaults",
+    jumpToPage: "Go to page",
+    pageTotal: (count: number) => `of ${count} pages`,
+    goToPage: "Go",
+    currentPage: (page: number) => `Current page ${page}`,
+    invalidPage: (count: number) => `Enter a whole page number from 1 to ${count}.`,
+    findPlaceholder: "Find current text",
+    findAction: "Find",
+    findScope: "Searches only currently loaded or prepared pages, not the whole paper.",
+    findEmpty: "Enter text to find.",
+    findTooLong: "Find text must be 200 characters or fewer.",
+    findNone: "No matches in the currently loaded pages.",
+    findCount: (current: number, total: number) => `Match ${current} of ${total}`,
+    previousMatch: "Previous match",
+    nextMatch: "Next match",
     page: (page: number) => `Page ${page}`,
     batch: (start: number, end: number) => `Pages ${start}–${end}`,
     loadingCache: "Reading prepared source text…",
@@ -413,7 +469,69 @@ function SourceVisual({ block, page, document, callbacks, copy }: {
   );
 }
 
-function BlockView({ block, page, document, callbacks, copy, mode, translation }: {
+interface FlowMatch {
+  index: number;
+  page: number;
+  blockId: string;
+  start: number;
+  end: number;
+}
+
+interface FlowSearchResult {
+  scope: string;
+  pages: SourcePage[];
+  mode: TextMode;
+  translation: TranslationJob | null;
+  matches: FlowMatch[];
+}
+
+function displayBlockText(block: SourceBlock, page: number, mode: TextMode, translation: TranslationJob | null) {
+  return mode === "translated" ? translatedBlock(translation, page, block) || block.source_text : block.source_text;
+}
+
+function findInPages(pages: SourcePage[], query: string, mode: TextMode, translation: TranslationJob | null) {
+  const matches: FlowMatch[] = [];
+  const expression = new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "giu");
+  for (const page of pages) {
+    if (page.status === "unavailable") continue;
+    const blocks = [...page.blocks].sort((first, second) => first.order - second.order);
+    for (const block of blocks) {
+      if (visualKinds.has(block.kind)) continue;
+      const text = displayBlockText(block, page.page, mode, translation);
+      if (!text.trim()) continue;
+      expression.lastIndex = 0;
+      let match: RegExpExecArray | null;
+      while ((match = expression.exec(text))) {
+        matches.push({
+          index: matches.length,
+          page: page.page,
+          blockId: block.id,
+          start: match.index,
+          end: match.index + match[0].length
+        });
+      }
+    }
+  }
+  return matches;
+}
+
+type FlowIconName = "return" | "previous" | "next" | "settings" | "search" | "up" | "down";
+
+function FlowIcon({ name }: { name: FlowIconName }) {
+  return (
+    <svg className="flow-icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+      {name === "return" && <><path d="M8 5 3 10l5 5M3 10h9" /><path d="M12 4h5v12h-5" /></>}
+      {name === "previous" && <path d="m12 4-6 6 6 6" />}
+      {name === "next" && <path d="m8 4 6 6-6 6" />}
+      {name === "up" && <path d="m4 12 6-6 6 6" />}
+      {name === "down" && <path d="m4 8 6 6 6-6" />}
+      {name === "settings" && <><path d="M3 5h14M3 10h14M3 15h14" /><path d="M7 3v4M13 8v4M8 13v4" /></>}
+      {name === "search" && <><circle cx="8.5" cy="8.5" r="5" /><path d="m12 12 4.5 4.5" /></>}
+    </svg>
+  );
+}
+
+function BlockView({ block, page, document, callbacks, copy, mode, translation, matches, activeMatch }: {
   block: SourceBlock;
   page: number;
   document: FlowDocument;
@@ -421,16 +539,36 @@ function BlockView({ block, page, document, callbacks, copy, mode, translation }
   copy: Copy;
   mode: TextMode;
   translation: TranslationJob | null;
+  matches: FlowMatch[];
+  activeMatch: number;
 }) {
   if (visualKinds.has(block.kind)) {
     return <SourceVisual block={block} page={page} document={document} callbacks={callbacks} copy={copy} />;
   }
-  const text = mode === "translated" ? translatedBlock(translation, page, block) || block.source_text : block.source_text;
+  const text = displayBlockText(block, page, mode, translation);
   if (!text.trim()) return null;
-  if (block.kind === "title") return <h3 className="flow-block flow-block-title">{text}</h3>;
-  if (block.kind === "caption") return <p className="flow-block flow-block-caption">{text}</p>;
-  if (block.kind === "code") return <pre className="flow-block flow-block-code">{text}</pre>;
-  return <p className={`flow-block flow-block-${block.kind}`}>{text}</p>;
+  const content: ReactNode[] = [];
+  let cursor = 0;
+  for (const match of matches) {
+    if (match.start > cursor) content.push(text.slice(cursor, match.start));
+    content.push(
+      <mark
+        className="flow-find-match"
+        data-flow-match-index={match.index}
+        data-active={activeMatch === match.index ? "true" : "false"}
+        key={`${match.page}:${block.id}:${match.start}`}
+      >
+        {text.slice(match.start, match.end)}
+      </mark>
+    );
+    cursor = match.end;
+  }
+  if (cursor < text.length) content.push(text.slice(cursor));
+  const children = matches.length ? content : text;
+  if (block.kind === "title") return <h3 className="flow-block flow-block-title" data-flow-block-id={block.id}>{children}</h3>;
+  if (block.kind === "caption") return <p className="flow-block flow-block-caption" data-flow-block-id={block.id}>{children}</p>;
+  if (block.kind === "code") return <pre className="flow-block flow-block-code" data-flow-block-id={block.id}>{children}</pre>;
+  return <p className={`flow-block flow-block-${block.kind}`} data-flow-block-id={block.id}>{children}</p>;
 }
 
 function FlowReader({ model, callbacks }: { model: FlowReaderModel; callbacks: FlowReaderCallbacks }) {
@@ -455,8 +593,20 @@ function FlowReader({ model, callbacks }: { model: FlowReaderModel; callbacks: F
   const [translationLoading, setTranslationLoading] = useState(false);
   const [translationError, setTranslationError] = useState<string | null>(null);
   const [translationRetry, setTranslationRetry] = useState(0);
+  const [preferences, setPreferences] = useState<FlowReadingPreferences>(readFlowReadingPreferences);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [jumpValue, setJumpValue] = useState(String(initialPage));
+  const [jumpError, setJumpError] = useState(false);
+  const [query, setQuery] = useState("");
+  const [searchResult, setSearchResult] = useState<FlowSearchResult | null>(null);
+  const [searchFeedback, setSearchFeedback] = useState<"empty" | "tooLong" | null>(null);
+  const [activeMatch, setActiveMatch] = useState(0);
   const requestRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const typographyAnchorRef = useRef<{ page: number; blockId: string; top: number } | null>(null);
+  const previousPreferencesRef = useRef(preferences);
   const modelRef = useRef(model);
   modelRef.current = model;
   const scope = `${document.id}:${document.sha256}`;
@@ -466,6 +616,81 @@ function FlowReader({ model, callbacks }: { model: FlowReaderModel; callbacks: F
   );
   const batchEnd = batchPages[batchPages.length - 1];
   const batchKey = batchPages.join(",");
+  const currentSearchResult = searchResult
+    && searchResult.scope === scope
+    && searchResult.pages === pages
+    && searchResult.mode === mode
+    && searchResult.translation === translation
+    ? searchResult
+    : null;
+  const searchMatches = currentSearchResult?.matches || [];
+  const readingStyle = {
+    "--flow-reading-font-size": `${preferences.fontSize}px`,
+    "--flow-reading-line-height": String(preferences.lineHeight),
+    "--flow-reading-width": flowReadingWidths[preferences.width]
+  } as CSSProperties;
+
+  function captureTypographyAnchor() {
+    const root = scrollRef.current;
+    if (!root) return;
+    const rootTop = root.getBoundingClientRect().top;
+    const blocks = [...root.querySelectorAll<HTMLElement>("[data-flow-block-id]")];
+    const block = blocks.find((element) => element.getBoundingClientRect().bottom > rootTop + 1) || blocks[blocks.length - 1];
+    if (!block?.dataset.flowBlockId) return;
+    const page = Number(block.closest<HTMLElement>("[data-flow-page]")?.dataset.flowPage);
+    if (!Number.isInteger(page)) return;
+    typographyAnchorRef.current = { page, blockId: block.dataset.flowBlockId, top: block.getBoundingClientRect().top - rootTop };
+  }
+
+  function changePreferences(next: FlowReadingPreferences) {
+    captureTypographyAnchor();
+    setPreferences(next);
+  }
+
+  function clearSearch() {
+    setQuery("");
+    setSearchResult(null);
+    setSearchFeedback(null);
+    setActiveMatch(0);
+  }
+
+  function submitSearch() {
+    if (!query.trim()) {
+      setSearchResult(null);
+      setSearchFeedback("empty");
+      setActiveMatch(0);
+      return;
+    }
+    if (query.length > 200) {
+      setSearchResult(null);
+      setSearchFeedback("tooLong");
+      setActiveMatch(0);
+      return;
+    }
+    const matches = findInPages(pages, query, mode, translation);
+    setSearchResult({ scope, pages, mode, translation, matches });
+    setSearchFeedback(null);
+    setActiveMatch(0);
+  }
+
+  function submitPageJump() {
+    if (!/^[1-9]\d*$/.test(jumpValue.trim())) {
+      setJumpError(true);
+      return;
+    }
+    const page = Number(jumpValue.trim());
+    if (!Number.isSafeInteger(page) || page < 1 || page > document.pageCount) {
+      setJumpError(true);
+      return;
+    }
+    setJumpError(false);
+    if (page === batchStart) {
+      if (scrollRef.current) scrollRef.current.scrollTop = 0;
+      setViewedPage(page);
+    } else {
+      setBatchStart(page);
+    }
+  }
 
   useEffect(() => {
     setJobs([]);
@@ -477,6 +702,44 @@ function FlowReader({ model, callbacks }: { model: FlowReaderModel; callbacks: F
     setTranslation(null);
     setTranslationError(null);
   }, [scope]);
+
+  useEffect(() => {
+    writeFlowReadingPreferences(preferences);
+  }, [preferences]);
+
+  useLayoutEffect(() => {
+    if (previousPreferencesRef.current === preferences) return;
+    previousPreferencesRef.current = preferences;
+    const root = scrollRef.current;
+    const anchor = typographyAnchorRef.current;
+    typographyAnchorRef.current = null;
+    if (!root || !anchor) return;
+    const block = [...root.querySelectorAll<HTMLElement>(`[data-flow-page="${anchor.page}"] [data-flow-block-id]`)]
+      .find((element) => element.dataset.flowBlockId === anchor.blockId);
+    if (block) root.scrollTop += block.getBoundingClientRect().top - root.getBoundingClientRect().top - anchor.top;
+  }, [preferences]);
+
+  useEffect(() => {
+    setSearchResult(null);
+    setSearchFeedback(null);
+    setActiveMatch(0);
+  }, [pages, mode, translation, scope]);
+
+  useEffect(() => {
+    if (!currentSearchResult?.matches.length || activeMatch < 0) return;
+    const root = scrollRef.current;
+    const match = [...(root?.querySelectorAll<HTMLElement>("[data-flow-match-index]") || [])]
+      .find((element) => element.dataset.flowMatchIndex === String(activeMatch));
+    match?.scrollIntoView({ block: "center", inline: "nearest" });
+  }, [currentSearchResult, activeMatch]);
+
+  useEffect(() => {
+    setJumpValue(String(viewedPage));
+  }, [viewedPage]);
+
+  useEffect(() => {
+    if (searchOpen) searchInputRef.current?.focus();
+  }, [searchOpen]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -702,19 +965,189 @@ function FlowReader({ model, callbacks }: { model: FlowReaderModel; callbacks: F
           <h2>{copy.heading}</h2>
           <p title={document.title || copy.untitled}>{document.title || copy.untitled}</p>
         </div>
-        <button className="button button-secondary" type="button" onClick={() => void callbacks.onOpenOriginal(viewedPage, null, document.id, document.sha256)}>
-          {copy.returnPdf}
+        <button
+          className="button button-secondary flow-icon-button"
+          type="button"
+          aria-label={copy.returnPdf}
+          title={copy.returnPdf}
+          onClick={() => void callbacks.onOpenOriginal(viewedPage, null, document.id, document.sha256)}
+        >
+          <FlowIcon name="return" />
         </button>
       </header>
       <div className="flow-controls">
-        <div className="flow-text-modes" role="group" aria-label={copy.original}>
+        <div className="flow-text-modes" role="group" aria-label={copy.textModeLabel}>
           <button className="button button-quiet" type="button" aria-pressed={mode === "original"} onClick={() => setMode("original")}>{copy.original}</button>
           <button className="button button-quiet" type="button" aria-pressed={mode === "translated"} onClick={() => setMode("translated")}>{copy.translated}</button>
         </div>
-        <span className="flow-batch-label">{copy.batch(batchStart, batchEnd)}</span>
+        <span className="flow-batch-label">{copy.batch(batchStart, batchEnd)} · {copy.currentPage(viewedPage)}</span>
         <div className="flow-batch-controls">
-          <button className="button button-quiet" type="button" disabled={batchStart <= 1 || busy} onClick={() => setBatchStart(Math.max(1, batchStart - 3))}>{copy.previous}</button>
-          <button className="button button-quiet" type="button" disabled={batchEnd >= document.pageCount || busy} onClick={() => setBatchStart(Math.min(document.pageCount, batchStart + 3))}>{copy.next}</button>
+          <button
+            className="button button-quiet flow-icon-button"
+            type="button"
+            aria-label={copy.previous}
+            title={copy.previous}
+            disabled={batchStart <= 1 || busy}
+            onClick={() => setBatchStart(Math.max(1, batchStart - 3))}
+          >
+            <FlowIcon name="previous" />
+          </button>
+          <button
+            className="button button-quiet flow-icon-button"
+            type="button"
+            aria-label={copy.next}
+            title={copy.next}
+            disabled={batchEnd >= document.pageCount || busy}
+            onClick={() => setBatchStart(Math.min(document.pageCount, batchStart + 3))}
+          >
+            <FlowIcon name="next" />
+          </button>
+        </div>
+        <form className="flow-page-jump" onSubmit={(event) => { event.preventDefault(); submitPageJump(); }} noValidate>
+          <label className="sr-only" htmlFor="flow-page-jump-input">{copy.jumpToPage}</label>
+          <input
+            id="flow-page-jump-input"
+            type="text"
+            inputMode="numeric"
+            autoComplete="off"
+            value={jumpValue}
+            aria-label={copy.jumpToPage}
+            aria-invalid={jumpError}
+            aria-describedby={`flow-page-total${jumpError ? " flow-page-jump-error" : ""}`}
+            onChange={(event) => { setJumpValue(event.target.value); setJumpError(false); }}
+          />
+          <span id="flow-page-total">/ {copy.pageTotal(document.pageCount)}</span>
+          <button className="button button-quiet flow-page-jump-button" type="submit" title={copy.goToPage}>{copy.goToPage}</button>
+          {jumpError && <p className="flow-jump-error" id="flow-page-jump-error" role="alert">{copy.invalidPage(document.pageCount)}</p>}
+        </form>
+        <div className="flow-utility-controls">
+          <details
+            className="flow-tool-details"
+            open={settingsOpen}
+            onToggle={(event) => {
+              const isOpen = event.currentTarget.open;
+              setSettingsOpen(isOpen);
+              if (isOpen) {
+                setSearchOpen(false);
+                clearSearch();
+              }
+            }}
+          >
+            <summary className="button button-quiet flow-icon-button" aria-label={copy.settings} title={copy.settings}>
+              <FlowIcon name="settings" />
+            </summary>
+            <div className="flow-popover flow-settings-popover">
+              <div className="flow-preference-row">
+                <label htmlFor="flow-font-size">{copy.fontSize}</label>
+                <input
+                  id="flow-font-size"
+                  type="range"
+                  min="14"
+                  max="28"
+                  step="1"
+                  value={preferences.fontSize}
+                  onChange={(event) => changePreferences({ ...preferences, fontSize: Number(event.target.value) })}
+                />
+                <output htmlFor="flow-font-size">{preferences.fontSize}px</output>
+              </div>
+              <div className="flow-preference-row">
+                <label htmlFor="flow-line-height">{copy.lineHeight}</label>
+                <input
+                  id="flow-line-height"
+                  type="range"
+                  min="1.4"
+                  max="2.4"
+                  step="0.05"
+                  value={preferences.lineHeight}
+                  onChange={(event) => changePreferences({ ...preferences, lineHeight: Number(event.target.value) })}
+                />
+                <output htmlFor="flow-line-height">{preferences.lineHeight.toFixed(2)}</output>
+              </div>
+              <div className="flow-preference-row">
+                <label htmlFor="flow-reading-width">{copy.readingWidth}</label>
+                <select
+                  id="flow-reading-width"
+                  value={preferences.width}
+                  onChange={(event) => {
+                    const width = event.target.value as FlowReadingWidth;
+                    if (width === "narrow" || width === "normal" || width === "wide") changePreferences({ ...preferences, width });
+                  }}
+                >
+                  <option value="narrow">{copy.narrow}</option>
+                  <option value="normal">{copy.normal}</option>
+                  <option value="wide">{copy.wide}</option>
+                </select>
+              </div>
+              <button
+                className="button button-quiet flow-reset-preferences"
+                type="button"
+                onClick={() => changePreferences({ ...defaultFlowReadingPreferences })}
+              >
+                {copy.resetDefaults}
+              </button>
+            </div>
+          </details>
+          <details
+            className="flow-tool-details"
+            open={searchOpen}
+            onToggle={(event) => {
+              const isOpen = event.currentTarget.open;
+              setSearchOpen(isOpen);
+              if (isOpen) setSettingsOpen(false);
+              else clearSearch();
+            }}
+          >
+            <summary className="button button-quiet flow-icon-button" aria-label={copy.find} title={copy.find}>
+              <FlowIcon name="search" />
+            </summary>
+            <div className="flow-popover flow-search-popover">
+              <form onSubmit={(event) => { event.preventDefault(); submitSearch(); }} noValidate>
+                <p className="flow-find-scope">{copy.findScope}</p>
+                <div className="flow-find-row">
+                  <label className="sr-only" htmlFor="flow-find-input">{copy.find}</label>
+                  <input
+                    id="flow-find-input"
+                    ref={searchInputRef}
+                    type="search"
+                    value={query}
+                    maxLength={200}
+                    autoComplete="off"
+                    placeholder={copy.findPlaceholder}
+                    onChange={(event) => {
+                      setQuery(event.target.value);
+                      setSearchResult(null);
+                      setSearchFeedback(null);
+                      setActiveMatch(0);
+                    }}
+                  />
+                  <button className="button button-secondary flow-find-submit" type="submit">{copy.findAction}</button>
+                  <button
+                    className="button button-quiet flow-icon-button"
+                    type="button"
+                    aria-label={copy.previousMatch}
+                    title={copy.previousMatch}
+                    disabled={!searchMatches.length}
+                    onClick={() => setActiveMatch((current) => (current - 1 + searchMatches.length) % searchMatches.length)}
+                  >
+                    <FlowIcon name="up" />
+                  </button>
+                  <button
+                    className="button button-quiet flow-icon-button"
+                    type="button"
+                    aria-label={copy.nextMatch}
+                    title={copy.nextMatch}
+                    disabled={!searchMatches.length}
+                    onClick={() => setActiveMatch((current) => (current + 1) % searchMatches.length)}
+                  >
+                    <FlowIcon name="down" />
+                  </button>
+                </div>
+                {searchFeedback && <p className="flow-find-feedback flow-error" role="alert">{searchFeedback === "empty" ? copy.findEmpty : copy.findTooLong}</p>}
+                {currentSearchResult && !searchMatches.length && <p className="flow-find-feedback" role="status">{copy.findNone}</p>}
+                {searchMatches.length > 0 && <p className="flow-find-feedback" aria-live="polite">{copy.findCount(activeMatch + 1, searchMatches.length)}</p>}
+              </form>
+            </div>
+          </details>
         </div>
       </div>
       {mode === "translated" && (
@@ -771,7 +1204,7 @@ function FlowReader({ model, callbacks }: { model: FlowReaderModel; callbacks: F
           {!busy && phase !== "ready" && <button className="button button-quiet" type="button" onClick={() => setRetry((value) => value + 1)}>{copy.retry}</button>}
         </div>
       )}
-      <div className="flow-scroll" ref={scrollRef}>
+      <div className="flow-scroll" ref={scrollRef} style={readingStyle}>
         {phase === "ready" && pages.length > 0 && <p className="flow-order-note">{copy.sourceReady}</p>}
         {pages.map((page) => {
           const blocks = [...page.blocks].sort((first, second) => first.order - second.order);
@@ -787,7 +1220,18 @@ function FlowReader({ model, callbacks }: { model: FlowReaderModel; callbacks: F
               {page.status !== "unavailable" && !blocks.length && <p className="flow-page-warning">{copy.noBlocks}</p>}
               {page.status !== "unavailable" && <div className="flow-blocks">
                 {blocks.map((block) => (
-                  <BlockView key={block.id} block={block} page={page.page} document={document} callbacks={callbacks} copy={copy} mode={mode} translation={translation} />
+                  <BlockView
+                    key={block.id}
+                    block={block}
+                    page={page.page}
+                    document={document}
+                    callbacks={callbacks}
+                    copy={copy}
+                    mode={mode}
+                    translation={translation}
+                    matches={searchMatches.filter((match) => match.page === page.page && match.blockId === block.id)}
+                    activeMatch={activeMatch}
+                  />
                 ))}
               </div>}
             </article>

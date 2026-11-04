@@ -3363,9 +3363,11 @@ h3 {
 
 .flow-header {
   justify-content: space-between;
+  flex-wrap: nowrap;
 }
 
 .flow-heading-wrap {
+  flex: 1;
   min-width: 0;
 }
 
@@ -3375,7 +3377,7 @@ h3 {
 }
 
 .flow-heading-wrap p {
-  max-width: min(60vw, 640px);
+  max-width: 100%;
   margin-top: 3px;
   overflow: hidden;
   color: var(--ui-text-muted);
@@ -3385,17 +3387,26 @@ h3 {
 }
 
 .flow-controls {
-  justify-content: space-between;
-  padding-block: 8px;
+  position: relative;
+  justify-content: flex-start;
+  gap: 6px 8px;
+  padding-block: 6px;
   background: var(--ui-surface-subtle);
 }
 
 .flow-text-modes,
-.flow-batch-controls {
+.flow-batch-controls,
+.flow-utility-controls {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
+  flex: none;
+  flex-wrap: nowrap;
   gap: 4px;
+}
+
+.flow-text-modes .button {
+  padding-inline: 9px;
+  white-space: nowrap;
 }
 
 .flow-text-modes .button[aria-pressed="true"] {
@@ -3404,9 +3415,196 @@ h3 {
   color: var(--ui-primary);
 }
 
+.flow-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 36px;
+  min-width: 36px;
+  min-height: 36px;
+  padding: 7px;
+}
+
+.flow-icon {
+  display: block;
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.5;
+}
+
 .flow-batch-label {
+  min-width: 0;
+  margin-right: auto;
   color: var(--ui-text-soft);
   font-size: 12px;
+  white-space: nowrap;
+}
+
+.flow-page-jump {
+  display: flex;
+  align-items: center;
+  flex: none;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 0;
+  color: var(--ui-text-soft);
+  font-size: 12px;
+}
+
+.flow-page-jump input {
+  width: 52px;
+  min-height: 36px;
+  padding: 4px 5px;
+  border: 1px solid var(--ui-input-border);
+  border-radius: 3px;
+  background: var(--ui-input-bg);
+  color: var(--ui-text);
+  text-align: center;
+}
+
+.flow-page-jump > span {
+  white-space: nowrap;
+}
+
+.flow-page-jump-button {
+  min-height: 36px;
+  padding-inline: 8px;
+}
+
+.flow-jump-error {
+  flex-basis: 100%;
+  color: var(--ui-danger);
+  line-height: 1.5;
+}
+
+.flow-tool-details {
+  position: static;
+  flex: none;
+}
+
+.flow-tool-details > summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+.flow-tool-details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.flow-tool-details > summary::marker {
+  content: "";
+}
+
+.flow-tool-details[open] > summary {
+  border-color: var(--ui-primary);
+  background: var(--ui-info-bg);
+  color: var(--ui-primary);
+}
+
+.flow-popover {
+  position: absolute;
+  z-index: 5;
+  top: calc(100% + 1px);
+  right: 12px;
+  width: min(420px, calc(100% - 24px));
+  padding: 12px;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: 3px;
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  box-shadow: 0 4px 12px var(--ui-backdrop);
+}
+
+.flow-preference-row {
+  display: grid;
+  grid-template-columns: minmax(64px, auto) minmax(90px, 1fr) 44px;
+  align-items: center;
+  gap: 8px 10px;
+  margin-bottom: 10px;
+  font-size: 12px;
+}
+
+.flow-preference-row input[type="range"] {
+  width: 100%;
+  min-width: 0;
+  min-height: 32px;
+  margin: 0;
+  accent-color: var(--ui-primary);
+}
+
+.flow-preference-row output {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.flow-preference-row select {
+  grid-column: 2 / 4;
+  min-width: 0;
+  min-height: 36px;
+  padding: 4px 7px;
+  border: 1px solid var(--ui-input-border);
+  border-radius: 3px;
+  background: var(--ui-input-bg);
+  color: var(--ui-text);
+}
+
+.flow-reset-preferences {
+  display: block;
+  min-height: 36px;
+  margin-left: auto;
+}
+
+.flow-search-popover {
+  width: min(480px, calc(100% - 24px));
+}
+
+.flow-find-scope,
+.flow-find-feedback {
+  color: var(--ui-text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.flow-find-scope {
+  margin-bottom: 8px;
+}
+
+.flow-find-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.flow-find-row input {
+  flex: 1;
+  width: auto;
+  min-width: 0;
+  min-height: 36px;
+  padding: 5px 8px;
+  border: 1px solid var(--ui-input-border);
+  border-radius: 3px;
+  background: var(--ui-input-bg);
+  color: var(--ui-text);
+}
+
+.flow-find-submit {
+  flex: none;
+  min-height: 36px;
+  padding-inline: 10px;
+}
+
+.flow-find-feedback {
+  margin-top: 8px;
+}
+
+.flow-find-feedback.flow-error {
+  color: var(--ui-danger);
 }
 
 .flow-translation-bar {
@@ -3518,7 +3716,7 @@ h3 {
 
 .flow-order-note,
 .flow-page {
-  width: min(100%, 760px);
+  width: min(100%, var(--flow-reading-width, 760px));
   margin-inline: auto;
 }
 
@@ -3566,22 +3764,34 @@ h3 {
   margin: 0;
   color: var(--ui-text);
   font-family: Georgia, "Times New Roman", "Microsoft YaHei", serif;
-  font-size: 17px;
-  line-height: 1.85;
+  font-size: var(--flow-reading-font-size, 17px);
+  line-height: var(--flow-reading-line-height, 1.85);
   overflow-wrap: anywhere;
   white-space: pre-wrap;
   user-select: text;
 }
 
 .flow-block-title {
-  font-size: 21px;
+  font-size: calc(var(--flow-reading-font-size, 17px) + 4px);
   line-height: 1.5;
 }
 
 .flow-block-caption {
   color: var(--ui-text-soft);
-  font-size: 14px;
+  font-size: calc(var(--flow-reading-font-size, 17px) - 3px);
   line-height: 1.65;
+}
+
+.flow-find-match {
+  padding: 0;
+  background: rgb(250 204 21 / 42%);
+  color: inherit;
+  box-shadow: 0 0 0 1px rgb(202 138 4 / 65%);
+}
+
+.flow-find-match[data-active="true"] {
+  background: rgb(249 115 22 / 48%);
+  box-shadow: 0 0 0 2px #c2410c;
 }
 
 .flow-block-code,
@@ -3658,21 +3868,25 @@ h3 {
     padding-inline: 12px;
   }
 
-  .flow-header {
-    align-items: flex-start;
-  }
-
   .flow-heading-wrap p {
-    max-width: 52vw;
+    max-width: 100%;
   }
 
   .flow-controls {
-    align-items: flex-start;
+    align-items: center;
   }
 
   .flow-batch-label {
-    order: 3;
+    order: 10;
     flex-basis: 100%;
+  }
+
+  .flow-utility-controls {
+    margin-left: auto;
+  }
+
+  .flow-popover {
+    width: calc(100% - 24px);
   }
 
   .flow-scroll {
@@ -3680,17 +3894,22 @@ h3 {
     scrollbar-gutter: auto;
   }
 
-  .flow-block {
-    font-size: 17px;
-    line-height: 1.8;
-  }
-
   .flow-header .button,
   .flow-controls .button,
   .flow-footer .button,
   .flow-translation-bar .button,
+  .flow-page-jump input,
+  .flow-find-row input,
+  .flow-preference-row select,
+  .flow-preference-row input[type="range"],
+  .flow-translation-bar select,
   .flow-source-link {
-    min-height: 42px;
+    min-height: 44px;
+  }
+
+  .flow-icon-button {
+    width: 44px;
+    min-width: 44px;
   }
 
   .flow-translation-bar,
@@ -3703,5 +3922,25 @@ h3 {
   .flow-translation-bar label {
     align-items: flex-start;
     flex-direction: column;
+  }
+}
+
+@media (pointer: coarse) {
+  .flow-header .button,
+  .flow-controls .button,
+  .flow-footer .button,
+  .flow-translation-bar .button,
+  .flow-page-jump input,
+  .flow-find-row input,
+  .flow-preference-row select,
+  .flow-preference-row input[type="range"],
+  .flow-translation-bar select,
+  .flow-source-link {
+    min-height: 44px;
+  }
+
+  .flow-icon-button {
+    width: 44px;
+    min-width: 44px;
   }
 }
