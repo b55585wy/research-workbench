@@ -195,3 +195,15 @@ SHA256 `9d060a48e753075b40ed9b24d0e249bd3d7c52d4afa17c73dc088b1f707a8c56`。
 无密钥的设备提问均401/no-store且不创建cookie。公开5ai.life导入本机真实PDF并打开新版助手，
 无POST/页面错误。真实模型输出、复杂版面质量、本机整篇解析/翻译及分析仍未因此验收或接通。
 范围见[流式阅读](FLOW-READING.md)、[本机AI](DEVICE-AI.md)。
+
+同日纯前端更新`4fdae14`：图形批注线宽由数值下拉框改为四档粗细线段，保留原有保存数值，
+同时修正手机颜色/线宽强制单行造成的重叠。UI为`ui-0.57.0-13af2df606cf3ee7`，包SHA256
+`2e201d0e1fea20549915247247362f7748c4c7ae19f5d2614b7a5e82b7a77c1c`。
+Kimi实现控件，Codex核对并调整手机换行；JS语法及隔离示例PDF的点选、键盘、保存重开、取消、
+桌面/390px截图和320px无溢出核对通过，无真实模型或全量回归。
+两机完整校验前端包后原子切换，后端/代理/旧机owner PID均保持23545/13133/13400及21862/2710，
+健康仍0.57.0；没有后端重启、资料迁移、强制刷新或数据目录操作。
+两域名公开HTML选中新版本，reader-shapes.js、styles.css、mobile-layout.css哈希与包内文件一致。
+旧UI`ui-0.57.0-42d8535a6c94bdfa`保留；指针备份位于各机
+`/opt/research-workspace/downloads/shape-width-visual/pointer-before-1793831557.json`（旧机）及
+`pointer-before-1793831520.json`（新机）。这轮回退只需切换兼容前端指针，不恢复旧数据库备份。
