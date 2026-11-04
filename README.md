@@ -1,5 +1,16 @@
 Server deployment and current status: [SERVER-DEPLOYMENT.md](SERVER-DEPLOYMENT.md).
 
+# research workspace
+
+当前线上版本：v0.55.1，入口为 https://itsyiyi.com/ 与 https://5ai.life/，两边用户资料独立。
+可选择浏览器本机资料或服务器游客空间。本机模式正式资料保存在 IndexedDB，当前没有远程 AI/分析。
+v0.55.2 加载提示、v0.55.3 前端独立发布已在本地核对，尚未上线；不因每个小改动重启线上服务。
+
+近期先做发布连续性、真实论文沉浸式翻译、本机资料明确接入 AI、跨文献与实验表分析。
+见 [近期迭代](NEAR-TERM-PLAN.md)、[长期产品路线](PRODUCT-ROADMAP.md)、[发布方式与限制](UPDATE-POLICY.md)。
+
+以下为历史版本记录，具体实现和线上状态以上述说明及部署记录为准。
+
 # research workspace · v0.54.0
 
 存储说明：当前在线版的上传资料仍保存在服务器，单机版保存在运行后端的电脑。

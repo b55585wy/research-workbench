@@ -2,6 +2,9 @@
 
 2026-11-03 只读调研。此文是选取部件的方案；没有把 K-Dense 技能、脚本、模型或完整应用接进本平台。
 
+这里实际记录的是 Scientific Agent Skills 和 K-Dense BYOK；K-Dense Web 未列作本次开源源码来源。
+其他候选见 [开源来源总表](TASK-PLAN.md#开源来源与产品关系)，近期安排见 [近期计划](NEAR-TERM-PLAN.md)。
+
 ## 两个来源
 
 - [Scientific Agent Skills](https://github.com/K-Dense-AI/scientific-agent-skills)：包、数据库及研究流程的操作说明，部分目录另有可执行脚本。说明、代码、依赖和运行权限需分开确认。

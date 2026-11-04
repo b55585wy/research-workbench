@@ -57,8 +57,12 @@ RAG 首轮可使用已上传且明确授权的论文，不以 M4 外部搜索闭
 
 ## 开源来源与产品关系
 
+下表为 2026-11-03 的候选调研记录，不是已接入清单。近期实施顺序见 [近期计划](NEAR-TERM-PLAN.md)，
+长期能力见 [产品路线](PRODUCT-ROADMAP.md)。
+
 | 来源 | 本次核对与用途 | 接入边界 |
 | --- | --- | --- |
+| K-Dense Scientific Agent Skills / BYOK | 数据质检、统计诊断、成果生成和可恢复研究流程候选 | 已单列 [K-DENSE-REUSE-PLAN.md](K-DENSE-REUSE-PLAN.md)；不整体部署、不全量加载技能，尚未接入 |
 | khoj-ai/openpaper | 阅读、批注、引用回跳、自定义提取表、可折叠菜单有相关实现；AGPL-3.0 | 优先参考交互；源码抽取逐文件核对许可/依赖；其 Next.js、存储、账号和任务栈不直接替换本平台 |
 | QiZishi/PaperAgent | Apache-2.0；AgentScope 研究流程与 MinerU API 客户端候选 | 本地 parse_pdf_file 明确为占位；已读技能工具文件未见独立 PubMed 实现，不能仅凭 README 勾选能力；先核查再决定可复用模块 |
 | Tswoen/Paper-Agent | 检索连接器、聚合去重和分阶段综述流程候选 | 已单列 PAPER-AGENT-PLAN.md；当前读取的根目录和配置未见明确许可证，复制源码前确认授权；AgentScope/LangGraph 不同时引入 |
@@ -74,7 +78,10 @@ RAG 首轮可使用已上传且明确授权的论文，不以 M4 外部搜索闭
 [Tswoen 检索模块](https://github.com/Tswoen/Paper-Agent/tree/main/src/paper_retrieval)、
 [alphaXiv MCP](https://www.alphaxiv.org/docs/mcp)。本轮只读源码和文档，未部署或运行这些候选工程。
 
-## 当前 M1 工程分工
+## 历史 M1 工程分工
+
+以下保留原切片实施者，不代表当前调度。当前采用 `all-codex`，默认前后端均为 Codex，
+DeepSeek official 仅按既定额度回退或明确选择使用，Kimi 需明确选择。
 
 - Codex：核对需求、文件边界、数据/引用兼容、资源许可，集成、备份、静态验收与发布。
 - Kimi：回答渲染器、聊天布局、界面命名、列表/核对文案和右键虚线框；保留来源、提案、重试、跨资料权限及浮窗控制。
