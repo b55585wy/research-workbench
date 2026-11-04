@@ -288,6 +288,10 @@ const messages = {
     readerActionPending: "上一条助手消息仍在提交，请完成后重试；原文选择和助手草稿已保留。",
     readerActionUnavailable: "助手尚未就绪，请稍后重试；原文选择和助手草稿已保留。",
     readerActionInvalid: "原文选择无效或已失效，请重新选择；助手草稿未更改。",
+    translationNoteReady: "已加入笔记草稿。",
+    translationNoteFailed: "译文未插入；目标笔记或编辑器状态已变化，或内容超过 10000 字。原有草稿已保留。",
+    translationExcerptOriginal: "原文",
+    translationExcerptSource: "来源：第 {page} 页 · 翻译段落",
     libraryTrash: "文献回收站",
     libraryTrashHelp: "回收站中的文献可恢复。彻底删除会清理原文及关联资料，无法撤销。",
     libraryTrashEmpty: "回收站为空。",
@@ -727,6 +731,10 @@ const messages = {
     readerActionPending: "The previous Agent message is still being submitted. Retry when it finishes; the source selection and Agent draft were preserved.",
     readerActionUnavailable: "The Agent is not ready. Retry shortly; the source selection and Agent draft were preserved.",
     readerActionInvalid: "The source selection is invalid or stale. Select it again; the Agent draft was not changed.",
+    translationNoteReady: "Added to the note draft.",
+    translationNoteFailed: "The translation was not inserted because the target note or editor changed, or the 10,000-character limit would be exceeded. The existing draft was preserved.",
+    translationExcerptOriginal: "Original",
+    translationExcerptSource: "Source: page {page} · translated paragraph",
     libraryTrash: "Paper trash",
     libraryTrashHelp: "Papers in trash can be restored. Permanent deletion removes the PDF and related records and cannot be undone.",
     libraryTrashEmpty: "Trash is empty.",
@@ -1221,6 +1229,7 @@ const translation = createTranslationBridge({
   onOpenChange: setTranslationOpen,
   goToSource: goToTranslationSource,
   onOpenSettings: openTranslationSettings,
+  onExcerpt: deviceMode ? undefined : handleTranslationExcerpt,
   onMounted: syncTranslationLayout
 });
 let translationPresentationMode = "dual";
@@ -5458,6 +5467,161 @@ function prepareTextReaderAction(kind) {
   }
   clearPdfTextSelection();
   setStatus("readerActionReady", "success");
+}
+
+function readTranslationExcerpt(value) {
+  if (deviceMode || !value || typeof value !== "object" || Array.isArray(value)) return null;
+  const owner = state.document;
+  if (!owner || !state.pdf || isStudy() || workspace?.getMode() !== "reading") return null;
+  if (
+    value.documentId !== owner.id || value.sourceSha256 !== owner.sha256
+    || !/^[0-9a-f]{64}$/.test(value.sourceSha256 || "")
+    || typeof value.jobId !== "string" || !value.jobId.trim()
+    || typeof value.blockId !== "string" || !value.blockId.trim()
+    || !Number.isInteger(value.page) || value.page < 1 || value.page > owner.page_count
+    || !["zh", "en"].includes(value.targetLanguage)
+    || typeof value.sourceText !== "string" || !value.sourceText.trim() || value.sourceText.length > 2400
+    || typeof value.translatedText !== "string" || !value.translatedText.trim() || value.translatedText.length > 8000
+  ) return null;
+  let rect = null;
+  if (value.rect !== null) {
+    const candidate = value.rect;
+    if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) return null;
+    const values = [candidate.x, candidate.y, candidate.width, candidate.height];
+    if (!values.every(Number.isFinite) || candidate.x < 0 || candidate.y < 0 || candidate.width <= 0 || candidate.height <= 0 || candidate.x + candidate.width > 1 || candidate.y + candidate.height > 1) return null;
+    rect = Object.freeze({ x: candidate.x, y: candidate.y, width: candidate.width, height: candidate.height });
+  }
+  return Object.freeze({
+    documentId: value.documentId,
+    sourceSha256: value.sourceSha256,
+    jobId: value.jobId,
+    blockId: value.blockId,
+    page: value.page,
+    rect,
+    sourceText: value.sourceText,
+    translatedText: value.translatedText,
+    targetLanguage: value.targetLanguage
+  });
+}
+
+function translationExcerptIsCurrent(excerpt, sequence) {
+  return Boolean(
+    !deviceMode && state.pdf && state.document && !isStudy()
+    && workspace?.getMode() === "reading"
+    && state.loadSequence === sequence
+    && state.document.id === excerpt.documentId
+    && state.document.sha256 === excerpt.sourceSha256
+  );
+}
+
+function translationExcerptQuote(excerpt) {
+  const language = excerpt.targetLanguage === "zh"
+    ? (state.language === "zh" ? "中文" : "Chinese")
+    : (state.language === "zh" ? "英文" : "English");
+  const label = state.language === "zh" ? `译文（${language}）` : `Translation (${language})`;
+  return `${label}:\n${excerpt.translatedText}\n\n${t("translationExcerptOriginal")}:\n“${excerpt.sourceText}”`;
+}
+
+function translationExcerptSource(excerpt) {
+  const sourceUrl = new URL(readerSourceUrl(excerpt.documentId, excerpt.page));
+  sourceUrl.searchParams.set("source_sha256", excerpt.sourceSha256);
+  const rect = excerpt.rect ? [excerpt.rect.x, excerpt.rect.y, excerpt.rect.x + excerpt.rect.width, excerpt.rect.y + excerpt.rect.height] : null;
+  if (rect) sourceUrl.searchParams.set("rect", rect.map(String).join(","));
+  return {
+    documentId: excerpt.documentId,
+    page: excerpt.page,
+    rect,
+    source_segments: null,
+    sourceLabel: t("translationExcerptSource", { page: excerpt.page }),
+    sourceUrl: sourceUrl.href
+  };
+}
+
+function addTranslationExcerptToNote(excerpt, sequence) {
+  if (!translationExcerptIsCurrent(excerpt, sequence)) {
+    setStatus("readerActionOwner", "error");
+    return false;
+  }
+  const draft = state.editDrafts.get(excerpt.documentId) || ensureDraft(excerpt.documentId);
+  const shouldAnchor = !state.editDrafts.has(excerpt.documentId) && !draft.text.trim() && draft.page === null;
+  const previousSource = shouldAnchor ? { page: draft.page, rect: draft.rect, sourceSegments: draft.sourceSegments } : null;
+  const source = translationExcerptSource(excerpt);
+  const insertion = `${translationExcerptQuote(excerpt)}\n`;
+  captureCurrentDraft();
+  if (!translationExcerptIsCurrent(excerpt, sequence)) {
+    setStatus("readerActionOwner", "error");
+    return false;
+  }
+  workspace?.showNotes();
+  const bookmark = richText?.getBookmark();
+  if (!bookmark) {
+    setStatus("translationNoteFailed", "error");
+    return false;
+  }
+  if (shouldAnchor) {
+    draft.page = source.page;
+    draft.rect = source.rect ? [...source.rect] : null;
+    draft.sourceSegments = null;
+  }
+  if (!translationExcerptIsCurrent(excerpt, sequence)) {
+    if (previousSource) Object.assign(draft, previousSource);
+    setStatus("readerActionOwner", "error");
+    return false;
+  }
+  if (!richText?.insertText(bookmark, insertion, readerSourceProvenance(source))) {
+    if (previousSource) Object.assign(draft, previousSource);
+    renderDraft();
+    setStatus("translationNoteFailed", "error");
+    return false;
+  }
+  anchorNewDraftAfterInsertion(excerpt.documentId, source, shouldAnchor);
+  highlightDraft(excerpt.documentId, excerpt.page, source.rect);
+  renderDraft();
+  setStatus("translationNoteReady", "success");
+  assistant?.contextChanged();
+  richText?.focus();
+  return true;
+}
+
+function askTranslationExcerpt(excerpt, sequence) {
+  if (!translationExcerptIsCurrent(excerpt, sequence)) {
+    setStatus("readerActionOwner", "error");
+    return false;
+  }
+  if (!assistant?.prepareReaderAction) {
+    setStatus("readerActionUnavailable", "error");
+    return false;
+  }
+  const result = assistant.prepareReaderAction(excerpt.documentId, {
+    kind: "ask",
+    page: excerpt.page,
+    rect: excerpt.rect ? [excerpt.rect.x, excerpt.rect.y, excerpt.rect.x + excerpt.rect.width, excerpt.rect.y + excerpt.rect.height] : null,
+    quote: translationExcerptQuote(excerpt)
+  });
+  if (result !== "added") {
+    setStatus(readerActionFailureStatus(result), "error");
+    return false;
+  }
+  setStatus("readerActionReady", "success");
+  return true;
+}
+
+function handleTranslationExcerpt(action, value) {
+  const excerpt = readTranslationExcerpt(value);
+  if (!excerpt || !["note", "ask"].includes(action)) {
+    setStatus("readerActionInvalid", "error");
+    return false;
+  }
+  if (state.pendingSaves > 0 || state.pendingMutations.size > 0) {
+    setStatus("readerActionPending", "error");
+    return false;
+  }
+  const sequence = state.loadSequence;
+  if (!translationExcerptIsCurrent(excerpt, sequence)) {
+    setStatus("readerActionOwner", "error");
+    return false;
+  }
+  return action === "note" ? addTranslationExcerptToNote(excerpt, sequence) : askTranslationExcerpt(excerpt, sequence);
 }
 
 function renderTextAnnotations() {

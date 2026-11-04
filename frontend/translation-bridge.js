@@ -20,6 +20,7 @@ export function createTranslationBridge({
   onOpenChange,
   goToSource,
   onOpenSettings,
+  onExcerpt,
   onMounted,
   bundleBase = "/vendor/workspace-shell"
 }) {
@@ -42,7 +43,7 @@ export function createTranslationBridge({
           controlsContainer,
           panelContainer,
           model: getModel(),
-          callbacks: { api, onOpenChange, goToSource, onOpenSettings },
+          callbacks: { api, onOpenChange, goToSource, onOpenSettings, onExcerpt },
           onMounted
         });
         return true;

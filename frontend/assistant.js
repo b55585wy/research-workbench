@@ -1368,7 +1368,9 @@ export function createAssistant(adapter) {
       url.searchParams.set("page", String(action.page));
       url.searchParams.set("workspace", "reading");
     }
-    const label = action.sourceLabel || (language === "zh" ? `来源：第 ${action.page} 页 · 选定区域` : `Source: page ${action.page} · selected region`);
+    const label = action.sourceLabel || (action.rect
+      ? (language === "zh" ? `来源：第 ${action.page} 页 · 选定区域` : `Source: page ${action.page} · selected region`)
+      : (language === "zh" ? `来源：第 ${action.page} 页` : `Source: page ${action.page}`));
     return `${label}\n${url.href}`;
   }
 
@@ -1443,8 +1445,8 @@ export function createAssistant(adapter) {
       source.type = "button";
       source.className = "button button-quiet assistant-reader-action-source";
       source.dataset.action = "open-reader-action-source";
-      source.textContent = `${t("readerActionPage", { page: action.page })} · ${t("readerActionOpen")}`;
-      source.addEventListener("click", () => adapter.navigateSource({ document_id: paper.id, page: action.page, rect: [...action.rect] }));
+      source.textContent = `${t(action.rect ? "readerActionPage" : "contextPage", { page: action.page })} · ${t("readerActionOpen")}`;
+      source.addEventListener("click", () => adapter.navigateSource({ document_id: paper.id, page: action.page, rect: action.rect ? [...action.rect] : null }));
       const remove = document.createElement("button");
       remove.type = "button";
       remove.className = "button button-quiet assistant-reader-action-remove";
@@ -1466,7 +1468,8 @@ export function createAssistant(adapter) {
     const rect = action.rect;
     const validRect = Array.isArray(rect) && rect.length === 4 && rect.every(Number.isFinite) &&
       rect[0] >= 0 && rect[1] >= 0 && rect[2] <= 1 && rect[3] <= 1 && rect[2] > rect[0] && rect[3] > rect[1];
-    if (!kind || !Number.isInteger(action.page) || action.page < 1 || action.page > paper.page_count || !validRect) return "invalid";
+    const pageOnly = kind === "ask" && rect === null;
+    if (!kind || !Number.isInteger(action.page) || action.page < 1 || action.page > paper.page_count || (!validRect && !pageOnly)) return "invalid";
     if (kind !== "image" && (typeof action.quote !== "string" || !action.quote.trim())) return "invalid";
     if (kind === "image" && (!action.image?.id || action.image.document_id !== documentId || !/^[0-9a-f]{64}$/.test(action.image.sha256 || ""))) return "invalid";
     const frozenSource = frozenImageSource(documentId, action);
@@ -1477,7 +1480,7 @@ export function createAssistant(adapter) {
       id: crypto.randomUUID(),
       kind,
       page: action.page,
-      rect: [...rect],
+      rect: validRect ? [...rect] : null,
       quote: typeof action.quote === "string" ? action.quote : "",
       imageId: kind === "image" ? action.image.id : null,
       imageAdded: kind === "image" && !adapter.getChatImages(documentId).some((image) => image.id === action.image.id),
@@ -2694,7 +2697,7 @@ export function createAssistant(adapter) {
         message,
         context: {
           page: readerAction?.page ?? context.page,
-          rect: readerAction ? [...readerAction.rect] : context.rect ? [...context.rect] : null,
+          rect: readerAction ? (readerAction.rect ? [...readerAction.rect] : null) : context.rect ? [...context.rect] : null,
           active_note_id: entry.explicitNoteContext ? null : context.activeNoteId || null,
           active_image: context.activeImage ? {
             source_kind: context.activeImage.source_kind,

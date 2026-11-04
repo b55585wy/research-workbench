@@ -2985,6 +2985,67 @@ h3 {
   margin-top: 2px;
 }
 
+.translation-block-footer {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.translation-excerpt-actions {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.translation-excerpt-action {
+  width: 44px;
+  height: 44px;
+  padding: 11px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--ui-primary);
+  cursor: pointer;
+}
+
+.translation-excerpt-action:hover,
+.translation-excerpt-action:focus-visible {
+  background: var(--ui-selected);
+}
+
+.translation-excerpt-action:disabled {
+  opacity: 0.45;
+  cursor: wait;
+}
+
+.translation-excerpt-action svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .translation-excerpt-actions {
+    opacity: 0;
+    transition: opacity 120ms ease;
+  }
+
+  .translation-block:hover .translation-excerpt-actions,
+  .translation-block:focus-within .translation-excerpt-actions {
+    opacity: 1;
+  }
+}
+
 .translation-page-warning {
   margin: 6px 0;
   font-size: 12px;

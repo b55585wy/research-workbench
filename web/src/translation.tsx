@@ -47,6 +47,20 @@ interface TranslationBlock {
   translated_text: string | null;
 }
 
+export type TranslationExcerptAction = "note" | "ask";
+
+export interface TranslationExcerpt {
+  documentId: string;
+  sourceSha256: string;
+  jobId: string;
+  blockId: string;
+  page: number;
+  rect: TranslationRect | null;
+  sourceText: string;
+  translatedText: string;
+  targetLanguage: TargetLanguage;
+}
+
 interface TranslationResultPage {
   page: number;
   status: "completed" | "unavailable" | "failed";
@@ -86,6 +100,7 @@ export interface TranslationPanelCallbacks {
   onOpenChange: (open: boolean) => void;
   goToSource: (page: number, rect: TranslationRect | null, expectedDocumentId: string, expectedSourceSha256: string) => void | boolean | Promise<void | boolean>;
   onOpenSettings: () => void;
+  onExcerpt?: (action: TranslationExcerptAction, excerpt: TranslationExcerpt) => void | boolean | Promise<void | boolean>;
 }
 
 export interface MountTranslationPanelOptions {
@@ -168,6 +183,9 @@ const strings = {
     pollFailed: "进度暂时无法刷新，将自动重试。",
     original: "查看原文",
     originalBlock: "原文位置",
+    addExcerptToNote: "将译文和原文加入笔记",
+    addExcerptToAsk: "将译文和原文加入助手草稿",
+    excerptFailed: "未能加入译文，请重试；原有草稿未更改。",
     page: (page: number) => `第 ${page} 页`,
     noText: "此页没有可翻译的文字，可能是扫描页或空页。",
     pageUnavailable: "此页无法提供译文。",
@@ -239,6 +257,9 @@ const strings = {
     pollFailed: "Progress could not be refreshed and will be retried automatically.",
     original: "View original",
     originalBlock: "Original location",
+    addExcerptToNote: "Add translation and original to note",
+    addExcerptToAsk: "Add translation and original to Agent draft",
+    excerptFailed: "The translation could not be added. Try again; the existing draft was not changed.",
     page: (page: number) => `Page ${page}`,
     noText: "No translatable text was found on this page. It may be scanned or empty.",
     pageUnavailable: "A translation is unavailable for this page.",
@@ -334,16 +355,19 @@ function runLabel(job: TranslationJob, copy: Copy, language: TranslationLanguage
   return `${formatPages(job.pages)} · ${copy.sourceLanguage(job.target_language)} · ${copy[job.status]}${timestamp ? ` · ${timestamp}` : ""}`;
 }
 
-function BlockView({ block, page, copy, onSource }: {
+function BlockView({ block, page, copy, onSource, onExcerpt, excerptPending = false }: {
   block: TranslationBlock;
   page: number;
   copy: Copy;
   onSource: (page: number, rect: TranslationRect | null) => void;
+  onExcerpt?: (action: TranslationExcerptAction, block: TranslationBlock, page: number) => void;
+  excerptPending?: boolean;
 }) {
   const translatable = block.kind === "text" || block.kind === "title" || block.kind === "caption";
   const translated = translatable && typeof block.translated_text === "string" && block.translated_text.trim()
     ? block.translated_text
     : null;
+  const canExcerpt = Boolean(translated && onExcerpt && typeof block.source_text === "string" && block.source_text.trim());
   const marker = translatable
     ? copy.missingTranslation
     : block.kind === "formula"
@@ -358,19 +382,51 @@ function BlockView({ block, page, copy, onSource }: {
       {translated
         ? <p className={block.kind === "title" ? "translation-translated-title" : "translation-paragraph"}>{translated}</p>
         : <p className="translation-original-marker">{marker}</p>}
-      {block.rect && (
-        <button className="translation-source-link" type="button" onClick={() => onSource(page, block.rect)}>
-          {copy.originalBlock}
-        </button>
+      {(block.rect || canExcerpt) && (
+        <div className="translation-block-footer">
+          {block.rect && (
+            <button className="translation-source-link" type="button" onClick={() => onSource(page, block.rect)}>
+              {copy.originalBlock}
+            </button>
+          )}
+          {canExcerpt && (
+            <div className="translation-excerpt-actions">
+              <button
+                className="translation-excerpt-action"
+                type="button"
+                data-excerpt-action="note"
+                aria-label={copy.addExcerptToNote}
+                title={copy.addExcerptToNote}
+                disabled={excerptPending}
+                onClick={() => onExcerpt?.("note", block, page)}
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 20h4L19 9l-4-4L4 16v4Zm9-13 4 4M3 3h12" /></svg>
+              </button>
+              <button
+                className="translation-excerpt-action"
+                type="button"
+                data-excerpt-action="ask"
+                aria-label={copy.addExcerptToAsk}
+                title={copy.addExcerptToAsk}
+                disabled={excerptPending}
+                onClick={() => onExcerpt?.("ask", block, page)}
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20 15a3 3 0 0 1-3 3H9l-5 3v-6a3 3 0 0 1-1-2V6a3 3 0 0 1 3-3h11a3 3 0 0 1 3 3v9ZM8 9h8M8 13h5" /></svg>
+              </button>
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
 }
 
-function TranslationResults({ job, copy, onSource }: {
+function TranslationResults({ job, copy, onSource, onExcerpt, excerptPending = false }: {
   job: TranslationJob;
   copy: Copy;
   onSource: (page: number, rect: TranslationRect | null) => void;
+  onExcerpt?: (action: TranslationExcerptAction, block: TranslationBlock, page: number) => void;
+  excerptPending?: boolean;
 }) {
   const pages = [...jobResults(job)].sort((a, b) => a.page - b.page);
   const hasVisuals = pages.some((page) => Array.isArray(page.blocks) && page.blocks.some((block) => !["text", "title", "caption"].includes(block.kind)));
@@ -393,7 +449,17 @@ function TranslationResults({ job, copy, onSource }: {
               <p className="translation-page-warning">{copy[page.status === "failed" ? "pageFailed" : "pageUnavailable"]}</p>
             )}
             {!blocks.length && page.status === "completed" && <p className="translation-empty">{copy.noText}</p>}
-            {blocks.map((block) => <BlockView block={block} page={page.page} copy={copy} onSource={onSource} key={block.id} />)}
+            {blocks.map((block) => (
+              <BlockView
+                block={block}
+                page={page.page}
+                copy={copy}
+                onSource={onSource}
+                onExcerpt={page.status === "completed" ? onExcerpt : undefined}
+                excerptPending={excerptPending}
+                key={block.id}
+              />
+            ))}
           </section>
         );
       })}
@@ -418,6 +484,7 @@ function TranslationExperience({ model, callbacks, controlsContainer, panelConta
   const generationRef = useRef(0);
   const scopeControllerRef = useRef<AbortController | null>(null);
   const jobActionRef = useRef(0);
+  const excerptActionRef = useRef(0);
   const toggleRef = useRef<HTMLButtonElement>(null);
   const [capabilities, setCapabilities] = useState<TranslationCapabilities | null>(null);
   const [capabilitiesError, setCapabilitiesError] = useState<string | null>(null);
@@ -429,12 +496,14 @@ function TranslationExperience({ model, callbacks, controlsContainer, panelConta
   const [targetLanguage, setTargetLanguage] = useState<TargetLanguage>(model.language);
   const [requestDraft, setRequestDraft] = useState<TranslationRequest | null>(null);
   const [pendingAction, setPendingAction] = useState<"start" | "cancel" | "open" | null>(null);
+  const [pendingExcerpt, setPendingExcerpt] = useState<string | null>(null);
   const [operationError, setOperationError] = useState<string | null>(null);
   const [pollError, setPollError] = useState(false);
   const visibleJob = activeScope && document && selectedJob && jobInScope(selectedJob, document) ? selectedJob : null;
 
   useEffect(() => {
     generationRef.current += 1;
+    excerptActionRef.current += 1;
     scopeControllerRef.current?.abort();
     setMode("dual");
     setOverlayStatus(null);
@@ -448,6 +517,7 @@ function TranslationExperience({ model, callbacks, controlsContainer, panelConta
     setTargetLanguage(model.language);
     setRequestDraft(null);
     setPendingAction(null);
+    setPendingExcerpt(null);
     setOperationError(null);
     setPollError(false);
   }, [documentKey]);
@@ -729,6 +799,55 @@ function TranslationExperience({ model, callbacks, controlsContainer, panelConta
     void callbacks.goToSource(page, rect, expectedDocumentId, expectedSourceSha256);
   }
 
+  async function excerpt(action: TranslationExcerptAction, block: TranslationBlock, page: number) {
+    const callback = callbacks.onExcerpt;
+    if (!callback || pendingExcerpt || !activeScope || scopeRef.current !== activeScope || !document || !selectedJob || !jobInScope(selectedJob, document)) return;
+    const resultPage = jobResults(selectedJob).find((item) => item.page === page && item.status === "completed");
+    const rect = block.rect == null ? null : block.rect;
+    const validRect = rect === null || (
+      [rect.x, rect.y, rect.width, rect.height].every(Number.isFinite)
+      && rect.x >= 0 && rect.y >= 0 && rect.width > 0 && rect.height > 0
+      && rect.x + rect.width <= 1 && rect.y + rect.height <= 1
+    );
+    if (
+      !resultPage || !resultPage.blocks.some((item) => item.id === block.id)
+      || !block.id || !["text", "title", "caption"].includes(block.kind)
+      || typeof block.source_text !== "string" || !block.source_text.trim()
+      || typeof block.translated_text !== "string" || !block.translated_text.trim()
+      || !Number.isInteger(page) || page < 1 || page > document.pageCount || !validRect
+    ) return;
+    const scope = activeScope;
+    const ticket = generationRef.current;
+    const jobAction = jobActionRef.current;
+    const actionToken = ++excerptActionRef.current;
+    const pendingKey = `${selectedJob.id}:${block.id}:${action}`;
+    const value: TranslationExcerpt = Object.freeze({
+      documentId: document.id,
+      sourceSha256: document.sha256,
+      jobId: selectedJob.id,
+      blockId: block.id,
+      page,
+      rect: rect ? Object.freeze({ ...rect }) : null,
+      sourceText: block.source_text,
+      translatedText: block.translated_text,
+      targetLanguage: selectedJob.target_language
+    });
+    const current = () => generationRef.current === ticket
+      && scopeRef.current === scope
+      && jobActionRef.current === jobAction
+      && excerptActionRef.current === actionToken;
+    setPendingExcerpt(pendingKey);
+    setOperationError(null);
+    try {
+      const result = await callback(action, value);
+      if (current() && result === false) setOperationError("excerpt");
+    } catch {
+      if (current()) setOperationError("excerpt");
+    } finally {
+      if (current()) setPendingExcerpt(null);
+    }
+  }
+
   const toggle = (
     <button
       ref={toggleRef}
@@ -787,7 +906,9 @@ function TranslationExperience({ model, callbacks, controlsContainer, panelConta
   const formDisabled = Boolean(requestDraft) || pendingAction === "start";
   const operationMessage = operationError === "invalid_pages"
     ? copy.invalidPages
-    : operationError?.startsWith("cancel:")
+    : operationError === "excerpt"
+      ? copy.excerptFailed
+      : operationError?.startsWith("cancel:")
       ? copy.cancelFailed
       : operationError?.startsWith("open:")
         ? copy.loadRunFailed
@@ -924,7 +1045,13 @@ function TranslationExperience({ model, callbacks, controlsContainer, panelConta
             </div>
           )}
           {visibleJob.error && <p className="translation-status" data-kind="error" role="alert">{visibleJob.error.message || copy.jobError}</p>}
-          <TranslationResults job={visibleJob} copy={copy} onSource={source} />
+          <TranslationResults
+            job={visibleJob}
+            copy={copy}
+            onSource={source}
+            onExcerpt={callbacks.onExcerpt ? excerpt : undefined}
+            excerptPending={Boolean(pendingExcerpt)}
+          />
         </section>
       ) : (
         <p className="translation-empty">{copy.empty}</p>
