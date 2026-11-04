@@ -3372,13 +3372,62 @@ h3 {
   align-items: center;
   justify-content: center;
   flex-wrap: wrap;
-  gap: 8px;
-  padding: 9px 16px;
-  border-bottom: 1px solid var(--ui-border);
-  background: var(--ui-info-bg);
+  gap: 4px 8px;
+  width: fit-content;
+  min-width: 0;
+  max-width: min(760px, calc(100% - 32px));
+  margin: 10px auto 4px;
+  padding: 0;
   color: var(--ui-text-soft);
   font-size: 12px;
   line-height: 1.5;
+}
+
+.flow-status-message {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.flow-status-spinner {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--ui-border);
+  border-top-color: var(--ui-primary);
+  border-radius: 50%;
+  animation: flow-status-spin 800ms linear infinite;
+}
+
+.flow-status .button {
+  flex: none;
+  min-height: 44px;
+}
+
+.flow-status-cancel {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  min-width: 44px;
+  padding: 0;
+}
+
+.flow-status-cancel svg {
+  display: block;
+  width: 16px;
+  height: 16px;
+}
+
+@keyframes flow-status-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flow-status-spinner {
+    animation: none;
+  }
 }
 
 .flow-status-error,
@@ -3570,8 +3619,7 @@ h3 {
   .flow-controls .button,
   .flow-footer .button,
   .flow-translation-bar .button,
-  .flow-source-link,
-  .flow-status .button {
+  .flow-source-link {
     min-height: 42px;
   }
 

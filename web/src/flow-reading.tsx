@@ -659,8 +659,21 @@ function FlowReader({ model, callbacks }: { model: FlowReaderModel; callbacks: F
       )}
       {statusMessage && (
         <div className={`flow-status flow-status-${phase}`} role={phase === "error" ? "alert" : "status"}>
-          <span>{statusMessage}</span>
-          {busy && <button className="button button-quiet" type="button" onClick={() => requestRef.current?.abort()}>{copy.cancel}</button>}
+          {busy && <span className="flow-status-spinner" aria-hidden="true" />}
+          <span className="flow-status-message">{statusMessage}</span>
+          {busy && (
+            <button
+              className="button button-quiet flow-status-cancel"
+              type="button"
+              aria-label={copy.cancel}
+              title={copy.cancel}
+              onClick={() => requestRef.current?.abort()}
+            >
+              <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                <path d="m4 4 8 8M12 4l-8 8" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="1.5" />
+              </svg>
+            </button>
+          )}
           {!busy && phase !== "ready" && <button className="button button-quiet" type="button" onClick={() => setRetry((value) => value + 1)}>{copy.retry}</button>}
         </div>
       )}
