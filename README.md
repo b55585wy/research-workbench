@@ -4,8 +4,8 @@ Server deployment and current status: [SERVER-DEPLOYMENT.md](SERVER-DEPLOYMENT.m
 
 当前版本：v0.55.5，入口为 https://itsyiyi.com/ 与 https://5ai.life/，两边用户资料独立。
 可选择浏览器本机资料或服务器游客空间。本机模式正式资料保存在 IndexedDB，当前没有远程 AI/分析。
-加载提示、版本化前端发布和[完全离线启动](OFFLINE-START.md)均已上线。首次联网进入本机模式，
-等“存储”显示离线阅读已就绪后，可在同一浏览器断网重开原网址；两个公开入口均已实际核对。
+加载提示、版本化前端发布和[完全离线启动](OFFLINE-START.md)均已上线。联网打开入口页或服务器工作区，
+即会后台准备本机离线功能；“存储”显示准备就绪后，可在同一浏览器断网重开根网址。服务器资料仍需联网。
 
 首次主题为默认中性；同一浏览器与域名记住上次选择，入口页和工作区保持一致。
 已保存批注使用图标操作和圆形色块。服务器资料支持[划词悬浮翻译](SELECTION-TRANSLATION.md)，
