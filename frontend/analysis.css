@@ -116,6 +116,87 @@
   margin-top: 6px;
 }
 
+.tfus-source-summary {
+  min-width: 0;
+  margin: 8px 0;
+  padding: 10px;
+  border: 1px solid var(--ui-border);
+  border-radius: 4px;
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.tfus-source-summary h3 {
+  margin: 0 0 4px;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.tfus-source-model {
+  margin: 0;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+
+.tfus-source-notice,
+.tfus-source-self-comparison {
+  margin: 6px 0 0;
+  color: var(--ui-text-muted);
+  font-size: 11px;
+}
+
+.tfus-source-fields {
+  display: grid;
+  grid-template-columns: minmax(112px, 0.8fr) minmax(0, 1.2fr);
+  gap: 5px 9px;
+  margin: 8px 0 0;
+}
+
+.tfus-source-fields dt {
+  color: var(--ui-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.tfus-source-fields dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.tfus-source-metrics dd {
+  font-variant-numeric: tabular-nums;
+}
+
+.tfus-source-details {
+  margin-top: 8px;
+  border-top: 1px solid var(--ui-border);
+}
+
+.tfus-source-details > summary {
+  min-height: 38px;
+  padding: 8px 0 4px;
+  color: var(--ui-text-soft);
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.tfus-source-details .tfus-source-fields {
+  margin-top: 4px;
+}
+
+@media (max-width: 480px) {
+  .tfus-source-fields {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
+
+  .tfus-source-fields dd {
+    margin-bottom: 6px;
+  }
+}
+
 .analysis-columns-fieldset {
   min-width: 0;
   margin: 12px 0 0;
