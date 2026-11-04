@@ -1,7 +1,7 @@
 import * as pdfjsLib from "/pdf-engine.js?v=0.52.0";
 import { createImageLibrary } from "/image-library.js";
 import { createImageViewer } from "/image-viewer.js";
-import { createAnalysis } from "/analysis.js";
+import { createAnalysis } from "/analysis.js?v=0.54.0";
 import { createDatasetSelection } from "/dataset-selection.js";
 import { createDataImports } from "/data-imports.js";
 import { createCharts } from "/charts.js";

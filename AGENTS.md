@@ -2,10 +2,10 @@
 
 This is our own research application, separate from workbench-web. User authorized
 the PDF reading / source-linked notes slice on 2026-10-30. ChatGPT plans; Codex owns
-engineering tasks, contracts, integration and acceptance; DeepSeek implements specified
-backend logic; actual Kimi via OMP owns frontend HTML/JS/CSS. Follow the global policy
+engineering tasks, contracts, backend implementation, integration and acceptance;
+official DeepSeek is the backend quota backup or an explicitly selected client; actual Kimi via OMP owns frontend HTML/JS/CSS. Follow the global policy
 in C:/Users/wangyi/.codex/AGENTS.md, including authorized quota fallback:
-backend DeepSeek official -> Codex; frontend Kimi -> DeepSeek official.
+backend Codex -> DeepSeek official; frontend Kimi -> DeepSeek official.
 Do not modify tFUS source, staging, live services, user data or global routing.
 
 Frontend target is React + TypeScript + Vite, explicitly chosen by the user on
@@ -41,3 +41,5 @@ and English, keyboard access and mobile operation are required.
 Current user testing instruction (2026-11-02): default to scoped smoke tests for
 the changed workflow. Historical full-regression matrices are reference only;
 do not routinely run the full suites. Report the actual verification scope.
+
+2026-11-04 integration candidate0.54 adds a passive source summary for the selected one-row tFUS CSV, within the existing analysis preview. All source fields are unverified file claims; no source access, identity mapping, fetch, Agent sharing or analysis action is inferred. Keep the original CSV/table, null/zero, units/scoring timing and owner-bound lifecycle. This slice does not overwrite other workspaces or public services. See TFUS-INTEGRATION.md.

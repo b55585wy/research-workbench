@@ -1,6 +1,13 @@
 import { createAnalysisNotebook } from "/analysis-notebook.js";
 
 const ACTIVE_JOBS = new Set(["queued", "running"]);
+const TFUS_CSV_HEADERS = [
+  "handoff_version", "source_verification", "job_id", "case_id", "model_name", "task_version", "roi", "pressure_kind", "unit", "axis_order",
+  "relative_l2", "peak_relative_error", "focus_distance_voxel", "validation_seconds", "scoring_seconds", "scoring_total_seconds",
+  "reference_sha256", "prediction_sha256", "report_sha256", "self_comparison", "shape_z", "shape_y", "shape_x", "project_id", "reference_artifact_id"
+];
+const TFUS_UUID_PATTERN = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/;
+const TFUS_SHA256_PATTERN = /^[0-9a-fA-F]{64}$/;
 
 const messages = {
   zh: {
@@ -221,7 +228,29 @@ const messages = {
     assistantPlan: "让助手规划分析",
     assistantPlanHelp: "仅使用已明确共享的数据预览；打开助手不会自动发送。",
     assistantPlanNoDataset: "请先选择数据，再让助手规划分析。",
-    assistantPlanShareRequired: "请先明确勾选“向助手提供此数据的预览”。"
+    assistantPlanShareRequired: "请先明确勾选“向助手提供此数据的预览”。",
+    tfusSourceHeading: "评测结果来源",
+    tfusSourceNotice: "来源信息来自导入文件，请与原始 JSON 报告核对。",
+    tfusSourceOverallError: "整体误差（比例）",
+    tfusSourcePeakError: "峰值误差（比例）",
+    tfusSourceFocusShift: "焦点偏移（体素）",
+    tfusSourceUndefined: "未定义",
+    tfusSourceDetails: "任务与文件信息",
+    tfusSourceJobId: "任务 ID",
+    tfusSourceCaseId: "案例 ID",
+    tfusSourceProjectId: "项目 ID",
+    tfusSourceReferenceArtifactId: "参考工件 ID",
+    tfusSourceProtocol: "协议",
+    tfusSourceValidationSeconds: "评分验证耗时（秒）",
+    tfusSourceScoringSeconds: "评分耗时（秒）",
+    tfusSourceScoringTotalSeconds: "评分总耗时（秒）",
+    tfusSourceShape: "形状（Z × Y × X）",
+    tfusSourceReferenceHash: "原参考校验值",
+    tfusSourcePredictionHash: "原预测校验值",
+    tfusSourceReportHash: "原报告校验值",
+    tfusSourceImportHash: "导入 CSV 校验值",
+    tfusSourceNotRecorded: "未记录",
+    tfusSourceSelfComparison: "文件标记为接口自检，不能作为模型性能。"
   },
   en: {
     panel: "Data & analysis",
@@ -441,7 +470,29 @@ const messages = {
     assistantPlan: "Plan analysis with assistant",
     assistantPlanHelp: "Uses only the explicitly shared data preview; opening the assistant does not send anything.",
     assistantPlanNoDataset: "Choose a dataset before asking the assistant to plan an analysis.",
-    assistantPlanShareRequired: "Explicitly select “Provide a preview of this data to the assistant” first."
+    assistantPlanShareRequired: "Explicitly select “Provide a preview of this data to the assistant” first.",
+    tfusSourceHeading: "Evaluation source",
+    tfusSourceNotice: "Source information comes from the imported file; check it against the original JSON report.",
+    tfusSourceOverallError: "Overall error (ratio)",
+    tfusSourcePeakError: "Peak error (ratio)",
+    tfusSourceFocusShift: "Focus shift (voxels)",
+    tfusSourceUndefined: "Undefined",
+    tfusSourceDetails: "Task and files",
+    tfusSourceJobId: "Job ID",
+    tfusSourceCaseId: "Case ID",
+    tfusSourceProjectId: "Project ID",
+    tfusSourceReferenceArtifactId: "Reference artifact ID",
+    tfusSourceProtocol: "Protocol",
+    tfusSourceValidationSeconds: "Scoring validation time (seconds)",
+    tfusSourceScoringSeconds: "Scoring time (seconds)",
+    tfusSourceScoringTotalSeconds: "Total scoring time (seconds)",
+    tfusSourceShape: "Shape (Z × Y × X)",
+    tfusSourceReferenceHash: "Original reference SHA-256",
+    tfusSourcePredictionHash: "Original prediction SHA-256",
+    tfusSourceReportHash: "Original report SHA-256",
+    tfusSourceImportHash: "Imported CSV SHA-256",
+    tfusSourceNotRecorded: "Not recorded",
+    tfusSourceSelfComparison: "The file is marked as an interface self-check and must not be used as model performance."
   }
 };
 
@@ -759,6 +810,89 @@ export function createAnalysis(adapter) {
     }
   }
 
+  function tfusNumber(value) {
+    if (typeof value === "number") return Number.isFinite(value) && value >= 0 ? value : null;
+    if (typeof value !== "string" || value.trim() === "" || !/^-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?$/.test(value)) return null;
+    const number = Number(value);
+    return Number.isFinite(number) && number >= 0 ? number : null;
+  }
+
+  function tfusOptionalUuid(value) {
+    if (value === null || value === "") return "";
+    return typeof value === "string" && TFUS_UUID_PATTERN.test(value) ? value : null;
+  }
+
+  function readTfusSource(dataset) {
+    if (dataset?.row_count !== 1 || dataset.column_count !== 25 || !Array.isArray(dataset.columns) || !Array.isArray(dataset.preview) || dataset.preview.length !== 1) return null;
+    const headers = dataset.columns.map((column) => column?.name);
+    if (headers.length !== TFUS_CSV_HEADERS.length || new Set(headers).size !== TFUS_CSV_HEADERS.length || headers.some((name, index) => name !== TFUS_CSV_HEADERS[index])) return null;
+    const row = dataset.preview[0];
+    if (!Array.isArray(row) || row.length !== TFUS_CSV_HEADERS.length) return null;
+    const source = Object.fromEntries(TFUS_CSV_HEADERS.map((name, index) => [name, row[index]]));
+    if (source.handoff_version !== "tfus-research-csv-v1" || source.source_verification !== "file_import_unverified" ||
+      source.task_version !== "rms-fullgrid-v0.1" || source.roi !== "full_grid" || source.pressure_kind !== "p_rms" ||
+      source.unit !== "Pa" || source.axis_order !== "zyx") return null;
+    if (typeof source.job_id !== "string" || !TFUS_UUID_PATTERN.test(source.job_id) ||
+      typeof source.case_id !== "string" || !source.case_id.trim() || typeof source.model_name !== "string" || !source.model_name.trim()) return null;
+    for (const name of ["relative_l2", "peak_relative_error", "validation_seconds", "scoring_seconds", "scoring_total_seconds"]) {
+      if (tfusNumber(source[name]) === null) return null;
+    }
+    if (source.focus_distance_voxel !== null && source.focus_distance_voxel !== "" && tfusNumber(source.focus_distance_voxel) === null) return null;
+    for (const name of ["shape_z", "shape_y", "shape_x"]) {
+      const value = tfusNumber(source[name]);
+      if (value === null || !Number.isSafeInteger(value) || value <= 0) return null;
+    }
+    for (const name of ["reference_sha256", "prediction_sha256", "report_sha256"]) {
+      if (typeof source[name] !== "string" || !TFUS_SHA256_PATTERN.test(source[name])) return null;
+    }
+    const projectId = tfusOptionalUuid(source.project_id);
+    const referenceArtifactId = tfusOptionalUuid(source.reference_artifact_id);
+    if (projectId === null || referenceArtifactId === null) return null;
+    if (source.self_comparison !== true && source.self_comparison !== false && source.self_comparison !== "true" && source.self_comparison !== "false") return null;
+    source.project_id = projectId;
+    source.reference_artifact_id = referenceArtifactId;
+    source.self_comparison = source.self_comparison === true || source.self_comparison === "true";
+    return source;
+  }
+
+  function renderTfusSource(dataset) {
+    const source = readTfusSource(dataset);
+    if (!source) return null;
+    const section = make("section", "tfus-source-summary");
+    section.id = "tfus-source-summary";
+    section.append(
+      make("h3", "", t("tfusSourceHeading")),
+      make("p", "tfus-source-model", source.model_name),
+      make("p", "tfus-source-notice", t("tfusSourceNotice"))
+    );
+    if (source.self_comparison) section.append(make("p", "tfus-source-self-comparison", t("tfusSourceSelfComparison")));
+    const metrics = make("dl", "tfus-source-fields tfus-source-metrics");
+    appendField(metrics, t("tfusSourceOverallError"), source.relative_l2);
+    appendField(metrics, t("tfusSourcePeakError"), source.peak_relative_error);
+    appendField(metrics, t("tfusSourceFocusShift"), source.focus_distance_voxel === null || source.focus_distance_voxel === "" ? t("tfusSourceUndefined") : source.focus_distance_voxel);
+    section.append(metrics);
+    const details = make("details", "tfus-source-details");
+    details.id = "tfus-source-details";
+    details.append(make("summary", "", t("tfusSourceDetails")));
+    const fields = make("dl", "tfus-source-fields");
+    appendField(fields, t("tfusSourceJobId"), source.job_id);
+    appendField(fields, t("tfusSourceCaseId"), source.case_id);
+    appendField(fields, t("tfusSourceProjectId"), source.project_id || t("tfusSourceNotRecorded"));
+    appendField(fields, t("tfusSourceReferenceArtifactId"), source.reference_artifact_id || t("tfusSourceNotRecorded"));
+    appendField(fields, t("tfusSourceProtocol"), [source.task_version, source.roi, source.pressure_kind, source.unit, source.axis_order].join(" · "));
+    appendField(fields, t("tfusSourceValidationSeconds"), source.validation_seconds);
+    appendField(fields, t("tfusSourceScoringSeconds"), source.scoring_seconds);
+    appendField(fields, t("tfusSourceScoringTotalSeconds"), source.scoring_total_seconds);
+    appendField(fields, t("tfusSourceShape"), [source.shape_z, source.shape_y, source.shape_x].join(" × "));
+    appendField(fields, t("tfusSourceReferenceHash"), source.reference_sha256);
+    appendField(fields, t("tfusSourcePredictionHash"), source.prediction_sha256);
+    appendField(fields, t("tfusSourceReportHash"), source.report_sha256);
+    appendField(fields, t("tfusSourceImportHash"), dataset.sha256 || t("tfusSourceNotRecorded"));
+    details.append(fields);
+    section.append(details);
+    return section;
+  }
+
   function renderDataset(entry) {
     elements.datasetSelect.replaceChildren();
     const dataset = selectedDataset(entry);
@@ -782,6 +916,8 @@ export function createAnalysis(adapter) {
       columns: dataset.column_count,
       bytes: dataset.byte_size
     })));
+    const source = renderTfusSource(dataset);
+    if (source) elements.preview.append(source);
     const scroll = make("div", "analysis-table-scroll");
     const table = make("table", "analysis-table");
     const thead = document.createElement("thead");
