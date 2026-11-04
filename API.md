@@ -678,6 +678,19 @@ Existing result items, source kinds, chunk identities and final/history checks r
 No new HTTP endpoint, context/submission field, frontend, schema or dependency.
 This remains literal keyword retrieval, not full-text/semantic/OCR verification.
 Functional, browser, HTTP, PDF and model checks were not run at the user's request.
+# v0.54 reader failure reports
+
+`POST /api/v1/documents/{document_id}/reader-errors` accepts a strict technical report:
+`stage` (`document` or `render`), `error_name`, `message`, `user_agent`, `app_version`,
+`pdfjs_version`, `elapsed_ms`, `loaded_bytes`, nullable `total_bytes`, and nine Boolean
+`features` (with_resolvers, promise_try, structured_clone, worker, offscreen_canvas,
+image_decoder, dom_matrix, readable_stream, array_buffer_transfer). Unknown fields are rejected.
+Text is bounded and resource URLs, Windows paths and credential patterns are redacted.
+The current Store must own an active PDF document. Response: `{report_id: UUID}`.
+At most ten reports per minute per loaded workspace; excess returns 429. Records go only
+to the private service journal; there is no public diagnostic read API or schema migration.
+Reports do not modify original PDFs, notes or model settings. See [PDF-LOADING.md](PDF-LOADING.md).
+
 # v0.52 PDF compatibility and conversation clearing
 
 `GET /api/v1/agent/status` returns `conversation_clear: true`, including when no model key is configured.

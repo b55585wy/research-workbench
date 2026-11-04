@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="/pdf-text-layer.css">
   <link rel="stylesheet" href="/pdf-annotation-layer.css">
   <link rel="stylesheet" href="/pdf-layer-rotation.css">
-  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/styles.css?v=0.54.0">
   <link rel="stylesheet" href="/workspace.css">
   <link rel="stylesheet" href="/image-library.css">
   <link rel="stylesheet" href="/analysis.css">
@@ -24,9 +24,9 @@
   <link rel="stylesheet" href="/vendor/assistant-markdown/texmath.css">
   <link rel="stylesheet" href="/assistant.css">
   <link rel="stylesheet" href="/task-client.css">
-  <link rel="stylesheet" href="/rich-text.css">
+  <link rel="stylesheet" href="/rich-text.css?v=0.54.0">
   <link rel="stylesheet" href="/doraemon-theme.css">
-  <link rel="stylesheet" href="/mobile-layout.css?v=0.53.0">
+  <link rel="stylesheet" href="/mobile-layout.css?v=0.54.0">
   <link rel="stylesheet" href="/reader-mobile-tools.css?v=0.53.0">
 </head>
 <body>
@@ -316,6 +316,7 @@
       </section>
       <p id="reader-text-status" class="reader-text-status" role="status" aria-live="polite" hidden></p>
       <p id="reader-progress-status" class="reader-progress-status" role="status" aria-live="polite" hidden></p>
+      <p id="reader-error-reference" class="reader-error-reference" role="status" aria-live="polite" hidden></p>
 
       <div id="reader-translation-layout" class="reader-translation-layout" data-translation-open="false">
         <div id="reader-stage" class="reader-stage">
@@ -341,6 +342,17 @@
               </div>
             </div>
           </section>
+          <div id="reader-loading" class="reader-loading" role="status" aria-live="polite" aria-atomic="true" hidden>
+            <p id="reader-loading-text" class="reader-loading-text" data-i18n="documentLoading">正在加载 PDF…</p>
+            <progress id="reader-loading-progress" class="reader-loading-progress" max="100" aria-label="正在加载 PDF"></progress>
+            <div id="reader-loading-hint" class="reader-loading-hint" hidden>
+              <p data-i18n="documentStillLoading">仍在加载。大型或复杂 PDF 可能需要更长时间。</p>
+              <div class="reader-loading-actions">
+                <button id="reader-loading-retry" class="button button-quiet" type="button" data-i18n="retry">重试</button>
+                <a id="reader-loading-original" class="button button-quiet" data-i18n="openOriginalPdf" target="_blank" rel="noopener">打开原 PDF</a>
+              </div>
+            </div>
+          </div>
           <div id="reader-empty" class="reader-empty">
             <p data-i18n="emptyReader">从左侧选择一篇文献开始阅读。</p>
             <a id="reader-open-original" class="reader-open-original button button-secondary" data-i18n="openOriginalPdf" href="#" target="_blank" rel="noopener" hidden>打开原 PDF</a>
@@ -373,11 +385,12 @@
           <textarea id="reader-shape-description" rows="2" maxlength="10000"></textarea>
         </label>
         <div class="reader-shape-style-row">
-          <label><span class="sr-only" data-i18n="annotationColor">标注颜色</span>
-            <select id="reader-shape-color" data-i18n-aria="annotationColor" aria-label="标注颜色">
+          <div class="reader-shape-color-field"><span class="sr-only" data-i18n="annotationColor">标注颜色</span>
+            <select id="reader-shape-color" data-i18n-aria="annotationColor" aria-label="标注颜色" hidden>
               <option value="yellow" data-i18n="colorYellow">黄色</option><option value="green" data-i18n="colorGreen">绿色</option><option value="blue" data-i18n="colorBlue">蓝色</option><option value="pink" data-i18n="colorPink">粉色</option>
             </select>
-          </label>
+            <div class="reader-shape-color-palette" role="radiogroup" data-i18n-aria="annotationColor" aria-label="标注颜色"></div>
+          </div>
           <label id="reader-shape-width-field" for="reader-shape-width"><span data-i18n="shapeLineWidth">线宽</span>
             <select id="reader-shape-width"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option></select>
           </label>
@@ -1101,7 +1114,7 @@
   <script src="/vendor/assistant-markdown/katex.min.js"></script>
   <script src="/vendor/assistant-markdown/texmath.js"></script>
   <script src="/vendor/assistant-markdown/purify.min.js"></script>
-  <script type="module" src="/app.js?v=0.53.0"></script>
+  <script type="module" src="/app.js?v=0.54.0"></script>
   <script type="module" src="/mobile-layout.js?v=0.53.0"></script>
   <script type="module" src="/reader-mobile-tools.js?v=0.53.0"></script>
 </body>

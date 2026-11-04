@@ -1,6 +1,13 @@
 Server deployment and current status: [SERVER-DEPLOYMENT.md](SERVER-DEPLOYMENT.md).
 
-# research workspace · v0.53.0
+# research workspace · v0.54.0
+
+存储说明：当前在线版的上传资料仍保存在服务器，单机版保存在运行后端的电脑。
+默认保存到各用户设备的下一阶段目标见 [LOCAL-STORAGE-PLAN.md](LOCAL-STORAGE-PLAN.md)，尚未实现。
+
+PDF 改用同源分段读取，显示加载进度并记录可定位的真实失败原因；手机界面统一字号层级，
+笔记编辑工具保留触控面积并缩小图标。尚不能仅凭通用失败提示认定用户文件是超时。
+范围与验证说明见 [PDF-LOADING.md](PDF-LOADING.md)。
 
 手机阅读工具改用紧凑图标，批注、视图与导出按需展开，为 PDF 正文留出空间。
 桌面操作与已保存资料保持原有行为。见 [MOBILE-TOOLS.md](MOBILE-TOOLS.md)。
