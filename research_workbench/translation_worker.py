@@ -19,6 +19,18 @@ from .translation_process import own_process_tree, transient_storage_error
 from .translation_runtime import TranslationRuntime
 
 
+def advance(service, stop):
+    """Exclusive run advancement; transient contention is retried, not failed."""
+    while not stop.is_set():
+        try:
+            service.runs.advance()
+            return
+        except sqlite3.OperationalError as error:
+            if not transient_storage_error(error):
+                raise
+            stop.wait(.2)
+
+
 def execute_job(service, row, args, stop):
     scratch_root = service.store.root / '.translation-worker/scratch'
     scratch_root.mkdir(exist_ok=True)
@@ -97,6 +109,9 @@ def main():
             temporary.replace(ready)
             try:
                 while not stop.is_set():
+                    advance(service, stop)
+                    if stop.is_set():
+                        break
                     try:
                         row = service.claim()
                     except sqlite3.OperationalError as error:
@@ -110,6 +125,8 @@ def main():
                         # Execution errors must end this worker: the supervisor's
                         # recovery owns the interrupted row, never a fresh claim.
                         execute_job(service, row, args, stop)
+                        if not stop.is_set():
+                            advance(service, stop)
                     else:
                         stop.wait(.2)
             finally:

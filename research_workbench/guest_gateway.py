@@ -288,12 +288,26 @@ def _stop_partial_services(app):
     return ok
 
 
+def _run_table_absent_is_legacy(schema_version):
+    """Schema <=26 predates persisted parent runs; anything else is unknown."""
+    return (isinstance(schema_version, int)
+            and not isinstance(schema_version, bool)
+            and 0 < schema_version <= 26)
+
+
 def _space_has_active_work(root):
     """Read actual persisted work before evicting a child.
 
     Idle supervisor processes and the always-alive agent thread are stopped on
-    eviction.  Any queued/running agent turn, active task, analysis job or
-    translation job keeps the space resident; this function never cancels work.
+    eviction.  Any queued/running agent turn, active task, analysis job,
+    translation job or parent translation run keeps the space resident; this
+    function never cancels work.
+
+    A running/queued parent run is busy even while it has no queued/running
+    child between two one-page children.  The additive run relation is absent
+    on a legacy schema <=26 store, where the old job checks are still the whole
+    truth; a missing relation on schema >=27 or an unreadable version stays
+    conservatively busy.
 
     ``agent_tasks.status='waiting_confirmation'`` stays conservative on purpose:
     ``AgentTasks.recover()`` rewrites that persisted state to ``paused`` (and
@@ -310,18 +324,28 @@ def _space_has_active_work(root):
     except sqlite3.Error:
         return True
     try:
+        try:
+            row = connection.execute('PRAGMA user_version').fetchone()
+            schema_version = row[0] if row is not None else None
+        except sqlite3.Error:
+            schema_version = None
         checks = (
             ('agent_turns', "status IN ('queued','running')"),
             ('agent_tasks',
              "status IN ('running','waiting_confirmation','waiting_analysis')"),
             ('analysis_jobs', "status IN ('queued','running')"),
             ('translation_jobs', "status IN ('queued','running')"),
+            ('translation_runs', "status IN ('queued','running')"),
         )
         for table, condition in checks:
             try:
                 row = connection.execute(
                     f'SELECT 1 FROM {table} WHERE {condition} LIMIT 1').fetchone()
             except sqlite3.Error:
+                if (table == 'translation_runs'
+                        and _run_table_absent_is_legacy(schema_version)):
+                    # Legacy store without the additive parent relation.
+                    continue
                 # Unknown state is treated as busy, never as evictable.
                 return True
             if row is not None:

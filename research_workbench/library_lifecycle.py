@@ -2,6 +2,7 @@
 from datetime import datetime, timezone
 import hashlib
 import json
+import sqlite3
 from uuid import UUID
 
 from .models import WorkspaceError
@@ -56,13 +57,31 @@ class PaperTrash:
     def ensure_idle(db, identifier):
         if db.execute('SELECT 1 FROM study_papers WHERE paper_id=? LIMIT 1', (identifier,)).fetchone():
             raise WorkspaceError('document_in_use', '请先在研究中解除这篇论文的关联，再移入回收站。', 409)
+        try:
+            version_row = db.execute('PRAGMA user_version').fetchone()
+            version = version_row[0] if version_row is not None else None
+        except sqlite3.Error:
+            version = None
         active = [('analysis_jobs', ('queued', 'running')),
                   ('agent_turns', ('queued', 'running', 'waiting_confirmation')),
-                  ('agent_tasks', ('running', 'waiting_confirmation', 'waiting_analysis'))]
+                  ('agent_tasks', ('running', 'waiting_confirmation', 'waiting_analysis')),
+                  ('translation_runs', ('queued', 'running'))]
         for table, states in active:
             marks = ','.join('?' for _ in states)
-            if db.execute(f'SELECT 1 FROM {table} WHERE document_id=? AND status IN ({marks}) LIMIT 1',
-                          (identifier, *states)).fetchone():
+            try:
+                found = db.execute(
+                    f'SELECT 1 FROM {table} WHERE document_id=? AND status IN ({marks}) LIMIT 1',
+                    (identifier, *states)).fetchone()
+            except sqlite3.Error:
+                if (table == 'translation_runs' and isinstance(version, int)
+                        and not isinstance(version, bool) and 0 < version <= 26):
+                    # Legacy schema <=26 predates persisted parent runs.
+                    continue
+                # A missing relation on schema >=27 or an unknown version
+                # stays conservatively busy rather than allowing a delete.
+                raise WorkspaceError(
+                    'document_busy', '这篇论文还有进行中的任务，请先停止或完成任务。', 409) from None
+            if found:
                 raise WorkspaceError('document_busy', '这篇论文还有进行中的任务，请先停止或完成任务。', 409)
 
     def mutate(self, identifier, kind, payload):

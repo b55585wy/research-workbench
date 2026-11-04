@@ -48,8 +48,19 @@ def uuid(value):
 NOTES = 'note_id IN (SELECT id FROM notes WHERE document_id=?)'
 TURNS = 'turn_id IN (SELECT id FROM agent_turns WHERE document_id=?)'
 OWNED = 'document_id=?'
+# Continuous translation adds four relations plus the run-owned child jobs they
+# reference.  Only children created by a run are removed here; independent
+# legacy translation jobs keep their existing (unchanged) lifecycle.
+RUN = 'run_id IN (SELECT id FROM translation_runs WHERE document_id=?)'
+RUN_JOB = ('id IN (SELECT job_id FROM translation_run_jobs WHERE run_id IN '
+           '(SELECT id FROM translation_runs WHERE document_id=?))')
+RUN_PAGE = ('job_id IN (SELECT job_id FROM translation_run_jobs WHERE run_id IN '
+            '(SELECT id FROM translation_runs WHERE document_id=?))')
 # Child records precede their parents. Restrictive foreign keys protect other owners.
 ERASE = (
+    ('translation_run_operations', RUN), ('translation_run_pages', RUN),
+    ('translation_run_jobs', RUN), ('translation_runs', OWNED),
+    ('translation_pages', RUN_PAGE), ('translation_jobs', RUN_JOB),
     ('agent_task_operations', 'task_id IN (SELECT id FROM agent_tasks WHERE document_id=?)'),
     ('agent_tasks', OWNED), ('agent_proposals', TURNS), ('agent_events', TURNS),
     ('agent_turns', OWNED), ('agent_conversations', OWNED),

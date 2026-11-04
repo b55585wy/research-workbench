@@ -1,12 +1,13 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal, flushSync } from "react-dom";
 import { createRoot, type Root } from "react-dom/client";
+import { TranslationRunPanel, runInScope, type TranslationRun } from "./translation-runs";
 
 type TranslationLanguage = "zh" | "en";
 type TargetLanguage = "zh" | "en";
 type TranslationMode = "original" | "dual" | "translated";
 type OverlayStatus = { documentId: string; sourceSha256: string; jobId: string; page: number; kind: "partial" | "unavailable" };
-type JobStatus = "queued" | "running" | "completed" | "partial" | "failed" | "cancelled" | "interrupted";
+type JobStatus = "queued" | "running" | "paused" | "completed" | "partial" | "failed" | "cancelled" | "interrupted";
 
 interface TranslationDocument {
   id: string;
@@ -28,6 +29,8 @@ interface TranslationCapabilities {
   model_ready: boolean;
   reason: string | null;
   max_pages: number;
+  run_support?: boolean;
+  run_max_pages?: number;
   target_languages: TargetLanguage[];
 }
 
@@ -66,6 +69,7 @@ interface TranslationResultPage {
   status: "completed" | "unavailable" | "failed";
   warning: string | null;
   blocks: TranslationBlock[];
+  job_id?: string;
 }
 
 interface TranslationJob {
@@ -157,6 +161,8 @@ const strings = {
     unavailable: "翻译暂不可用。",
     openSettings: "打开模型设置",
     savedRuns: "已保存的翻译",
+    continuous: "连续翻译",
+    legacy: "早期翻译",
     noSavedRuns: "暂无已保存翻译",
     loadRunFailed: "无法打开这条翻译记录，请重试。",
     listFailed: "无法读取已保存的翻译。",
@@ -167,6 +173,7 @@ const strings = {
     pageRange: (pages: string, count: number) => `第 ${pages} 页 · 共 ${count} 页`,
     queued: "排队中",
     running: "翻译中",
+    paused: "已停止",
     completed: "已完成",
     partial: "部分完成",
     failed: "失败",
@@ -231,6 +238,8 @@ const strings = {
     unavailable: "Translation is currently unavailable.",
     openSettings: "Open model settings",
     savedRuns: "Saved translations",
+    continuous: "Continuous translation",
+    legacy: "Earlier translations",
     noSavedRuns: "No saved translations",
     loadRunFailed: "This saved translation could not be opened. Try again.",
     listFailed: "Saved translations could not be loaded.",
@@ -241,6 +250,7 @@ const strings = {
     pageRange: (pages: string, count: number) => `Pages ${pages} · ${count} total`,
     queued: "Queued",
     running: "Running",
+    paused: "Stopped",
     completed: "Completed",
     partial: "Partially completed",
     failed: "Failed",
@@ -491,6 +501,8 @@ function TranslationExperience({ model, callbacks, controlsContainer, panelConta
   const [jobs, setJobs] = useState<TranslationJob[]>([]);
   const [jobsError, setJobsError] = useState<string | null>(null);
   const [selectedJob, setSelectedJob] = useState<TranslationJob | null>(null);
+  const [selectedRun, setSelectedRun] = useState<TranslationRun | null>(null);
+  const [historyView, setHistoryView] = useState<"run" | "legacy">("run");
   const [selectionMode, setSelectionMode] = useState<"current" | "pages">("current");
   const [pageInput, setPageInput] = useState(String(model.currentPage || 1));
   const [targetLanguage, setTargetLanguage] = useState<TargetLanguage>(model.language);
@@ -499,7 +511,16 @@ function TranslationExperience({ model, callbacks, controlsContainer, panelConta
   const [pendingExcerpt, setPendingExcerpt] = useState<string | null>(null);
   const [operationError, setOperationError] = useState<string | null>(null);
   const [pollError, setPollError] = useState(false);
-  const visibleJob = activeScope && document && selectedJob && jobInScope(selectedJob, document) ? selectedJob : null;
+  const visibleLegacyJob = activeScope && document && selectedJob && jobInScope(selectedJob, document) ? selectedJob : null;
+  const visibleRun = activeScope && document && selectedRun && runInScope(selectedRun, document) ? selectedRun : null;
+  const visibleJob: TranslationJob | null = historyView === "run" ? visibleRun : visibleLegacyJob;
+  const visibleSourceJobId = historyView === "run"
+    ? visibleRun?.result_pages.find((page) => page.status === "completed")?.job_id || ""
+    : visibleLegacyJob?.id || "";
+  const handleRunSelection = useCallback((run: TranslationRun | null) => {
+    excerptActionRef.current += 1;
+    setSelectedRun(run);
+  }, []);
 
   useEffect(() => {
     generationRef.current += 1;
@@ -512,6 +533,8 @@ function TranslationExperience({ model, callbacks, controlsContainer, panelConta
     setJobs([]);
     setJobsError(null);
     setSelectedJob(null);
+    setSelectedRun(null);
+    setHistoryView("run");
     setSelectionMode("current");
     setPageInput(String(model.currentPage || 1));
     setTargetLanguage(model.language);
@@ -529,14 +552,14 @@ function TranslationExperience({ model, callbacks, controlsContainer, panelConta
         setOverlayStatus(null);
         return;
       }
-      if (mode === "translated" && document && visibleJob
+      if (mode === "translated" && document && visibleJob && visibleSourceJobId
         && detail.documentId === document.id && detail.sourceSha256 === document.sha256
-        && detail.jobId === visibleJob.id && detail.page === model.currentPage
+        && detail.jobId === visibleSourceJobId && detail.page === model.currentPage
         && ["partial", "unavailable"].includes(detail.kind)) setOverlayStatus(detail);
     };
     controlsContainer.addEventListener("translation-overlay-status", handleStatus);
     return () => controlsContainer.removeEventListener("translation-overlay-status", handleStatus);
-  }, [controlsContainer, documentKey, visibleJob?.id, model.currentPage, mode]);
+  }, [controlsContainer, documentKey, visibleJob, visibleSourceJobId, model.currentPage, mode]);
 
   useEffect(() => {
     setOverlayStatus(null);
@@ -544,13 +567,13 @@ function TranslationExperience({ model, callbacks, controlsContainer, panelConta
       mode,
       documentId: document.id,
       sourceSha256: document.sha256,
-      jobId: mode === "translated" && visibleJob ? visibleJob.id : "",
+      jobId: mode === "translated" ? visibleSourceJobId : "",
       currentPage: model.currentPage,
       language: model.language,
-      resultPages: mode === "translated" && visibleJob ? frozenCompletedPages(visibleJob) : Object.freeze([])
+      resultPages: mode === "translated" && visibleSourceJobId && visibleJob ? frozenCompletedPages(visibleJob) : Object.freeze([])
     }) : null;
     controlsContainer.dispatchEvent(new CustomEvent("translation-presentation-change", { detail: snapshot }));
-  }, [controlsContainer, mode, documentKey, visibleJob, model.reading, model.currentPage, model.language]);
+  }, [controlsContainer, mode, documentKey, visibleJob, visibleSourceJobId, model.reading, model.currentPage, model.language]);
 
   useEffect(() => () => {
     controlsContainer.dispatchEvent(new CustomEvent("translation-presentation-change", { detail: null }));
@@ -621,7 +644,7 @@ function TranslationExperience({ model, callbacks, controlsContainer, panelConta
   }, [activeScope]);
 
   useEffect(() => {
-    if (!activeScope || !document || !isActive(selectedJob)) return;
+    if (historyView !== "legacy" || !activeScope || !document || !isActive(selectedJob)) return;
     const scope = activeScope;
     const scopeDocument = document;
     const jobId = (selectedJob as TranslationJob).id;
@@ -664,7 +687,7 @@ function TranslationExperience({ model, callbacks, controlsContainer, panelConta
       if (timer) clearTimeout(timer);
       controller?.abort();
     };
-  }, [activeScope, selectedJob?.id, selectedJob?.status]);
+  }, [activeScope, historyView, selectedJob?.id, selectedJob?.status]);
 
   async function submitTranslation(request: TranslationRequest) {
     if (!activeScope || !document || pendingAction || request.documentId !== document.id || request.sourceSha256 !== document.sha256) return;
@@ -722,7 +745,7 @@ function TranslationExperience({ model, callbacks, controlsContainer, panelConta
   }
 
   async function openSaved(jobId: string) {
-    if (!activeScope || !document || !jobId || pendingAction) return;
+    if (historyView !== "legacy" || !activeScope || !document || !jobId || pendingAction) return;
     const scope = activeScope;
     const scopeDocument = document;
     const ticket = generationRef.current;
@@ -747,7 +770,7 @@ function TranslationExperience({ model, callbacks, controlsContainer, panelConta
   }
 
   async function cancelSelected() {
-    if (!activeScope || !document || !selectedJob || !isActive(selectedJob) || pendingAction) return;
+    if (historyView !== "legacy" || !activeScope || !document || !selectedJob || !isActive(selectedJob) || pendingAction) return;
     const scope = activeScope;
     const scopeDocument = document;
     const jobId = selectedJob.id;
@@ -792,7 +815,7 @@ function TranslationExperience({ model, callbacks, controlsContainer, panelConta
   }
 
   function source(page: number, rect: TranslationRect | null) {
-    if (!activeScope || scopeRef.current !== activeScope || !document || !selectedJob || !jobInScope(selectedJob, document)) return;
+    if (!activeScope || scopeRef.current !== activeScope || !document || !visibleJob) return;
     const expectedDocumentId = document.id;
     const expectedSourceSha256 = document.sha256;
     changeMode("original");
@@ -801,8 +824,9 @@ function TranslationExperience({ model, callbacks, controlsContainer, panelConta
 
   async function excerpt(action: TranslationExcerptAction, block: TranslationBlock, page: number) {
     const callback = callbacks.onExcerpt;
-    if (!callback || pendingExcerpt || !activeScope || scopeRef.current !== activeScope || !document || !selectedJob || !jobInScope(selectedJob, document)) return;
-    const resultPage = jobResults(selectedJob).find((item) => item.page === page && item.status === "completed");
+    if (!callback || pendingExcerpt || !activeScope || scopeRef.current !== activeScope || !document || !visibleJob) return;
+    const resultPage = jobResults(visibleJob).find((item) => item.page === page && item.status === "completed");
+    const excerptJobId = historyView === "run" ? resultPage?.job_id : visibleJob.id;
     const rect = block.rect == null ? null : block.rect;
     const validRect = rect === null || (
       [rect.x, rect.y, rect.width, rect.height].every(Number.isFinite)
@@ -810,7 +834,7 @@ function TranslationExperience({ model, callbacks, controlsContainer, panelConta
       && rect.x + rect.width <= 1 && rect.y + rect.height <= 1
     );
     if (
-      !resultPage || !resultPage.blocks.some((item) => item.id === block.id)
+      !resultPage || !excerptJobId || !resultPage.blocks.some((item) => item.id === block.id)
       || !block.id || !["text", "title", "caption"].includes(block.kind)
       || typeof block.source_text !== "string" || !block.source_text.trim()
       || typeof block.translated_text !== "string" || !block.translated_text.trim()
@@ -820,17 +844,17 @@ function TranslationExperience({ model, callbacks, controlsContainer, panelConta
     const ticket = generationRef.current;
     const jobAction = jobActionRef.current;
     const actionToken = ++excerptActionRef.current;
-    const pendingKey = `${selectedJob.id}:${block.id}:${action}`;
+    const pendingKey = `${visibleJob.id}:${block.id}:${action}`;
     const value: TranslationExcerpt = Object.freeze({
       documentId: document.id,
       sourceSha256: document.sha256,
-      jobId: selectedJob.id,
+      jobId: excerptJobId,
       blockId: block.id,
       page,
       rect: rect ? Object.freeze({ ...rect }) : null,
       sourceText: block.source_text,
       translatedText: block.translated_text,
-      targetLanguage: selectedJob.target_language
+      targetLanguage: visibleJob.target_language
     });
     const current = () => generationRef.current === ticket
       && scopeRef.current === scope
@@ -933,6 +957,45 @@ function TranslationExperience({ model, callbacks, controlsContainer, panelConta
         <button className="button button-quiet translation-close" type="button" aria-label={copy.close} title={copy.close} onClick={closePanel}>×</button>
       </header>
 
+      {!capabilities && !capabilitiesError && <p className="translation-status" role="status">{copy.loading}</p>}
+      {capabilitiesError && <p className="translation-status" data-kind="error" role="alert">{copy.capabilitiesFailed}</p>}
+      <div className="translation-history-tabs" role="group" aria-label={copy.savedRuns}>
+        <button className="button button-quiet" type="button" aria-pressed={historyView === "run"} onClick={() => {
+          setHistoryView("run");
+          setOperationError(null);
+        }}>{copy.continuous}</button>
+        <button className="button button-quiet" type="button" aria-pressed={historyView === "legacy"} onClick={() => {
+          excerptActionRef.current += 1;
+          setSelectedRun(null);
+          setHistoryView("legacy");
+          setOperationError(null);
+        }}>{copy.legacy}</button>
+      </div>
+
+      {historyView === "run" ? (
+        <>
+          <TranslationRunPanel
+            document={document}
+            currentPage={model.currentPage}
+            language={model.language}
+            capabilities={capabilities}
+            api={callbacks.api}
+            onOpenSettings={openSettings}
+            onSelectionChange={handleRunSelection}
+            renderResults={(run) => (
+              <TranslationResults
+                job={run}
+                copy={copy}
+                onSource={source}
+                onExcerpt={callbacks.onExcerpt ? excerpt : undefined}
+                excerptPending={Boolean(pendingExcerpt)}
+              />
+            )}
+          />
+          {operationError === "excerpt" && <p className="translation-status" data-kind="error" role="alert">{copy.excerptFailed}</p>}
+        </>
+      ) : (
+        <>
       <form className="translation-form" onSubmit={(event) => {
         event.preventDefault();
         startFromForm();
@@ -983,8 +1046,6 @@ function TranslationExperience({ model, callbacks, controlsContainer, panelConta
         {requestDraft && <p className="translation-retry-hint">{copy.retryHint}</p>}
       </form>
 
-      {!capabilities && !capabilitiesError && <p className="translation-status" role="status">{copy.loading}</p>}
-      {capabilitiesError && <p className="translation-status" data-kind="error" role="alert">{copy.capabilitiesFailed}</p>}
       {capabilities && !capabilities.ready && (
         <div className="translation-unavailable" role="status">
           <p>{capabilities.reason || copy.unavailable}</p>
@@ -1055,6 +1116,8 @@ function TranslationExperience({ model, callbacks, controlsContainer, panelConta
         </section>
       ) : (
         <p className="translation-empty">{copy.empty}</p>
+      )}
+        </>
       )}
     </div>
   );

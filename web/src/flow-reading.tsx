@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { createRoot, type Root } from "react-dom/client";
+import { runInScope, type TranslationRun } from "./translation-runs";
 
 type FlowLanguage = "zh" | "en";
 type FlowPhase = "cache" | "preparing" | "ready" | "error" | "cancelled" | "unavailable";
@@ -85,6 +86,8 @@ interface TranslationJob {
   }>;
 }
 
+type SelectedTranslation = { kind: "run" | "job"; id: string; scope: string } | null;
+
 interface VisualResult {
   url: string;
   width: number;
@@ -156,6 +159,9 @@ const strings = {
     loadingTranslations: "正在读取已保存的译文…",
     noTranslations: "当前文献没有匹配的已保存译文。",
     translationFailed: "无法读取已保存的译文。",
+    translationListPartial: "部分已保存译文暂时无法读取；其他记录仍可使用。",
+    continuous: "连续",
+    single: "单次",
     translationScope: "缺少译文的段落保留原文；图像、表格和公式始终保留原文。",
     translate: "翻译当前页",
     untitled: "未命名文献",
@@ -189,6 +195,9 @@ const strings = {
     loadingTranslations: "Reading saved translations…",
     noTranslations: "No matching saved translation is available for this paper.",
     translationFailed: "Saved translations could not be read.",
+    translationListPartial: "Some saved translations could not be read; the other records remain available.",
+    continuous: "Continuous",
+    single: "Single",
     translationScope: "Paragraphs without a translation remain in the original language; images, tables, and formulas always remain original.",
     translate: "Translate current page",
     untitled: "Untitled paper",
@@ -283,10 +292,27 @@ function translationDetailInScope(
     && Array.isArray(job.result_pages);
 }
 
+function translationRunDetailInScope(
+  value: unknown,
+  document: FlowDocument,
+  parser: { id: string; version: string },
+  runId: string,
+  page: number
+): value is TranslationRun {
+  if (!runInScope(value, document)) return false;
+  return value.id === runId
+    && value.pages.includes(page)
+    && value.result_schema_version === 1
+    && value.parser?.id === parser.id
+    && value.parser?.version === parser.version
+    && value.result_pages.length <= 1
+    && value.result_pages.every((result) => result.page === page && Array.isArray(result.blocks));
+}
+
 function translatedBlock(job: TranslationJob | null, page: number, block: SourceBlock) {
   if (!job || !translatableKinds.has(block.kind)) return null;
   for (const resultPage of job.result_pages || []) {
-    if (resultPage.page !== page || !Array.isArray(resultPage.blocks)) continue;
+    if (resultPage.page !== page || resultPage.status !== "completed" || !Array.isArray(resultPage.blocks)) continue;
     for (const candidate of resultPage.blocks) {
       if (
         candidate.id === block.id
@@ -420,9 +446,11 @@ function FlowReader({ model, callbacks }: { model: FlowReaderModel; callbacks: F
   const [mode, setMode] = useState<TextMode>("original");
   const [viewedPage, setViewedPage] = useState(initialPage);
   const [jobs, setJobs] = useState<TranslationJob[]>([]);
+  const [runs, setRuns] = useState<TranslationRun[]>([]);
   const [jobsLoaded, setJobsLoaded] = useState(false);
   const [jobsError, setJobsError] = useState<string | null>(null);
-  const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  const [runsError, setRunsError] = useState<string | null>(null);
+  const [selectedTranslation, setSelectedTranslation] = useState<SelectedTranslation>(null);
   const [translation, setTranslation] = useState<TranslationJob | null>(null);
   const [translationLoading, setTranslationLoading] = useState(false);
   const [translationError, setTranslationError] = useState<string | null>(null);
@@ -437,6 +465,18 @@ function FlowReader({ model, callbacks }: { model: FlowReaderModel; callbacks: F
     [batchStart, document.pageCount]
   );
   const batchEnd = batchPages[batchPages.length - 1];
+  const batchKey = batchPages.join(",");
+
+  useEffect(() => {
+    setJobs([]);
+    setRuns([]);
+    setJobsLoaded(false);
+    setJobsError(null);
+    setRunsError(null);
+    setSelectedTranslation(null);
+    setTranslation(null);
+    setTranslationError(null);
+  }, [scope]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -516,20 +556,36 @@ function FlowReader({ model, callbacks }: { model: FlowReaderModel; callbacks: F
     const controller = new AbortController();
     let active = true;
     setJobsError(null);
+    setRunsError(null);
     if (!jobsLoaded) {
-      void callbacks.api<{ items: unknown[] }>(
+      const legacyRequest = callbacks.api<{ items: unknown[] }>(
         `/api/v1/documents/${encodeURIComponent(document.id)}/translations?limit=20`,
         { signal: controller.signal }
-      ).then((body) => {
+      );
+      const runRequest = callbacks.api<{ items: unknown[] }>(
+        `/api/v1/documents/${encodeURIComponent(document.id)}/translation-runs?limit=20`,
+        { signal: controller.signal }
+      );
+      void Promise.allSettled([legacyRequest, runRequest]).then(([legacyResult, runResult]) => {
         if (!active) return;
-        const items = Array.isArray(body.items)
-          ? body.items.filter((job): job is TranslationJob => translationSummaryInScope(job, document)).slice(0, 20)
+        const items = legacyResult.status === "fulfilled" && Array.isArray(legacyResult.value.items)
+          ? legacyResult.value.items.filter((job): job is TranslationJob => translationSummaryInScope(job, document)).slice(0, 20)
+          : [];
+        const runItems = runResult.status === "fulfilled" && Array.isArray(runResult.value.items)
+          ? runResult.value.items.filter((run): run is TranslationRun => runInScope(run, document)).slice(0, 20)
           : [];
         setJobs(items);
-        setSelectedJobId((current) => items.some((job) => job.id === current) ? current : items[0]?.id || null);
+        setRuns(runItems);
+        if (legacyResult.status === "rejected") setJobsError(errorCode(legacyResult.reason));
+        if (runResult.status === "rejected") setRunsError(errorCode(runResult.reason));
+        const choices = [
+          ...runItems.map((run) => ({ selection: { kind: "run", id: run.id, scope } as const, createdAt: run.created_at })),
+          ...items.map((job) => ({ selection: { kind: "job", id: job.id, scope } as const, createdAt: job.created_at }))
+        ].sort((first, second) => second.createdAt.localeCompare(first.createdAt));
+        setSelectedTranslation((current) => current && choices.some((choice) => choice.selection.kind === current.kind && choice.selection.id === current.id)
+          ? { ...current, scope }
+          : choices[0]?.selection || null);
         setJobsLoaded(true);
-      }).catch((reason: unknown) => {
-        if (active && !isAbort(reason)) setJobsError(errorCode(reason));
       });
     }
     return () => {
@@ -539,32 +595,64 @@ function FlowReader({ model, callbacks }: { model: FlowReaderModel; callbacks: F
   }, [callbacks, document.id, document.sha256, jobsLoaded, mode, translationRetry]);
 
   useEffect(() => {
-    if (mode !== "translated" || !selectedJobId || !parser) {
+    if (mode !== "translated" || !selectedTranslation || selectedTranslation.scope !== scope || !parser) {
       setTranslation(null);
       setTranslationLoading(false);
       return;
     }
+    const selection = selectedTranslation;
+    const detailParser = parser;
     const controller = new AbortController();
     let active = true;
     setTranslation(null);
     setTranslationLoading(true);
     setTranslationError(null);
-    void callbacks.api<unknown>(`/api/v1/translations/${encodeURIComponent(selectedJobId)}`, {
-      signal: controller.signal
-    }).then((job) => {
-      if (!active) return;
-      if (translationDetailInScope(job, document, parser)) setTranslation(job);
-      else setTranslationError("translation_scope_mismatch");
-    }).catch((reason: unknown) => {
-      if (active && !isAbort(reason)) setTranslationError(errorCode(reason));
-    }).finally(() => {
-      if (active) setTranslationLoading(false);
-    });
+
+    async function load() {
+      try {
+        if (selection.kind === "job") {
+          const job = await callbacks.api<unknown>(`/api/v1/translations/${encodeURIComponent(selection.id)}`, {
+            signal: controller.signal
+          });
+          if (!active) return;
+          if (translationDetailInScope(job, document, detailParser)) setTranslation(job);
+          else setTranslationError("translation_scope_mismatch");
+          return;
+        }
+        const metadata = runs.find((run) => run.id === selection.id);
+        if (!metadata) {
+          setTranslationError("translation_scope_mismatch");
+          return;
+        }
+        const requestedPages = batchPages.filter((page) => metadata.pages.includes(page));
+        if (!requestedPages.length) {
+          setTranslation({ ...metadata, result_pages: [] });
+          return;
+        }
+        const details = await Promise.all(requestedPages.map((page) => callbacks.api<unknown>(
+          `/api/v1/translation-runs/${encodeURIComponent(metadata.id)}?page=${page}`,
+          { signal: controller.signal }
+        )));
+        if (!active) return;
+        if (details.some((detail, index) => !translationRunDetailInScope(detail, document, detailParser, metadata.id, requestedPages[index]))) {
+          setTranslationError("translation_scope_mismatch");
+          return;
+        }
+        const validDetails = details as TranslationRun[];
+        setTranslation({ ...metadata, result_pages: validDetails.flatMap((detail) => detail.result_pages) });
+      } catch (reason: unknown) {
+        if (active && !isAbort(reason)) setTranslationError(errorCode(reason));
+      } finally {
+        if (active) setTranslationLoading(false);
+      }
+    }
+
+    void load();
     return () => {
       active = false;
       controller.abort();
     };
-  }, [callbacks, document.id, document.sha256, mode, parser, selectedJobId, translationRetry]);
+  }, [callbacks, document.id, document.sha256, mode, parser, selectedTranslation, runs, batchKey, translationRetry]);
 
   useEffect(() => {
     const root = scrollRef.current;
@@ -631,29 +719,35 @@ function FlowReader({ model, callbacks }: { model: FlowReaderModel; callbacks: F
       </div>
       {mode === "translated" && (
         <div className="flow-translation-bar">
-          {jobs.length > 1 && (
+          {jobs.length + runs.length > 1 && (
             <label>{copy.translationLabel}
-              <select value={selectedJobId || ""} onChange={(event) => setSelectedJobId(event.target.value || null)}>
-                {jobs.map((job) => <option value={job.id} key={job.id}>{job.target_language.toUpperCase()} · {job.created_at}</option>)}
+              <select value={selectedTranslation ? `${selectedTranslation.kind}:${selectedTranslation.id}` : ""} onChange={(event) => {
+                const [kind, id] = event.target.value.split(":", 2);
+                setSelectedTranslation(id && (kind === "run" || kind === "job") ? { kind, id, scope } : null);
+              }}>
+                {runs.map((run) => <option value={`run:${run.id}`} key={`run:${run.id}`}>{copy.continuous} · {run.target_language.toUpperCase()} · {run.created_at}</option>)}
+                {jobs.map((job) => <option value={`job:${job.id}`} key={`job:${job.id}`}>{copy.single} · {job.target_language.toUpperCase()} · {job.created_at}</option>)}
               </select>
             </label>
           )}
           <button className="button button-secondary" type="button" onClick={() => callbacks.onRequestTranslation(viewedPage, document.id, document.sha256)}>
             {copy.translate}
           </button>
-          {(translationLoading || (!jobsLoaded && !jobsError)) && <p role="status">{copy.loadingTranslations}</p>}
+          {(translationLoading || (!jobsLoaded && !jobsError && !runsError)) && <p role="status">{copy.loadingTranslations}</p>}
           {(jobsError || translationError) && (
             <p className="flow-error" role="alert">
-              {jobsError ? copy.noTranslations : copy.translationFailed}
+              {copy.translationFailed}
               <button className="button button-quiet" type="button" onClick={() => {
                 setJobsLoaded(false);
                 setJobsError(null);
+                setRunsError(null);
                 setTranslationError(null);
                 setTranslationRetry((value) => value + 1);
               }}>{copy.retry}</button>
             </p>
           )}
-          {jobsLoaded && !jobs.length && !jobsError && <p>{copy.noTranslations}</p>}
+          {runsError && !jobsError && <p className="flow-error" role="alert">{copy.translationListPartial}</p>}
+          {jobsLoaded && !jobs.length && !runs.length && !jobsError && !runsError && <p>{copy.noTranslations}</p>}
           {missingTranslation && <p>{copy.translationScope}</p>}
         </div>
       )}

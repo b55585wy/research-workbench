@@ -435,6 +435,12 @@ from .conversation_lifecycle import SCHEMA as CONVERSATION_CLEAR_SCHEMA
 SCHEMA = SCHEMA[:SCHEMA.rindex('COMMIT;')] + CONVERSATION_CLEAR_SCHEMA + '\nPRAGMA user_version=25;\nCOMMIT;'
 from .source_segments import SCHEMA as SOURCE_SEGMENT_SCHEMA
 SCHEMA = SCHEMA[:SCHEMA.rindex('COMMIT;')] + SOURCE_SEGMENT_SCHEMA + '\nPRAGMA user_version=26;\nCOMMIT;'
+# Version 27 adds four additive relations for an explicitly authorized
+# continuous translation run.  The legacy translation job/table, its five-page
+# limits and every earlier row/receipt/hash stay untouched; an older build must
+# refuse this file rather than ignore persisted run authorization.
+from .translation_run_schema import SCHEMA as TRANSLATION_RUN_SCHEMA
+SCHEMA = SCHEMA[:SCHEMA.rindex('COMMIT;')] + TRANSLATION_RUN_SCHEMA + '\nPRAGMA user_version=27;\nCOMMIT;'
 
 
 def timestamp():
@@ -461,7 +467,7 @@ class Store:
         self.exports.mkdir(exist_ok=True)
         self.database = self.root / 'workspace.sqlite3'
         with self.connection() as connection:
-            if connection.execute('PRAGMA user_version').fetchone()[0] > 26:
+            if connection.execute('PRAGMA user_version').fetchone()[0] > 27:
                 raise RuntimeError('Database requires a newer application')
             from .study_migration import install
             install(connection,SCHEMA)

@@ -1,3 +1,12 @@
+# v0.56 continuous translation runs
+
+Additive schema27 persists explicitly authorized page ranges and control receipts.
+New `translation-runs` create/list/detail/pause/resume routes coordinate one-page
+children through the existing exclusive worker. GETs never queue work. Completed
+compatible pages are reused; failed/uncertain calls require explicit continuation.
+The legacy translation job API and five-page limit remain unchanged. Page results
+include their actual source `job_id`. See [full contract](CONTINUOUS-TRANSLATION.md).
+
 # v0.44 local guest / first React view slice
 
 No business API, schema, authentication, grant or ownership changes. The local guest

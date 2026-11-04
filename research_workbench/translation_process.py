@@ -73,11 +73,11 @@ class TranslationSupervisor:
         self.monitor = None
         service.supervisor = self
 
-    def recover(self, queued=False):
+    def recover(self, queued=False, restart=False):
         """One bounded recovery pass; False means contention still owed retry."""
         try:
             with WorkerLease(self.root / '.lease'):
-                self.service.recover(queued=queued)
+                self.service.recover(queued=queued, restart=restart)
         except WorkerBusy:
             return False
         except sqlite3.OperationalError as error:
@@ -87,11 +87,16 @@ class TranslationSupervisor:
         return True
 
     def start(self):
-        self.recover()
+        # Initial Web/supervisor startup has no on-demand request behind any
+        # persisted queued parent, so those parents are interrupted instead of
+        # auto-resuming.  Manual queued legacy jobs are preserved unchanged.
+        self.recover(restart=True)
         self.monitor = threading.Thread(target=self.watch, name='translation-health', daemon=True)
         self.monitor.start()
         with self.service.store.connection() as db:
-            queued = db.execute("SELECT 1 FROM translation_jobs WHERE status='queued' LIMIT 1").fetchone()
+            queued = db.execute(
+                "SELECT 1 FROM translation_jobs WHERE status='queued' "
+                "UNION ALL SELECT 1 FROM translation_runs WHERE status='queued' LIMIT 1").fetchone()
         if queued:
             try:
                 self.ensure_started()

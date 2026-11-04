@@ -2,8 +2,14 @@ from uuid import uuid4
 import sqlite3
 import pytest
 
-from research_workbench.store import Store
+from research_workbench.library_lifecycle import PaperTrash
+from research_workbench.models import WorkspaceError
+from research_workbench.store import Store, timestamp
 from test_excerpts import add_region, excerpt_url
+from test_translation_runs import add_document
+
+RUN_TABLES = ('translation_run_operations', 'translation_run_pages',
+              'translation_run_jobs', 'translation_runs')
 
 
 def metadata(client, document):
@@ -110,6 +116,77 @@ def test_strict_mutation_inputs(client, document, payload):
     result = client.request('DELETE', f"/api/v1/documents/{document['id']}", json=payload)
     assert result.status_code == 422
     assert len(client.get('/api/v1/documents').json()['items']) == 1
+
+
+def insert_translation_run(store, document, status='running', stage='parsing'):
+    identifier = str(uuid4())
+    with store.connection() as db:
+        stamp = timestamp()
+        db.execute(
+            'INSERT INTO translation_runs (id,document_id,source_sha256,pages_json,'
+            'target_language,request_hash,status,stage,revision,total_pages,'
+            'processed_pages,completed_pages,reused_pages,active_job_id,parser_id,'
+            'parser_version,prompt_version,result_schema_version,model_name,'
+            'model_fingerprint,error_json,created_at,updated_at) '
+            'VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+            (identifier, document['id'], document['sha256'], '[1]', 'zh', 'a' * 64,
+             status, stage, 1, 1, 0, 0, 0, None, 'mineru-flash-txt', '4.1.5',
+             'translate-blocks-v1', 1, 'synthetic-model', 'b' * 16, None,
+             stamp, stamp))
+    return identifier
+
+
+def test_active_translation_run_blocks_removal_and_paused_purge_cleans_relations(
+        tmp_path):
+    from research_workbench.document_purge import PaperPurgeMutation
+    from research_workbench.models import NoteMutation
+
+    store = Store(tmp_path / 'workspace')
+    document = add_document(store, pages=1)
+    identifier = insert_translation_run(store, document)
+
+    with pytest.raises(WorkspaceError) as error:
+        store.paper_trash.mutate(
+            document['id'], 'trash',
+            NoteMutation(request_id=uuid4(), expected_revision=1))
+    assert error.value.code == 'document_busy' and error.value.status == 409
+
+    with store.connection() as db:
+        db.execute("UPDATE translation_runs SET status='paused',stage='finished' "
+                   "WHERE id=?", (identifier,))
+    trashed = store.paper_trash.mutate(
+        document['id'], 'trash',
+        NoteMutation(request_id=uuid4(), expected_revision=1))
+    assert trashed['deleted_at'] is not None and trashed['revision'] == 2
+
+    preview = store.paper_purge.preview(document['id'])
+    purged = store.paper_purge.purge(document['id'], PaperPurgeMutation(
+        request_id=uuid4(), expected_revision=preview['expected_revision'],
+        preview_sha256=preview['preview_sha256']))
+    assert purged == {'id': document['id'], 'purged': True, 'files_removed': True}
+
+    with store.connection() as db:
+        for table in RUN_TABLES:
+            assert db.execute(f'SELECT COUNT(*) FROM {table}').fetchone()[0] == 0
+        assert db.execute('SELECT COUNT(*) FROM documents WHERE id=?',
+                          (document['id'],)).fetchone()[0] == 0
+        assert db.execute('PRAGMA foreign_key_check').fetchall() == []
+
+
+def test_missing_parent_run_table_legacy_is_idle_but_schema27_is_busy(tmp_path):
+    store = Store(tmp_path / 'workspace')
+    document = add_document(store, pages=1)
+    with store.connection() as db:
+        for table in RUN_TABLES:
+            db.execute(f'DROP TABLE {table}')
+        db.execute('PRAGMA user_version=26')
+    with store.connection() as db:
+        PaperTrash.ensure_idle(db, document['id'])
+        db.execute('PRAGMA user_version=27')
+    with store.connection() as db:
+        with pytest.raises(WorkspaceError) as error:
+            PaperTrash.ensure_idle(db, document['id'])
+    assert error.value.code == 'document_busy'
 
 
 def test_schema13_upgrade_preserves_rows_and_future_schema_refused(tmp_path):

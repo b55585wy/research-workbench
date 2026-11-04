@@ -260,6 +260,11 @@ class Translations:
     def __init__(self, store, provider, runtime):
         self.store, self.provider, self.runtime = store, provider, runtime
         self.supervisor = None
+        # Continuous runs reuse this same service in the Web API, the supervisor
+        # and the disposable job process; the coordinator never owns a thread or
+        # a second executor.
+        from .translation_runs import TranslationRuns
+        self.runs = TranslationRuns(self)
 
     # ---------------------------------------------------------------- reads
     def capabilities(self):
@@ -271,7 +276,9 @@ class Translations:
         return {'ready': parser_ready and model_ready, 'parser_ready': parser_ready,
                 'model_ready': model_ready,
                 'reason': '；'.join(reasons) if reasons else None,
-                'max_pages': MAX_PAGES, 'target_languages': list(TARGET_LANGUAGES),
+                'max_pages': MAX_PAGES, 'run_support': True,
+                'run_max_pages': MAX_DOCUMENT_PAGES,
+                'target_languages': list(TARGET_LANGUAGES),
                 'parser': {'id': PARSER_ID, 'version': PARSER_VERSION}}
 
     def job(self, row, pages=None):
@@ -383,6 +390,7 @@ class Translations:
                     "updated_at=?,error_json=? WHERE status='queued'",
                     (now(), now(), canonical({'code': 'worker_unavailable',
                                               'message': '翻译进程未能启动，请检查运行环境后重新发起。'})))
+                self.runs.worker_unavailable(connection)
 
     def cancel(self, identifier):
         with self.store.connection() as connection:
@@ -415,9 +423,15 @@ class Translations:
             return dict(connection.execute('SELECT * FROM translation_jobs WHERE id=?',
                                            (row['id'],)).fetchone())
 
-    def recover(self, queued=False):
+    def recover(self, queued=False, restart=False):
+        # ``restart`` is the Web/supervisor startup mode: queued parent runs are
+        # interrupted too, but legacy manually queued jobs are still preserved.
         states = "('queued','running')" if queued else "('running')"
         stamp = now()
+        # Runs first: their queued/running children must be cancelled while they
+        # are still identifiable as run children.  Manual legacy jobs then keep
+        # exactly the deployed recovery behaviour below.
+        self.runs.recover(queued=queued, restart=restart)
         with self.store.connection() as connection:
             connection.execute(
                 "UPDATE translation_jobs SET status='interrupted',stage='finished',finished_at=?,"
@@ -435,6 +449,7 @@ class Translations:
         with self.store.connection() as connection:
             connection.execute("UPDATE translation_jobs SET stage=?,updated_at=? "
                                "WHERE id=? AND status='running'", (stage, now(), identifier))
+        self.runs.child_stage(identifier, stage)
 
     def fail(self, identifier, code, message):
         with self.store.connection() as connection:
@@ -535,13 +550,17 @@ class Translations:
             plans.append(plan)
         return plans
 
-    def translate(self, chunk, target_language, provider):
+    def translate(self, chunk, target_language, provider, once=False):
         payload = {'target_language': target_language,
                    'blocks': [{'id': identifier, 'source': text} for identifier, text in chunk]}
         messages = [{'role': 'system', 'content': SYSTEM_PROMPT},
                     {'role': 'user', 'content': json.dumps(payload, ensure_ascii=False)}]
         try:
-            result = provider.complete(messages, [])
+            # A run child is one explicit page of an authorized run: one attempt
+            # only, never an automatic transport retry.  Legacy jobs keep the
+            # existing bounded complete() retry behaviour.
+            result = (provider.complete_once(messages, []) if once
+                      else provider.complete(messages, []))
         except WorkspaceError as error:
             if error.code in ('translation_output_invalid',):
                 raise
@@ -571,6 +590,7 @@ class Translations:
         identifier = row['id']
         if self.status(identifier) != 'running':
             return
+        once = self.runs.is_linked(identifier)
         config, _ = self.provider.config()
         ModelConnection.validate(config)
         if self.model_identity(config) != (row['model_name'], row['model_fingerprint']):
@@ -609,7 +629,8 @@ class Translations:
                                                  '本次翻译的模型调用次数已达上限，请减少页数后重试。', 409)
                         verified_source(self.store, row['document_id'], row['source_sha256'])
                         used += 1
-                        translations.update(self.translate(chunk, row['target_language'], provider))
+                        translations.update(self.translate(chunk, row['target_language'],
+                                                          provider, once))
                 except WorkspaceError as error:
                     if error.code != 'translation_output_invalid':
                         raise
