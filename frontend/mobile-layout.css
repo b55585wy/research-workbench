@@ -663,7 +663,7 @@
 
   .mobile-layout-active #assistant-panel {
     inset: var(--mobile-viewport-top, 0px) auto auto var(--mobile-viewport-left, 0px) !important;
-    z-index: 60;
+    z-index: 80;
     width: var(--mobile-viewport-width, 100vw) !important;
     height: calc(var(--mobile-viewport-height, 100dvh) - 60px - env(safe-area-inset-bottom, 0px)) !important;
     max-height: none !important;

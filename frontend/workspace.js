@@ -5,6 +5,7 @@ const messages = {
     analysis: "分析",
     charts: "图表",
     notes: "笔记",
+    library: "资料",
     noteEditor: "编辑笔记",
     showLibrary: "展开资料栏",
     hideLibrary: "收起资料栏",
@@ -31,6 +32,7 @@ const messages = {
     analysis: "Analysis",
     charts: "Charts",
     notes: "Notes",
+    library: "Library",
     noteEditor: "Edit note",
     showLibrary: "Expand library sidebar",
     hideLibrary: "Collapse library sidebar",
@@ -64,6 +66,30 @@ function make(tag, className, text) {
   return node;
 }
 
+function sidebarIcon(side, visible) {
+  const ns = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(ns, "svg");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("fill", "none");
+  svg.setAttribute("stroke", "currentColor");
+  svg.setAttribute("stroke-width", "1.7");
+  svg.setAttribute("stroke-linecap", "round");
+  svg.setAttribute("stroke-linejoin", "round");
+  svg.setAttribute("aria-hidden", "true");
+  const frame = document.createElementNS(ns, "rect");
+  for (const [name, value] of Object.entries({ x: 3, y: 4, width: 18, height: 16, rx: 2 })) frame.setAttribute(name, String(value));
+  const divider = document.createElementNS(ns, "path");
+  divider.setAttribute("d", side === "left" ? "M9 4v16" : "M15 4v16");
+  const arrow = document.createElementNS(ns, "path");
+  const arrows = {
+    left: ["m13 9 3 3-3 3", "m16 9-3 3 3 3"],
+    right: ["m11 9-3 3 3 3", "m8 9 3 3-3 3"]
+  };
+  arrow.setAttribute("d", arrows[side][visible ? 1 : 0]);
+  svg.append(frame, divider, arrow);
+  return svg;
+}
+
 export function createWorkspace(adapter) {
   const byId = (id) => document.getElementById(id);
   const main = document.querySelector(".workspace");
@@ -78,6 +104,18 @@ export function createWorkspace(adapter) {
   const libraryToggle = byId("workspace-library-toggle");
   const notesToggle = byId("workspace-notes-toggle");
   const dataWorkspace = byId("data-workspace");
+  const readerHeading = byId("reader-heading").closest(".reader-heading-row");
+  const notesHeading = byId("notes-heading").parentElement;
+  const dataWorkspaceHeading = dataWorkspace.querySelector(".data-workspace-header");
+  const libraryHeading = make("div", "panel-heading workspace-library-heading");
+  const libraryTitle = make("h2", "", "资料");
+  libraryTitle.id = "workspace-library-heading";
+  libraryHeading.append(libraryTitle);
+  documents.prepend(libraryHeading);
+  documents.setAttribute("aria-labelledby", libraryTitle.id);
+  libraryToggle.classList.add("workspace-pane-toggle");
+  notesToggle.classList.add("workspace-pane-toggle");
+  for (const heading of [readerHeading, dataWorkspaceHeading, notesHeading]) heading.classList.add("workspace-pane-heading");
   const studyView = byId("study-view");
   const studyMaterials = byId("study-materials");
   const analysisTab = byId("data-tool-analysis");
@@ -283,17 +321,24 @@ export function createWorkspace(adapter) {
     importReview.hidden = !reviewVisible || !byId("spss-import-summary").children.length;
     prerequisite.hidden = Boolean(owner);
     const libraryToggleLabel = t(libraryVisible ? "hideLibrary" : "showLibrary");
-    libraryToggle.textContent = libraryToggleLabel;
+    libraryTitle.textContent = t("library");
+    libraryToggle.replaceChildren(sidebarIcon("left", libraryVisible));
     libraryToggle.setAttribute("aria-expanded", String(libraryVisible));
     libraryToggle.setAttribute("aria-pressed", String(libraryVisible));
     libraryToggle.setAttribute("aria-label", libraryToggleLabel);
     libraryToggle.title = libraryToggleLabel;
     const notesToggleLabel = t(notesVisible ? "hideNotes" : "showNotes");
-    notesToggle.textContent = notesToggleLabel;
+    notesToggle.replaceChildren(sidebarIcon("right", notesVisible));
     notesToggle.setAttribute("aria-expanded", String(notesVisible));
     notesToggle.setAttribute("aria-pressed", String(notesVisible));
     notesToggle.setAttribute("aria-label", notesToggleLabel);
     notesToggle.title = notesToggleLabel;
+    const activeHeading = mode === "reading" ? readerHeading : dataWorkspaceHeading;
+    const libraryTarget = libraryVisible ? libraryHeading : activeHeading;
+    if (libraryToggle.parentElement !== libraryTarget) libraryVisible ? libraryTarget.append(libraryToggle) : libraryTarget.prepend(libraryToggle);
+    const notesTarget = notesVisible ? notesHeading : activeHeading;
+    if (notesToggle.parentElement !== notesTarget) notesTarget.append(notesToggle);
+    document.querySelector(".workspace-sidebar-controls")?.remove();
     revealManualSettings();
     revealProjectMaterials();
     adapter.modeRendered?.(mode);
