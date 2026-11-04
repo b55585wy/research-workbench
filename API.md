@@ -746,7 +746,8 @@ LOCAL-STORAGE-PLAN.md and DEVICE-STORAGE-ACCEPTANCE.md for actual scope and limi
 
 POST `/api/v1/documents/{document_id}/selection-translation` accepts only
 `{request_id, source_sha256, pages, text, target_language}`. UUID and SHA identify
-the frozen request/source; pages are1..20 ascending unique actual PDF pages,
+the frozen request/source; pages contains1..20 ascending unique page numbers
+within the actual PDF page count (not only its first20 pages),
 text is nonblank and at most3000 characters, target language is `zh|en`.
 The200 response is `{request_id,document_id,source_sha256,pages,target_language,translated_text}`.
 No rectangle, model, credentials or endpoint can be supplied by the client.
