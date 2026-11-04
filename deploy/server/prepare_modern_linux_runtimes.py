@@ -32,7 +32,9 @@ def parser_runtime(conda, parent, release):
     root = parent / 'mineru-flash-v415-linux'
     python = create_python(conda, root)
     lock = release / 'deploy/server/translation-requirements.lock.txt'
-    execute([str(python), '-m', 'pip', '--isolated', 'install', '--only-binary=:all:',
+    # jieba has no wheel at this pinned version; permit its ordinary source
+    # package while preferring wheels for the native dependencies.
+    execute([str(python), '-m', 'pip', '--isolated', 'install', '--prefer-binary',
              '--no-cache-dir', '-r', str(lock)], root / 'install.log')
     execute([str(python), '-I', '-c', 'import mineru, docvortex; from importlib.metadata import version; '
              'assert version("mineru")=="4.1.5" and version("docvortex")=="0.6.11"'], root / 'verify.log')

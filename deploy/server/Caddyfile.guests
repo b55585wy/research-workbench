@@ -1,5 +1,6 @@
 # Public guest origin. Keep the existing authenticated IP owner site separate.
 https://itsyiyi.com {
+ encode zstd gzip
  route {
   @unsafe_cross_site expression `{http.request.header.Sec-Fetch-Site} == "cross-site" && ({method} != "GET" || {http.request.header.Sec-Fetch-Mode} != "navigate" || {http.request.header.Sec-Fetch-Dest} != "document")`
   respond @unsafe_cross_site "Cross-site request refused." 403
