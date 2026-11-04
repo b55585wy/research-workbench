@@ -21,7 +21,8 @@ if (readerPanel && toolbar) {
       page: "页面",
       view: "视图与翻译",
       export: "导出",
-      currentZoom: "当前缩放"
+      currentZoom: "当前缩放",
+      textSelectionHint: "先选中文字，再高亮或加下划线。"
     },
     en: {
       annotations: "Annotation tools",
@@ -30,7 +31,8 @@ if (readerPanel && toolbar) {
       page: "Page",
       view: "View and translation",
       export: "Export",
-      currentZoom: "Current zoom"
+      currentZoom: "Current zoom",
+      textSelectionHint: "Select text first, then highlight or underline it."
     }
   };
 
@@ -187,6 +189,8 @@ if (readerPanel && toolbar) {
   viewSection.section.append(viewModeSection);
 
   const proxies = [];
+  const textAnnotationToolbar = toolbar.querySelector(".text-annotation-toolbar");
+  let pdfSelectionSnapshot = null;
   const flowLockedIds = new Set([
     "page-first", "page-last", "zoom-out", "zoom-in", "zoom-fit", "zoom-fit-page", "reader-fullscreen",
     "annotation-undo", "annotation-redo", "reader-region-mode", "export-reading-record", "export-annotated-pdf",
@@ -195,6 +199,61 @@ if (readerPanel && toolbar) {
 
   function translationToggle() {
     return translationControls.querySelector(".translation-toggle, #translation-fallback");
+  }
+
+  function pdfSelectionRange() {
+    const selection = window.getSelection();
+    if (!selection?.rangeCount || selection.isCollapsed || !selection.toString().trim()) return null;
+    const range = selection.getRangeAt(0);
+    const container = range.commonAncestorContainer;
+    const element = container.nodeType === Node.ELEMENT_NODE ? container : container.parentElement;
+    const textLayer = element?.closest(".textLayer");
+    return textLayer && readerStage?.contains(textLayer) ? range : null;
+  }
+
+  function selectionContext() {
+    return {
+      documentId: readerStage?.dataset.documentId || "",
+      page: byId("page-input")?.value || ""
+    };
+  }
+
+  function rememberPdfSelection(range = pdfSelectionRange()) {
+    if (!range) return null;
+    pdfSelectionSnapshot = { range: range.cloneRange(), ...selectionContext() };
+    return pdfSelectionSnapshot;
+  }
+
+  function matchingPdfSelectionSnapshot() {
+    if (!pdfSelectionSnapshot) return null;
+    const context = selectionContext();
+    if (pdfSelectionSnapshot.documentId !== context.documentId || pdfSelectionSnapshot.page !== context.page) {
+      pdfSelectionSnapshot = null;
+      return null;
+    }
+    return pdfSelectionSnapshot;
+  }
+
+  function availablePdfSelection() {
+    const range = pdfSelectionRange();
+    if (range) return rememberPdfSelection(range).range;
+    const snapshot = matchingPdfSelectionSnapshot();
+    return snapshot && textAnnotationToolbar?.dataset.contextual === "true" ? snapshot.range : null;
+  }
+
+  function preservePdfSelection(event) {
+    if (event.button !== 0 || !availablePdfSelection()) return;
+    event.preventDefault();
+  }
+
+  function restorePdfSelection() {
+    if (pdfSelectionRange()) return true;
+    const snapshot = matchingPdfSelectionSnapshot();
+    const selection = window.getSelection();
+    if (!snapshot || !selection || textAnnotationToolbar?.dataset.contextual !== "true") return false;
+    selection.removeAllRanges();
+    selection.addRange(snapshot.range.cloneRange());
+    return Boolean(pdfSelectionRange());
   }
 
   function addProxy(container, nativeOrGetter, iconName, options = {}) {
@@ -208,12 +267,18 @@ if (readerPanel && toolbar) {
     container.append(proxy);
     const definition = { proxy, nativeOrGetter, options };
     proxies.push(definition);
+    if (options.textAction) {
+      proxy.addEventListener("pointerdown", preservePdfSelection);
+      proxy.addEventListener("mousedown", preservePdfSelection);
+    }
     proxy.addEventListener("click", () => {
       const native = typeof nativeOrGetter === "function" ? nativeOrGetter() : nativeOrGetter;
       if (!native?.isConnected || native.disabled || native.hidden || native.getAttribute("aria-disabled") === "true" || native.closest("[hidden]")) return;
       const nativeId = native.id;
       if (readerPanel.dataset.flowActive === "true" && (options.flowLock || flowLockedIds.has(nativeId))) return;
-      if (!options.keepOpen) closeTools();
+      if (options.textAction && !availablePdfSelection()) return;
+      if (!options.keepOpen) closeTools({ restoreFocus: !options.textAction });
+      if (options.textAction && !restorePdfSelection()) return;
       native.click();
     });
     return proxy;
@@ -221,10 +286,15 @@ if (readerPanel && toolbar) {
 
   addProxy(annotationSection.grid, byId("annotation-undo"), "undo");
   addProxy(annotationSection.grid, byId("annotation-redo"), "redo");
+  addProxy(annotationSection.grid, byId("text-annotation-highlight"), "highlight", { textAction: true, flowLock: true });
+  addProxy(annotationSection.grid, byId("text-annotation-underline"), "underline", { textAction: true, flowLock: true });
   for (const kind of ["rectangle", "arrow", "line", "ellipse", "ink", "textbox"]) {
     addProxy(annotationSection.grid, byId(`reader-shape-${kind}`), kind);
   }
   addProxy(annotationSection.grid, byId("reader-region-mode"), "capture");
+  const textSelectionHint = document.createElement("p");
+  textSelectionHint.className = "reader-mobile-selection-hint";
+  annotationSection.section.append(textSelectionHint);
 
   addProxy(pageSection.grid, byId("page-first"), "first", { preferAria: true });
   addProxy(pageSection.grid, byId("page-last"), "last", { preferAria: true });
@@ -281,8 +351,9 @@ if (readerPanel && toolbar) {
         setAttribute(proxy, "title", label);
       }
       const flowLocked = flowActive && (options.flowLock || flowLockedIds.has(native.id));
-      const disabled = Boolean(native.disabled || native.getAttribute("aria-disabled") === "true" || flowLocked);
-      const hidden = Boolean(native.hidden || native.closest("[hidden]") || flowLocked);
+      const selectionMissing = options.textAction && !availablePdfSelection();
+      const disabled = Boolean(native.disabled || native.getAttribute("aria-disabled") === "true" || flowLocked || selectionMissing);
+      const hidden = options.textAction ? flowLocked : Boolean(native.hidden || native.closest("[hidden]") || flowLocked);
       if (proxy.disabled !== disabled) proxy.disabled = disabled;
       if (proxy.hidden !== hidden) proxy.hidden = hidden;
       const pressed = native.getAttribute("aria-pressed");
@@ -290,7 +361,10 @@ if (readerPanel && toolbar) {
       else setAttribute(proxy, "aria-pressed", pressed);
     }
     setAttribute(fullscreenProxy, "aria-pressed", Boolean(document.fullscreenElement));
-    const annotationNatives = [byId("annotation-undo"), byId("annotation-redo"), byId("reader-region-mode"), ...Array.from(toolbar.querySelectorAll(".reader-shape-tools button"))];
+    const annotationNatives = [
+      byId("annotation-undo"), byId("annotation-redo"), byId("text-annotation-highlight"), byId("text-annotation-underline"),
+      byId("reader-region-mode"), ...Array.from(toolbar.querySelectorAll(".reader-shape-tools button"))
+    ];
     const annotationsDisabled = flowActive || annotationNatives.every((native) => native.disabled);
     if (annotationTrigger.disabled !== annotationsDisabled) annotationTrigger.disabled = annotationsDisabled;
     const zoomLabel = byId("zoom-label").textContent;
@@ -304,6 +378,7 @@ if (readerPanel && toolbar) {
     moreTrigger.title = text("more");
     annotations.heading.textContent = text("annotations");
     more.heading.textContent = text("more");
+    textSelectionHint.textContent = text("textSelectionHint");
     for (const panel of [annotations, more]) {
       setAttribute(panel.close, "aria-label", text("close"));
       panel.close.title = text("close");
@@ -421,7 +496,10 @@ if (readerPanel && toolbar) {
         previousFlow = flowActive;
       }
     }
-    if (navigationChanged) closeTools({ restoreFocus: false });
+    if (navigationChanged) {
+      pdfSelectionSnapshot = null;
+      closeTools({ restoreFocus: false });
+    }
     syncState();
   });
   observer.observe(toolbar, {
@@ -434,6 +512,17 @@ if (readerPanel && toolbar) {
   observer.observe(readerPanel, { attributes: true, attributeFilter: ["data-flow-active"] });
   if (workspace) observer.observe(workspace, { attributes: true, attributeFilter: ["data-mobile-pane", "data-owner-kind"] });
   if (readerStage) observer.observe(readerStage, { attributes: true, attributeFilter: ["data-document-id"] });
+
+  document.addEventListener("selectionchange", () => {
+    const selection = window.getSelection();
+    if (pdfSelectionRange()) rememberPdfSelection();
+    else if (selection?.rangeCount && !selection.isCollapsed) pdfSelectionSnapshot = null;
+    syncProxies();
+  });
+  byId("page-input")?.addEventListener("change", () => {
+    pdfSelectionSnapshot = null;
+    syncProxies();
+  });
 
   phoneQuery.addEventListener("change", updateViewport);
   syncState();

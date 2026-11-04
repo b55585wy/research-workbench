@@ -181,6 +181,13 @@
     gap: 4px;
   }
 
+  .reader-mobile-selection-hint {
+    margin: 8px 0 0;
+    color: var(--ui-text-soft);
+    font-size: 12px;
+    line-height: 1.4;
+  }
+
   .reader-mobile-proxy {
     display: inline-flex;
     flex: 0 0 44px;
