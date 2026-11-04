@@ -9,7 +9,6 @@ if (main && documents && notes && assistant) {
   const readerHeading = byId("reader-heading");
   const notesHeading = byId("notes-heading");
   const dataHeading = byId("data-workspace-title");
-  const libraryToggle = byId("workspace-library-toggle");
   const notesToggle = byId("workspace-notes-toggle");
   const readingToggle = byId("workspace-mode-reading");
   const assistantToggle = byId("assistant-toggle");
@@ -17,6 +16,7 @@ if (main && documents && notes && assistant) {
   const appStatus = byId("app-status");
   const navigation = byId("mobile-primary-navigation");
   const navigationButtons = Array.from(navigation.querySelectorAll("[data-mobile-pane]"));
+  const svgNamespace = "http://www.w3.org/2000/svg";
   const labels = {
     zh: {
       navigation: "主要工作区",
@@ -24,26 +24,47 @@ if (main && documents && notes && assistant) {
       reader: "阅读",
       notes: "笔记",
       assistant: "助手",
-      back: "返回",
-      backLabel: "返回上一窗格",
-      emptyNotes: "选择一篇文献后即可记录笔记。已有草稿和来源会保留。"
+      backReading: "返回阅读",
+      backData: "返回数据分析",
+      emptyNotes: "请先在资料中选择一篇文献，再编辑或查看笔记。已有草稿和来源会保留。",
+      chooseDocument: "选择文献"
     },
     en: {
       navigation: "Primary workspace",
-      library: "Papers",
+      library: "Library",
       reader: "Read",
       notes: "Notes",
       assistant: "Assistant",
-      back: "Back",
-      backLabel: "Back to previous pane",
-      emptyNotes: "Choose a paper to start taking notes. Existing drafts and sources are preserved."
+      backReading: "Back to reading",
+      backData: "Back to data analysis",
+      emptyNotes: "Choose a paper in Library to edit or view notes. Existing drafts and sources are preserved.",
+      chooseDocument: "Choose a paper"
     }
   };
+  const iconPaths = {
+    library: '<path d="M3 6h7l2 2h9v11H3z"/><path d="M3 6V4h7l2 2"/>',
+    reader: '<path d="M3 5c4-1 7 0 9 2 2-2 5-3 9-2v14c-4-1-7 0-9 2-2-2-5-3-9-2z"/><path d="M12 7v14"/>',
+    notes: '<path d="M5 3h14v18H5z"/><path d="M9 8h6M9 12h6M9 16h4"/>',
+    assistant: '<path d="M4 4h16v12H9l-5 4z"/><path d="M8 9h8M8 12h5"/>',
+    back: '<path d="m15 18-6-6 6-6"/>'
+  };
+
+  function makeIcon(name) {
+    const svg = document.createElementNS(svgNamespace, "svg");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("fill", "none");
+    svg.setAttribute("stroke", "currentColor");
+    svg.setAttribute("stroke-width", "1.7");
+    svg.setAttribute("stroke-linecap", "round");
+    svg.setAttribute("stroke-linejoin", "round");
+    svg.setAttribute("aria-hidden", "true");
+    svg.setAttribute("focusable", "false");
+    svg.innerHTML = iconPaths[name];
+    return svg;
+  }
 
   let phoneActive = false;
   let currentPane = "library";
-  let libraryReturnPane = "reader";
-  let notesReturnPane = "reader";
   let pendingDocument = null;
   let pendingMode = null;
   let assistantOpen = !assistant.hidden;
@@ -57,18 +78,33 @@ if (main && documents && notes && assistant) {
   const libraryBack = document.createElement("button");
   libraryBack.type = "button";
   libraryBack.className = "mobile-pane-back";
+  libraryBack.append(makeIcon("back"));
   libraryBar.append(libraryTitle, libraryBack);
   documents.prepend(libraryBar);
 
   const notesBack = document.createElement("button");
   notesBack.type = "button";
   notesBack.className = "mobile-pane-back";
+  notesBack.append(makeIcon("back"));
   notesHeading.parentElement.append(notesBack);
   const notesEmpty = document.createElement("p");
   notesEmpty.className = "mobile-notes-empty";
   notesEmpty.id = "mobile-notes-empty";
+  const notesEmptyText = document.createElement("span");
+  const notesChooseDocument = document.createElement("button");
+  notesChooseDocument.type = "button";
+  notesChooseDocument.className = "button button-secondary mobile-notes-library";
+  notesEmpty.append(notesEmptyText, notesChooseDocument);
   notesHeading.parentElement.after(notesEmpty);
 
+  for (const button of navigationButtons) {
+    const label = document.createElement("span");
+    label.className = "mobile-primary-label";
+    label.textContent = button.textContent;
+    button.replaceChildren(makeIcon(button.dataset.mobilePane), label);
+  }
+
+  libraryTitle.tabIndex = -1;
   readerHeading.tabIndex = -1;
   notesHeading.tabIndex = -1;
   dataHeading.tabIndex = -1;
@@ -79,19 +115,21 @@ if (main && documents && notes && assistant) {
 
   function applyLanguage() {
     const copy = labels[language()];
+    const backLabel = nativeMode() === "data" ? copy.backData : copy.backReading;
     navigation.setAttribute("aria-label", copy.navigation);
     for (const button of navigationButtons) {
       const key = button.dataset.mobilePane;
-      button.textContent = copy[key];
+      button.querySelector(".mobile-primary-label").textContent = copy[key];
       button.setAttribute("aria-label", copy[key]);
     }
     libraryTitle.textContent = copy.library;
-    for (const button of [libraryBack, notesBack]) {
-      button.textContent = copy.back;
-      button.setAttribute("aria-label", copy.backLabel);
-      button.title = copy.backLabel;
-    }
-    notesEmpty.textContent = copy.emptyNotes;
+    libraryBack.setAttribute("aria-label", backLabel);
+    libraryBack.title = backLabel;
+    const notesBackLabel = phoneActive ? backLabel : notesToggle.getAttribute("aria-label") || backLabel;
+    notesBack.setAttribute("aria-label", notesBackLabel);
+    notesBack.title = notesBackLabel;
+    notesEmptyText.textContent = copy.emptyNotes;
+    notesChooseDocument.textContent = copy.chooseDocument;
   }
 
   function nativeMode() {
@@ -135,14 +173,14 @@ if (main && documents && notes && assistant) {
       navigationButtons.find((button) => button.dataset.mobilePane === (pane === "data" ? "reader" : pane))?.focus({ preventScroll: true });
       return;
     }
-    const heading = pane === "notes" ? notesHeading : pane === "data" ? dataHeading : readerHeading;
+    const heading = pane === "library" ? libraryTitle : pane === "notes" ? notesHeading : pane === "data" ? dataHeading : readerHeading;
     heading?.focus({ preventScroll: true });
   }
 
   function showPane(pane, options = {}) {
     if (!phoneActive) return;
     currentPane = pane;
-    main.dataset.mobilePane = pane;
+    if (main.dataset.mobilePane !== pane) main.dataset.mobilePane = pane;
     main.dataset.mobileHasDocument = String(hasDocument());
     renderNavigation();
     if (options.focus) focusPane(pane, options.focus);
@@ -158,22 +196,9 @@ if (main && documents && notes && assistant) {
     assistantClose.click();
   }
 
-  function openLibrary() {
-    if (currentPane !== "library") libraryReturnPane = currentPane;
-    if (documents.hidden) libraryToggle.click();
-    if (!documents.hidden) showPane("library");
-  }
-
-  function openNotes() {
-    if (currentPane !== "notes") notesReturnPane = currentPane;
-    if (notes.hidden) notesToggle.click();
-    if (!notes.hidden) showPane("notes");
-  }
-
-  function closeFocusedPane(pane) {
-    const remembered = pane === "library" ? libraryReturnPane : notesReturnPane;
-    const target = remembered === "reader" || remembered === "data" ? basePane() : remembered;
-    showPane(target || basePane(), { focus: "tab" });
+  function closeFocusedPane() {
+    clearPendingDocument();
+    showBasePane({ focus: "heading" });
   }
 
   function clearPendingDocument() {
@@ -185,12 +210,10 @@ if (main && documents && notes && assistant) {
   function resolvePendingDocument() {
     if (!pendingDocument) return;
     const pending = pendingDocument;
-    const matches = matchesPendingDocument(pending);
-    if (!matches) return;
+    if (!matchesPendingDocument(pending)) return;
     clearPendingDocument();
     if (pending.noteId) {
-      if (notes.hidden) notesToggle.click();
-      if (!notes.hidden) showPane("notes", { focus: "heading" });
+      showPane("notes", { focus: "heading" });
       return;
     }
     showBasePane({ focus: "heading" });
@@ -204,10 +227,10 @@ if (main && documents && notes && assistant) {
       showPane("notes", { focus: "heading" });
     }
     if (!pendingDocument) return;
-    const matches = matchesPendingDocument(pendingDocument);
-    if (matches) return;
+    const pending = pendingDocument;
+    if (matchesPendingDocument(pending)) return;
     clearPendingDocument();
-    if (appStatus.dataset.kind === "error" && hasDocument() && !notes.hidden && currentPane === "library") {
+    if (appStatus.dataset.kind === "error" && hasDocument() && pending.noteId && currentPane === "library") {
       showPane("notes", { focus: "heading" });
     }
   }
@@ -221,6 +244,7 @@ if (main && documents && notes && assistant) {
       pendingMode = null;
       if (revealMode) showBasePane();
     }
+    applyLanguage();
     resolvePendingDocument();
     if (!userNavigated && hasDocument() && !assistantOpen) showBasePane();
     renderNavigation();
@@ -228,9 +252,7 @@ if (main && documents && notes && assistant) {
 
   function repairVisiblePane() {
     main.dataset.mobileHasDocument = String(hasDocument());
-    if (currentPane === "library" && documents.hidden) showBasePane();
-    else if (currentPane === "notes" && notes.hidden) showBasePane();
-    else if (currentPane === "reader" && nativeMode() !== "reading") showBasePane();
+    if (currentPane === "reader" && nativeMode() !== "reading") showBasePane();
     else if (currentPane === "data" && nativeMode() !== "data") showBasePane();
     renderNavigation();
   }
@@ -239,19 +261,17 @@ if (main && documents && notes && assistant) {
     button.addEventListener("click", () => {
       const pane = button.dataset.mobilePane;
       userNavigated = true;
-      if (assistantOpen && pane !== "assistant") closeAssistant();
-      if (pane === "library") openLibrary();
-      else if (pane === "notes") openNotes();
+      clearPendingDocument();
+      if (!assistant.hidden && pane !== "assistant") closeAssistant();
+      if (pane === "library") showPane("library");
+      else if (pane === "notes") showPane("notes");
       else if (pane === "reader") {
         if (nativeMode() === "reading") showPane("reader");
         else {
           pendingMode = "reading";
           readingToggle.click();
         }
-      } else if (pane === "assistant") {
-        if (assistantOpen) closeAssistant();
-        else assistantToggle.click();
-      }
+      } else if (pane === "assistant" && assistant.hidden) assistantToggle.click();
     });
   }
 
@@ -275,21 +295,22 @@ if (main && documents && notes && assistant) {
     requestAnimationFrame(resolvePendingDocument);
   });
 
-  libraryBack.addEventListener("click", () => closeFocusedPane("library"));
+  libraryBack.addEventListener("click", closeFocusedPane);
   notesBack.addEventListener("click", () => {
     if (!phoneActive) {
       if (!notes.hidden) notesToggle.click();
       notesToggle.focus({ preventScroll: true });
       return;
     }
-    closeFocusedPane("notes");
+    closeFocusedPane();
   });
+  notesChooseDocument.addEventListener("click", () => showPane("library", { focus: "heading" }));
 
   document.addEventListener("keydown", (event) => {
     if (event.key !== "Escape" || event.defaultPrevented || !phoneActive || assistantOpen || document.querySelector("dialog[open]")) return;
     if (currentPane === "library" || currentPane === "notes") {
       event.preventDefault();
-      closeFocusedPane(currentPane);
+      closeFocusedPane();
     }
   });
 
@@ -309,8 +330,6 @@ if (main && documents && notes && assistant) {
     subtree: true,
     attributeFilter: ["data-active", "data-study-id"]
   });
-  new MutationObserver(repairVisiblePane).observe(documents, { attributes: true, attributeFilter: ["hidden"] });
-  new MutationObserver(repairVisiblePane).observe(notes, { attributes: true, attributeFilter: ["hidden"] });
   new MutationObserver(handleNativeStatus).observe(appStatus, {
     attributes: true,
     childList: true,
@@ -398,6 +417,7 @@ if (main && documents && notes && assistant) {
     phoneActive = nextPhoneActive;
     document.documentElement.classList.toggle("mobile-layout-active", phoneActive);
     document.body.classList.toggle("mobile-layout-active", phoneActive);
+    applyLanguage();
     if (phoneActive) {
       if (hasDocument() && !userNavigated) showBasePane();
       else showPane(currentPane);

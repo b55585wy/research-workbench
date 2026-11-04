@@ -1,8 +1,10 @@
 # tFUS 报告资料接入（首版）
 
-2026-11-04：tFUS v0.33.0 提供工作台入口及旧 RMS 评分报告的本地 CSV 交接。此分支只补文档，ResearchWorkbench v0.52.0 应用、资料、游客和个人服务不改动。
+2026-11-04：tFUS v0.34.0 提供工作台入口及旧 RMS 评分报告的本地 CSV 交接。此分支只补文档，ResearchWorkbench v0.53.0 应用、资料、游客和个人服务不改动。
 
 ## 用户流程
+
+网页也可在 tFUS 已完成的 RMS 评分结果中直接点击“导出评测数据（CSV）”，将 CSV 加入下述工作台资料入口；完整 JSON 报告另行保留。
 
 1. 在 tFUS 用本人 PAT 执行 `python scripts/tfus_client.py reports export-research JOB_ID --output-dir ../tfus-handoff-run-001`，父目录存在、目标目录不存在。
 2. 在本工作台已有“我的数据”或选定研究课题的数据入口上传 `research-summary.csv`，需要时再关联课题。原 `report.json` 和 README 保留本机。
@@ -20,4 +22,4 @@ tFUS 只提供新标签页链接，不附带项目、用户、令牌或模型 Ke
 
 ## 本轮证据
 
-工作台代码核对基线 main `150c2347e051b2a66db405fb3911d12cfdba37e1`。临时只读 PAT 读取合成评分→本地导出→当前代码已有 CSV API 保存/重开，原字节、SHA、指标一致；另一独立临时上下文读取拒绝。没有论文上传、统计执行、模型调用、真实资料、线上游客创建或公网服务更新。tFUS 本机预览已备份/兼容验证后更新；完整接入约定在其私有仓库 `docs/RESEARCH-WORKBENCH-INTEGRATION.md`。
+本轮核对工作台 main `5de5aaf8bfe29c4b8600d7bfc0df00880185afbb` / v0.53.0；与原 v0.52.0 验收基线相比，后端只改版本号，原 CSV 入库接口和存储代码相同，沿用其保留冒烟证据。网页版另通过39项有界检查和4份原始报告的 CLI/网页字段、数值及原字节哈希对照。临时只读 PAT 读取合成评分→本地导出→当前代码已有 CSV API 保存/重开，原字节、SHA、指标一致；另一独立临时上下文读取拒绝。没有论文上传、统计执行、模型调用、真实资料、线上游客创建或公网服务更新。tFUS 本机预览已备份/兼容验证后更新；完整接入约定在其私有仓库 `docs/RESEARCH-WORKBENCH-INTEGRATION.md`。

@@ -110,9 +110,9 @@
     border: 0;
   }
 
-  .mobile-layout-active .workspace[data-mobile-pane="library"] > #documents-panel:not([hidden]),
-  .mobile-layout-active .workspace[data-mobile-pane="notes"] > #notes-panel:not([hidden]) {
-    display: block;
+  .mobile-layout-active .workspace[data-mobile-pane="library"] > #documents-panel,
+  .mobile-layout-active .workspace[data-mobile-pane="notes"] > #notes-panel {
+    display: block !important;
     overflow-y: auto;
     overscroll-behavior: contain;
     -webkit-overflow-scrolling: touch;
@@ -144,31 +144,51 @@
 
   .mobile-primary-button {
     position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
     min-width: 0;
     min-height: 48px;
-    padding: 8px 4px;
+    padding: 3px 4px;
     border: 0;
-    border-radius: 3px;
+    border-radius: 0;
     background: transparent;
     color: var(--ui-text-soft);
-    font-size: 13px;
-    font-weight: 600;
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1.2;
     cursor: pointer;
   }
 
   .mobile-primary-button::before {
     position: absolute;
-    top: 0;
-    left: 24%;
-    width: 52%;
-    height: 3px;
-    border-radius: 0 0 2px 2px;
+    top: -4px;
+    left: 30%;
+    width: 40%;
+    height: 2px;
     background: transparent;
     content: "";
   }
 
+  .mobile-primary-button > svg {
+    display: block;
+    width: 22px;
+    height: 22px;
+    flex: none;
+  }
+
+  .mobile-primary-label {
+    display: block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   .mobile-primary-button[aria-pressed="true"] {
-    background: var(--ui-selected);
+    background: transparent;
     color: var(--ui-primary);
   }
 
@@ -207,21 +227,37 @@
     background: var(--ui-surface);
   }
 
+  .mobile-layout-active :is(.mobile-pane-bar, .notes-heading) > :is(strong, h2) {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+  }
+
   .mobile-pane-back {
     align-items: center;
     justify-content: center;
+    width: 44px;
     min-width: 44px;
     min-height: 44px;
-    padding: 7px 10px;
-    border: 1px solid transparent;
+    padding: 0;
+    border: 0;
     border-radius: 3px;
     background: transparent;
     color: var(--ui-text-soft);
     cursor: pointer;
   }
 
+  .mobile-pane-back > svg {
+    width: 22px;
+    height: 22px;
+  }
+
   .mobile-layout-active .mobile-pane-back {
     display: inline-flex;
+  }
+
+  .mobile-layout-active #paper-library > .paper-library-summary {
+    display: none;
   }
 
   .mobile-layout-active .library-search {
@@ -359,8 +395,12 @@
     position: sticky;
     top: 0;
     z-index: 3;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     min-height: 52px;
     padding: 4px 12px;
+    border-bottom: 1px solid var(--ui-border);
     background: var(--ui-surface);
   }
 
@@ -402,6 +442,10 @@
     min-height: 44px;
   }
 
+  .mobile-layout-active .workspace[data-mobile-pane="notes"][data-mobile-has-document="false"] #notes-panel > :not(.notes-heading):not(.mobile-notes-empty) {
+    display: none;
+  }
+
   .mobile-layout-active .workspace[data-mobile-has-document="false"] .mobile-notes-empty {
     display: block;
     margin: 12px;
@@ -410,6 +454,11 @@
     background: var(--ui-info-bg);
     color: var(--ui-text-soft);
     line-height: 1.6;
+  }
+
+  .mobile-layout-active .mobile-notes-library {
+    display: flex;
+    margin-top: 12px;
   }
 
   .mobile-layout-active .workspace[data-mobile-has-document="false"] #notes-empty {
@@ -425,7 +474,7 @@
     inset: var(--mobile-viewport-top, 0px) auto auto var(--mobile-viewport-left, 0px) !important;
     z-index: 60;
     width: var(--mobile-viewport-width, 100vw) !important;
-    height: var(--mobile-viewport-height, 100dvh) !important;
+    height: calc(var(--mobile-viewport-height, 100dvh) - 60px - env(safe-area-inset-bottom, 0px)) !important;
     max-height: none !important;
     border: 0;
     border-radius: 0;

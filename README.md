@@ -1,10 +1,9 @@
 Server deployment and current status: [SERVER-DEPLOYMENT.md](SERVER-DEPLOYMENT.md).
 
-## tFUS 首版资料接入（2026-11-04）
+# research workspace · v0.53.0
 
-tFUS v0.33.0 提供跳转本工作台的入口，以及旧 RMS 评分报告的 CSV 导出；本工作台复用现有资料上传、保存与课题关联，见[接入约定](TFUS-INTEGRATION.md)。本分支仅文档，应用及公网服务保持。文件来源声明不替代身份验证；账号适配、显式空间绑定与在线引用仍待后续，不自动认领游客历史。
-
-# research workspace · v0.52.0
+手机阅读工具改用紧凑图标，批注、视图与导出按需展开，为 PDF 正文留出空间。
+桌面操作与已保存资料保持原有行为。见 [MOBILE-TOOLS.md](MOBILE-TOOLS.md)。
 
 修复缺少新 Promise 接口的浏览器打不开 PDF：使用同版 PDF.js legacy 及本地兼容资源，
 加载失败时可打开原 PDF。助手新增「清空对话」，保留草稿和已保存研究资料；
@@ -346,3 +345,9 @@ Agent 悬浮窗支持拖动、调整大小和页面内全屏，退出全屏恢�
 v0.32 阅读器集成：匹配 PDF.js 版本的文字层与旋转、选区整理、嵌入位图右键复制和 PDF 原生引用跳转。复用来源、操作与限制见 [PDF-READER-INTEGRATION.md](PDF-READER-INTEGRATION.md)。
 
 用户提供的 pdf-manage 工具栏已整理为 [阅读器功能参考清单](READER-FEATURE-REFERENCE.md)，区分上游现成功能与本工作台接入状态。
+
+## tFUS 首版资料接入（2026-11-04）
+
+tFUS v0.34.0 提供跳转本工作台的入口，以及旧 RMS 评分报告的 CSV 导出；本工作台复用现有资料上传、保存与课题关联，见[接入约定](TFUS-INTEGRATION.md)。本分支仅文档，应用及公网服务保持。文件来源声明不替代身份验证；账号适配、显式空间绑定与在线引用仍待后续，不自动认领游客历史。
+
+网页版在已完成 RMS 评分结果和任务记录提供“导出评测数据（CSV）”；完整 JSON 报告单独保留，命令行交接继续可用。
