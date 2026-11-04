@@ -4,8 +4,33 @@ import zipfile
 import pytest
 
 from research_workbench.ui_publish import pack, install, activate
-from research_workbench.ui_releases import ReleaseError, backend_fingerprint
+from research_workbench.ui_releases import ReleaseError, backend_fingerprint, digest
 from ui_release_support import project_fixture, publish_fixture
+
+
+def offline_fixture(tmp_path):
+    project = project_fixture(tmp_path)
+    frontend = project / 'frontend'
+    additions = {
+        'offline-worker.js': '// Root offline worker\n',
+        'offline-client.js': 'export const state = "idle";\n',
+        'vendor/module.mjs': 'export const m = 1;\n',
+        'vendor/skin.css': 'body{}\n',
+        'assets/runtime.json': '{"ready":true}',
+        'assets/example.pdf': '%PDF-1.4 sample',
+        'vendor/pdfjs/cmaps/H.bcmap': 'cmap',
+        'vendor/pdfjs/wasm/jbig2.wasm': '\0asm',
+        'vendor/fonts/reader.woff2': 'wOF2',
+        'notes.md': '# note',
+        'README.txt': 'read me',
+        'LICENSE': 'legal',
+        'vendor/third-party/LICENSES.txt': 'legal',
+    }
+    for name, body in additions.items():
+        path = frontend / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(body.encode('utf-8'))
+    return project
 
 
 def test_pack_pins_assets_without_changing_api_navigation_or_worker(tmp_path):
@@ -93,3 +118,64 @@ def test_permission_failure_preserves_pointer(tmp_path, monkeypatch):
         activate(project, releases, first['release'])
     assert (releases / 'current.json').read_bytes() == before
     assert not list(releases.glob('.current-*'))
+
+
+def test_offline_manifest_hashes_only_immutable_runtime_payloads(tmp_path):
+    project = offline_fixture(tmp_path)
+    releases, manifest = publish_fixture(project, tmp_path, 'first')
+    frontend = releases / manifest['release'] / 'frontend'
+    prefix = '/_ui/' + manifest['release']
+    offline = json.loads((frontend / 'offline-manifest.json').read_text(encoding='utf-8'))
+    assets = [entry['url'][len(prefix) + 1:] for entry in offline['assets']]
+
+    assert offline['format'] == 'research-workspace-offline-v1'
+    assert offline['release'] == manifest['release']
+    assert [entry['url'] for entry in offline['assets']] == sorted(entry['url'] for entry in offline['assets'])
+    assert assets == sorted(assets)
+    assert 'offline-manifest.json' in manifest['files']
+    assert 'offline-manifest.json' not in assets
+    assert all(url.startswith(prefix + '/') for url in (entry['url'] for entry in offline['assets']))
+
+    for name in ('app.js', 'lazy.js', 'styles.css', 'offline-client.js', 'offline-worker.js', 'vendor/module.mjs',
+                 'vendor/skin.css', 'assets/runtime.json', 'assets/example.pdf', 'vendor/pdfjs/cmaps/H.bcmap',
+                 'vendor/pdfjs/wasm/jbig2.wasm', 'vendor/fonts/reader.woff2'):
+        assert name in assets
+    for name in ('index.html', 'storage-choice.html', 'recover.html', 'device-sw.js', 'notes.md', 'README.txt',
+                 'LICENSE', 'vendor/third-party/LICENSES.txt'):
+        assert name not in assets
+
+    for entry, name in zip(offline['assets'], assets):
+        body = (frontend / name).read_bytes()
+        assert entry['bytes'] == len(body) == manifest['files'][name]['bytes']
+        assert entry['sha256'] == digest(body) == manifest['files'][name]['sha256']
+
+
+def test_offline_manifest_embeds_transformed_device_and_choice_html(tmp_path):
+    project = offline_fixture(tmp_path)
+    releases, manifest = publish_fixture(project, tmp_path, 'first')
+    frontend = releases / manifest['release'] / 'frontend'
+    prefix = '/_ui/' + manifest['release']
+    offline = json.loads((frontend / 'offline-manifest.json').read_text(encoding='utf-8'))
+    device, choice = offline['entries']['device'], offline['entries']['choice']
+    index = (frontend / 'index.html').read_text(encoding='utf-8')
+
+    assert device['url'] == '/device/' and choice['url'] == '/'
+    assert device['html'] == index.replace('<html ', '<html data-storage-mode="device" ', 1)
+    assert 'data-storage-mode="device"' in device['html']
+    assert 'src="' + prefix + '/app.js"' in device['html']
+    assert 'src="/app.js"' not in device['html']
+    assert choice['html'] == (frontend / 'storage-choice.html').read_text(encoding='utf-8')
+    assert 'href="/device/"' in choice['html']
+
+
+def test_offline_manifest_is_deterministic_and_optional(tmp_path):
+    project = offline_fixture(tmp_path)
+    first = pack(project, tmp_path / 'first.zip')
+    second = pack(project, tmp_path / 'second.zip')
+    assert first == second
+    with zipfile.ZipFile(tmp_path / 'first.zip') as left, zipfile.ZipFile(tmp_path / 'second.zip') as right:
+        assert left.read('frontend/offline-manifest.json') == right.read('frontend/offline-manifest.json')
+
+    toy = project_fixture(tmp_path / 'toy')
+    _, manifest = publish_fixture(toy, tmp_path / 'toy-out', 'toy')
+    assert 'offline-manifest.json' not in manifest['files']

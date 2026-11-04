@@ -2,7 +2,7 @@
 import argparse
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import re
 import shutil
 import stat
@@ -11,10 +11,44 @@ from uuid import uuid4
 import zipfile
 
 from . import __version__
-from .ui_releases import (FORMAT, MAX_BYTES, MAX_FILE_BYTES, MAX_FILES, STABLE_FILES,
-                          ReleaseError, backend_fingerprint, canonical, digest,
-                          read_manifest, safe_name, stable_fingerprints,
-                          validate_manifest, verify_files)
+from .ui_releases import (FORMAT, MAX_BYTES, MAX_FILE_BYTES, MAX_FILES, OFFLINE_FORMAT,
+                           OFFLINE_MANIFEST, OFFLINE_WORKER, STABLE_FILES, ReleaseError,
+                           backend_fingerprint, canonical, digest, read_manifest, safe_name,
+                           stable_fingerprints, validate_manifest, verify_files)
+
+
+# Offline-playable, immutable same-release payloads only. HTML, Markdown, plain
+# text, licenses, the legacy device worker and the derived manifest are excluded.
+OFFLINE_SUFFIXES = ('.js', '.mjs', '.css', '.json', '.bcmap', '.pfb', '.ttf', '.woff', '.woff2', '.wasm', '.pdf')
+OFFLINE_LEGAL = re.compile(r'(?i)^(?:licen[cs]e|notice|copying)(?:[._-]|$)')
+
+
+def offline_assets(payload):
+    names = []
+    for name in payload:
+        if name in (OFFLINE_MANIFEST, 'device-sw.js'):
+            continue
+        path = PurePosixPath(name)
+        if any(part.lower() == 'licenses' for part in path.parts[:-1]) or OFFLINE_LEGAL.match(path.name):
+            continue
+        if path.suffix.lower() in OFFLINE_SUFFIXES:
+            names.append(name)
+    return sorted(names)
+
+
+def offline_manifest(payload, identifier):
+    try:
+        index = payload['index.html'].decode('utf-8')
+        choice = payload['storage-choice.html'].decode('utf-8')
+    except KeyError as error:
+        raise ReleaseError('Offline manifest requires the device and storage-choice HTML') from error
+    prefix = '/_ui/' + identifier
+    return {'format': OFFLINE_FORMAT, 'release': identifier,
+            'entries': {'device': {'url': '/device/',
+                                   'html': index.replace('<html ', '<html data-storage-mode="device" ', 1)},
+                        'choice': {'url': '/', 'html': choice}},
+            'assets': [{'url': prefix + '/' + name, 'sha256': digest(payload[name]), 'bytes': len(payload[name])}
+                       for name in offline_assets(payload)]}
 
 
 def asset_pattern(frontend):
@@ -31,7 +65,9 @@ def pack(project, output, frontend=None):
         if path.is_symlink():
             raise ReleaseError('Frontend symlinks are not supported')
         if path.is_file():
-            files[safe_name(path.relative_to(frontend).as_posix())] = path.read_bytes()
+            name = safe_name(path.relative_to(frontend).as_posix())
+            if name != OFFLINE_MANIFEST:
+                files[name] = path.read_bytes()
     backend, stable = backend_fingerprint(project), stable_fingerprints(frontend)
     source = {name: digest(body) for name, body in files.items()}
     identifier = 'ui-' + __version__ + '-' + digest(canonical({'backend': backend, 'files': source}))[:16]
@@ -42,6 +78,11 @@ def pack(project, output, frontend=None):
             text = pattern.sub(lambda m: m[1] + prefix + '/' + m[2], body.decode('utf-8'))
             body = text.encode('utf-8')
         payload[name] = body
+    if OFFLINE_WORKER in files:
+        # Derived after the release identifier is fixed, then hashed like any
+        # other payload file. The manifest never lists itself, so hashing stays
+        # acyclic while its bytes remain part of the release.
+        payload[OFFLINE_MANIFEST] = canonical(offline_manifest(payload, identifier))
     manifest = {'format': FORMAT, 'release': identifier, 'ui_version': __version__, 'backend_sha256': backend,
                 'stable_files': stable, 'files': {name: {'bytes': len(body), 'sha256': digest(body)} for name, body in payload.items()}}
     validate_manifest(manifest, backend, stable)

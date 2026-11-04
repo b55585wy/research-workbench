@@ -1,8 +1,14 @@
 import { isDeviceMode } from "/device-context.js";
+import { offlineSupport } from "/offline-client.js";
 
 const copy = {
   zh: {
     storage: "存储",
+    offlineReady: "离线阅读已就绪",
+    offlinePreparing: "正在准备离线阅读",
+    offlineFailed: "离线准备未完成",
+    offlineUnsupported: "此浏览器不支持离线启动",
+    offlineRetry: "重试准备",
     device: "本机资料",
     server: "服务器资料",
     switchDevice: "切换到本机资料（不移动数据）",
@@ -22,6 +28,11 @@ const copy = {
   },
   en: {
     storage: "Storage",
+    offlineReady: "Offline reading is ready",
+    offlinePreparing: "Preparing offline reading",
+    offlineFailed: "Offline preparation did not finish",
+    offlineUnsupported: "Offline startup is not supported by this browser",
+    offlineRetry: "Retry preparation",
     device: "On this device",
     server: "On server",
     switchDevice: "Switch to device storage (data is not moved)",
@@ -63,9 +74,61 @@ export function createDeviceUI(adapter) {
   if (controls && root.parentElement !== controls) controls.prepend(root);
   let pending = false;
   let status = null;
+  let offlineState = offlineSupport.getState();
 
   function text(key) {
     return copy[adapter.getLanguage()]?.[key] || copy.en[key];
+  }
+
+  function offlineText() {
+    const key = {
+      ready: "offlineReady",
+      preparing: "offlinePreparing",
+      failed: "offlineFailed",
+      unsupported: "offlineUnsupported"
+    }[offlineState.status] || "offlinePreparing";
+    const label = text(key);
+    return offlineState.status === "preparing" && offlineState.total > 0
+      ? `${label} ${offlineState.completed}/${offlineState.total}`
+      : label;
+  }
+
+  function renderOffline() {
+    const device = isDeviceMode();
+    const offlineLabel = device ? offlineText() : "";
+    const summary = root.querySelector(".device-storage-summary");
+    if (summary) {
+      summary.setAttribute("aria-label", device ? `${text("storage")}: ${offlineLabel}` : text("storage"));
+      summary.title = device ? offlineLabel : text("storage");
+      const icon = summary.querySelector(".offline-status-icon");
+      if (icon) icon.dataset.state = offlineState.status;
+    }
+    const offline = root.querySelector(".offline-status");
+    if (!device || !offline) return;
+    offline.replaceChildren();
+    const offlineRow = window.document.createElement("div");
+    offlineRow.className = "offline-status-row";
+    const offlineMessage = window.document.createElement("p");
+    offlineMessage.className = "offline-status-text";
+    offlineMessage.setAttribute("role", offlineState.status === "failed" ? "alert" : "status");
+    offlineMessage.textContent = offlineLabel;
+    offlineRow.append(offlineMessage);
+    if (offlineState.status === "failed") {
+      const retry = window.document.createElement("button");
+      retry.type = "button";
+      retry.className = "button button-quiet offline-retry";
+      retry.textContent = text("offlineRetry");
+      retry.addEventListener("click", () => void offlineSupport.start());
+      offlineRow.append(retry);
+    }
+    offline.append(offlineRow);
+    if (offlineState.status === "preparing" && offlineState.total > 0) {
+      const progress = window.document.createElement("progress");
+      progress.max = offlineState.total;
+      progress.value = offlineState.completed;
+      progress.setAttribute("aria-label", offlineLabel);
+      offline.append(progress);
+    }
   }
 
   function render() {
@@ -79,7 +142,15 @@ export function createDeviceUI(adapter) {
     menu.open = wasOpen;
     const summary = window.document.createElement("summary");
     summary.className = "device-storage-summary";
-    summary.textContent = text("storage");
+    if (device) {
+      const icon = window.document.createElement("span");
+      icon.className = "offline-status-icon";
+      icon.setAttribute("aria-hidden", "true");
+      summary.append(icon);
+    }
+    const label = window.document.createElement("span");
+    label.textContent = text("storage");
+    summary.append(label);
     const panel = window.document.createElement("div");
     panel.className = "device-storage-panel";
     const switchLink = window.document.createElement("a");
@@ -109,6 +180,9 @@ export function createDeviceUI(adapter) {
       help.className = "device-storage-note";
       help.textContent = text("localOnly");
       panel.append(actions, help);
+      const offline = window.document.createElement("div");
+      offline.className = "offline-status";
+      panel.append(offline);
     }
     if (status) {
       const message = window.document.createElement("p");
@@ -120,7 +194,13 @@ export function createDeviceUI(adapter) {
     }
     menu.append(summary, panel);
     root.append(menu);
+    renderOffline();
   }
+
+  offlineSupport.subscribe((next) => {
+    offlineState = next;
+    renderOffline();
+  });
 
   function setStatus(kind, key) {
     status = key ? { kind, text: text(key) } : null;

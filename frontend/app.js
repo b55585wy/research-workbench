@@ -25,6 +25,7 @@ import { createTranslationOverlay } from "/translation-overlay.js";
 import { createFlowReadingBridge } from "/flow-reading-bridge.js";
 import { isDeviceMode, mapDeviceAssetUrl } from "/device-context.js";
 import { createDeviceUI, applyDeviceCapabilities } from "/device-ui.js";
+import { offlineSupport } from "/offline-client.js";
 import { collectPdfTextSelection, formatSelectionQuote, sourceSegmentsFor } from "/cross-page-selection.js";
 
 window.workbenchStartup?.stage("workspace");
@@ -42,7 +43,7 @@ const MAX_DEVICE_PIXEL_RATIO = 2;
 const MAX_FILE_BYTES = 20 * 1024 * 1024;
 const ZOOM_MIN = 0.4;
 const ZOOM_MAX = 3;
-const APP_VERSION = "0.55.3";
+const APP_VERSION = "0.55.4";
 const PDF_RANGE_CHUNK_SIZE = 64 * 1024;
 const PDF_LOADING_HINT_DELAY = 12_000;
 
@@ -1451,36 +1452,12 @@ class ApiError extends Error {
   }
 }
 
-async function waitForDeviceController() {
-  const current = navigator.serviceWorker.controller;
-  if (current && new URL(current.scriptURL).pathname === "/device-sw.js") return;
-  await new Promise((resolve, reject) => {
-    const timer = setTimeout(() => {
-      navigator.serviceWorker.removeEventListener("controllerchange", changed);
-      reject(new Error("Device worker did not take control"));
-    }, 15000);
-    function changed() {
-      const controller = navigator.serviceWorker.controller;
-      if (!controller || new URL(controller.scriptURL).pathname !== "/device-sw.js") return;
-      clearTimeout(timer);
-      navigator.serviceWorker.removeEventListener("controllerchange", changed);
-      resolve();
-    }
-    navigator.serviceWorker.addEventListener("controllerchange", changed);
-    changed();
-  });
-}
-
 async function prepareDeviceRepository() {
   if (!deviceMode) return null;
   if (deviceRepository) return deviceRepository;
   if (deviceReadyPromise) return deviceReadyPromise;
   deviceReadyPromise = (async () => {
-    if (!navigator.serviceWorker) throw new Error("Service workers unavailable");
-    await navigator.serviceWorker.register("/device-sw.js?v=0.55.0", { type: "module", scope: "/device/" });
-    const registration = await navigator.serviceWorker.ready;
-    if (!registration.scope.endsWith("/device/")) throw new Error("Device worker scope mismatch");
-    await waitForDeviceController();
+    await offlineSupport.ensureDeviceController();
     const { createDeviceRepository } = await import("/device-repository.js");
     const repository = createDeviceRepository({
       pdfjsLib,
@@ -8308,6 +8285,7 @@ deviceUI = createDeviceUI({
 applyDeviceCapabilities();
 applyTheme();
 applyLanguage();
+if (deviceMode) void offlineSupport.start();
 
 async function startApplication() {
   if (deviceMode) {

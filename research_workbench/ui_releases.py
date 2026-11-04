@@ -11,6 +11,9 @@ from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
 
 FORMAT = 'research-workspace-ui-v1'
+OFFLINE_FORMAT = 'research-workspace-offline-v1'
+OFFLINE_MANIFEST = 'offline-manifest.json'
+OFFLINE_WORKER = 'offline-worker.js'
 MAX_BYTES = 100 * 1024 * 1024
 MAX_FILE_BYTES = 20 * 1024 * 1024
 MAX_FILES = 5000
@@ -58,11 +61,14 @@ def stable_fingerprints(frontend):
     return {name: digest((Path(frontend) / name).read_bytes()) for name in STABLE_FILES}
 
 
-def validate_manifest(manifest, backend, stable):
+def validate_payload(manifest):
+    """Release metadata that must hold for any installed release.
+
+    Deliberately independent of the running backend: an installed bundle is
+    judged by its own recorded metadata, path bounds and file hashes.
+    """
     if not isinstance(manifest, dict) or manifest.get('format') != FORMAT or not isinstance(manifest.get('release'), str) or not RELEASE_ID.fullmatch(manifest['release']):
         raise ReleaseError('Unsupported UI release')
-    if manifest.get('backend_sha256') != backend or manifest.get('stable_files') != stable:
-        raise ReleaseError('UI release requires a backend or device-storage update')
     files = manifest.get('files')
     if not isinstance(files, dict) or not 1 <= len(files) <= MAX_FILES or 'index.html' not in files:
         raise ReleaseError('Invalid release file list')
@@ -75,19 +81,49 @@ def validate_manifest(manifest, backend, stable):
         if type(size) is not int or not 0 <= size <= MAX_FILE_BYTES or not isinstance(sha, str) or not re.fullmatch('[0-9a-f]{64}', sha):
             raise ReleaseError('Invalid release file metadata')
         total += size
-    if total > MAX_BYTES or any(files.get(name, {}).get('sha256') != sha for name, sha in stable.items()):
+    if total > MAX_BYTES:
+        raise ReleaseError('Invalid release size')
+    return files
+
+
+def validate_manifest(manifest, backend, stable):
+    files = validate_payload(manifest)
+    if manifest.get('backend_sha256') != backend or manifest.get('stable_files') != stable:
+        raise ReleaseError('UI release requires a backend or device-storage update')
+    if any(files.get(name, {}).get('sha256') != sha for name, sha in stable.items()):
         raise ReleaseError('Invalid release size or stable device files')
 
 
-def read_manifest(directory, backend, stable):
+def release_metadata(directory):
     directory = Path(directory)
     path = directory / 'RELEASE.json'
     if path.is_symlink() or path.stat().st_size > 2 * 1024 * 1024:
         raise ReleaseError('Invalid release manifest')
-    manifest = json.loads(path.read_text(encoding='utf-8'))
+    return json.loads(path.read_text(encoding='utf-8'))
+
+
+def read_manifest(directory, backend, stable):
+    directory = Path(directory)
+    manifest = release_metadata(directory)
     validate_manifest(manifest, backend, stable)
     if directory.name != manifest['release']:
         raise ReleaseError('Release directory mismatch')
+    return manifest
+
+
+def read_historical_manifest(directory, identifier):
+    """Validate an already-installed immutable bundle on its own terms.
+
+    Selection and installation stay bound to the running backend fingerprint.
+    Serving bytes that a still-open page pinned must not be: a distribution-only
+    update changes that fingerprint while the installed bundle stays intact.
+    """
+    directory = Path(directory)
+    manifest = release_metadata(directory)
+    validate_payload(manifest)
+    if directory.name != manifest['release'] or manifest['release'] != identifier:
+        raise ReleaseError('Release directory mismatch')
+    verify_files(directory, manifest)
     return manifest
 
 
@@ -122,6 +158,21 @@ class UIDelivery:
         verify_files(directory, manifest)
         return directory, manifest, StaticFiles(directory=directory / 'frontend')
 
+    @lru_cache(maxsize=8)
+    def historical(self, identifier):
+        """Installed bundle served to pages opened before a distribution update.
+
+        Unlike ``release`` this never compares against the running backend or
+        stable-file fingerprints, so pinned immutable paths keep their bytes.
+        """
+        if not self.releases or not RELEASE_ID.fullmatch(identifier):
+            raise ReleaseError('Unknown UI release')
+        directory = self.releases / identifier
+        if directory.is_symlink():
+            raise ReleaseError('Release symlinks are not supported')
+        manifest = read_historical_manifest(directory, identifier)
+        return directory, manifest, StaticFiles(directory=directory / 'frontend')
+
     def selected(self):
         if not self.releases:
             return self.frontend, None
@@ -154,12 +205,16 @@ class UIDelivery:
         try:
             if not separator or name.endswith('.html') or name == 'device-sw.js':
                 raise ReleaseError('Not a versioned asset')
-            _, manifest, static = await run_in_threadpool(self.release, identifier)
+            _, manifest, static = await run_in_threadpool(self.historical, identifier)
             if safe_name(name) not in manifest['files']:
                 raise ReleaseError('Unknown release asset')
             response = await static.get_response(name, scope)
             response.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
             response.headers['X-Workspace-UI-Release'] = identifier
+            if name == OFFLINE_WORKER:
+                # Only the exact versioned worker may claim the root scope; every
+                # other asset keeps its existing headers and versioned HTML stays 404.
+                response.headers['Service-Worker-Allowed'] = '/'
             return response
         except (OSError, ValueError, TypeError):
             return Response(status_code=404, headers={'Cache-Control': 'no-store'})
