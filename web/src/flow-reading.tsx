@@ -9,6 +9,7 @@ import {
   type FlowReadingPreferences,
   type FlowReadingWidth
 } from "./flow-preferences";
+import { validatedSentences } from "./flow-sentences";
 import { runInScope, type TranslationRun } from "./translation-runs";
 
 type FlowLanguage = "zh" | "en";
@@ -90,6 +91,7 @@ interface TranslationJob {
       kind: string;
       source_text: string;
       translated_text: string | null;
+      sentences?: unknown;
     }>;
   }>;
 }
@@ -196,6 +198,7 @@ const strings = {
     continuous: "连续",
     single: "单次",
     translationScope: "缺少译文的段落保留原文；图像、表格和公式始终保留原文。",
+    sentenceFallback: "部分段落缺少有效的句子对齐，仍按整段对照显示；如需句子对齐，请手动翻译当前页。",
     translate: "翻译当前页",
     untitled: "未命名文献",
     translationLabel: "选择已保存译文",
@@ -257,6 +260,7 @@ const strings = {
     continuous: "Continuous",
     single: "Single",
     translationScope: "Paragraphs without a translation remain in the original language; images, tables, and formulas always remain original.",
+    sentenceFallback: "Some paragraphs lack valid sentence alignment and remain paragraph pairs. To create aligned text, use Translate current page.",
     translate: "Translate current page",
     untitled: "Untitled paper",
     translationLabel: "Saved translation",
@@ -367,20 +371,25 @@ function translationRunDetailInScope(
     && value.result_pages.every((result) => result.page === page && Array.isArray(result.blocks));
 }
 
-function translatedBlock(job: TranslationJob | null, page: number, block: SourceBlock) {
+function translatedBlockCandidate(job: TranslationJob | null, page: number, block: SourceBlock) {
   if (!job || !translatableKinds.has(block.kind)) return null;
   for (const resultPage of job.result_pages || []) {
     if (resultPage.page !== page || resultPage.status !== "completed" || !Array.isArray(resultPage.blocks)) continue;
     for (const candidate of resultPage.blocks) {
+      const translatedText = candidate.translated_text;
       if (
         candidate.id === block.id
         && candidate.source_text === block.source_text
-        && typeof candidate.translated_text === "string"
-        && candidate.translated_text.trim()
-      ) return candidate.translated_text;
+        && typeof translatedText === "string"
+        && translatedText.trim()
+      ) return { ...candidate, translated_text: translatedText };
     }
   }
   return null;
+}
+
+function translatedBlock(job: TranslationJob | null, page: number, block: SourceBlock) {
+  return translatedBlockCandidate(job, page, block)?.translated_text ?? null;
 }
 
 function SourceVisual({ block, page, document, callbacks, copy }: {
@@ -473,11 +482,18 @@ function SourceVisual({ block, page, document, callbacks, copy }: {
 
 type FlowTextPart = "source" | "translation";
 
+interface FlowTextVariant {
+  part: FlowTextPart;
+  text: string;
+  sentenceId?: string;
+}
+
 interface FlowMatch {
   index: number;
   page: number;
   blockId: string;
   part: FlowTextPart;
+  sentenceId?: string;
   start: number;
   end: number;
 }
@@ -490,13 +506,22 @@ interface FlowSearchResult {
   matches: FlowMatch[];
 }
 
-function blockTextVariants(block: SourceBlock, page: number, mode: TextMode, translation: TranslationJob | null): Array<{ part: FlowTextPart; text: string }> {
+function blockTextVariants(block: SourceBlock, page: number, mode: TextMode, translation: TranslationJob | null): FlowTextVariant[] {
   const source = { part: "source" as const, text: block.source_text };
   if (mode === "original") return [source];
-  const translated = translatedBlock(translation, page, block);
+  const translated = translatedBlockCandidate(translation, page, block);
   if (!translated) return [source];
-  if (mode === "bilingual") return [source, { part: "translation", text: translated }];
-  return [{ part: "translation", text: translated }];
+  if (mode === "bilingual") {
+    const sentences = validatedSentences(block, translated);
+    if (sentences) {
+      return sentences.flatMap((sentence): FlowTextVariant[] => [
+        { part: "source", text: sentence.source_text, sentenceId: sentence.id },
+        { part: "translation", text: sentence.translated_text, sentenceId: sentence.id }
+      ]);
+    }
+    return [source, { part: "translation", text: translated.translated_text }];
+  }
+  return [{ part: "translation", text: translated.translated_text }];
 }
 
 function findInPages(pages: SourcePage[], query: string, mode: TextMode, translation: TranslationJob | null) {
@@ -517,6 +542,7 @@ function findInPages(pages: SourcePage[], query: string, mode: TextMode, transla
             page: page.page,
             blockId: block.id,
             part: variant.part,
+            ...(variant.sentenceId ? { sentenceId: variant.sentenceId } : {}),
             start: match.index,
             end: match.index + match[0].length
           });
@@ -543,25 +569,29 @@ function FlowIcon({ name }: { name: FlowIconName }) {
   );
 }
 
-function highlightedText(text: string, part: FlowTextPart, blockId: string, matches: FlowMatch[], activeMatch: number): ReactNode {
+function variantMatches(matches: FlowMatch[], variant: FlowTextVariant) {
+  return matches.filter((match) => match.part === variant.part && match.sentenceId === variant.sentenceId);
+}
+
+function highlightedText(variant: FlowTextVariant, blockId: string, matches: FlowMatch[], activeMatch: number): ReactNode {
   const content: ReactNode[] = [];
   let cursor = 0;
   for (const match of matches) {
-    if (match.start > cursor) content.push(text.slice(cursor, match.start));
+    if (match.start > cursor) content.push(variant.text.slice(cursor, match.start));
     content.push(
       <mark
         className="flow-find-match"
         data-flow-match-index={match.index}
         data-active={activeMatch === match.index ? "true" : "false"}
-        key={`${match.page}:${blockId}:${part}:${match.start}`}
+        key={`${match.page}:${blockId}:${variant.sentenceId || "block"}:${variant.part}:${match.start}`}
       >
-        {text.slice(match.start, match.end)}
+        {variant.text.slice(match.start, match.end)}
       </mark>
     );
     cursor = match.end;
   }
-  if (cursor < text.length) content.push(text.slice(cursor));
-  return matches.length ? content : text;
+  if (cursor < variant.text.length) content.push(variant.text.slice(cursor));
+  return matches.length ? content : variant.text;
 }
 
 function flowBlockElement(block: SourceBlock, children: ReactNode, className = "", identified = true) {
@@ -589,17 +619,24 @@ function BlockView({ block, page, document, callbacks, copy, mode, translation, 
   }
   const variants = blockTextVariants(block, page, mode, translation);
   const source = variants[0];
-  const translated = variants[1];
-  if (mode === "bilingual" && source && translated) {
+  if (mode === "bilingual" && variants.length > 1) {
     return (
       <div className="flow-bilingual-pair" data-flow-block-id={block.id}>
-        {flowBlockElement(block, highlightedText(source.text, source.part, block.id, matches.filter((match) => match.part === source.part), activeMatch), "flow-bilingual-original", false)}
-        {flowBlockElement(block, highlightedText(translated.text, translated.part, block.id, matches.filter((match) => match.part === translated.part), activeMatch), "flow-bilingual-translation", false)}
+        {Array.from({ length: Math.floor(variants.length / 2) }, (_, index) => {
+          const original = variants[index * 2];
+          const translated = variants[index * 2 + 1];
+          return (
+            <div className="flow-bilingual-sentence" data-flow-sentence-id={original.sentenceId} key={original.sentenceId || "paragraph"}>
+              {flowBlockElement(block, highlightedText(original, block.id, variantMatches(matches, original), activeMatch), "flow-bilingual-original", false)}
+              {flowBlockElement(block, highlightedText(translated, block.id, variantMatches(matches, translated), activeMatch), "flow-bilingual-translation", false)}
+            </div>
+          );
+        })}
       </div>
     );
   }
   if (!source?.text.trim()) return null;
-  return flowBlockElement(block, highlightedText(source.text, source.part, block.id, matches.filter((match) => match.part === source.part), activeMatch));
+  return flowBlockElement(block, highlightedText(source, block.id, variantMatches(matches, source), activeMatch));
 }
 
 function FlowReader({ model, callbacks }: { model: FlowReaderModel; callbacks: FlowReaderCallbacks }) {
@@ -973,6 +1010,12 @@ function FlowReader({ model, callbacks }: { model: FlowReaderModel; callbacks: F
     return () => observer.disconnect();
   }, [callbacks, document.id, document.sha256, pages]);
 
+  const sentenceFallback = mode === "bilingual" && translation !== null && pages.some((page) => (
+    page.blocks.some((block) => {
+      const candidate = translatedBlockCandidate(translation, page.page, block);
+      return candidate !== null && validatedSentences(block, candidate) === null;
+    })
+  ));
   const missingTranslation = mode !== "original" && translation !== null && pages.some((page) => (
     page.blocks.some((block) => translatableKinds.has(block.kind) && block.source_text.trim() && !translatedBlock(translation, page.page, block))
   ));
@@ -1213,6 +1256,7 @@ function FlowReader({ model, callbacks }: { model: FlowReaderModel; callbacks: F
           )}
           {runsError && !jobsError && <p className="flow-error" role="alert">{copy.translationListPartial}</p>}
           {jobsLoaded && !jobs.length && !runs.length && !jobsError && !runsError && <p>{copy.noTranslations}</p>}
+          {sentenceFallback && <p className="flow-sentence-fallback">{copy.sentenceFallback}</p>}
           {missingTranslation && <p>{copy.translationScope}</p>}
         </div>
       )}

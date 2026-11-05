@@ -38,6 +38,7 @@
   <link rel="stylesheet" href="/status-notice.css">
   <link rel="stylesheet" href="/sidebar-navigation.css">
   <link rel="stylesheet" href="/ui-foundation.css">
+  <link rel="stylesheet" href="/reader-action-icons.css">
   <link rel="stylesheet" href="/translation-mobile.css">
 </head>
 <body>
@@ -286,15 +287,21 @@
               <option value="flow" data-i18n="viewFlow">段落阅读</option>
             </select>
           </label>
-          <button id="reader-find-toggle" class="button button-quiet reader-find-toggle" type="button" aria-controls="reader-find-panel" aria-expanded="false" disabled>
+          <button id="reader-find-toggle" class="button button-quiet reader-find-toggle" type="button" data-i18n-aria="findInPdf" aria-label="查找正文" title="查找正文" aria-controls="reader-find-panel" aria-expanded="false" disabled>
             <svg class="reader-find-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true" focusable="false">
               <circle cx="8.5" cy="8.5" r="5.25" stroke="currentColor" stroke-width="1.5"></circle>
               <path d="m12.5 12.5 4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path>
             </svg>
-            <span data-i18n="findInPdf">查找正文</span>
+            <span class="sr-only" data-i18n="findInPdf">查找正文</span>
           </button>
-          <button id="annotation-undo" class="button button-quiet" type="button" data-i18n="annotationUndo" disabled>撤销批注</button>
-          <button id="annotation-redo" class="button button-quiet" type="button" data-i18n="annotationRedo" disabled>重做批注</button>
+          <button id="annotation-undo" class="button button-quiet" type="button" data-i18n-aria="annotationUndo" aria-label="撤销批注" title="撤销批注" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m9 7-5 5 5 5M5 12h8a6 6 0 0 1 6 6"/></svg>
+            <span class="sr-only" data-i18n="annotationUndo">撤销批注</span>
+          </button>
+          <button id="annotation-redo" class="button button-quiet" type="button" data-i18n-aria="annotationRedo" aria-label="重做批注" title="重做批注" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m15 7 5 5-5 5M19 12h-8a6 6 0 0 0-6 6"/></svg>
+            <span class="sr-only" data-i18n="annotationRedo">重做批注</span>
+          </button>
           <div id="translation-controls" class="translation-controls">
             <button id="translation-fallback" class="button button-secondary" type="button" disabled>翻译页面</button>
           </div>

@@ -1,0 +1,30 @@
+.reader-reading-controls > :is(#reader-find-toggle, #annotation-undo, #annotation-redo) {
+  display: inline-flex;
+  flex: 0 0 var(--ui-control-height, 36px);
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  width: var(--ui-control-height, 36px);
+  min-width: var(--ui-control-height, 36px);
+  height: var(--ui-control-height, 36px);
+  min-height: var(--ui-control-height, 36px);
+  padding: 0;
+}
+
+.reader-reading-controls > :is(#reader-find-toggle, #annotation-undo, #annotation-redo) > svg {
+  display: block;
+  flex: none;
+  width: var(--ui-icon-size, 20px);
+  height: var(--ui-icon-size, 20px);
+  pointer-events: none;
+}
+
+@media (pointer: coarse), (max-width: 820px) {
+  .reader-reading-controls > :is(#reader-find-toggle, #annotation-undo, #annotation-redo) {
+    flex-basis: var(--ui-touch-target, 44px);
+    width: var(--ui-touch-target, 44px);
+    min-width: var(--ui-touch-target, 44px);
+    height: var(--ui-touch-target, 44px);
+    min-height: var(--ui-touch-target, 44px);
+  }
+}

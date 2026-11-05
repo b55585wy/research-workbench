@@ -19,6 +19,7 @@ const sourceFiles = [
   "src/guest-access.tsx",
   "src/translation.tsx",
   "src/flow-reading.tsx",
+  "src/flow-sentences.ts",
   "src/source-preparation.tsx"
 ];
 const runtimePackages = ["react", "react-dom", "scheduler"];

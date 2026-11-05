@@ -24,11 +24,17 @@ from .agent_store import canonical, digest, now
 from .agent_provider import ModelConnection
 from .library import read_metadata
 from .models import WorkspaceError
+from .translation_sentences import (
+    MAX_SENTENCES_PER_PAGE, PROMPT_VERSION as SENTENCE_PROMPT_VERSION,
+    PROMPT_VERSIONS, chunk_units, sentence_units,
+)
 
 PARSER_ID = 'mineru-flash-txt'
 PARSER_VERSION = '4.1.5'
 DOCVORTEX_VERSION = '0.6.11'
-PROMPT_VERSION = 'translate-blocks-v1'
+# New jobs and runs segment each supported paragraph into deterministic sentence
+# units.  Existing rows keep their frozen legacy block version.
+PROMPT_VERSION = SENTENCE_PROMPT_VERSION
 RESULT_SCHEMA_VERSION = 1
 
 MAX_PAGES = 5
@@ -165,6 +171,26 @@ def blocks_from_units(page, units):
         if supported:
             translatable.append((identifier, text))
     return blocks, translatable, issues
+
+
+def published_blocks(plan, translations, sentences=None):
+    """The exact block list persisted for one page.
+
+    ``publish`` and the result-size bound share this builder so a page that
+    passes validation can never exceed ``MAX_RESULT_BYTES`` once stored: real
+    rows also carry ``id``/``kind``/``order``/``rect`` and every untranslated
+    visual block, not only the translated preview.
+    """
+    blocks = []
+    for block in plan['blocks']:
+        item = dict(block)
+        item['translated_text'] = translations.get(item['id'])
+        if sentences:
+            aligned = sentences.get(item['id'])
+            if aligned:
+                item['sentences'] = aligned
+        blocks.append(item)
+    return blocks
 
 
 def chunked(entries, size=MAX_CHUNK_CHARS):
@@ -468,12 +494,8 @@ class Translations:
                 ('partial' if completed else 'failed', 'finished', completed, stamp, stamp,
                  canonical({'code': code, 'message': message}), identifier))
 
-    def publish(self, identifier, plan, translations):
-        blocks = []
-        for block in plan['blocks']:
-            item = dict(block)
-            item['translated_text'] = translations.get(item['id'])
-            blocks.append(item)
+    def publish(self, identifier, plan, translations, sentences=None):
+        blocks = published_blocks(plan, translations, sentences)
         with self.store.connection() as connection:
             connection.execute('BEGIN IMMEDIATE')
             row = connection.execute('SELECT * FROM translation_jobs WHERE id=?',
@@ -522,7 +544,7 @@ class Translations:
                  canonical(error) if error else None, identifier))
 
     # ------------------------------------------------------------- pipeline
-    def plan(self, pages, units):
+    def plan(self, pages, units, prompt_version=PROMPT_VERSION):
         by_page = {}
         for item in units:
             by_page[item['page_idx'] + 1] = item['units']
@@ -538,7 +560,7 @@ class Translations:
             elif not translatable:
                 plan.update(status='unavailable',
                             warning='本页没有可翻译的正文，只保留了图形或公式位置。')
-            else:
+            elif prompt_version != SENTENCE_PROMPT_VERSION:
                 plan['chunks'] = list(chunked(translatable))
                 plan['chars'] = sum(len(text) for _, text in translatable)
                 if issues:
@@ -547,8 +569,79 @@ class Translations:
                 elif plan['chars'] > MAX_PAGE_CHARS:
                     plan.update(status='failed', warning='本页可翻译文字超过单页上限，未翻译。')
                     plan['chunks'] = []
+            else:
+                sentences, entries = self.sentence_page(translatable)
+                plan['sentences'] = sentences
+                plan['chars'] = sum(len(text) for _, text in entries)
+                plan['chunks'] = list(chunk_units(entries, MAX_CHUNK_CHARS))
+                if sentences is None:
+                    plan.update(status='failed',
+                                warning='本页可对齐的句子数量超出上限，未翻译。')
+                    plan['chunks'] = []
+                elif issues:
+                    plan.update(status='failed',
+                                warning='本页有超长或过多的段落未翻译，已保留可用部分。')
+                elif plan['chars'] > MAX_PAGE_CHARS:
+                    plan.update(status='failed', warning='本页可翻译文字超过单页上限，未翻译。')
+                    plan['chunks'] = []
             plans.append(plan)
         return plans
+
+    @staticmethod
+    def sentence_page(translatable):
+        """Split supported blocks into deterministic units within page bounds."""
+        sentences, entries = {}, []
+        for identifier, text in translatable:
+            value = sentence_units(identifier, text)
+            if not value:
+                return None, []
+            sentences[identifier] = value
+            entries.extend((unit['id'], unit['source_text']) for unit in value)
+        if len(entries) > MAX_SENTENCES_PER_PAGE:
+            return None, []
+        return sentences, entries
+
+    @staticmethod
+    def aligned(plan, targets):
+        """Map verified sentence targets back onto their parent blocks."""
+        invalid = '模型译文未能与源句对应，本页未采用。'
+        blocks = {block['id']: block for block in plan['blocks']}
+        aggregates, sentences, expected = {}, {}, set()
+        for identifier, units in (plan.get('sentences') or {}).items():
+            block = blocks.get(identifier)
+            if block is None:
+                raise WorkspaceError('translation_output_invalid', invalid, 502)
+            if [unit['id'] for unit in units] != [
+                    f'{identifier}-s{index}' for index in range(len(units))]:
+                raise WorkspaceError('translation_output_invalid', invalid, 502)
+            if ''.join(unit['source_text'] for unit in units) != block['source_text']:
+                raise WorkspaceError('translation_output_invalid', invalid, 502)
+            values, pairs = [], []
+            for unit in units:
+                target = targets.get(unit['id'])
+                if (not isinstance(target, str) or not target
+                        or len(target) > MAX_TRANSLATION_CHARS):
+                    raise WorkspaceError('translation_output_invalid', invalid, 502)
+                values.append(target)
+                pairs.append({'id': unit['id'], 'source_text': unit['source_text'],
+                              'translated_text': target})
+            aggregate = ' '.join(values)
+            if len(aggregate) > MAX_TRANSLATION_CHARS:
+                raise WorkspaceError('translation_output_invalid',
+                                     '模型译文超出长度限制，本页未采用。', 502)
+            aggregates[identifier] = aggregate
+            sentences[identifier] = pairs
+            expected.update(unit['id'] for unit in units)
+        if set(targets) != expected:
+            raise WorkspaceError('translation_output_invalid', invalid, 502)
+        # Bound the exact payload ``publish`` would store, including untranslated
+        # visual blocks and every field, so a page accepted here cannot exceed
+        # MAX_RESULT_BYTES after serialization.
+        stored = published_blocks(plan, aggregates, sentences)
+        if len(canonical(stored).encode()) > MAX_RESULT_BYTES:
+            raise WorkspaceError('translation_output_invalid',
+                                 '模型译文超出结果大小限制，本页未采用。', 502)
+        return aggregates, sentences
 
     def translate(self, chunk, target_language, provider, once=False):
         payload = {'target_language': target_language,
@@ -590,6 +683,13 @@ class Translations:
         identifier = row['id']
         if self.status(identifier) != 'running':
             return
+        version = row['prompt_version']
+        # Only the two frozen supported prompt versions may execute.  An unknown
+        # frozen row is rejected before any provider, model or parser work
+        # instead of silently falling through to the legacy block plan.
+        if version not in PROMPT_VERSIONS:
+            raise WorkspaceError('translation_parser_changed',
+                                 '翻译结果版本已更新，请重新发起翻译。', 409)
         once = self.runs.is_linked(identifier)
         config, _ = self.provider.config()
         ModelConnection.validate(config)
@@ -603,7 +703,7 @@ class Translations:
         if stop.is_set() or self.status(identifier) != 'running':
             return
         self.stage(identifier, 'translating')
-        plans = self.plan(pages, units)
+        plans = self.plan(pages, units, version)
         calls = sum(len(plan['chunks']) for plan in plans)
         if calls > MAX_MODEL_CALLS:
             raise WorkspaceError(
@@ -618,6 +718,7 @@ class Translations:
             if stop.is_set() or self.status(identifier) != 'running':
                 return
             translations = {}
+            sentences = None
             if plan['chunks']:
                 verified_source(self.store, row['document_id'], row['source_sha256'])
                 try:
@@ -631,14 +732,20 @@ class Translations:
                         used += 1
                         translations.update(self.translate(chunk, row['target_language'],
                                                           provider, once))
+                    if version == SENTENCE_PROMPT_VERSION:
+                        translations, sentences = self.aligned(plan, translations)
                 except WorkspaceError as error:
                     if error.code != 'translation_output_invalid':
                         raise
-                    translations = {}
+                    translations, sentences = {}, None
                     plan['status'] = 'failed'
                     plan['warning'] = error.message
+            # Only a completed page may publish sentence pairs; a failed page
+            # keeps the legacy paragraph outcome instead of a partial alignment.
+            if plan['status'] != 'completed':
+                sentences = None
             verified_source(self.store, row['document_id'], row['source_sha256'])
-            if not self.publish(identifier, plan, translations):
+            if not self.publish(identifier, plan, translations, sentences):
                 return
         if stop.is_set() or self.status(identifier) != 'running':
             return

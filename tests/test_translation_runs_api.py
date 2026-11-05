@@ -178,7 +178,7 @@ def test_page_request_returns_exactly_the_saved_page_and_its_child_identity(
     result = first.json()['result_pages'][0]
     assert result['page'] == 1 and result['status'] == 'completed'
     assert result['job_id'] == child['id']
-    assert result['blocks'][0]['translated_text'] == '译文 p1-b0'
+    assert result['blocks'][0]['translated_text'] == '译文 p1-b0-s0'
 
     second = client.get(f"/api/v1/translation-runs/{created['id']}", params={'page': 2})
     assert second.json()['result_pages'] == []

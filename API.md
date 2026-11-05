@@ -1,3 +1,14 @@
+# v0.60 additive sentence-aligned translation results
+
+New translation jobs/runs freeze `prompt_version=translate-sentences-v2`.
+Parent blocks and result schema1 remain; supported blocks may additionally return
+`sentences:[{id,source_text,translated_text}]`. IDs are parent ID plus `-s0`, `-s1`;
+source strings concatenate exactly to parent source, targets joined with one ASCII
+space equal parent translated_text. Existing v1 records/DTOs/idempotency and SQL27
+are unchanged. Old jobs and resumed runs keep their frozen version. GET never
+generates/retranslates; cache reuse requires the exact prompt version. See
+[scope and checks](SENTENCE-TRANSLATION.md).
+
 # v0.56.1 explicit device selection translation
 
 POST /device/ai/selection-translation is outside guest workspace dispatch. It

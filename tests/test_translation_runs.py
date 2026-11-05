@@ -172,7 +172,7 @@ def test_six_pages_run_sequentially_with_one_page_children_and_one_shot_calls(
     result = page['result_pages'][0]
     assert result['page'] == 3 and result['status'] == 'completed'
     assert result['job_id'] == children[2]['id']
-    assert result['blocks'][0]['translated_text'] == '译文 p3-b0'
+    assert result['blocks'][0]['translated_text'] == '译文 p3-b0-s0'
     assert result['blocks'][0]['source_text'] == 'Source page 3'
 
     # Run children never use the legacy transport retry path.

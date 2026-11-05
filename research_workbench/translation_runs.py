@@ -24,6 +24,7 @@ from .models import WorkspaceError
 from .translation import (
     PARSER_ID, PARSER_VERSION, PROMPT_VERSION, RESULT_SCHEMA_VERSION, verified_source,
 )
+from .translation_sentences import PROMPT_VERSIONS
 
 ACTIVE = ('queued', 'running')
 # ``partial`` is a finished attempt with untranslated/failed pages.  An explicit
@@ -448,11 +449,15 @@ class TranslationRuns:
         return result['job_id'] if result is not None else None
 
     def check_identity(self, row):
-        if (row['parser_id'], row['parser_version'], row['prompt_version'],
-                row['result_schema_version']) != (
-                PARSER_ID, PARSER_VERSION, PROMPT_VERSION, RESULT_SCHEMA_VERSION):
+        if (row['parser_id'], row['parser_version'], row['result_schema_version']) != (
+                PARSER_ID, PARSER_VERSION, RESULT_SCHEMA_VERSION):
             raise WorkspaceError('translation_parser_changed',
                                  '翻译解析或结果版本已更新，请重新发起整篇翻译。', 409)
+        # The prompt version is frozen per row: a legacy v1 run continues with
+        # its original block behaviour and is never silently upgraded.
+        if row['prompt_version'] not in PROMPT_VERSIONS:
+            raise WorkspaceError('translation_parser_changed',
+                                 '翻译结果版本已更新，请重新发起整篇翻译。', 409)
         config, _ = self.translations.provider.config()
         try:
             ModelConnection.validate(config)
