@@ -1,7 +1,7 @@
 import { frozenChartSkill, chartSkillReference, chartSkillsMatch, chartSkillAllows, chartSkillImageOptions, visibleChartSkill } from "/chart-skill-state.js";
+import { CHART_RENDERER_URL, isChartRenderer } from "/chart-renderer.js";
 
 const MAX_ARTIFACT_BYTES = 4 * 1024 * 1024;
-const RENDERER_URL = "/vendor/plotly/4.2.0/plotly-strict.min.js";
 const HEX_64 = /^[0-9a-f]{64}$/;
 
 const messages = {
@@ -448,16 +448,14 @@ let rendererPromise = null;
 let rendererHash = null;
 
 function loadRenderer(renderer) {
-  if (!renderer || renderer.id !== "plotly-strict" || renderer.version !== "4.2.0" || renderer.script_url !== RENDERER_URL ||
-    !HEX_64.test(renderer.sha256 || "") || !isInteger(renderer.byte_size, 1)) {
+  if (!isChartRenderer(renderer)) {
     return Promise.reject(new Error("invalidCapabilities"));
   }
-  if (window.Plotly && rendererHash === renderer.sha256) return Promise.resolve(window.Plotly);
   if (rendererPromise && rendererHash === renderer.sha256) return rendererPromise;
   rendererHash = renderer.sha256;
   rendererPromise = new Promise((resolve, reject) => {
     const script = document.createElement("script");
-    script.src = RENDERER_URL;
+    script.src = CHART_RENDERER_URL;
     script.async = true;
     const bytes = Uint8Array.from(renderer.sha256.match(/.{2}/g), (pair) => parseInt(pair, 16));
     let binary = "";
@@ -682,8 +680,7 @@ export function createCharts(adapter) {
     if (!capabilitiesPromise) {
       capabilitiesPromise = adapter.api("/api/v1/charts/capabilities").then((body) => {
         if (!body || body.arbitrary_code !== false || !Array.isArray(body.items) || body.limits?.data_bytes !== MAX_ARTIFACT_BYTES ||
-          body.renderer?.id !== "plotly-strict" || body.renderer?.version !== "4.2.0" || body.renderer?.script_url !== RENDERER_URL ||
-          !HEX_64.test(body.renderer?.sha256 || "") || !isInteger(body.renderer?.byte_size, 1) ||
+          !isChartRenderer(body.renderer) ||
           !["analysis_counts", "histogram", "scatter", "grouped_points"].every((kind) => body.items.some((item) => item.id === kind && HEX_64.test(item.recipe_sha256 || "")))) {
           throw new Error("invalidCapabilities");
         }
@@ -696,6 +693,10 @@ export function createCharts(adapter) {
       });
     }
     return capabilitiesPromise;
+  }
+
+  function chartWorkspaceVisible() {
+    return elements.panel.open && !elements.panel.hidden && elements.panel.getClientRects().length > 0;
   }
 
   function errorStatus(error, fallback = "request_failed", retry = null) {
@@ -1526,8 +1527,12 @@ export function createCharts(adapter) {
     syncDataset,
     refreshLayout() {
       const entry = currentEntry();
-      const view = entry?.view;
-      if (!entry || !view?.artifact || view.pending) return;
+      if (!entry || !chartWorkspaceVisible()) return;
+      void getCapabilities().then((capabilities) => {
+        if (entry === currentEntry() && chartWorkspaceVisible()) return loadRenderer(capabilities.renderer);
+      }).catch(() => { /* Foreground rendering owns status and retry. */ });
+      const view = entry.view;
+      if (!view?.artifact || view.pending) return;
       if (!view.renderReady || !view.host?.isConnected) {
         displayArtifact(entry, view);
       } else if (view.host.clientWidth && window.Plotly) {
