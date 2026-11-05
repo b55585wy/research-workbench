@@ -2,7 +2,8 @@ Server deployment and current status: [SERVER-DEPLOYMENT.md](SERVER-DEPLOYMENT.m
 
 # research workspace
 
-当前代码/前端：v0.65.1，公开后端保持 v0.64.0；入口为 https://itsyiyi.com/ 与 https://5ai.life/，两边用户资料独立。
+当前代码/前端：v0.66.0，公开后端保持 v0.64.0；入口为 https://itsyiyi.com/ 与 https://5ai.life/，两边用户资料独立。
+[桌面/手机按钮布局](BUTTON-LAYOUT.md)已重排：桌面主导航与栏边开关分开，手机使用紧凑功能选择器和当前内容面板导航；笔记标签与编辑图标同排。
 [医学生示例数据引导](MEDICAL-TEACHING-DATA.md)已上线：预览合成数据、明确导入、真实分析、保存图表和可编辑 PPT，按实际运行环境开放方法。
 资料栏的「试读论文」入口常驻，可打开指定的20页 SLC13A3 论文；旧测试文献及批注保留。本轮仅切换前端，未重启后端。
 v0.64.0 已在双站上线[自定义科研绘图 skill](CUSTOM-CHART-SKILLS.md)：结构化规则、配置导入导出、版本与图表冻结快照；当前版本核对见[发布记录](UPDATE-POLICY.md)。

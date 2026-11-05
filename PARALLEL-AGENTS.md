@@ -70,7 +70,7 @@ v0.64.0 新增独立 `chart-skills` React 控制器／组件和后端版本配�
 
 现有 analysis、charts、presentations、translation、flow-reading 已有独立实现，后续优先统一其公开接口，避免为目录整齐而重写已工作的逻辑。抽取成功的标准是状态与依赖边界清楚、能够独立验证，同时原有用户操作继续可用。
 
-## 本轮并发任务
+## 历史并发任务（旧基线）
 
 基线：`b3fce27e9d52ebc3184d325348edd15998ae776c`。
 
