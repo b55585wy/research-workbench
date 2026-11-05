@@ -5,7 +5,9 @@ const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 const messages = {
   zh: {
     library: "图片库",
-    help: "上传 PNG、JPEG 或 WebP 图片，并明确选择用于新笔记或助手。图片批注使用 EXIF 规范化预览图；原图保留并可下载。",
+    help: "添加图片到笔记或助手。",
+    info: "图片信息",
+    infoText: "批注使用 EXIF 规范化预览；原图保留并可下载。",
     upload: "上传图片",
     uploading: "正在上传图片…",
     uploaded: "图片已上传。",
@@ -31,7 +33,9 @@ const messages = {
   },
   en: {
     library: "Image library",
-    help: "Upload PNG, JPEG, or WebP images and explicitly choose them for a new note or the assistant. Annotations use the EXIF-normalized preview; the original is preserved and downloadable.",
+    help: "Add images to a note or the assistant.",
+    info: "Image information",
+    infoText: "Annotations use the EXIF-normalized preview; the original is preserved and downloadable.",
     upload: "Upload image",
     uploading: "Uploading image…",
     uploaded: "Image uploaded.",
@@ -127,13 +131,26 @@ export function createImageLibrary(adapter) {
   function viewButton(paperId, imageId) {
     const button = document.createElement("button");
     button.type = "button";
-    button.className = "button button-quiet";
+    button.className = "button button-quiet image-icon-action";
     button.dataset.action = "view-image";
     button.dataset.sourceKind = "user_upload";
     button.dataset.sourceId = imageId;
-    button.textContent = t("view");
+    button.setAttribute("aria-label", t("view"));
+    button.title = t("view");
+    button.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"/><circle cx="12" cy="12" r="2.5"/></svg>';
     button.addEventListener("click", () => adapter.openImage(paperId, "user_upload", imageId));
     return button;
+  }
+
+  function downloadLink(paperId, image) {
+    const download = document.createElement("a");
+    download.className = "image-download image-icon-action";
+    download.href = imageUrl(paperId, image.id, "file");
+    download.download = image.original_filename;
+    download.setAttribute("aria-label", t("download"));
+    download.title = t("download");
+    download.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 4v11m-4-4 4 4 4-4M5 19h14"/></svg>';
+    return download;
   }
 
   function render() {
@@ -197,15 +214,17 @@ export function createImageLibrary(adapter) {
         selections.append(wrapper);
       }
 
-      const download = document.createElement("a");
-      download.className = "image-download";
-      download.href = imageUrl(paper.id, image.id, "file");
-      download.download = image.original_filename;
-      download.textContent = t("download");
+      const info = document.createElement("details");
+      info.className = "image-technical-info";
+      const infoSummary = document.createElement("summary");
+      infoSummary.textContent = t("info");
+      const infoText = document.createElement("p");
+      infoText.textContent = t("infoText");
+      info.append(infoSummary, infoText);
       const actions = document.createElement("div");
       actions.className = "note-excerpt-actions";
-      actions.append(viewButton(paper.id, image.id), download);
-      body.append(name, source, selections, actions);
+      actions.append(viewButton(paper.id, image.id), downloadLink(paper.id, image));
+      body.append(name, source, info, selections, actions);
       item.append(preview, body);
       elements.list.append(item);
     }
@@ -421,11 +440,10 @@ export function createImageLibrary(adapter) {
         const caption = document.createElement("figcaption");
         const name = document.createElement("span");
         name.textContent = `${image.original_filename} · ${t("source")}`;
-        const download = document.createElement("a");
-        download.href = imageUrl(paper.id, image.id, "file");
-        download.download = image.original_filename;
-        download.textContent = t("download");
-        caption.append(name, viewButton(paper.id, image.id), download);
+        const actions = document.createElement("div");
+        actions.className = "note-excerpt-actions";
+        actions.append(viewButton(paper.id, image.id), downloadLink(paper.id, image));
+        caption.append(name, actions);
         figure.append(preview, caption);
         group.append(figure);
       }

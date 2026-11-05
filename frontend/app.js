@@ -22,6 +22,7 @@ import { createReaderNavigation } from "/reader-navigation.js";
 import { createReaderObjectMenu } from "/reader-object-menu.js";
 import { createReaderShapes, shapeBounds } from "/reader-shapes.js";
 import { createWorkspaceShellBridge } from "/workspace-shell-bridge.js";
+import { createNoteControlsBridge } from "/note-controls-bridge.js";
 import { createTranslationBridge } from "/translation-bridge.js";
 import { createTranslationLibrary } from "/translation-library.js";
 import { createTranslationOverlay } from "/translation-overlay.js";
@@ -29,6 +30,7 @@ import { createFlowReadingBridge } from "/flow-reading-bridge.js";
 import { isDeviceMode, mapDeviceAssetUrl } from "/device-context.js";
 import { createDeviceUI, applyDeviceCapabilities } from "/device-ui.js";
 import { offlineSupport } from "/offline-client.js";
+import { serverPdfCache } from "/server-pdf-cache.js";
 import { collectPdfTextSelection, formatSelectionQuote, sourceSegmentsFor } from "/cross-page-selection.js";
 import { createSelectionTranslation } from "/selection-translation.js";
 
@@ -47,7 +49,7 @@ const MAX_DEVICE_PIXEL_RATIO = 2;
 const MAX_FILE_BYTES = 20 * 1024 * 1024;
 const ZOOM_MIN = 0.4;
 const ZOOM_MAX = 3;
-const APP_VERSION = "0.55.4";
+const APP_VERSION = "0.61.0";
 const PDF_RANGE_CHUNK_SIZE = 64 * 1024;
 const PDF_LOADING_HINT_DELAY = 12_000;
 
@@ -193,11 +195,11 @@ const messages = {
     editCancel: "取消编辑",
     saveEdit: "保存修改",
     retryEdit: "重试保存修改",
-    reviewExplainer: "“已核对原文”仅表示你检查了来源，不代表身份认证或科学验证。",
-    reviewUnreviewed: "待核对",
-    reviewChecked: "已核对原文",
-    markChecked: "标记已核对",
-    markUnchecked: "改为待核对",
+    reviewExplainer: "引文原文核对状态与掌握程度分别记录。",
+    reviewUnreviewed: "待核对引文原文",
+    reviewChecked: "已核对引文原文",
+    markChecked: "标记引文原文已核对",
+    markUnchecked: "将引文原文改为待核对",
     editNote: "编辑",
     deleteNote: "删除",
     restoreNote: "恢复",
@@ -209,6 +211,10 @@ const messages = {
     reviewSaving: "正在保存核对状态…",
     reviewSaved: "已记录你核对了原文。",
     reviewUnmarked: "已改为待核对。",
+    mastery: "掌握程度",
+    moreActions: "更多笔记操作",
+    masterySaving: "正在保存掌握程度…",
+    masterySaved: "掌握程度已保存。",
     deleteConfirm: "删除这条笔记？它将从当前列表和导出中隐藏，之后可以在“已删除笔记”中恢复。",
     deleting: "正在删除笔记…",
     deleted: "笔记已删除，可随时恢复。",
@@ -666,11 +672,11 @@ const messages = {
     editCancel: "Cancel edit",
     saveEdit: "Save changes",
     retryEdit: "Retry saving changes",
-    reviewExplainer: "“Source checked” only records that you checked the source; it is not authenticated review or scientific validation.",
-    reviewUnreviewed: "Pending source check",
-    reviewChecked: "Source checked",
-    markChecked: "Mark source checked",
-    markUnchecked: "Mark needs checking",
+    reviewExplainer: "Quoted-source checks and mastery are tracked separately.",
+    reviewUnreviewed: "Quoted source needs checking",
+    reviewChecked: "Quoted source checked",
+    markChecked: "Mark quoted source checked",
+    markUnchecked: "Mark quoted source needs checking",
     editNote: "Edit",
     deleteNote: "Delete",
     restoreNote: "Restore",
@@ -682,6 +688,10 @@ const messages = {
     reviewSaving: "Saving review status…",
     reviewSaved: "Your source check was recorded.",
     reviewUnmarked: "Marked as needing checking.",
+    mastery: "Mastery",
+    moreActions: "More note actions",
+    masterySaving: "Saving mastery…",
+    masterySaved: "Mastery saved.",
     deleteConfirm: "Delete this note? It will be hidden from the active list and exports, and can be restored from “Deleted notes”.",
     deleting: "Deleting note…",
     deleted: "Note deleted. You can restore it later.",
@@ -1134,6 +1144,8 @@ const elements = {
   notesEmpty: $("notes-empty"),
   notesCount: $("notes-count"),
   notesFilterPanel: $("notes-filter-panel"),
+  notesFilterReactHost: $("notes-filter-react-host"),
+  notesFilterNative: $("notes-filter-native"),
   notesFilterQuery: $("notes-filter-query"),
   notesFilterColor: $("notes-filter-color"),
   notesFilterKind: $("notes-filter-kind"),
@@ -1289,6 +1301,11 @@ const workspaceShell = createWorkspaceShellBridge({
   onMounted: rebindDocumentMenuReturnFocus,
   onOpenDocument: (documentId) => openDocument(documentId, { workspace: "reading" }),
   onDocumentMenu: (documentId, anchor, point) => openDocumentMenu(documentId, anchor, point)
+});
+
+const noteControls = createNoteControlsBridge({
+  filterContainer: elements.notesFilterReactHost,
+  nativeFilterContainer: elements.notesFilterNative
 });
 
 const translation = createTranslationBridge({
@@ -3502,6 +3519,15 @@ function renderNoteTools(document, visibleNotes) {
   if (!paper) return;
   elements.notesFilterPanel.setAttribute("aria-label", t("notesFilterText"));
   const tools = ensureNoteTools(paper.id);
+  noteControls.updateFilters(
+    { language: state.language, query: tools.query, color: tools.color, kind: tools.kind },
+    (field, value) => {
+      const control = field === "query" ? elements.notesFilterQuery : field === "color" ? elements.notesFilterColor : elements.notesFilterKind;
+      control.value = field === "query" ? value.slice(0, 200) : value;
+      control.dispatchEvent(new Event(field === "query" ? "input" : "change", { bubbles: true }));
+    },
+    () => { elements.notesFilterNative.hidden = true; }
+  );
   const visibleIds = new Set(visibleNotes.map((note) => note.id));
   for (const id of [...tools.selected]) {
     if (!visibleIds.has(id)) tools.selected.delete(id);
@@ -3511,9 +3537,21 @@ function renderNoteTools(document, visibleNotes) {
   elements.notesFilterKind.value = tools.kind;
   const filtered = Boolean(tools.query || tools.color !== "all" || tools.kind !== "all");
   elements.notesFilterClear.disabled = !filtered;
+  elements.notesFilterClear.hidden = !filtered;
   elements.notesSelectVisible.disabled = !visibleNotes.length;
   elements.notesSelectionClear.disabled = !tools.selected.size;
+  elements.notesSelectionClear.hidden = !tools.selected.size;
   elements.notesBatchAgent.disabled = !tools.selected.size || tools.selected.size > 8 || state.pendingSaves > 0 || state.pendingMutations.size > 0;
+  elements.notesBatchAgent.hidden = !tools.selected.size;
+  for (const [control, key] of [
+    [elements.notesFilterClear, "searchClear"],
+    [elements.notesSelectVisible, "selectVisible"],
+    [elements.notesSelectionClear, "clearSelection"],
+    [elements.notesBatchAgent, "batchAddAssistant"]
+  ]) {
+    control.setAttribute("aria-label", t(key));
+    control.title = t(key);
+  }
   const status = [t("notesVisibleCount", { visible: visibleNotes.length, total: state.notes.length })];
   if (state.notes.length && !visibleNotes.length) status.push(t("notesNoMatch"));
   if (tools.selected.size) status.push(t("notesSelectedCount", { count: tools.selected.size }));
@@ -3524,6 +3562,7 @@ function renderNoteTools(document, visibleNotes) {
 }
 
 function renderNotes() {
+  noteControls.destroyNotes();
   if (isStudy()) {
     elements.notesFilterPanel.hidden = true;
     study?.renderNotes();
@@ -3594,15 +3633,6 @@ function renderNotes() {
     }
     imageLibrary?.appendNoteImages(item, note, noteState);
 
-    const reviewRow = window.document.createElement("div");
-    reviewRow.className = "note-review-row";
-    const badge = window.document.createElement("span");
-    badge.className = "review-badge";
-    badge.dataset.status = reviewStatus;
-    badge.textContent = t(reviewStatus === "source_checked" ? "reviewChecked" : "reviewUnreviewed");
-    reviewRow.append(badge);
-    item.append(reviewRow);
-
     const excerpt = state.excerpts.find((item) => item.note_id === note.id);
     if (!shape && note.rect && excerpt) {
       const preview = window.document.createElement("button");
@@ -3645,28 +3675,83 @@ function renderNotes() {
       item.append(create);
     }
 
+    const disabled = actionsLocked || !noteState;
+    const fallback = window.document.createElement("div");
+    fallback.className = "note-native-controls";
     if (annotation) {
       const styleControls = window.document.createElement("div");
       styleControls.className = "annotation-style-controls";
       styleControls.append(
-        makeAnnotationStyleControl(document, note, annotation, "kind", actionsLocked || !noteState),
-        makeAnnotationStyleControl(document, note, annotation, "color", actionsLocked || !noteState)
+        makeAnnotationStyleControl(document, note, annotation, "kind", disabled),
+        makeAnnotationStyleControl(document, note, annotation, "color", disabled)
       );
-      item.append(styleControls);
+      fallback.append(styleControls);
     }
+    const masteryLabel = window.document.createElement("label");
+    masteryLabel.textContent = t("mastery");
+    const masterySelect = window.document.createElement("select");
+    masterySelect.dataset.action = "mastery-level";
+    masterySelect.disabled = disabled;
+    masterySelect.setAttribute("aria-label", t("mastery"));
+    for (let level = 0; level <= 5; level += 1) {
+      const option = window.document.createElement("option");
+      option.value = String(level);
+      option.textContent = `${level} / 5`;
+      option.selected = (noteState?.mastery_level ?? 0) === level;
+      masterySelect.append(option);
+    }
+    masterySelect.addEventListener("change", () => changeMastery(document, note, Number(masterySelect.value)));
+    masteryLabel.append(masterySelect);
+    fallback.append(masteryLabel);
     const actions = window.document.createElement("div");
     actions.className = "note-actions";
-    if (annotation || shape) actions.append(makeNoteAction("annotation-actions", t("annotationAction"), () => showAnnotationFromNote(document, note), actionsLocked || !noteState));
+    if (annotation || shape) actions.append(makeNoteAction("annotation-actions", t("annotationAction"), () => showAnnotationFromNote(document, note), disabled));
     if (!deviceMode || !shape) actions.append(
-      makeNoteAction("annotation-agent", t("addToAssistant"), () => shape ? shareShapeFromNote(document, noteState, "agent") : assistant?.addNoteReference(document.id, noteState), actionsLocked || !noteState)
+      makeNoteAction("annotation-agent", t("addToAssistant"), () => shape ? shareShapeFromNote(document, noteState, "agent") : assistant?.addNoteReference(document.id, noteState), disabled)
     );
     actions.append(
-      makeNoteAction("edit-note", t("editNote"), () => shape ? showAnnotationFromNote(document, note) : startEditNote(document, note), actionsLocked || !noteState),
-      makeNoteAction("review-note", t(reviewStatus === "source_checked" ? "markUnchecked" : "markChecked"), () => reviewNote(document, note), actionsLocked || !noteState),
-      makeNoteAction("delete-note", t("deleteNote"), () => deleteNote(document, note), actionsLocked || !noteState)
+      makeNoteAction("edit-note", t("editNote"), () => shape ? showAnnotationFromNote(document, note) : startEditNote(document, note), disabled),
+      makeNoteAction("delete-note", t("deleteNote"), () => deleteNote(document, note), disabled)
     );
-    item.append(actions);
+    const more = window.document.createElement("details");
+    const moreSummary = window.document.createElement("summary");
+    moreSummary.textContent = t("moreActions");
+    more.append(moreSummary);
+    const reviewStatusText = window.document.createElement("p");
+    reviewStatusText.textContent = t(reviewStatus === "source_checked" ? "reviewChecked" : "reviewUnreviewed");
+    more.append(reviewStatusText, makeNoteAction("review-note", t(reviewStatus === "source_checked" ? "markUnchecked" : "markChecked"), () => reviewNote(document, note), disabled));
+    actions.append(more);
+    fallback.append(actions);
+    const host = window.document.createElement("div");
+    host.className = "note-controls-host";
+    item.append(host, fallback);
+    item.dataset.masteryLevel = String(noteState?.mastery_level ?? 0);
     elements.notesList.append(item);
+    noteControls.mount(host, {
+      noteId: note.id,
+      language: state.language,
+      disabled,
+      masteryLevel: noteState?.mastery_level ?? 0,
+      reviewStatus,
+      annotation: annotation ? { kind: annotation.kind, color: annotation.color } : null,
+      canOpenAnnotation: Boolean(annotation || shape),
+      canShare: !deviceMode || !shape
+    }, {
+      onMastery: (noteId, level) => {
+        if (noteId === note.id) void changeMastery(document, note, level);
+      },
+      onStyle: (noteId, change) => {
+        if (noteId === note.id) void changeAnnotationStyle(document, note, change);
+      },
+      onAction: (noteId, action) => {
+        if (noteId !== note.id) return;
+        if (action === "annotation") showAnnotationFromNote(document, note);
+        else if (action === "assistant") shape ? shareShapeFromNote(document, noteState, "agent") : assistant?.addNoteReference(document.id, noteState);
+        else if (action === "edit") shape ? showAnnotationFromNote(document, note) : startEditNote(document, note);
+        else if (action === "delete") void deleteNote(document, note);
+        else if (action === "review") void reviewNote(document, note);
+      }
+    }, () => { fallback.hidden = true; });
   }
   renderDeletedNotes();
 }
@@ -4356,7 +4441,13 @@ async function openDocument(documentId, options = {}) {
   if (!studyOwner) {
     await requestRender();
     if (sequence === state.loadSequence && state.document?.id === documentId) {
+      const cacheAttempt = state.pdfAttempt;
+      const renderedPdf = state.pdf;
       finishPdfLoading(documentId, sequence);
+      if (cacheAttempt?.cacheTicket && renderedPdf) {
+        serverPdfCache.schedule(cacheAttempt.cacheTicket, renderedPdf, () => isPdfAttemptCurrent(cacheAttempt)
+          && state.pdf === renderedPdf && state.document?.sha256 === cacheAttempt.sourceSha256);
+      }
       if (state.readerProgress.pending) await restorePendingReaderProgress();
       else state.readerProgress.loading = false;
     }
@@ -4668,10 +4759,12 @@ async function loadPdf(document, sequence, signal) {
   const url = mapDeviceAssetUrl(`/api/v1/documents/${encodeURIComponent(document.id)}/file`);
   const attempt = {
     documentId: document.id,
+    sourceSha256: document.sha256,
     sequence,
     signal,
     startedAt: Date.now(),
     task: null,
+    cacheTicket: null,
     phase: "loading",
     loadedBytes: 0,
     totalBytes: null,
@@ -4688,8 +4781,27 @@ async function loadPdf(document, sequence, signal) {
   signal.addEventListener("abort", attempt.abortListener, { once: true });
   try {
     if (signal.aborted) throw new DOMException("Document load aborted", "AbortError");
+    let cached = null;
+    if (!deviceMode) {
+      try {
+        cached = await serverPdfCache.prepare(document, { signal, isCurrent: () => isPdfAttemptCurrent(attempt) });
+      } catch (error) {
+        if (isPdfAbortError(error, signal)) throw error;
+        if (error?.name === "ServerPdfCacheProbeError") throw new ApiError(error.code);
+      }
+    }
+    if (cached?.sourceChanged) {
+      if (isPdfAttemptCurrent(attempt)) {
+        state.documents = state.documents.map((item) => item.id === cached.document.id ? cached.document : item);
+        if (state.document?.id === cached.document.id) state.document = cached.document;
+        renderDocuments();
+      }
+      throw new ApiError("source_changed");
+    }
+      if (signal.aborted || !isPdfAttemptCurrent(attempt)) throw new DOMException("PDF load aborted", "AbortError");
+      attempt.cacheTicket = cached?.ticket || null;
     const task = pdfjsLib.getDocument({
-      url,
+      ...(cached?.data ? { data: cached.data } : { url }),
       rangeChunkSize: PDF_RANGE_CHUNK_SIZE,
       disableRange: false,
       disableAutoFetch: true,
@@ -7017,6 +7129,7 @@ function makeLifecycleMutation(document, note, action, change = {}) {
   const basePath = `/api/v1/documents/${encodeURIComponent(document.id)}/notes/${encodeURIComponent(note.id)}`;
   const labels = {
     review: ["reviewSaving", noteState.review_status === "source_checked" ? "reviewUnmarked" : "reviewSaved"],
+    mastery: ["masterySaving", "masterySaved"],
     style: ["annotationStyleSaving", "annotationStyleSaved"],
     shape: ["shapeSaving", "shapeSaved"],
     delete: ["deleting", "deleted"],
@@ -7083,6 +7196,22 @@ async function reviewNote(document, note) {
   if (!noteState) return;
   const reviewStatus = noteState.review_status === "source_checked" ? "unreviewed" : "source_checked";
   const operation = makeLifecycleMutation(document, note, "review", { review_status: reviewStatus });
+  if (operation) await runMutation(operation);
+}
+
+async function changeMastery(document, note, level) {
+  if (state.pendingSaves > 0 || state.pendingMutations.size > 0 || state.editDrafts.has(document.id)) return;
+  const key = mutationKey(document.id, note.id);
+  const failed = state.failedMutations.get(key);
+  if (failed?.action === "mastery") {
+    if (!failed.conflicted) await runMutation(failed);
+    else setStatus("revisionConflict", "error", {}, () => refreshLatest(document), "viewLatest");
+    return;
+  }
+  if (!Number.isInteger(level) || level < 0 || level > 5) return;
+  const noteState = noteStateFor(note.id);
+  if (!noteState || (noteState.mastery_level ?? 0) === level) return;
+  const operation = makeLifecycleMutation(document, note, "mastery", { mastery_level: level });
   if (operation) await runMutation(operation);
 }
 
@@ -7479,6 +7608,10 @@ async function uploadFile(file) {
       document = await response.json();
     } catch {
       throw new ApiError("request_failed");
+    }
+    if (!deviceMode) {
+      const admission = await serverPdfCache.admitUpload(file, document);
+      if (admission.document) document = admission.document;
     }
     state.lastUpload = null;
     if (status === 201) {
@@ -7937,7 +8070,7 @@ elements.notesFilterClear.addEventListener("click", () => {
   tools.kind = "all";
   tools.message = null;
   renderNotes();
-  elements.notesFilterQuery.focus();
+  noteControls.focusFilterQuery();
 });
 elements.notesSelectVisible.addEventListener("click", () => {
   if (!state.document || isStudy()) return;

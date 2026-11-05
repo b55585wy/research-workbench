@@ -441,6 +441,12 @@ SCHEMA = SCHEMA[:SCHEMA.rindex('COMMIT;')] + SOURCE_SEGMENT_SCHEMA + '\nPRAGMA u
 # refuse this file rather than ignore persisted run authorization.
 from .translation_run_schema import SCHEMA as TRANSLATION_RUN_SCHEMA
 SCHEMA = SCHEMA[:SCHEMA.rindex('COMMIT;')] + TRANSLATION_RUN_SCHEMA + '\nPRAGMA user_version=27;\nCOMMIT;'
+# Version 28 adds ONE additive table for independently self-reported learning
+# mastery.  Existing notes have no row and read back as 0; review_status keeps
+# its separate source-check meaning, and every earlier table/row/trigger/receipt
+# stays exactly as deployed.
+from .note_mastery_schema import SCHEMA as NOTE_MASTERY_SCHEMA
+SCHEMA = SCHEMA[:SCHEMA.rindex('COMMIT;')] + NOTE_MASTERY_SCHEMA + '\nPRAGMA user_version=28;\nCOMMIT;'
 
 
 def timestamp():
@@ -467,7 +473,7 @@ class Store:
         self.exports.mkdir(exist_ok=True)
         self.database = self.root / 'workspace.sqlite3'
         with self.connection() as connection:
-            if connection.execute('PRAGMA user_version').fetchone()[0] > 27:
+            if connection.execute('PRAGMA user_version').fetchone()[0] > 28:
                 raise RuntimeError('Database requires a newer application')
             from .study_migration import install
             install(connection,SCHEMA)

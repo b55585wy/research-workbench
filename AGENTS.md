@@ -55,4 +55,16 @@ Current user testing instruction (2026-11-02): default to scoped smoke tests for
 the changed workflow. Historical full-regression matrices are reference only;
 do not routinely run the full suites. Report the actual verification scope.
 
+2026-11-05 parallel-agent development: follow PARALLEL-AGENTS.md. Codex coordinates
+explicit independent implementation tasks; OMP model routing alone is not a
+concurrency scheduler. Each worker has one isolated workspace, pinned baseline,
+assigned files, frozen interface contract and bounded acceptance. One writer per
+workspace/module state; one owner for schema/migrations. The main workspace is
+coordinator-written. Workers may propose narrow changes to shared app.js/routes/
+build entries only when assigned; Codex integrates them without overwriting other
+workers. New business logic belongs in focused modules with explicit lifecycle
+adapters and public interfaces; app.js progressively becomes bootstrap/wiring.
+React/native descendants must retain one DOM owner. Existing URLs, source hashes,
+drafts, storage/guest boundaries, revisions and cached records remain compatible.
+
 2026-11-04 integration slice based on main0.54 adds a passive source summary for the selected one-row tFUS CSV, within the existing analysis preview. All source fields are unverified file claims; no source access, identity mapping, fetch, Agent sharing or analysis action is inferred. Keep the original CSV/table, null/zero, units/scoring timing and owner-bound lifecycle. This slice does not overwrite other workspaces or public services. See TFUS-INTEGRATION.md.

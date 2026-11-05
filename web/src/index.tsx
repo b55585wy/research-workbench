@@ -7,6 +7,25 @@ export type {
   HeaderSettingsHandle,
   MountHeaderSettingsOptions
 } from "./header-settings";
+export { mountNoteControls, mountNoteFilters } from "./note-controls";
+export type {
+  MountNoteControlsOptions,
+  MountNoteFiltersOptions,
+  NoteAnnotationControl,
+  NoteControlAction,
+  NoteControlCallbacks,
+  NoteControlLanguage,
+  NoteControlModel,
+  NoteControlsHandle,
+  NoteFilterField,
+  NoteFilterModel,
+  NoteFiltersHandle
+} from "./note-controls";
+export { presentTranslationBlocks } from "./translation-presentation";
+export type {
+  TranslationPagePresentation,
+  TranslationPresentationBlock
+} from "./translation-presentation";
 export { mountTranslationPanel } from "./translation";
 export type {
   MountTranslationPanelOptions,

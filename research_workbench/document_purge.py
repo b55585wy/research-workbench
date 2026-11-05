@@ -70,7 +70,7 @@ ERASE = (
     ('image_annotation_operations', 'annotation_id IN (SELECT id FROM image_annotations WHERE document_id=?)'),
     ('image_annotations', OWNED), ('image_note_requests', OWNED), ('note_images', NOTES),
     ('note_operations', NOTES), ('note_rich_content', NOTES), ('note_text_annotations', NOTES),
-    ('note_shape_annotations', NOTES), ('study_note_sources', NOTES), ('purged_notes', OWNED), ('note_states', NOTES),
+    ('note_shape_annotations', NOTES), ('note_mastery', NOTES), ('study_note_sources', NOTES), ('purged_notes', OWNED), ('note_states', NOTES),
     ('excerpts', NOTES), ('image_assets', OWNED), ('notes', OWNED), ('document_operations', OWNED),
     ('document_trash', OWNED), ('document_metadata', OWNED), ('documents', 'id=?'),
 )

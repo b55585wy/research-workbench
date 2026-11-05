@@ -12,16 +12,20 @@ NOTE_FIELDS = ('id', 'document_id', 'page', 'rect', 'text', 'created_at')
 STATE_QUERY = '''SELECT n.id,n.document_id,n.page,n.rect,s.current_text AS text,
     n.created_at,s.revision,s.review_status,s.reviewed_at,s.updated_at,s.deleted_at,r.current_json,a.source_json,t.current_json AS annotation_json,
     q.original_json AS shape_original_json,q.current_json AS shape_current_json,
-    g.segments_json,g.source_sha256 AS segment_source_sha256
+    g.segments_json,g.source_sha256 AS segment_source_sha256,
+    COALESCE(k.mastery_level,0) AS mastery_level
     FROM notes n JOIN note_states s ON s.note_id=n.id
     LEFT JOIN note_rich_content r ON r.note_id=n.id LEFT JOIN study_note_sources a ON a.note_id=n.id
     LEFT JOIN note_text_annotations t ON t.note_id=n.id
     LEFT JOIN note_shape_annotations q ON q.note_id=n.id
-    LEFT JOIN note_source_segments g ON g.note_id=n.id'''
+    LEFT JOIN note_source_segments g ON g.note_id=n.id
+    LEFT JOIN note_mastery k ON k.note_id=n.id'''
 
 
 def state_record(row):
     result = dict(row)
+    if result.get('mastery_level') is None:
+        result['mastery_level'] = 0
     result['rect'] = json.loads(result['rect']) if result['rect'] else None
     add_shape_record(result, result.pop('shape_original_json', None), result.pop('shape_current_json', None))
     add_annotation_record(result, result.pop('annotation_json', None))
@@ -152,6 +156,9 @@ class NoteLifecycle:
         if kind == 'patch':
             if current['deleted_at'] is not None:
                 raise WorkspaceError('note_deleted', '请先恢复这条笔记，再修改或核对。', 409)
+            if 'mastery_level' in data:
+                # Independent self-report; it never means the source was checked.
+                result['mastery_level'] = data['mastery_level']
             if 'annotation_style' in data:
                 if not current.get('annotation'):
                     raise WorkspaceError('text_annotation_required', '这条笔记没有可修改样式的文字批注。', 409)
@@ -201,6 +208,7 @@ class NoteLifecycle:
         meaningful = any(current[key] != result[key] for key in ('text', 'review_status', 'reviewed_at', 'deleted_at')) or current.get('rich_content')!=result.get('rich_content')
         meaningful = meaningful or result.get('annotation') != current.get('annotation')
         meaningful = meaningful or result.get('shape_annotation') != current.get('shape_annotation')
+        meaningful = meaningful or (result.get('mastery_level', 0) != current.get('mastery_level', 0))
         if meaningful:
             result.update(revision=current['revision'] + 1, updated_at=now)
         result['review_provenance'] = 'self_reported' if result['review_status'] == 'source_checked' else None
@@ -229,3 +237,8 @@ class NoteLifecycle:
             value=canonical(content) if content is not None else None
             connection.execute('''INSERT INTO note_rich_content VALUES (?,NULL,?)
                 ON CONFLICT(note_id) DO UPDATE SET current_json=excluded.current_json''',(current['id'],value))
+        if previous.get('mastery_level', 0) != current.get('mastery_level', 0):
+            connection.execute('''INSERT INTO note_mastery VALUES (?,?,?)
+                ON CONFLICT(note_id) DO UPDATE SET mastery_level=excluded.mastery_level,
+                updated_at=excluded.updated_at''',
+                (current['id'], current['mastery_level'], current['updated_at']))

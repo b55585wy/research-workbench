@@ -148,6 +148,9 @@ class NoteUpdate(NoteMutation):
     rich_content: dict | None = None
     annotation_style: AnnotationStyle | None = None
     shape_annotation: Optional[ShapeAnnotationInput] = None
+    # Independently self-reported learning level; strict integer only so null,
+    # booleans, fractions, strings and out-of-range values are rejected.
+    mastery_level: int | None = Field(default=None, strict=True, ge=0, le=5)
 
     @field_validator('rich_content')
     @classmethod
@@ -163,7 +166,8 @@ class NoteUpdate(NoteMutation):
 
     @model_validator(mode='after')
     def has_change(self):
-        if not ({'text', 'review_status', 'annotation_style', 'shape_annotation'} & self.model_fields_set):
+        if not ({'text', 'review_status', 'annotation_style', 'shape_annotation',
+                 'mastery_level'} & self.model_fields_set):
             raise ValueError('No change supplied')
         if 'annotation_style' in self.model_fields_set and self.annotation_style is None:
             raise ValueError('Annotation style cannot be null')
@@ -171,6 +175,8 @@ class NoteUpdate(NoteMutation):
             raise ValueError('Shape annotation cannot be null')
         if 'review_status' in self.model_fields_set and self.review_status is None:
             raise ValueError('Review status cannot be null')
+        if 'mastery_level' in self.model_fields_set and self.mastery_level is None:
+            raise ValueError('Mastery level cannot be null')
         if 'rich_content' in self.model_fields_set and 'text' not in self.model_fields_set:
             raise ValueError('Rich edits require matching text')
         if self.rich_content is not None and plaintext(self.rich_content)!=self.text:

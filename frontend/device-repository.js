@@ -1,7 +1,7 @@
 import { openDeviceDB } from "./device-db.js";
 import { mapDeviceAssetUrl } from "./device-context.js";
 import { createDeviceBackup, readDeviceBackup } from "./device-backup.js";
-import { DeviceError, baseDocument, baseNote, canonical, clone, errorResponse, excerptRecord, fail, imageRecord, isSHA, isUUID, json, metadata, mutationFingerprint, noteState, now, plainText, richReferences, richText, sha256, shapeBounds, text, validateNoteCreate, validateShape } from "./device-format.js";
+import { DeviceError, baseDocument, baseNote, canonical, clone, errorResponse, excerptRecord, fail, imageRecord, isSHA, isUUID, json, masteryLevel, metadata, mutationFingerprint, noteState, now, plainText, richReferences, richText, sha256, shapeBounds, text, validateNoteCreate, validateShape } from "./device-format.js";
 
 const MAX_PDF = 20 * 1024 * 1024;
 const MAX_IMAGE = 8 * 1024 * 1024;
@@ -211,7 +211,7 @@ export function createDeviceRepository({ pdfjsLib, renderExcerpt, readProgress, 
       }
       note.attached_image_ids = [...(note.image_ids || [])].sort();
       await syncRichImages(tx, documentId, note);
-      Object.assign(note, { revision: 1, review_status: "unreviewed", reviewed_at: null, updated_at: note.created_at, deleted_at: null });
+      Object.assign(note, { revision: 1, mastery_level: 0, review_status: "unreviewed", reviewed_at: null, updated_at: note.created_at, deleted_at: null });
       await tx.objectStore("notes").add(note);
       return { note: baseNote(note), created: true };
     });
@@ -234,8 +234,8 @@ export function createDeviceRepository({ pdfjsLib, renderExcerpt, readProgress, 
       const stamp = now();
       if (kind === "patch") {
         if (current.deleted_at) fail("note_deleted", "请先恢复这条笔记，再修改或核对。", 409);
-        const allowed = ["request_id", "expected_revision", "text", "rich_content", "review_status", "annotation_style", "shape_annotation"];
-        if (Object.keys(payload).some((key) => !allowed.includes(key)) || !["text", "rich_content", "review_status", "annotation_style", "shape_annotation"].some((key) => Object.hasOwn(payload, key))) fail("validation_error", "没有可保存的笔记修改。");
+        const allowed = ["request_id", "expected_revision", "text", "rich_content", "mastery_level", "review_status", "annotation_style", "shape_annotation"];
+        if (Object.keys(payload).some((key) => !allowed.includes(key)) || !["text", "rich_content", "mastery_level", "review_status", "annotation_style", "shape_annotation"].some((key) => Object.hasOwn(payload, key))) fail("validation_error", "没有可保存的笔记修改。");
         if (Object.hasOwn(payload, "source_segments")) fail("validation_error", "来源区段创建后不可修改。");
         if (Object.hasOwn(payload, "annotation_style")) {
           const style = payload.annotation_style;
@@ -263,6 +263,7 @@ export function createDeviceRepository({ pdfjsLib, renderExcerpt, readProgress, 
           if (!updated.rich_content) delete updated.rich_content;
         } else if (textChanged) delete updated.rich_content;
         if (updated.shape_annotation?.kind === "textbox" && updated.text.length > 2000) fail("textbox_text_too_long", "文本框内容不能超过 2000 个字符。");
+        if (Object.hasOwn(payload, "mastery_level")) updated.mastery_level = masteryLevel(payload.mastery_level);
         if (Object.hasOwn(payload, "review_status") && !["unreviewed", "source_checked"].includes(payload.review_status)) fail("validation_error", "核对状态无效。");
         const contentChanged = textChanged || canonical(updated.rich_content) !== canonical(current.rich_content) || geometryChanged;
         if (geometryChanged || fontChanged || (textChanged && current.shape_annotation?.kind === "textbox")) {
@@ -283,7 +284,7 @@ export function createDeviceRepository({ pdfjsLib, renderExcerpt, readProgress, 
         await tx.objectStore("mutations").add({ request_id: payload.request_id, target: noteId, fingerprint, result_revision: tombstone.revision, response, created_at: stamp });
         return response;
       } else fail("validation_error", "不支持这种笔记操作。");
-      const changed = ["text", "review_status", "reviewed_at", "deleted_at", "rich_content", "annotation", "shape_annotation", "rect", "image_ids"].some((key) => canonical(updated[key]) !== canonical(current[key]));
+      const changed = ["text", "mastery_level", "review_status", "reviewed_at", "deleted_at", "rich_content", "annotation", "shape_annotation", "rect", "image_ids"].some((key) => canonical(updated[key]) !== canonical(current[key]));
       if (changed) { updated.revision = current.revision + 1; updated.updated_at = stamp; }
       await tx.objectStore("notes").put(updated);
       await tx.objectStore("mutations").add({ request_id: payload.request_id, target: noteId, fingerprint, result_revision: updated.revision, created_at: stamp });

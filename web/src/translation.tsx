@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal, flushSync } from "react-dom";
 import { createRoot, type Root } from "react-dom/client";
 import { TranslationRunPanel, runInScope, type TranslationRun } from "./translation-runs";
+import { presentTranslationBlocks } from "./translation-presentation";
 
 type TranslationLanguage = "zh" | "en";
 type TargetLanguage = "zh" | "en";
@@ -206,6 +207,7 @@ const strings = {
     pollFailed: "进度暂时无法刷新，将自动重试。",
     original: "查看原文",
     originalBlock: "原文位置",
+    pageInformation: "期刊 / 出版信息",
     addExcerptToNote: "将译文和原文加入笔记",
     addExcerptToAsk: "将译文和原文加入助手草稿",
     excerptFailed: "未能加入译文，请重试；原有草稿未更改。",
@@ -289,6 +291,7 @@ const strings = {
     pollFailed: "Progress could not be refreshed and will be retried automatically.",
     original: "View original",
     originalBlock: "Original location",
+    pageInformation: "Journal / publication information",
     addExcerptToNote: "Add translation and original to note",
     addExcerptToAsk: "Add translation and original to Agent draft",
     excerptFailed: "The translation could not be added. Try again; the existing draft was not changed.",
@@ -417,8 +420,14 @@ function BlockView({ block, page, copy, onSource, onExcerpt, excerptPending = fa
       {(block.rect || canExcerpt) && (
         <div className="translation-block-footer">
           {block.rect && (
-            <button className="translation-source-link" type="button" onClick={() => onSource(page, block.rect)}>
-              {copy.originalBlock}
+            <button
+              className="translation-source-link translation-source-icon"
+              type="button"
+              aria-label={copy.originalBlock}
+              title={copy.originalBlock}
+              onClick={() => onSource(page, block.rect)}
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 4H4v5M15 4h5v5M20 15v5h-5M9 20H4v-5" /><path d="m9 15 6-6M10 9h5v5" /></svg>
             </button>
           )}
           {canExcerpt && (
@@ -453,6 +462,38 @@ function BlockView({ block, page, copy, onSource, onExcerpt, excerptPending = fa
   );
 }
 
+function TranslationPageInformation({ blocks, page, copy, onSource }: {
+  blocks: TranslationBlock[];
+  page: number;
+  copy: Copy;
+  onSource: (page: number, rect: TranslationRect | null) => void;
+}) {
+  if (!blocks.length) return null;
+  return (
+    <details className="translation-page-information">
+      <summary>{copy.pageInformation}</summary>
+      <div className="translation-page-information-content">
+        {blocks.map((block) => (
+          <div className="translation-information-block" key={block.id}>
+            <p>{block.source_text}</p>
+            {block.rect && (
+              <button
+                className="translation-source-link translation-source-icon"
+                type="button"
+                aria-label={copy.originalBlock}
+                title={copy.originalBlock}
+                onClick={() => onSource(page, block.rect)}
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 4H4v5M15 4h5v5M20 15v5h-5M9 20H4v-5" /><path d="m9 15 6-6M10 9h5v5" /></svg>
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+    </details>
+  );
+}
+
 function TranslationResults({ job, copy, onSource, onExcerpt, excerptPending = false }: {
   job: TranslationJob;
   copy: Copy;
@@ -466,6 +507,7 @@ function TranslationResults({ job, copy, onSource, onExcerpt, excerptPending = f
     <div className="translation-results">
       {pages.map((page) => {
         const blocks = Array.isArray(page.blocks) ? [...page.blocks].sort((a, b) => a.order - b.order) : [];
+        const presented = presentTranslationBlocks(blocks, page.page);
         return (
           <section className="translation-result-page" key={page.page} aria-labelledby={`translation-page-${job.id}-${page.page}`}>
             <header className="translation-page-header">
@@ -478,8 +520,9 @@ function TranslationResults({ job, copy, onSource, onExcerpt, excerptPending = f
             {page.status !== "completed" && (
               <p className="translation-page-warning">{copy[page.status === "failed" ? "pageFailed" : "pageUnavailable"]}</p>
             )}
+            <TranslationPageInformation blocks={presented.pageInformation} page={page.page} copy={copy} onSource={onSource} />
             {!blocks.length && page.status === "completed" && <p className="translation-empty">{copy.noText}</p>}
-            {blocks.map((block) => (
+            {presented.blocks.map((block) => (
               <BlockView
                 block={block}
                 page={page.page}

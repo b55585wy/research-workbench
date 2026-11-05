@@ -41,6 +41,7 @@
   <link rel="stylesheet" href="/reader-action-icons.css">
   <link rel="stylesheet" href="/translation-mobile.css">
   <link rel="stylesheet" href="/translation-reading.css">
+  <link rel="stylesheet" href="/note-controls.css">
 </head>
 <body>
   <section id="startup-status" class="startup-status" role="status" aria-live="polite" aria-atomic="true" data-state="loading">
@@ -603,7 +604,7 @@
             <span id="notes-count" class="notes-count"></span>
           </div>
         </summary>
-        <p id="study-review-explainer" class="review-explainer" hidden>“已核对来源”仅表示你检查了来源，不代表身份认证或科学验证。</p>
+        <p id="study-review-explainer" class="review-explainer" hidden>引文原文核对状态与掌握程度分别记录。</p>
         <p id="study-notes-empty" class="notes-empty" hidden>这项研究还没有笔记。</p>
         <ul id="study-notes-list" class="notes-list" aria-label="已保存研究笔记" hidden></ul>
       </details>
@@ -992,7 +993,8 @@
       </form>
 
       <section id="notes-filter-panel" class="notes-filter-panel" aria-label="筛选和选择笔记" hidden>
-        <div class="notes-filter-grid">
+        <div id="notes-filter-react-host" class="notes-filter-react-host"></div>
+        <div id="notes-filter-native" class="notes-filter-grid">
           <label for="notes-filter-query"><span data-i18n="notesFilterText">筛选笔记</span>
             <input id="notes-filter-query" type="search" maxlength="200" autocomplete="off" data-i18n-placeholder="notesFilterPlaceholder" placeholder="搜索正文或原始引文">
           </label>
@@ -1022,14 +1024,14 @@
           </label>
         </div>
         <div class="notes-filter-actions">
-          <button id="notes-filter-clear" class="button button-quiet" type="button" data-i18n="searchClear" disabled>清除</button>
-          <button id="notes-select-visible" class="button button-quiet" type="button" data-i18n="selectVisible">选择当前显示</button>
-          <button id="notes-selection-clear" class="button button-quiet" type="button" data-i18n="clearSelection" disabled>清除选择</button>
-          <button id="notes-batch-agent" class="button button-secondary" type="button" data-i18n="batchAddAssistant" disabled>将所选加入助手</button>
+          <button id="notes-filter-clear" class="button button-quiet note-tool-icon" type="button" data-i18n-aria="searchClear" aria-label="清除" title="清除" disabled hidden><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m6 6 12 12M18 6 6 18" /></svg></button>
+          <button id="notes-select-visible" class="button button-quiet note-tool-icon" type="button" data-i18n-aria="selectVisible" aria-label="选择当前显示" title="选择当前显示"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 6h10M4 12h10M4 18h7M17 15l2 2 4-5" /></svg></button>
+          <button id="notes-selection-clear" class="button button-quiet note-tool-icon" type="button" data-i18n-aria="clearSelection" aria-label="清除选择" title="清除选择" disabled hidden><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 5h14v14H5zM9 9l6 6M15 9l-6 6" /></svg></button>
+          <button id="notes-batch-agent" class="button button-secondary note-tool-icon" type="button" data-i18n-aria="batchAddAssistant" aria-label="将所选加入助手" title="将所选加入助手" disabled hidden><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20 15a3 3 0 0 1-3 3H9l-5 3v-6a3 3 0 0 1-1-2V7a3 3 0 0 1 3-3h11a3 3 0 0 1 3 3v8ZM9 11h6M12 8v6" /></svg></button>
         </div>
         <p id="notes-filter-status" class="notes-filter-status" role="status" aria-live="polite"></p>
       </section>
-      <p id="review-explainer" class="review-explainer" data-i18n="reviewExplainer">“已核对原文”仅表示你检查了来源，不代表身份认证或科学验证。</p>
+      <p id="review-explainer" class="review-explainer" data-i18n="reviewExplainer">引文原文核对状态与掌握程度分别记录。</p>
       <div id="notes-empty" class="notes-empty" data-i18n="emptyNotes">这篇文献还没有笔记。</div>
       <ul id="notes-list" class="notes-list" data-testid="notes-list" aria-label="已保存笔记"></ul>
       <details id="deleted-notes" class="deleted-notes" hidden>

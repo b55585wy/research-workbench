@@ -1,5 +1,6 @@
 import { isDeviceMode } from "/device-context.js";
 import { offlineSupport } from "/offline-client.js";
+import { serverPdfCache } from "/server-pdf-cache.js";
 
 const copy = {
   zh: {
@@ -28,7 +29,12 @@ const copy = {
     unsupportedBackup: "仅支持本应用导出的本机 v1 备份。",
     storageQuota: "本机空间不足，现有资料未改动；请清理空间后重试。",
     invalidBackup: "备份无效或已截断，请选择完整备份。",
-    localOnly: "仅保存在此浏览器，不会静默上传。"
+    localOnly: "仅保存在此浏览器，不会静默上传。",
+    serverCache: "服务器 PDF 阅读缓存",
+    clearCache: "清除阅读缓存",
+    cacheWorking: "正在清除阅读缓存…",
+    cacheCleared: "阅读缓存已清除。",
+    cacheFailed: "阅读缓存操作未完成，请重试。"
   },
   en: {
     storage: "Storage",
@@ -56,7 +62,12 @@ const copy = {
     unsupportedBackup: "Only device v1 backups exported by this app are supported.",
     storageQuota: "Device storage is full. Your data is unchanged; free space and retry.",
     invalidBackup: "The backup is invalid or truncated. Choose a complete backup.",
-    localOnly: "Stored only in this browser; never uploaded silently."
+    localOnly: "Stored only in this browser; never uploaded silently.",
+    serverCache: "Server PDF read cache",
+    clearCache: "Clear read cache",
+    cacheWorking: "Clearing read cache…",
+    cacheCleared: "Read cache cleared.",
+    cacheFailed: "The read-cache operation did not finish. Try again."
   }
 };
 
@@ -75,6 +86,17 @@ function backupFilename(document) {
   return `${base || "reading-backup"}.zip`;
 }
 
+function formatCacheBytes(value, language) {
+  const units = ["B", "KiB", "MiB"];
+  let amount = Math.max(0, Number(value) || 0);
+  let unit = 0;
+  while (amount >= 1024 && unit < units.length - 1) {
+    amount /= 1024;
+    unit += 1;
+  }
+  return `${new Intl.NumberFormat(language === "zh" ? "zh-CN" : "en", { maximumFractionDigits: unit ? 1 : 0 }).format(amount)} ${units[unit]}`;
+}
+
 export function createDeviceUI(adapter) {
   const root = document.getElementById("device-storage-ui");
   const input = document.getElementById("device-backup-input");
@@ -82,10 +104,62 @@ export function createDeviceUI(adapter) {
   if (controls && root.parentElement !== controls) controls.prepend(root);
   let pending = false;
   let status = null;
+  let cacheStats = null;
+  let cacheStatsPending = false;
   let offlineState = offlineSupport.getState();
 
   function text(key) {
     return copy[adapter.getLanguage()]?.[key] || copy.en[key];
+  }
+
+  async function refreshCacheStats() {
+    if (cacheStatsPending || isDeviceMode()) return;
+    cacheStatsPending = true;
+    try {
+      cacheStats = await serverPdfCache.getStats();
+    } catch {
+      cacheStats = { entries: 0, bytes: 0, unavailable: true };
+    } finally {
+      cacheStatsPending = false;
+      render();
+    }
+  }
+
+  async function clearServerCache() {
+    if (pending || cacheStatsPending || isDeviceMode()) return;
+    pending = true;
+    setStatus("info", "cacheWorking");
+    try {
+      await serverPdfCache.clear();
+      cacheStats = { entries: 0, bytes: 0 };
+      setStatus("success", "cacheCleared");
+    } catch {
+      setStatus("error", "cacheFailed");
+    } finally {
+      pending = false;
+      render();
+    }
+  }
+
+  function renderServerCache(panel, menu) {
+    const row = window.document.createElement("div");
+    row.className = "device-storage-actions";
+    const label = window.document.createElement("p");
+    label.className = "device-storage-note";
+    label.textContent = cacheStats?.unavailable ? text("cacheFailed") : cacheStats
+      ? `${text("serverCache")}: ${formatCacheBytes(cacheStats.bytes, adapter.getLanguage())} · ${cacheStats.entries} PDF`
+      : text("serverCache");
+    const clear = window.document.createElement("button");
+    clear.type = "button";
+    clear.className = "button button-quiet";
+    clear.textContent = text("clearCache");
+    clear.disabled = pending || cacheStatsPending || cacheStats?.entries === 0;
+    clear.addEventListener("click", () => void clearServerCache());
+    row.append(label, clear);
+    panel.append(row);
+    menu.addEventListener("toggle", () => {
+      if (menu.open && !cacheStats && !cacheStatsPending) void refreshCacheStats();
+    });
   }
 
   function offlineText(device) {
@@ -174,6 +248,7 @@ export function createDeviceUI(adapter) {
     switchLink.title = device ? text("switchServer") : text("switchDevice");
     switchLink.setAttribute("aria-label", switchLink.title);
     panel.append(switchLink);
+    if (!device) renderServerCache(panel, menu);
     if (device) {
       const actions = window.document.createElement("div");
       actions.className = "device-storage-actions";

@@ -466,7 +466,7 @@ def test_server_paths_schema_and_legacy_selection_api_are_unchanged(
     assert transport.calls == []
 
     with app.state.store.connection() as database:
-        assert database.execute('PRAGMA user_version').fetchone()[0] == 27
+        assert database.execute('PRAGMA user_version').fetchone()[0] == 28
 
 
 def test_guest_gateway_serves_device_relay_without_allocating_a_space(

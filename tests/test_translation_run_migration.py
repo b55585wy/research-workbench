@@ -29,7 +29,7 @@ def insert_legacy_job(connection, document, identifier, total_pages=1):
                        (identifier, 1, 'completed', None, '[]'))
 
 
-def test_schema_26_to_27_is_additive_and_keeps_the_legacy_five_page_check(tmp_path):
+def test_schema_26_upgrade_is_additive_and_keeps_the_legacy_five_page_check(tmp_path):
     root = tmp_path / 'workspace'
     store = Store(root)
     document = add_document(store, pages=2)
@@ -46,7 +46,7 @@ def test_schema_26_to_27_is_additive_and_keeps_the_legacy_five_page_check(tmp_pa
 
     reopened = Store(root)
     with reopened.connection() as db:
-        assert db.execute('PRAGMA user_version').fetchone()[0] == 27
+        assert db.execute('PRAGMA user_version').fetchone()[0] == 28
         names = {row[0] for row in db.execute(
             "SELECT name FROM sqlite_master WHERE type='table'")}
         assert set(RUN_TABLES) <= names
@@ -88,13 +88,13 @@ def test_purge_removes_run_relations_and_run_owned_children_without_fk_leftovers
         assert db.execute('PRAGMA foreign_key_check').fetchall() == []
 
 
-def test_schema_28_is_refused_without_rewriting_the_database(tmp_path):
+def test_future_schema_29_is_refused_without_rewriting_the_database(tmp_path):
     root = tmp_path / 'future'
     root.mkdir()
     database = root / 'workspace.sqlite3'
     with sqlite3.connect(database) as db:
-        db.execute('PRAGMA user_version=28')
+        db.execute('PRAGMA user_version=29')
     with pytest.raises(RuntimeError):
         Store(root)
     with sqlite3.connect(database) as db:
-        assert db.execute('PRAGMA user_version').fetchone()[0] == 28
+        assert db.execute('PRAGMA user_version').fetchone()[0] == 29

@@ -1,0 +1,466 @@
+.note-react-controls {
+  display: grid;
+  gap: 8px;
+  padding-top: 8px;
+  font-size: 14px;
+}
+
+.note-mastery,
+.note-style-controls,
+.note-react-actions,
+.note-kind-control,
+.note-color-control,
+.note-mastery-stars {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.note-control-label,
+.note-filter-react,
+.note-review-status,
+.note-mastery-clear {
+  color: var(--ui-text-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.note-control-label {
+  margin-right: 4px;
+}
+
+.note-icon-button,
+.note-color-button,
+.note-mastery-star,
+.image-icon-action {
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  padding: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ui-text-soft);
+  cursor: pointer;
+}
+
+.note-icon-button:hover,
+.note-color-button:hover,
+.note-mastery-star:hover,
+.image-icon-action:hover,
+.note-icon-button[aria-pressed="true"],
+.note-color-button[aria-pressed="true"] {
+  border-color: var(--ui-border);
+  background: var(--ui-selected);
+  color: var(--ui-primary);
+}
+
+.note-icon-button:focus-visible,
+.note-color-button:focus-visible,
+.note-mastery-star:focus-visible,
+.note-mastery-clear:focus-visible,
+.note-filter-all:focus-visible,
+.image-icon-action:focus-visible {
+  outline: 2px solid var(--ui-focus, var(--ui-primary));
+  outline-offset: 2px;
+}
+
+.note-icon-button:disabled,
+.note-color-button:disabled,
+.note-mastery-star:disabled {
+  opacity: 0.45;
+  cursor: wait;
+}
+
+.note-mastery-clear:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.note-icon-button svg,
+.image-icon-action svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.note-icon-button[data-danger="true"] {
+  color: var(--ui-danger);
+}
+
+.note-color-swatch {
+  width: 20px;
+  height: 20px;
+  display: block;
+  border: 2px solid var(--ui-surface);
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px var(--ui-border-strong);
+}
+
+.note-color-swatch[data-color="yellow"] { background: #f2cf4a; }
+.note-color-swatch[data-color="green"] { background: #62ad78; }
+.note-color-swatch[data-color="blue"] { background: #6299d1; }
+.note-color-swatch[data-color="pink"] { background: #df8da9; }
+.note-color-swatch[data-color="black"] { background: #3f4650; }
+.note-color-swatch[data-color="red"] { background: #c95d5d; }
+
+.note-mastery-star {
+  width: 36px;
+  padding: 7px;
+  color: var(--ui-text-muted);
+}
+
+.note-mastery-star svg {
+  width: 22px;
+  height: 22px;
+  fill: transparent;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+}
+
+.note-mastery-star svg[data-filled="true"] {
+  fill: #e2b93b;
+  stroke: #9a7514;
+}
+
+.note-mastery-clear {
+  border-top: 1px solid var(--ui-border);
+  border-radius: 0;
+}
+
+.note-more {
+  position: relative;
+}
+
+.note-more-menu {
+  position: absolute;
+  z-index: 30;
+  right: 0;
+  bottom: calc(100% + 4px);
+  width: max-content;
+  min-width: 176px;
+  max-width: min(240px, 80vw);
+  padding: 8px;
+  border: 1px solid var(--ui-border);
+  border-radius: 4px;
+  background: var(--ui-surface);
+  box-shadow: 0 6px 20px rgb(0 0 0 / 14%);
+}
+
+.note-review-status {
+  margin: 0 4px 6px;
+}
+
+.note-review-status[data-status="source_checked"] {
+  color: var(--ui-success);
+}
+
+.note-review-action {
+  width: 100%;
+  min-height: 36px;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--ui-text);
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.note-review-action:hover,
+.note-review-action:focus-visible {
+  background: var(--ui-selected);
+}
+
+.note-filter-react {
+  position: relative;
+  display: grid;
+  gap: 10px;
+}
+
+.note-filter-search-row {
+  display: flex;
+  align-items: end;
+  gap: 6px;
+}
+
+.note-filter-query {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.note-filter-query input {
+  width: 100%;
+  min-width: 0;
+  min-height: 36px;
+  padding: 6px 8px;
+  border: 1px solid var(--ui-input-border);
+  border-radius: 3px;
+  background: var(--ui-input-bg);
+  color: var(--ui-text);
+  font-size: 14px;
+}
+
+.note-filter-disclosure {
+  position: relative;
+  flex: none;
+}
+
+.note-filter-disclosure[data-active="true"] {
+  border-color: var(--ui-border);
+  background: var(--ui-selected);
+  color: var(--ui-primary);
+}
+
+.note-filter-disclosure[data-active="true"]::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.note-filter-options {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 4px);
+  right: 0;
+  width: min(300px, calc(100vw - 64px));
+  max-height: 70vh;
+  overflow-y: auto;
+  display: grid;
+  gap: 12px;
+  padding: 10px;
+  border: 1px solid var(--ui-border);
+  border-radius: 4px;
+  background: var(--ui-surface);
+  box-shadow: 0 6px 20px rgb(0 0 0 / 14%);
+}
+
+.note-filter-row {
+  display: grid;
+  gap: 5px;
+}
+
+.note-filter-swatches,
+.note-filter-kinds {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.note-filter-options .note-icon-button,
+.note-filter-options .note-color-button,
+.note-filter-all {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.note-filter-all {
+  padding: 5px 8px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ui-text-soft);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.note-filter-all[aria-pressed="true"] {
+  border-color: var(--ui-border);
+  background: var(--ui-selected);
+  color: var(--ui-primary);
+}
+
+.notes-filter-actions .note-tool-icon {
+  width: 36px;
+  min-width: 36px;
+  min-height: 36px;
+  padding: 7px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.notes-filter-actions .note-tool-icon svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.notes-filter-actions [hidden] {
+  display: none;
+}
+
+.image-icon-action {
+  box-sizing: border-box;
+  text-decoration: none;
+}
+
+.image-item .note-excerpt-actions,
+.note-uploaded-image figcaption .note-excerpt-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.note-uploaded-image figcaption a.image-icon-action {
+  display: inline-flex;
+  margin-top: 0;
+}
+
+.image-technical-info {
+  margin-top: 6px;
+  color: var(--ui-text-muted);
+  font-size: 12px;
+}
+
+.translation-source-icon {
+  width: 36px;
+  min-width: 36px;
+  min-height: 36px;
+  padding: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  text-decoration: none;
+}
+
+.translation-source-icon:hover,
+.translation-source-icon:focus-visible {
+  background: var(--ui-selected);
+}
+
+.translation-source-icon svg {
+  width: 19px;
+  height: 19px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.translation-block .translation-source-icon {
+  display: inline-flex;
+  margin-top: 0;
+}
+
+.translation-page-information {
+  margin: 6px 0 10px;
+  color: var(--ui-text-muted);
+  font-size: 12px;
+}
+
+.translation-page-information > summary {
+  min-height: 36px;
+  cursor: pointer;
+}
+
+.translation-page-information-content {
+  padding: 4px 8px;
+  border-left: 2px solid var(--ui-border);
+}
+
+.translation-page-information-content p {
+  margin: 5px 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .translation-block .translation-source-icon {
+    opacity: 0;
+    transition: opacity 120ms ease;
+  }
+
+  .translation-block:hover .translation-source-icon,
+  .translation-block:focus-within .translation-source-icon {
+    opacity: 1;
+  }
+}
+
+@media (pointer: coarse) {
+  .note-icon-button,
+  .note-color-button,
+  .note-mastery-star,
+  .note-filter-all,
+  .note-review-action,
+  .image-icon-action,
+  .translation-source-icon,
+  .notes-filter-actions .note-tool-icon {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .note-icon-button,
+  .note-color-button,
+  .note-mastery-star,
+  .image-icon-action,
+  .translation-source-icon,
+  .notes-filter-actions .note-tool-icon {
+    width: 44px;
+    height: 44px;
+  }
+}
+
+@media (max-width: 480px) {
+  .note-filter-query input {
+    min-height: 44px;
+    font-size: 16px;
+  }
+
+  .note-icon-button,
+  .note-color-button,
+  .note-mastery-star,
+  .image-icon-action {
+    box-sizing: border-box;
+    flex: 0 0 44px;
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+    min-height: 44px;
+  }
+
+  .note-icon-button svg,
+  .note-mastery-star svg,
+  .image-icon-action svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .note-mastery {
+    flex-wrap: wrap;
+    gap: 0;
+  }
+
+  .note-mastery-stars {
+    flex-wrap: nowrap;
+    gap: 0;
+  }
+
+  .note-mastery .note-control-label {
+    margin-right: 0;
+  }
+}

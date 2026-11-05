@@ -34,6 +34,16 @@ def markdown_text(value):
     return re.sub(r'([\\`*_{}\[\]()#+.!|>\-])', r'\\\1', html.escape(value, quote=False))
 
 
+def mastery_label(note):
+    """Concise learning star/rating; never replaces the source-check label."""
+    level = note.get('mastery_level', 0)
+    if type(level) is not int or not 0 <= level <= 5:
+        level = 0
+    if level == 0:
+        return '学习掌握 / Mastery: 未评级 / Unrated'
+    return f'学习掌握 / Mastery: {"★" * level}{"☆" * (5 - level)} ({level}/5)'
+
+
 def reading_documents(document, notes, excerpts, exported_at,annotation_groups=None):
     by_note = {record['note_id']: record for record in excerpts}
     markdown = [f"# {markdown_text(document['title'])}", '',
@@ -56,6 +66,7 @@ def reading_documents(document, notes, excerpts, exported_at,annotation_groups=N
         checked = note.get('review_status') == 'source_checked'
         review_label = '已核对原文（自行确认） / Source checked (self-reported)' if checked else '待核对原文 / Needs source checking'
         markdown.extend([review_label, ''])
+        markdown.extend([mastery_label(note), ''])
         markdown.extend('> ' + markdown_text(line) for line in note['text'].splitlines())
         from .image_export import note_rich_html,attachment_only
         body = note_rich_html(note) if note.get('rich_content') else '<p>'+html.escape(note['text']).replace('\n', '<br>')+'</p>'
@@ -71,7 +82,8 @@ def reading_documents(document, notes, excerpts, exported_at,annotation_groups=N
             markdown.extend(['', shape_label+': '+shape_summary(note['shape_annotation']), ''])
             body = shape_annotation_markup(note) + body
         section = f'<section><h2>{index}. 第 {note["page"]} 页 / Page {note["page"]}</h2>'
-        section += f'<p><a href="{source_link}">查看原文 / View source</a></p><p class="review-status">{review_label}</p>'+body
+        section += f'<p><a href="{source_link}">查看原文 / View source</a></p><p class="review-status">{review_label}</p>'
+        section += f'<p class="mastery">{mastery_label(note)}</p>'+body
         if len(segments) > 1:
             for segment in segments:
                 link = f"source.pdf#page={segment['page']}"

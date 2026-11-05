@@ -1,5 +1,5 @@
 import { Zip, ZipPassThrough, Unzip, strToU8, strFromU8 } from "./vendor/device-storage/device-storage.js";
-import { DeviceError, baseDocument, canonical, clone, fail, isSHA, isUUID, metadata, noteState, sha256, validateNoteCreate, validateShape } from "./device-format.js";
+import { DeviceError, baseDocument, canonical, clone, fail, isSHA, isUUID, masteryLevel, metadata, noteState, sha256, validateNoteCreate, validateShape } from "./device-format.js";
 
 export const DEVICE_BACKUP_FORMAT = "research-workspace-device/v1";
 const MAX_ARCHIVE = 64 * 1024 * 1024;
@@ -211,7 +211,7 @@ function checkNote(value, document, imageIds) {
   }
   if (attached.length) payload.image_ids = attached;
   const checked = validateNoteCreate(payload, document, attached.length > 0);
-  return { ...checked, created_at: value.created_at, image_ids: unique.sort(), attached_image_ids: attached, revision: value.revision, review_status: value.review_status, reviewed_at: value.reviewed_at ?? null, updated_at: value.updated_at, deleted_at: value.deleted_at ?? null };
+  return { ...checked, created_at: value.created_at, image_ids: unique.sort(), attached_image_ids: attached, revision: value.revision, mastery_level: value.mastery_level === undefined ? 0 : masteryLevel(value.mastery_level), review_status: value.review_status, reviewed_at: value.reviewed_at ?? null, updated_at: value.updated_at, deleted_at: value.deleted_at ?? null };
 }
 
 export async function readDeviceBackup(blob) {

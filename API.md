@@ -1,3 +1,15 @@
+# v0.61 reader-source and independent note mastery
+
+GET `/api/v1/documents/{id}/reader-source` returns a no-store
+`{cache_scope, document}` probe within the existing workspace boundary. The stable
+scope is a cache namespace, never authentication; no path or secret is returned.
+Only active PDFs with a regular, size-matching original file are eligible.
+
+Note state adds `mastery_level` default0. Existing note PATCH accepts a strict
+integer0..5 through the same request/revision transaction; source review is
+independent. SQLite28 adds only `note_mastery`; old rows and API semantics remain.
+See [cache, controls and verification](CACHE-NOTES.md).
+
 # v0.60 additive sentence-aligned translation results
 
 New translation jobs/runs freeze `prompt_version=translate-sentences-v2`.

@@ -617,4 +617,4 @@ def test_server_paths_schema_and_legacy_translation_api_are_unchanged(
     assert len(transport.calls) == 1
 
     with app.state.store.connection() as database:
-        assert database.execute('PRAGMA user_version').fetchone()[0] == 27
+        assert database.execute('PRAGMA user_version').fetchone()[0] == 28

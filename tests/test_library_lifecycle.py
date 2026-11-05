@@ -198,9 +198,9 @@ def test_schema13_upgrade_preserves_rows_and_future_schema_refused(tmp_path):
         db.execute('PRAGMA user_version=13')
     Store(store.root)
     with store.connection() as db:
-        assert db.execute('PRAGMA user_version').fetchone()[0] == 15
+        assert db.execute('PRAGMA user_version').fetchone()[0] == 28
         assert all(db.execute(f'SELECT * FROM {name}').fetchall() == rows for name, rows in before.items())
         assert db.execute('PRAGMA foreign_key_check').fetchall() == []
-        db.execute('PRAGMA user_version=16')
+        db.execute('PRAGMA user_version=29')
     with pytest.raises(RuntimeError, match='newer application'):
         Store(store.root)

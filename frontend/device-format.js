@@ -55,6 +55,11 @@ export function text(value, label = "笔记", maximum = 10000) {
   return result;
 }
 
+export function masteryLevel(value) {
+  if (!Number.isInteger(value) || value < 0 || value > 5) fail("validation_error", "掌握程度必须是 0 至 5 的整数。");
+  return value;
+}
+
 export function rect(value) {
   if (!Array.isArray(value) || value.length !== 4 || value.some((item) => typeof item !== "number" || !Number.isFinite(item) || item < 0 || item > 1) || value[0] >= value[2] || value[1] >= value[3]) fail("validation_error", "请选择有效的归一化页面区域。");
   return [...value];
@@ -293,6 +298,7 @@ export function baseNote(record) {
 export function noteState(record) {
   const result = { ...baseNote(record) };
   for (const key of ["revision", "review_status", "reviewed_at", "updated_at", "deleted_at", "annotation", "shape_annotation"]) result[key] = clone(record[key]);
+  result.mastery_level = masteryLevel(record.mastery_level ?? 0);
   result.review_provenance = record.review_status === "source_checked" ? "self_reported" : null;
   if (record.rich_content) { result.rich_content = clone(record.rich_content); result.rich_html = richHTML(record.rich_content); }
   return result;
