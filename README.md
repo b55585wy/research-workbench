@@ -2,7 +2,7 @@ Server deployment and current status: [SERVER-DEPLOYMENT.md](SERVER-DEPLOYMENT.m
 
 # research workspace
 
-当前版本：v0.58.0，入口为 https://itsyiyi.com/ 与 https://5ai.life/，两边用户资料独立。
+当前版本：v0.59.0，入口为 https://itsyiyi.com/ 与 https://5ai.life/，两边用户资料独立。
 可选择浏览器本机资料或服务器游客空间。本机资料保存在 IndexedDB；选区翻译和明确文字问答须预览确认，数据导入/分析尚未接入本机模式。
 加载提示、版本化前端发布和[完全离线启动](OFFLINE-START.md)均已上线。联网打开入口页或服务器工作区，
 即会后台准备本机离线功能；“存储”显示准备就绪后，可在同一浏览器断网重开根网址。服务器资料仍需联网。
@@ -12,6 +12,7 @@ Server deployment and current status: [SERVER-DEPLOYMENT.md](SERVER-DEPLOYMENT.m
 只在明确点击后发送选定文字。两站默认使用平台 DeepSeek，也可优先使用自己的 Key，见[连接状态](SERVER-MODEL-CONNECTION.md)。
 
 当前面向医学生，依次推进易上手数据分析、Nature/Cell 等视觉预设科研绘图、可编辑 AI 汇报 PPT，再继续阅读主线。
+服务器资料模式已发布分析引导、三种图表预设、PNG/SVG/离线包，以及选定资料的 AI 大纲和可编辑 PPTX，见[实施与验收](MEDICAL-STUDENT-ANALYSIS.md)。
 医生提出的29项功能和UI取舍已完整记录在[需求清单](CLINICIAN-REQUIREMENTS.md)，其余先留档、以后讨论。
 见 [近期迭代](NEAR-TERM-PLAN.md)、[长期产品路线](PRODUCT-ROADMAP.md)、[发布方式与限制](UPDATE-POLICY.md)。
 

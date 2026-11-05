@@ -1,5 +1,21 @@
 # 更新与访问连续性
 
+## 2026-11-05：v0.59.0 分析、绘图与PPT发布
+
+源码 `01e319893c2be1d418355c4e7a481495955af8c6`，前端 `ui-0.59.0-1af99627ca9f986a`；
+双站公开健康、平台连接状态和前端资源已核对，旧v0.58前端资源继续可取。功能与验收范围见 [实施记录](MEDICAL-STUDENT-ANALYSIS.md)。
+schema27、资料表内容指纹保持，代理与旧站原owner进程未变；没有复制两站用户数据。
+只新增PPT所需的三个已锁定运行包，未升级已有包；两台Linux均用实际部署运行时生成并重新打开原生图表PPT，无提供商调用。
+
+| 入口 | 数据核对：空间/文献/笔记 | 切换窗口 | 备份 |
+|---|---|---|---|
+| https://5ai.life/ | 10 / 5 / 4，前后内容指纹一致 | 4.28秒 | `/var/backups/research-workspace/before-medical-student-v0590-1793838995/guest-spaces.tar.gz` |
+| https://itsyiyi.com/ | 32 / 8 / 0，前后内容指纹一致 | 4.95秒 | `/var/backups/research-workspace/before-medical-student-v0590-1793839043/guest-spaces.tar.gz` |
+
+两站部署记录位于 `/opt/research-workspace/downloads/medical-student-v1/DEPLOYMENT-STATUS.json`。
+PPT大纲/导出是有界同步请求，未新增持久任务队列；后续后端发布仍需考虑正在生成的请求，当前尚无统一HTTP在途排空机制。
+兼容纯前端更新仍可不重启；不因此宣称后端更新零中断或重启后仍保留内存中的AI请求回执。
+
 ## 2026-11-05：v0.58.0 平台连接发布
 
 双站已更新至源码 `f7b3d3140f56cf2a3697cd832d4d504ec693d706`、前端 `ui-0.58.0-5f9acfb5744afb32`。
