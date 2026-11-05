@@ -1,4 +1,5 @@
 import { TEXTBOX_COLORS, TEXTBOX_FONT_FAMILY, drawTextboxCanvas, layoutTextbox } from "/reader-textbox.js";
+import { readerEditorPlacement } from "/reader-editor-position.js";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 const COLORS = { yellow: "#ffe069", green: "#91dab1", blue: "#91c8f6", pink: "#efa9cf" };
@@ -77,6 +78,8 @@ export function createReaderShapes(adapter) {
   let drawKind = null;
   let saving = false;
   let widthMenuOpen = false;
+  let editorViewportActive = false;
+  let editorFrame = null;
   let clipSequence = 0;
   const layers = new Map();
   const editor = document.getElementById("reader-shape-editor");
@@ -142,18 +145,45 @@ export function createReaderShapes(adapter) {
     const stage = adapter.getStage().getBoundingClientRect();
     const surface = interaction.record.surface.getBoundingClientRect();
     const bounds = shapeBounds(interaction.shape);
-    const anchorLeft = surface.left + bounds[0] * surface.width;
-    const anchorTop = surface.top + bounds[1] * surface.height;
-    const anchorBottom = surface.top + bounds[3] * surface.height;
-    editor.style.left = "8px";
-    editor.style.top = "8px";
-    const editorWidth = editor.offsetWidth;
-    const editorHeight = editor.offsetHeight;
-    const left = Math.max(4, Math.min(window.innerWidth - editorWidth - 4, anchorLeft));
-    const above = anchorTop - editorHeight - 6;
-    const top = above >= Math.max(4, stage.top + 4) ? above : Math.max(4, Math.min(window.innerHeight - editorHeight - 4, anchorBottom + 6));
-    editor.style.left = `${left}px`;
-    editor.style.top = `${top}px`;
+    const anchor = { left: surface.left + bounds[0] * surface.width, top: surface.top + bounds[1] * surface.height,
+      right: surface.left + bounds[2] * surface.width, bottom: surface.top + bounds[3] * surface.height };
+    const visual = window.visualViewport;
+    const viewport = { left: visual?.offsetLeft || 0, top: visual?.offsetTop || 0,
+      right: (visual?.offsetLeft || 0) + (visual?.width || window.innerWidth), bottom: (visual?.offsetTop || 0) + (visual?.height || window.innerHeight) };
+    const measure = () => {
+      const size = editor.getBoundingClientRect();
+      return readerEditorPlacement({ stage, viewport, anchor, width: size.width, height: size.height });
+    };
+    let position = measure();
+    editor.style.visibility = position ? "" : "hidden";
+    if (!position) return;
+    editor.style.maxWidth = `${position.maxWidth}px`;
+    editor.style.maxHeight = `${position.maxHeight}px`;
+    // Width changes can reflow the description and action rows.
+    position = measure();
+    editor.style.left = `${position.left}px`;
+    editor.style.top = `${position.top}px`;
+  }
+
+  function scheduleEditorPosition() {
+    if (editorFrame !== null) return;
+    editorFrame = requestAnimationFrame(() => {
+      editorFrame = null;
+      positionEditor();
+    });
+  }
+
+  function watchEditorViewport(active) {
+    if (editorViewportActive === active) return;
+    editorViewportActive = active;
+    const method = active ? "addEventListener" : "removeEventListener";
+    window[method]("resize", scheduleEditorPosition);
+    window.visualViewport?.[method]("resize", scheduleEditorPosition);
+    window.visualViewport?.[method]("scroll", scheduleEditorPosition);
+    if (!active && editorFrame !== null) {
+      cancelAnimationFrame(editorFrame);
+      editorFrame = null;
+    }
   }
 
   function makeTextboxLayout(record, shape, text, cssWidth, cssHeight) {
@@ -277,6 +307,7 @@ export function createReaderShapes(adapter) {
   function renderEditor(sync = false) {
     const focusedColor = colorPalette.contains(document.activeElement) ? document.activeElement.dataset.value : null;
     editor.hidden = !interaction || Boolean(interaction.drawing);
+    watchEditorViewport(!editor.hidden);
     if (editor.hidden) {
       closeWidthMenu();
       return;

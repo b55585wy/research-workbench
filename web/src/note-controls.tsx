@@ -1,6 +1,7 @@
-import { useEffect, useId, useRef, useState } from "react";
-import { flushSync } from "react-dom";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { createPortal, flushSync } from "react-dom";
 import { createRoot, type Root } from "react-dom/client";
+import { positionNoteMenu, type NoteMenuRect } from "./note-menu-position";
 
 export type NoteControlLanguage = "zh" | "en";
 export type NoteControlAction = "annotation" | "assistant" | "edit" | "delete" | "review";
@@ -265,40 +266,163 @@ function ActionButton({ action, label, icon, disabled, onClick, danger = false }
   );
 }
 
-function NoteControls({ model, callbacks }: {
+function menuGeometry(trigger: HTMLButtonElement) {
+  if (!trigger.isConnected || !trigger.getClientRects().length) return null;
+  const visual = window.visualViewport;
+  const viewport = {
+    left: visual?.offsetLeft ?? 0,
+    top: visual?.offsetTop ?? 0,
+    width: visual?.width ?? document.documentElement.clientWidth,
+    height: visual?.height ?? document.documentElement.clientHeight
+  };
+  const clips: NoteMenuRect[] = [];
+  for (let parent: HTMLElement | null = trigger; parent; parent = parent.parentElement) {
+    const style = getComputedStyle(parent);
+    if (parent.inert || parent.getAttribute("aria-hidden") === "true"
+      || style.display === "none" || style.visibility === "hidden" || style.visibility === "collapse") return null;
+    const panel = parent.matches("#notes-panel, .notes-panel");
+    const clipX = panel || /auto|scroll|hidden|clip/.test(style.overflowX);
+    const clipY = panel || /auto|scroll|hidden|clip/.test(style.overflowY);
+    if (!clipX && !clipY) continue;
+    const rect = parent.getBoundingClientRect();
+    clips.push({
+      left: clipX ? rect.left + parent.clientLeft : viewport.left,
+      top: clipY ? rect.top + parent.clientTop : viewport.top,
+      width: clipX ? parent.clientWidth : viewport.width,
+      height: clipY ? parent.clientHeight : viewport.height
+    });
+  }
+  return { viewport, clips };
+}
+
+function enabledMenuItems(menu: HTMLDivElement | null) {
+  return Array.from(menu?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]:not(:disabled)') || []);
+}
+
+function focusMenuItem(menu: HTMLDivElement | null, item: HTMLButtonElement | undefined) {
+  if (!menu || !item) return;
+  item.focus({ preventScroll: true });
+  const top = menu.getBoundingClientRect().top + menu.clientTop;
+  const rect = item.getBoundingClientRect();
+  if (rect.top < top) menu.scrollTop -= top - rect.top;
+  else if (rect.bottom > top + menu.clientHeight) menu.scrollTop += rect.bottom - top - menu.clientHeight;
+}
+
+function NoteMoreControl({ model, callbacks, copy }: {
   model: NoteControlModel;
   callbacks: NoteControlCallbacks;
+  copy: Copy;
 }) {
-  const copy = strings[model.language];
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [position, setPosition] = useState<(NoteMenuRect & { ready: boolean }) | null>(null);
   const menuContainerRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const menuTriggerRef = useRef<HTMLButtonElement>(null);
+  const repositionRef = useRef<(() => void) | null>(null);
+  const focusedRef = useRef(false);
+  const menuId = useId();
+  const menuOpen = open && !model.disabled;
   const checked = model.reviewStatus === "source_checked";
 
   function closeMenu(restoreFocus: boolean) {
-    setMenuOpen(false);
-    if (restoreFocus) requestAnimationFrame(() => menuTriggerRef.current?.focus({ preventScroll: true }));
+    setOpen(false);
+    const trigger = menuTriggerRef.current;
+    if (restoreFocus && trigger && !trigger.disabled && menuGeometry(trigger)) trigger.focus({ preventScroll: true });
   }
 
-  useEffect(() => {
-    if (model.disabled) setMenuOpen(false);
+  function openMenu() {
+    setPosition(null);
+    setOpen(true);
+  }
+
+  useLayoutEffect(() => {
+    if (model.disabled) setOpen(false);
   }, [model.disabled]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!menuOpen) return;
+    const trigger = menuTriggerRef.current;
+    const menu = menuRef.current;
     const container = menuContainerRef.current;
-    const frame = requestAnimationFrame(() => container?.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus());
-    const outside = (event: PointerEvent) => {
-      if (container && event.target instanceof Node && !container.contains(event.target)) closeMenu(false);
+    if (!trigger || !menu || !container) return;
+    let frame: number | null = null;
+    const reposition = () => {
+      const geometry = menuGeometry(trigger);
+      const rect = menu.getBoundingClientRect();
+      const next = geometry && positionNoteMenu({
+        ...geometry,
+        anchor: trigger.getBoundingClientRect(),
+        menu: { width: 240, height: menu.scrollHeight + menu.offsetHeight - menu.clientHeight }
+      });
+      if (!next || next.width < 20 || next.height < 20) {
+        closeMenu(false);
+        return;
+      }
+      const ready = Math.abs(rect.width - next.width) < 1;
+      setPosition((current) => current && current.left === next.left && current.top === next.top
+        && current.width === next.width && current.height === next.height && current.ready === ready
+        ? current : { ...next, ready });
     };
-    document.addEventListener("pointerdown", outside);
+    const schedule = () => {
+      if (frame !== null) return;
+      frame = requestAnimationFrame(() => {
+        frame = null;
+        reposition();
+      });
+    };
+    const outside = (event: PointerEvent) => {
+      if (event.target instanceof Node && !container.contains(event.target) && !menu.contains(event.target)) closeMenu(false);
+    };
+    const observer = new MutationObserver((records) => {
+      if (records.some((record) => record.type === "attributes" ? record.target.contains(trigger)
+        : [...record.removedNodes, ...record.addedNodes].some((node) => node.contains(trigger)))) schedule();
+    });
+    observer.observe(document.documentElement, { subtree: true, childList: true, attributes: true });
+    const resize = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(schedule);
+    for (let parent: HTMLElement | null = trigger; parent; parent = parent.parentElement) resize?.observe(parent);
+    resize?.observe(menu);
+    repositionRef.current = reposition;
+    window.addEventListener("resize", schedule);
+    window.addEventListener("scroll", schedule, true);
+    document.addEventListener("scroll", schedule, true);
+    window.visualViewport?.addEventListener("resize", schedule);
+    window.visualViewport?.addEventListener("scroll", schedule);
+    document.addEventListener("pointerdown", outside, true);
     return () => {
-      cancelAnimationFrame(frame);
-      document.removeEventListener("pointerdown", outside);
+      if (frame !== null) cancelAnimationFrame(frame);
+      repositionRef.current = null;
+      focusedRef.current = false;
+      observer.disconnect();
+      resize?.disconnect();
+      window.removeEventListener("resize", schedule);
+      window.removeEventListener("scroll", schedule, true);
+      document.removeEventListener("scroll", schedule, true);
+      window.visualViewport?.removeEventListener("resize", schedule);
+      window.visualViewport?.removeEventListener("scroll", schedule);
+      document.removeEventListener("pointerdown", outside, true);
     };
   }, [menuOpen]);
 
+  // Width changes can wrap labels; measure again in layout, before the portal is shown.
+  useLayoutEffect(() => {
+    if (menuOpen) repositionRef.current?.();
+  });
+
+  useLayoutEffect(() => {
+    if (!menuOpen || !position?.ready) return;
+    const active = document.activeElement;
+    const disabledFocus = active instanceof HTMLButtonElement && active.disabled && menuRef.current?.contains(active);
+    if (focusedRef.current && !disabledFocus) return;
+    focusMenuItem(menuRef.current, enabledMenuItems(menuRef.current)[0]);
+    focusedRef.current = true;
+  }, [menuOpen, position, model.masteryLevel]);
+
   function menuKeys(event: React.KeyboardEvent<HTMLDivElement>) {
+    if (event.key === "Tab") {
+      // Native Tab continues from the trigger's document order, outside the body portal.
+      closeMenu(true);
+      return;
+    }
     if (event.key === "Escape") {
       event.preventDefault();
       event.stopPropagation();
@@ -306,14 +430,85 @@ function NoteControls({ model, callbacks }: {
       return;
     }
     if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
-    const items = Array.from(menuContainerRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]:not(:disabled)') || []);
+    const items = enabledMenuItems(menuRef.current);
     if (!items.length) return;
     event.preventDefault();
+    event.stopPropagation();
     const current = items.indexOf(document.activeElement as HTMLButtonElement);
     const next = event.key === "Home" ? 0 : event.key === "End" ? items.length - 1 : event.key === "ArrowDown" ? (current + 1 + items.length) % items.length : (current - 1 + items.length) % items.length;
-    items[next].focus();
+    focusMenuItem(menuRef.current, items[next]);
   }
 
+  return (
+    <div className="note-more" ref={menuContainerRef}>
+      <button
+        ref={menuTriggerRef}
+        className="note-icon-button"
+        type="button"
+        data-action="note-more"
+        aria-label={copy.more}
+        aria-haspopup="menu"
+        aria-expanded={menuOpen}
+        aria-controls={menuId}
+        title={copy.more}
+        disabled={model.disabled}
+        onClick={() => menuOpen ? closeMenu(false) : openMenu()}
+        onKeyDown={(event) => {
+          if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+            event.preventDefault();
+            openMenu();
+          }
+          if (event.key === "Escape" && menuOpen) {
+            event.preventDefault();
+            event.stopPropagation();
+            closeMenu(true);
+          }
+        }}
+      >
+        <Icon name="more" />
+      </button>
+      {menuOpen && createPortal(
+        <div ref={menuRef} id={menuId} className="note-more-menu" role="menu" aria-label={copy.more} onKeyDown={menuKeys}
+          style={{ left: position?.left ?? 0, top: position?.top ?? 0, width: position?.width ?? 240,
+            maxHeight: position?.height, visibility: position?.ready ? "visible" : "hidden" }}>
+          <p className="note-review-status" data-status={model.reviewStatus}>{checked ? copy.reviewChecked : copy.reviewUnreviewed}</p>
+          <button
+            className="note-review-action note-mastery-clear"
+            type="button"
+            role="menuitem"
+            data-mastery-level="0"
+            disabled={model.disabled || masteryValue(model.masteryLevel) === 0}
+            onClick={() => {
+              closeMenu(true);
+              callbacks.onMastery(model.noteId, 0);
+            }}
+          >
+            {copy.clearMastery}
+          </button>
+          <button
+            className="note-review-action"
+            type="button"
+            role="menuitem"
+            data-action="review-note"
+            disabled={model.disabled}
+            onClick={() => {
+              closeMenu(true);
+              callbacks.onAction(model.noteId, "review");
+            }}
+          >
+            {checked ? copy.markUnchecked : copy.markChecked}
+          </button>
+        </div>, document.body
+      )}
+    </div>
+  );
+}
+
+function NoteControls({ model, callbacks }: {
+  model: NoteControlModel;
+  callbacks: NoteControlCallbacks;
+}) {
+  const copy = strings[model.language];
   return (
     <div className="note-react-controls">
       <MasteryControl model={model} callbacks={callbacks} copy={copy} />
@@ -323,58 +518,7 @@ function NoteControls({ model, callbacks }: {
         {model.canShare && <ActionButton action="annotation-agent" label={copy.assistant} icon="assistant" disabled={model.disabled} onClick={() => callbacks.onAction(model.noteId, "assistant")} />}
         <ActionButton action="edit-note" label={copy.edit} icon="edit" disabled={model.disabled} onClick={() => callbacks.onAction(model.noteId, "edit")} />
         <ActionButton action="delete-note" label={copy.delete} icon="delete" danger disabled={model.disabled} onClick={() => callbacks.onAction(model.noteId, "delete")} />
-        <div className="note-more" ref={menuContainerRef} onKeyDown={menuKeys}>
-          <button
-            ref={menuTriggerRef}
-            className="note-icon-button"
-            type="button"
-            data-action="note-more"
-            aria-label={copy.more}
-            aria-haspopup="menu"
-            aria-expanded={menuOpen}
-            title={copy.more}
-            disabled={model.disabled}
-            onClick={() => setMenuOpen((open) => !open)}
-            onKeyDown={(event) => {
-              if (event.key === "ArrowDown") {
-                event.preventDefault();
-                setMenuOpen(true);
-              }
-            }}
-          >
-            <Icon name="more" />
-          </button>
-          {menuOpen && (
-            <div className="note-more-menu" role="menu" aria-label={copy.more}>
-              <p className="note-review-status" data-status={model.reviewStatus}>{checked ? copy.reviewChecked : copy.reviewUnreviewed}</p>
-              <button
-                className="note-review-action note-mastery-clear"
-                type="button"
-                role="menuitem"
-                data-mastery-level="0"
-                disabled={model.disabled || masteryValue(model.masteryLevel) === 0}
-                onClick={() => {
-                  closeMenu(true);
-                  callbacks.onMastery(model.noteId, 0);
-                }}
-              >
-                {copy.clearMastery}
-              </button>
-              <button
-                className="note-review-action"
-                type="button"
-                role="menuitem"
-                data-action="review-note"
-                onClick={() => {
-                  closeMenu(true);
-                  callbacks.onAction(model.noteId, "review");
-                }}
-              >
-                {checked ? copy.markUnchecked : copy.markChecked}
-              </button>
-            </div>
-          )}
-        </div>
+        <NoteMoreControl key={model.noteId} model={model} callbacks={callbacks} copy={copy} />
       </div>
     </div>
   );
