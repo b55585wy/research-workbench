@@ -1,5 +1,32 @@
 # 更新与访问连续性
 
+## 2026-11-05：v0.63.0 组件化前端已发布到双站
+
+`itsyiyi.com` 与 `5ai.life` 均为 `ui-0.63.0-f83d9f33ce1eef2e`，后端仍运行 v0.62.0。
+前端源码 `343df89c771d584d20959a842b94c44d4850ecd8`；后端源码链接保持
+`/opt/research-workspace/releases/0.62.0-b84de01c55ea`。
+
+本轮包含 React 主功能导航、笔记工作区视图、简化翻译、常显资料入口与首次区别说明、
+助手全屏图标和当前工作区内的论文引用定位。133 项针对性检查、TypeScript、生产构建、
+私有真实浏览器及实际保存／可编辑 PPT 导出通过；具体范围和未迁移部分见
+[UI-COMPONENT-REFACTOR.md](UI-COMPONENT-REFACTOR.md)。
+
+ZIP SHA-256：`40e6540afff77e376275e09c0d85c26069ec19d779c5c1180fc321617b57631d`。
+1011 个文件完整安装校验后原子切换前端指针；后端兼容指纹与稳定离线文件均一致。
+
+| 入口 | 切换前后保持的进程号 |
+| --- | --- |
+| https://itsyiyi.com/ | guest 28246 / Caddy 13133 / 原个人服务 13400 |
+| https://5ai.life/ | guest 90186 / Caddy 2710 |
+
+两站发布记录：`/opt/research-workspace/downloads/ui-refactor-v063/DEPLOYMENT-STATUS.json`；
+原指针备份：同目录 `current.before.json`。无后端或代理重启、数据库迁移、原 PDF 改写、
+用户资料搬移或强制刷新，上一版 `ui-0.62.1-da433bdc703215e3` 资源保留。
+
+外网只读核对根入口、`/device/`、14 项资源哈希、原试读 PDF 字节、旧版脚本及平台连接可用状态。
+两站真实 Chrome 的本机入口均加载新版，390 像素无横向溢出、无脚本异常；没有创建生产验收游客、资料或调用真实模型。
+该发布方式保留旧页面资源，不代表后续不兼容后端或数据库变更也能零中断；此类变更需另行设计兼容与请求排空。
+
 ## 2026-11-05：v0.62.1 前端补丁已发布到双站
 
 `itsyiyi.com` 与 `5ai.life` 均已切换为 `ui-0.62.1-da433bdc703215e3`，

@@ -1,6 +1,6 @@
 # v0.63.0：功能分区与 React 组件边界
 
-2026-11-05。此次为前端改造；发布状态以 [UPDATE-POLICY.md](UPDATE-POLICY.md) 为准，后端保持 v0.62.0。
+2026-11-05。两站已发布前端 `ui-0.63.0-f83d9f33ce1eef2e`，后端保持 v0.62.0；实际切换与外网核对见 [UPDATE-POLICY.md](UPDATE-POLICY.md)。
 
 ## 依据与范围
 
