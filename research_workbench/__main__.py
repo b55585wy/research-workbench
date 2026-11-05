@@ -21,6 +21,7 @@ def main():
     parser.add_argument('--guest-root', type=Path)
     parser.add_argument('--guest-max-spaces', type=int, default=32)
     parser.add_argument('--guest-max-active', type=int, default=2)
+    parser.add_argument('--guest-model-config', type=Path)
     args = parser.parse_args()
 
     if args.guest_root is not None:
@@ -30,6 +31,12 @@ def main():
             parser.error('--guest-max-spaces 必须在 1 到 32 之间')
         if not 1 <= args.guest_max_active <= 2:
             parser.error('--guest-max-active 必须在 1 到 2 之间')
+        shared_model_config = args.guest_model_config
+        if shared_model_config is None:
+            # Environment fallback exists in guest mode only; the owner server
+            # never inherits a site configuration implicitly.
+            value = os.environ.get('RESEARCH_GUEST_MODEL_CONFIG')
+            shared_model_config = Path(value) if value else None
         # Guest data and registry files stay owner-only where the platform
         # supports it; this process is separate from the owner server.
         try:
@@ -41,9 +48,12 @@ def main():
             args.guest_root, max_spaces=args.guest_max_spaces,
             max_active=args.guest_max_active, analysis_rscript=args.rscript,
             statistics_root=args.statistics_root, import_root=args.import_root,
-            translation_runtime=args.translation_runtime)
+            translation_runtime=args.translation_runtime,
+            shared_model_config=shared_model_config)
         port = args.port if args.port is not None else 3151
     else:
+        if args.guest_model_config is not None:
+            parser.error('--guest-model-config 需要与 --guest-root 一起使用')
         app = create_app(args.data,agent_config=args.agent_config,analysis_rscript=args.rscript,statistics_root=args.statistics_root,import_root=args.import_root,translation_runtime=args.translation_runtime)
         port = args.port if args.port is not None else 3150
     uvicorn.run(app, host='127.0.0.1', port=port,

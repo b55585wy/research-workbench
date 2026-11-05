@@ -37,7 +37,11 @@ There is no dependency on tFUS identity or release progress.
 This supersedes this workbench's older tFUS-directory-first planning, without
 changing tFUS's own identity policy. The default local mode remains single-user.
 2026-11-04 authorization adds a separate opt-in server guest mode: password-free
-per-guest data isolation and recovery, each guest supplies its own model key.
+per-guest data isolation and recovery. The 2026-11-05 user authorization supersedes
+BYOK-only for both public sites: platform DeepSeek is the default, a guest's valid
+personal key takes priority, and explicit return to platform is supported. Keep the
+operator credential outside guest roots and all browser responses/bundles; invalid
+personal configuration must not silently fall back or spend platform credit.
 Keep the local default and existing owner service/data unchanged. Stable guest
 space IDs permit later explicit verified-account binding; no registration or
 fake authenticated actor is introduced now. See GUEST-SPACES.md for acceptance.

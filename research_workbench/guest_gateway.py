@@ -20,7 +20,6 @@ import os
 from pathlib import Path
 import sqlite3
 import time
-from urllib.parse import urlsplit
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -29,17 +28,17 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from starlette.concurrency import run_in_threadpool
 
 from . import __version__
-from .agent_provider import ModelConnection
 from .guest_registry import (
     COOKIE_MAX_AGE, COOKIE_NAME, HINT_COOKIE_NAME, HINT_MAX_AGE, MAX_SPACES,
     TOKEN_PATTERN, GuestCapacityError, GuestNotFound, GuestRegistry,
     GuestRegistryError, GuestSecurityError, GuestSpace, GuestStorageError,
     IssuedSession, RecoveryRateLimited, new_bearer_token)
 from .main import LocalBoundary, ROOT, create_app
-from .models import WorkspaceError
+from .shared_model import (
+    SHARED_MODEL_HOST as GUEST_MODEL_HOST,
+    SHARED_MODEL_PATHS as GUEST_MODEL_PATHS,
+    SharedFallbackModelConnection, SharedModel)
 
-GUEST_MODEL_HOST = 'api.deepseek.com'
-GUEST_MODEL_PATHS = ('', '/v1')
 MAX_ACTIVE_CHILDREN = 2
 ALL_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS']
 
@@ -73,58 +72,22 @@ class _ApiNoStore:
         await self.app(scope, receive, wrapped_send)
 
 
-class GuestModelConnection(ModelConnection):
+class GuestModelConnection(SharedFallbackModelConnection):
     """Per-guest model connection with an explicit public-guest endpoint policy.
 
-    Public guests may use the DeepSeek official endpoint only.  The check runs
-    both when saving a connection and when resolving an existing configuration,
-    so a config file that predates or bypasses the API is not used.  The owner
-    process keeps the original unrestricted ``ModelConnection`` behaviour.
+    Public guests may use the DeepSeek official endpoint only.  The personal
+    ``.agent-model.json`` in the guest space always wins; when it is absent the
+    operator shared connection may be used.  An existing but invalid (or
+    symlinked) personal file fails closed instead of falling back to shared.
+    The owner process keeps the original unrestricted ``ModelConnection``
+    behaviour.
     """
 
-    def __init__(self, root):
-        # Never inherit the owner's agent config or credentials.
-        super().__init__(root, None)
+    def __init__(self, root, shared_model=None):
+        # Never inherit the owner's agent config or credentials.  Public guests
+        # keep the fixed official endpoint rule even without a shared file.
+        super().__init__(root, None, shared_model, guest_policy=True)
 
-    @staticmethod
-    def validate(config):
-        ModelConnection.validate(config)
-        raw = str(config.get('base_url', '')).strip()
-        try:
-            url = urlsplit(raw)
-            valid = (
-                url.scheme == 'https'
-                and url.hostname == GUEST_MODEL_HOST
-                and url.port is None
-                and not url.username
-                and not url.password
-                and not url.query
-                and not url.fragment
-                and url.path in GUEST_MODEL_PATHS
-                and raw == f'https://{GUEST_MODEL_HOST}{url.path}')
-        except ValueError:
-            valid = False
-        if not valid:
-            raise WorkspaceError(
-                'agent_endpoint_not_allowed',
-                '公共访客模式仅支持 DeepSeek 官方模型地址。', 422)
-
-    def config(self):
-        if self.path.is_symlink():
-            return {}, 'none'
-        try:
-            config, source = super().config()
-        except Exception:
-            return {}, 'none'
-        if not config:
-            return {}, 'none'
-        try:
-            self.validate(config)
-        except Exception:
-            # Malformed or non-official existing configuration is unusable
-            # rather than being trusted or silently rewritten.
-            return {}, 'none'
-        return config, source
 
 
 # --------------------------------------------------------------------- cookies
@@ -574,19 +537,31 @@ class _GuestProxyResponse(Response):
 
 # --------------------------------------------------------------------- factory
 def guest_child_app(root, analysis_rscript=None, statistics_root=None,
-                    import_root=None, translation_runtime=None):
-    """Build one isolated child app bound to exactly this guest data root."""
+                    import_root=None, translation_runtime=None,
+                    shared_model=None, shared_model_root=None):
+    """Build one isolated child app bound to exactly this guest data root.
+
+    ``shared_model`` is the operator ``SharedModel`` resolver (or ``None``).
+    Only its file path is forwarded so the translation worker resolves the same
+    own-key-first/shared fallback; the secret itself is never copied here.
+    """
     root = Path(root)
+    shared_path = (shared_model.path
+                   if shared_model is not None else None)
     return create_app(
         root,
-        agent_provider=GuestModelConnection(root),
+        agent_provider=GuestModelConnection(root, shared_model),
         # Explicit guest path: create_app must not fall back to
         # RESEARCH_AGENT_CONFIG, and translation workers use this same file.
         agent_config=root / '.agent-model.json',
+        shared_model_config=shared_path,
+        guest_model_policy=True,
+        shared_model_forbidden_root=shared_model_root,
         analysis_rscript=analysis_rscript,
         statistics_root=statistics_root,
         import_root=import_root,
         translation_runtime=translation_runtime)
+
 
 
 async def _guest_from_request(registry, request):
@@ -731,21 +706,29 @@ def _reject_owner_store(guest_root):
 
 def create_guest_gateway(guest_root, *, max_spaces=MAX_SPACES, max_active=2,
                          analysis_rscript=None, statistics_root=None,
-                         import_root=None, translation_runtime=None):
+                         import_root=None, translation_runtime=None,
+                         shared_model_config=None):
     """Create the opt-in public guest ASGI application.
 
     ``guest_root`` is the only tenant data location; the caller must keep it
     separate from the owner data root.  The owner server continues to use
     ``create_app`` directly and is unaffected by this factory.
+
+    ``shared_model_config`` is the optional operator connection file.  It is
+    read lazily; an absent, invalid or unsafe file simply disables sharing.
     """
     _reject_owner_store(guest_root)
     registry = GuestRegistry(guest_root, max_spaces=max_spaces)
+    shared_model = (SharedModel(shared_model_config, forbidden_root=guest_root)
+                    if shared_model_config is not None else None)
 
     def child_factory(guest_id, root):
         return guest_child_app(
             root, analysis_rscript=analysis_rscript,
             statistics_root=statistics_root, import_root=import_root,
-            translation_runtime=translation_runtime)
+            translation_runtime=translation_runtime,
+            shared_model=shared_model, shared_model_root=registry.root)
+
 
     manager = GuestSpaceManager(registry, max_active, child_factory)
 
@@ -762,6 +745,7 @@ def create_guest_gateway(guest_root, *, max_spaces=MAX_SPACES, max_active=2,
         docs_url=None, redoc_url=None, lifespan=lifespan)
     app.state.guest_registry = registry
     app.state.guest_manager = manager
+    app.state.shared_model = shared_model
     app.add_middleware(LocalBoundary)
     app.add_middleware(_ApiNoStore)
 
@@ -908,9 +892,10 @@ def create_guest_gateway(guest_root, *, max_spaces=MAX_SPACES, max_active=2,
         return _error('not_found', '找不到接口。', 404)
 
     # The explicit device translation relay sits outside the credential-gated
-    # /api dispatcher and allocates no guest space or cookie.
+    # /api dispatcher and allocates no guest space or cookie.  The same operator
+    # shared resolver backs the connection status and the explicit shared source.
     from .device_ai import install_device_ai_routes
-    install_device_ai_routes(app)
+    install_device_ai_routes(app, shared_model=shared_model)
 
     # Static frontend (including Kimi-owned recover.html/guest-recovery.js) is
     # served without a session and without allocating a space.  API paths are

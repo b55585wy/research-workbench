@@ -3,9 +3,12 @@ import { flushSync } from "react-dom";
 import { createRoot, type Root } from "react-dom/client";
 import {
   clearDeviceModelConnection,
+  loadDeviceModelCapability,
   readDeviceModelConnection,
   rememberDeviceModelSubmission,
-  subscribeDeviceModelConnection
+  selectDeviceModelSource,
+  subscribeDeviceModelConnection,
+  type DeviceModelSource
 } from "./device-model-connection";
 
 const MAX_MODEL_CHARACTERS = 120;
@@ -96,6 +99,11 @@ const strings = {
     credential: "DeepSeek API 密钥",
     credentialPlaceholder: "仅在本页暂存",
     clearConnection: "清除连接",
+    sharedConnection: "平台连接",
+    personalConnection: "自己的 Key",
+    sharedLoading: "正在读取平台连接…",
+    sharedUnavailable: "平台连接不可用，请使用自己的 Key。",
+    sharedNotice: "使用平台 DeepSeek 连接，不会要求或保存你的 API 密钥。",
     transit: "所选文字经本站转发到 DeepSeek，可能产生模型费用；PDF 不上传。",
     keyNotice: "密钥仅在本页暂存，不保存到服务器、浏览器存储或备份。",
     confirm: "确认可能产生费用并连接翻译",
@@ -132,6 +140,11 @@ const strings = {
     credential: "DeepSeek API key",
     credentialPlaceholder: "Kept only in this page",
     clearConnection: "Clear connection",
+    sharedConnection: "Platform connection",
+    personalConnection: "Your key",
+    sharedLoading: "Reading the platform connection…",
+    sharedUnavailable: "The platform connection is unavailable. Use your own key instead.",
+    sharedNotice: "Uses the platform DeepSeek connection without requesting or saving your API key.",
     transit: "Selected text is forwarded by this site to DeepSeek and may incur model charges. The PDF is not uploaded.",
     keyNotice: "The key is kept only in this page and is not saved to the server, browser storage, or backups.",
     confirm: "Confirm possible charges and connect to translate",
@@ -203,10 +216,18 @@ function DeviceAIConfirmation({ model, callbacks }: {
   const saveController = useRef<AbortController | null>(null);
   const translationSubmissionPending = useRef(false);
   const saveSubmissionPending = useRef(false);
+  const ownSubmission = useRef(false);
   const [initialConnection] = useState(() => readDeviceModelConnection());
+  const lastConnection = useRef(initialConnection);
   const [targetLanguage, setTargetLanguage] = useState<DeviceAILanguage>(model.language);
   const [modelName, setModelName] = useState(initialConnection.model);
   const [credential, setCredential] = useState(initialConnection.credential);
+  const [connectionSource, setConnectionSource] = useState<DeviceModelSource>(initialConnection.source);
+  const [capability, setCapability] = useState({
+    loaded: initialConnection.capabilityLoaded,
+    failed: initialConnection.capabilityFailed,
+    sharedAvailable: initialConnection.sharedAvailable
+  });
   const [phase, setPhase] = useState<DeviceAIPhase>("idle");
   const [result, setResult] = useState<TranslationResult | null>(null);
   const [errorKey, setErrorKey] = useState<DeviceAIErrorKey | null>(null);
@@ -217,10 +238,23 @@ function DeviceAIConfirmation({ model, callbacks }: {
     mounted.current = true;
     const updateOnline = () => setOnline(navigator.onLine);
     const unsubscribe = subscribeDeviceModelConnection(() => {
+      if (ownSubmission.current) return;
+      const previous = lastConnection.current;
       const connection = readDeviceModelConnection();
+      lastConnection.current = connection;
       setCredential(connection.credential);
       setModelName(connection.model);
+      setConnectionSource(connection.source);
+      setCapability({
+        loaded: connection.capabilityLoaded,
+        failed: connection.capabilityFailed,
+        sharedAvailable: connection.sharedAvailable
+      });
+      const changed = previous.source !== connection.source || previous.model !== connection.model
+        || (connection.source === "personal" && previous.credential !== connection.credential);
+      if (changed && !requestController.current && !saveController.current) invalidateResult();
     });
+    void loadDeviceModelCapability();
     window.addEventListener("online", updateOnline);
     window.addEventListener("offline", updateOnline);
     return () => {
@@ -234,7 +268,7 @@ function DeviceAIConfirmation({ model, callbacks }: {
 
   useEffect(() => {
     callbacks.onLayout();
-  }, [callbacks, phase, result, errorKey, noticeKey, online, model.language]);
+  }, [callbacks, phase, result, errorKey, noticeKey, online, model.language, connectionSource, capability]);
 
   function invalidateResult() {
     if (phase === "loading" || phase === "saving") return;
@@ -251,7 +285,10 @@ function DeviceAIConfirmation({ model, callbacks }: {
       return;
     }
     const trimmedModel = modelName.trim();
-    if (!validVisibleAscii(credential, MAX_CREDENTIAL_CHARACTERS)) {
+    const submissionSource = connectionSource;
+    const submissionCredential = credential;
+    if (submissionSource === "shared" && (!capability.loaded || !capability.sharedAvailable)) return;
+    if (submissionSource === "personal" && !validVisibleAscii(submissionCredential, MAX_CREDENTIAL_CHARACTERS)) {
       setErrorKey("credentialInvalid");
       return;
     }
@@ -265,7 +302,12 @@ function DeviceAIConfirmation({ model, callbacks }: {
     }
 
     translationSubmissionPending.current = true;
-    rememberDeviceModelSubmission(credential, trimmedModel);
+    ownSubmission.current = true;
+    try {
+      rememberDeviceModelSubmission(submissionCredential, trimmedModel, submissionSource);
+    } finally {
+      ownSubmission.current = false;
+    }
     const requestId = crypto.randomUUID();
     const noteId = crypto.randomUUID();
     const generation = ++requestGeneration.current;
@@ -285,7 +327,8 @@ function DeviceAIConfirmation({ model, callbacks }: {
         response = await fetch("/device/ai/selection-translation", {
           method: "POST",
           headers: {
-            "Authorization": `Bearer ${credential}`,
+            "X-Research-Model-Source": submissionSource,
+            ...(submissionSource === "personal" ? { Authorization: `Bearer ${submissionCredential}` } : {}),
             "Content-Type": "application/json"
           },
           body: JSON.stringify({
@@ -423,6 +466,31 @@ function DeviceAIConfirmation({ model, callbacks }: {
         <div className="device-ai-text" tabIndex={0}>{source.text}</div>
       </section>
 
+      <div className="device-ai-source" role="group" aria-label={copy.model}>
+        <label className="device-ai-source-option">
+          <input
+            type="radio"
+            name={`${modelId}-source`}
+            checked={connectionSource === "shared"}
+            disabled={!capability.sharedAvailable || requestPending || savePending || phase === "saved"}
+            onChange={() => selectDeviceModelSource("shared")}
+          />
+          <span>{copy.sharedConnection}</span>
+        </label>
+        <label className="device-ai-source-option">
+          <input
+            type="radio"
+            name={`${modelId}-source`}
+            checked={connectionSource === "personal"}
+            disabled={requestPending || savePending || phase === "saved"}
+            onChange={() => selectDeviceModelSource("personal")}
+          />
+          <span>{copy.personalConnection}</span>
+        </label>
+      </div>
+      {!capability.loaded && <p className="device-ai-capability">{copy.sharedLoading}</p>}
+      {capability.loaded && !capability.sharedAvailable && <p className="device-ai-capability">{copy.sharedUnavailable}</p>}
+
       <div className="device-ai-fields">
         <label htmlFor={languageId}>
           <span>{copy.target}</span>
@@ -448,6 +516,7 @@ function DeviceAIConfirmation({ model, callbacks }: {
             autoCapitalize="off"
             autoComplete="off"
             spellCheck={false}
+            readOnly={connectionSource === "shared"}
             disabled={requestPending || savePending || phase === "saved"}
             onChange={(event) => {
               setModelName(event.target.value);
@@ -457,41 +526,48 @@ function DeviceAIConfirmation({ model, callbacks }: {
         </label>
       </div>
 
-      <label className="device-ai-credential" htmlFor={keyId}>
-        <span>{copy.credential}</span>
-        <input
-          id={keyId}
-          type="password"
-          value={credential}
-          placeholder={copy.credentialPlaceholder}
-          maxLength={MAX_CREDENTIAL_CHARACTERS}
-          autoCapitalize="off"
-          autoComplete="off"
-          spellCheck={false}
-          disabled={requestPending || savePending || phase === "saved"}
-          onChange={(event) => setCredential(event.target.value)}
-        />
-      </label>
+      {connectionSource === "personal" && (
+        <label className="device-ai-credential" htmlFor={keyId}>
+          <span>{copy.credential}</span>
+          <input
+            id={keyId}
+            type="password"
+            value={credential}
+            placeholder={copy.credentialPlaceholder}
+            maxLength={MAX_CREDENTIAL_CHARACTERS}
+            autoCapitalize="off"
+            autoComplete="off"
+            spellCheck={false}
+            disabled={requestPending || savePending || phase === "saved"}
+            onChange={(event) => {
+              setCredential(event.target.value);
+              invalidateResult();
+            }}
+          />
+        </label>
+      )}
 
-      <button
-        className="button button-quiet device-ai-clear-connection"
-        type="button"
-        disabled={requestPending || savePending}
-        onClick={clearConnection}
-      >
-        {copy.clearConnection}
-      </button>
+      {connectionSource === "personal" && (
+        <button
+          className="button button-quiet device-ai-clear-connection"
+          type="button"
+          disabled={requestPending || savePending}
+          onClick={clearConnection}
+        >
+          {copy.clearConnection}
+        </button>
+      )}
 
       <div className="device-ai-notices">
         <p>{copy.transit}</p>
-        <p>{copy.keyNotice}</p>
+        <p>{connectionSource === "shared" ? copy.sharedNotice : copy.keyNotice}</p>
       </div>
 
       {!showResult && (
         <button
           className="button button-primary device-ai-confirm"
           type="button"
-          disabled={requestPending || savePending || !online}
+          disabled={requestPending || savePending || !online || (connectionSource === "shared" && (!capability.loaded || !capability.sharedAvailable))}
           onClick={() => void confirmTranslation()}
         >
           {phase === "requestError" ? copy.confirmAgain : copy.confirm}

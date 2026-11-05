@@ -147,12 +147,25 @@ def copy_upload(upload, output):
 
 def create_app(data_root=None, validator=None, renderer=None, *, agent_provider=None, agent_config=None,
                page_reader=None, agent_autostart=True, analysis_rscript=None, analysis_autostart=True,
-               statistics_root=None,import_root=None,translation_runtime=None,translation_autostart=True):
+               statistics_root=None,import_root=None,translation_runtime=None,translation_autostart=True,
+               shared_model_config=None,guest_model_policy=False,
+               shared_model_forbidden_root=None):
     store = Store(data_root or os.environ.get('RESEARCH_WORKBENCH_DATA', ROOT / 'data'))
     validator = validator or PdfValidator()
     images=ImageLibrary(store)
     bibliography=Bibliography(store)
-    provider=agent_provider or ModelConnection(store.root,agent_config or os.environ.get('RESEARCH_AGENT_CONFIG'))
+    shared_path = Path(shared_model_config) if shared_model_config is not None else None
+    if agent_provider is not None:
+        provider = agent_provider
+    elif shared_path is not None:
+        # Explicit operator path only: owner/local startup never inherits it.
+        from .shared_model import SharedFallbackModelConnection
+        provider = SharedFallbackModelConnection.from_paths(
+            store.root, agent_config or os.environ.get('RESEARCH_AGENT_CONFIG'),
+            shared_path, guest_policy=True,
+            forbidden_root=shared_model_forbidden_root)
+    else:
+        provider = ModelConnection(store.root,agent_config or os.environ.get('RESEARCH_AGENT_CONFIG'))
     from .translation import Translations
     from .translation_runtime import TranslationRuntime
     from .translation_process import TranslationSupervisor
@@ -161,7 +174,10 @@ def create_app(data_root=None, validator=None, renderer=None, *, agent_provider=
     translation_root = translation_runtime or os.environ.get('RESEARCH_TRANSLATION_RUNTIME')
     translations = Translations(store, provider, TranslationRuntime(translation_root))
     translation_supervisor = TranslationSupervisor(translations, translation_root,
-        agent_config or os.environ.get('RESEARCH_AGENT_CONFIG')) if translation_autostart else None
+        agent_config or os.environ.get('RESEARCH_AGENT_CONFIG'),
+        shared_model_config=shared_path,
+        guest_model_policy=guest_model_policy,
+        shared_model_forbidden_root=shared_model_forbidden_root) if translation_autostart else None
     from .selection_translation import SelectionTranslation
     from .selection_translation_api import router as selection_translation_router
     selection_translation = SelectionTranslation(store, provider)
@@ -224,6 +240,10 @@ def create_app(data_root=None, validator=None, renderer=None, *, agent_provider=
 
     app = FastAPI(title='Research workbench', version=__version__, docs_url=None, redoc_url=None,lifespan=lifespan)
     app.state.store, app.state.validator = store, validator
+    # The explicit shared reset endpoint is a guest-only capability; the owner
+    # application never exposes it even when a root caller explicitly wires a
+    # shared connection for testing.
+    app.state.guest_model_space = bool(guest_model_policy)
     app.state.reader_errors = ReaderErrorReporter(store)
     app.state.translations = translations
     app.include_router(translation_router)

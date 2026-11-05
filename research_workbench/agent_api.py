@@ -2,10 +2,28 @@ from uuid import UUID
 
 from fastapi import APIRouter,File,Form,Request,UploadFile
 from fastapi.responses import FileResponse,JSONResponse
+from pydantic import BaseModel,ConfigDict
 
 from .agent_models import AgentSubmission,ConversationClear,ImageNoteCreate,ModelSettings,ProposalConfirmation,TaskControl
+from .models import WorkspaceError
 
 router=APIRouter(prefix='/api/v1')
+
+
+class SharedModelSettings(BaseModel):
+    """Strict empty body: explicitly reuse the operator shared connection."""
+
+    model_config=ConfigDict(extra='forbid')
+
+
+def _shared_settings(request):
+    """Only a guest space may delete its personal connection; owner is refused."""
+    if not getattr(request.app.state,'guest_model_space',False):
+        raise WorkspaceError('shared_model_unavailable','当前工作区没有可用的平台连接。',409)
+    use_shared=getattr(request.app.state.agent.provider,'use_shared',None)
+    if use_shared is None:
+        raise WorkspaceError('shared_model_unavailable','当前工作区没有可用的平台连接。',409)
+    return use_shared()
 
 
 @router.get('/documents/{document_id}/images')
@@ -51,6 +69,13 @@ def status(request:Request):
 @router.post('/agent/settings')
 def settings(payload:ModelSettings,request:Request):
     return request.app.state.agent.provider.save(payload)
+
+
+@router.post('/agent/settings/shared')
+def shared_settings(payload:SharedModelSettings,request:Request):
+    # Explicitly return to the platform connection.  Only a guest resolver
+    # implements this; an unsupported owner removes nothing.
+    return _shared_settings(request)
 
 
 @router.get('/documents/{document_id}/agent/conversations')

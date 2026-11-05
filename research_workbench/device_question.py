@@ -33,8 +33,9 @@ from .device_ai import (
     BUSY_CODE as SHARED_BUSY_CODE,
     CONFLICT_CODE as SHARED_CONFLICT_CODE,
     PENDING_CODE as SHARED_PENDING_CODE,
+    SHARED_CHANGED_CODE, SHARED_CHANGED_MESSAGE,
     _CONTROL, _MODEL, _credential_digest, _error, _json, _read_bounded_body,
-    credential_from_scope, json_media_type,
+    json_media_type, resolve_device_access, shared_model_mismatch,
 )
 from .models import WorkspaceError
 
@@ -304,13 +305,15 @@ def ask_question(relay, credential, payload):
 
 
 # ----------------------------------------------------------------- HTTP layer
-def _question_endpoint(relay):
+def _question_endpoint(relay, shared_model=None):
     async def ask(request: Request):
         if not json_media_type(request):
             return _error(MEDIA_CODE, QUESTION_MEDIA_MESSAGE, 415)
-        credential = credential_from_scope(request.scope)
-        if credential is None:
-            return _error(CREDENTIAL_CODE, QUESTION_CREDENTIAL_MESSAGE, 401)
+        try:
+            credential, shared_config = resolve_device_access(
+                request.scope, shared_model, QUESTION_CREDENTIAL_MESSAGE)
+        except WorkspaceError as error:
+            return _error(error.code, error.message, error.status)
         try:
             body = await _read_bounded_body(request, MAX_BODY_BYTES)
         except WorkspaceError as error:
@@ -321,6 +324,8 @@ def _question_endpoint(relay):
             payload = DeviceQuestionRequest.model_validate_json(body)
         except ValidationError:
             return _error(VALIDATION_CODE, QUESTION_VALIDATION_MESSAGE, 422)
+        if shared_model_mismatch(payload, shared_config):
+            return _error(SHARED_CHANGED_CODE, SHARED_CHANGED_MESSAGE, 409)
         try:
             result = await run_in_threadpool(
                 ask_question, relay, credential, payload)
@@ -334,9 +339,10 @@ def _method_not_allowed():
     return _error(METHOD_CODE, QUESTION_METHOD_MESSAGE, 405, {'Allow': 'POST'})
 
 
-def install_device_question_route(app, relay):
+def install_device_question_route(app, relay, shared_model=None):
     """Install the explicit device-hard question route on the shared relay."""
-    app.add_api_route(DEVICE_QUESTION_PATH, _question_endpoint(relay),
+    app.add_api_route(DEVICE_QUESTION_PATH,
+                      _question_endpoint(relay, shared_model),
                       methods=['POST'], include_in_schema=False)
     app.add_api_route(
         DEVICE_QUESTION_PATH, _method_not_allowed,

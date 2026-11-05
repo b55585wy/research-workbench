@@ -11,9 +11,12 @@ import { flushSync } from "react-dom";
 import { createRoot, type Root } from "react-dom/client";
 import {
   clearDeviceModelConnection,
+  loadDeviceModelCapability,
   readDeviceModelConnection,
   rememberDeviceModelSubmission,
-  subscribeDeviceModelConnection
+  selectDeviceModelSource,
+  subscribeDeviceModelConnection,
+  type DeviceModelSource
 } from "./device-model-connection";
 
 const MAX_QUESTION = 2000;
@@ -152,6 +155,8 @@ interface Confirmation {
   owner: DeviceAssistantOwner | null;
   materials: readonly DeviceAssistantMaterial[];
   payload: QuestionPayload;
+  source: DeviceModelSource;
+  credential: string;
 }
 
 interface Turn {
@@ -200,6 +205,11 @@ const strings = {
     credentialPlaceholder: "仅在本页暂存",
     model: "模型标识",
     clearConnection: "清除连接",
+    sharedConnection: "平台连接",
+    personalConnection: "自己的 Key",
+    sharedLoading: "正在读取平台连接…",
+    sharedUnavailable: "平台连接不可用，请使用自己的 Key。",
+    sharedNotice: "使用平台 DeepSeek 连接，不会要求或保存你的 API 密钥。",
     keyNotice: "密钥仅在本页暂存，不保存到服务器、浏览器存储或备份。",
     materials: "本次加入的资料",
     selection: "PDF 选区",
@@ -274,6 +284,11 @@ const strings = {
     credentialPlaceholder: "Kept only in this page",
     model: "Model identifier",
     clearConnection: "Clear connection",
+    sharedConnection: "Platform connection",
+    personalConnection: "Your key",
+    sharedLoading: "Reading the platform connection…",
+    sharedUnavailable: "The platform connection is unavailable. Use your own key instead.",
+    sharedNotice: "Uses the platform DeepSeek connection without requesting or saving your API key.",
     keyNotice: "The key is kept only in this page and is not saved to the server, browser storage, or backups.",
     materials: "Materials added for this request",
     selection: "PDF selection",
@@ -515,6 +530,12 @@ const DeviceAssistant = forwardRef<Controller, {
   const [initialConnection] = useState(() => readDeviceModelConnection());
   const [credential, setCredential] = useState(initialConnection.credential);
   const [modelName, setModelName] = useState(initialConnection.model);
+  const [connectionSource, setConnectionSource] = useState<DeviceModelSource>(initialConnection.source);
+  const [capability, setCapability] = useState({
+    loaded: initialConnection.capabilityLoaded,
+    failed: initialConnection.capabilityFailed,
+    sharedAvailable: initialConnection.sharedAvailable
+  });
   const [materials, setMaterials] = useState<readonly DeviceAssistantMaterial[]>([]);
   const [turns, setTurns] = useState<readonly Turn[]>([]);
   const [includeHistory, setIncludeHistory] = useState(false);
@@ -566,9 +587,18 @@ const DeviceAssistant = forwardRef<Controller, {
       const connection = readDeviceModelConnection();
       setCredential(connection.credential);
       setModelName(connection.model);
-      setConfirmation(null);
-      setPhase("editing");
+      setConnectionSource(connection.source);
+      setCapability({
+        loaded: connection.capabilityLoaded,
+        failed: connection.capabilityFailed,
+        sharedAvailable: connection.sharedAvailable
+      });
+      if (!reviewController.current && !requestController.current && !saveController.current) {
+        setConfirmation(null);
+        setPhase("editing");
+      }
     });
+    void loadDeviceModelCapability();
     window.addEventListener("online", updateOnline);
     window.addEventListener("offline", updateOnline);
     return () => {
@@ -656,7 +686,7 @@ const DeviceAssistant = forwardRef<Controller, {
       await callbacks.revalidate(owner, snapshot, controller.signal);
       if (!mounted.current || ticket !== generation.current || !callbacks.isCurrent(owner)) return;
       reviewController.current = null;
-      setConfirmation({ owner, materials: snapshot, payload: built.payload });
+      setConfirmation({ owner, materials: snapshot, payload: built.payload, source: connectionSource, credential });
       setPhase("confirmed");
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") return;
@@ -673,7 +703,12 @@ const DeviceAssistant = forwardRef<Controller, {
       showStatus("turnLimit", "error");
       return;
     }
-    if (!VISIBLE_ASCII.test(credential) || credential.length > MAX_CREDENTIAL) {
+    const current = confirmation;
+    if (current.source === "shared" && (!capability.loaded || !capability.sharedAvailable)) {
+      showStatus("sharedUnavailable", "error");
+      return;
+    }
+    if (current.source === "personal" && (!VISIBLE_ASCII.test(current.credential) || current.credential.length > MAX_CREDENTIAL)) {
       showStatus("credentialInvalid", "error");
       return;
     }
@@ -681,7 +716,6 @@ const DeviceAssistant = forwardRef<Controller, {
       showStatus("offline", "error");
       return;
     }
-    const current = confirmation;
     const requestId = crypto.randomUUID();
     const noteId = crypto.randomUUID();
     const ticket = ++generation.current;
@@ -701,7 +735,7 @@ const DeviceAssistant = forwardRef<Controller, {
       const payloadSha256 = await digest(canonical(current.payload));
       ownSubmission.current = true;
       try {
-        rememberDeviceModelSubmission(credential, current.payload.model);
+        rememberDeviceModelSubmission(current.credential, current.payload.model, current.source);
       } finally {
         ownSubmission.current = false;
       }
@@ -710,7 +744,8 @@ const DeviceAssistant = forwardRef<Controller, {
         response = await fetch("/device/ai/question", {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${credential}`,
+            "X-Research-Model-Source": current.source,
+            ...(current.source === "personal" ? { Authorization: `Bearer ${current.credential}` } : {}),
             "Content-Type": "application/json"
           },
           body,
@@ -956,13 +991,15 @@ const DeviceAssistant = forwardRef<Controller, {
               <pre tabIndex={0}>{message.content}</pre>
             </div>
           ))}
-          <p>{copy.modelLabel}: {confirmation.payload.model} · {copy.answerLanguage}: {confirmation.payload.answer_language === "zh" ? copy.chinese : copy.english}</p>
+          <p>
+            {confirmation.source === "shared" ? copy.sharedConnection : copy.personalConnection} · {copy.modelLabel}: {confirmation.payload.model} · {copy.answerLanguage}: {confirmation.payload.answer_language === "zh" ? copy.chinese : copy.english}
+          </p>
           <p className="device-assistant-fee">{copy.transit}</p>
           <div className="device-assistant-preview-actions">
             <button className="button button-quiet" type="button" disabled={phase === "sending"} onClick={invalidateConfirmation}>
               {copy.edit}
             </button>
-            <button className="button button-primary" type="button" disabled={phase === "sending" || !online} onClick={() => void send()}>
+            <button className="button button-primary" type="button" disabled={phase === "sending" || !online || (confirmation.source === "shared" && (!capability.loaded || !capability.sharedAvailable))} onClick={() => void send()}>
               {phase === "sending" ? copy.sending : copy.confirm}
             </button>
           </div>
@@ -1055,24 +1092,50 @@ const DeviceAssistant = forwardRef<Controller, {
           <details className="device-assistant-settings">
             <summary>{copy.settings}</summary>
             <div className="device-assistant-settings-body">
-              <label htmlFor={credentialId}>
-                <span>{copy.credential}</span>
-                <input
-                  id={credentialId}
-                  type="password"
-                  value={credential}
-                  placeholder={copy.credentialPlaceholder}
-                  maxLength={MAX_CREDENTIAL}
-                  autoCapitalize="off"
-                  autoComplete="off"
-                  spellCheck={false}
-                  disabled={busy}
-                  onChange={(event) => {
-                    setCredential(event.target.value);
-                    invalidateConfirmation();
-                  }}
-                />
-              </label>
+              <div className="device-assistant-source" role="group" aria-label={copy.settings}>
+                <label className="device-assistant-source-option">
+                  <input
+                    type="radio"
+                    name={`${modelId}-source`}
+                    checked={connectionSource === "shared"}
+                    disabled={!capability.sharedAvailable || busy}
+                    onChange={() => selectDeviceModelSource("shared")}
+                  />
+                  <span>{copy.sharedConnection}</span>
+                </label>
+                <label className="device-assistant-source-option">
+                  <input
+                    type="radio"
+                    name={`${modelId}-source`}
+                    checked={connectionSource === "personal"}
+                    disabled={busy}
+                    onChange={() => selectDeviceModelSource("personal")}
+                  />
+                  <span>{copy.personalConnection}</span>
+                </label>
+              </div>
+              {!capability.loaded && <p className="device-assistant-capability">{copy.sharedLoading}</p>}
+              {capability.loaded && !capability.sharedAvailable && <p className="device-assistant-capability">{copy.sharedUnavailable}</p>}
+              {connectionSource === "personal" && (
+                <label htmlFor={credentialId}>
+                  <span>{copy.credential}</span>
+                  <input
+                    id={credentialId}
+                    type="password"
+                    value={credential}
+                    placeholder={copy.credentialPlaceholder}
+                    maxLength={MAX_CREDENTIAL}
+                    autoCapitalize="off"
+                    autoComplete="off"
+                    spellCheck={false}
+                    disabled={busy}
+                    onChange={(event) => {
+                      setCredential(event.target.value);
+                      invalidateConfirmation();
+                    }}
+                  />
+                </label>
+              )}
               <label htmlFor={modelId}>
                 <span>{copy.model}</span>
                 <input
@@ -1082,6 +1145,7 @@ const DeviceAssistant = forwardRef<Controller, {
                   autoCapitalize="off"
                   autoComplete="off"
                   spellCheck={false}
+                  readOnly={connectionSource === "shared"}
                   disabled={busy}
                   onChange={(event) => {
                     setModelName(event.target.value);
@@ -1089,23 +1153,25 @@ const DeviceAssistant = forwardRef<Controller, {
                   }}
                 />
               </label>
-              <button
-                className="button button-quiet"
-                type="button"
-                disabled={busy}
-                onClick={() => {
-                  clearDeviceModelConnection();
-                  setStatus(null);
-                }}
-              >
-                {copy.clearConnection}
-              </button>
-              <p>{copy.keyNotice}</p>
+              {connectionSource === "personal" && (
+                <button
+                  className="button button-quiet"
+                  type="button"
+                  disabled={busy}
+                  onClick={() => {
+                    clearDeviceModelConnection();
+                    setStatus(null);
+                  }}
+                >
+                  {copy.clearConnection}
+                </button>
+              )}
+              <p>{connectionSource === "shared" ? copy.sharedNotice : copy.keyNotice}</p>
             </div>
           </details>
 
           <p className="device-assistant-fee">{copy.transit}</p>
-          <button className="button button-primary device-assistant-review" type="button" disabled={busy} onClick={() => void review()}>
+          <button className="button button-primary device-assistant-review" type="button" disabled={busy || (connectionSource === "shared" && (!capability.loaded || !capability.sharedAvailable))} onClick={() => void review()}>
             {phase === "reviewing" ? copy.reviewing : copy.review}
           </button>
         </div>

@@ -269,6 +269,12 @@ const messages = {
     confirmed: "操作已按原提案保存。",
     rejectedDone: "已拒绝此提案，未执行写入。",
     settings: "本地模型设置",
+    personalConnection: "自己的 Key",
+    sharedConnection: "平台连接",
+    sharedConnectionHelp: "返回平台连接只会清除当前空间已保存的个人连接。",
+    sharedConnectionPending: "正在返回平台连接…",
+    sharedConnectionSaved: "已返回平台连接；仅当前空间的个人连接已清除。",
+    shared_model_unavailable: "平台连接当前不可用，可继续使用自己的 Key。",
     settingsHelp: "设置仅保存在此研究工作台的私有配置中。密钥不会写入浏览器本地存储。",
     providerUrl: "API 地址（HTTPS）",
     providerModel: "模型",
@@ -280,6 +286,7 @@ const messages = {
     settingsInvalid: "请输入不含凭据、查询或片段的 HTTPS 地址和模型名称。",
     notConfigured: "尚未配置远程模型。请在“高级选项 → 本地模型设置”中保存连接；阅读、上传和笔记仍可使用。",
     configured: "模型：{model} · 图片输入：{vision}",
+    sharedConfigured: "平台连接就绪 · 模型：{model} · 图片输入：{vision}",
     visionOn: "支持",
     visionOff: "不支持或未确认",
     agent_not_configured: "尚未配置远程模型。请先在“高级选项 → 本地模型设置”中保存连接。",
@@ -657,6 +664,12 @@ const messages = {
     confirmed: "The exact proposal was saved.",
     rejectedDone: "Proposal rejected; no write was performed.",
     settings: "Local model settings",
+    personalConnection: "Your key",
+    sharedConnection: "Platform connection",
+    sharedConnectionHelp: "Returning to the platform clears only this space’s saved personal connection.",
+    sharedConnectionPending: "Returning to the platform connection…",
+    sharedConnectionSaved: "Platform connection restored; only this space’s personal connection was cleared.",
+    shared_model_unavailable: "The platform connection is unavailable. You can still use your own key.",
     settingsHelp: "Settings are stored only in this workbench’s private configuration. Keys are never written to browser local storage.",
     providerUrl: "API URL (HTTPS)",
     providerModel: "Model",
@@ -668,6 +681,7 @@ const messages = {
     settingsInvalid: "Enter an HTTPS URL without credentials, query, or fragment, and a model name.",
     notConfigured: "No remote model is configured. Save a connection under “Advanced options → Local model settings”; reading, uploads, and notes remain available.",
     configured: "Model: {model} · Image input: {vision}",
+    sharedConfigured: "Platform connection ready · Model: {model} · Image input: {vision}",
     visionOn: "supported",
     visionOff: "unsupported or unconfirmed",
     agent_not_configured: "No remote model is configured. Save a connection under “Advanced options → Local model settings” first.",
@@ -847,6 +861,9 @@ export function createAssistant(adapter) {
     settingsToggle: byId("assistant-settings-toggle"),
     settingsForm: byId("assistant-settings-form"),
     settingsHelp: byId("assistant-settings-help"),
+    sharedConnection: byId("assistant-shared-connection"),
+    sharedUse: byId("assistant-shared-use"),
+    sharedHelp: byId("assistant-shared-help"),
     providerUrl: byId("assistant-provider-url"),
     providerModel: byId("assistant-provider-model"),
     providerKey: byId("assistant-provider-key"),
@@ -898,6 +915,7 @@ export function createAssistant(adapter) {
   let provider = { loaded: false, configured: false, model: "", image_input: false };
   let providerStatus = { key: "loading", kind: "info" };
   let settingsPending = false;
+  let sharedPending = false;
   let settingsStatus = null;
   let clearDialogOperation = null;
 
@@ -2328,7 +2346,8 @@ export function createAssistant(adapter) {
     if (!provider.loaded) return providerStatus;
     if (!provider.configured) return { key: "notConfigured", kind: "info" };
     if (adapter.getChatImages(paper.id).length && !provider.image_input) return { key: "agent_vision_disabled", kind: "error" };
-    return { key: "configured", kind: "info", values: { model: provider.model || "—", vision: t(provider.image_input ? "visionOn" : "visionOff") } };
+    const values = { model: provider.model || "—", vision: t(provider.image_input ? "visionOn" : "visionOff") };
+    return { key: provider.connection_source === "shared" ? "sharedConfigured" : "configured", kind: "info", values };
   }
 
   function renderStatus(paper, entry) {
@@ -2353,7 +2372,10 @@ export function createAssistant(adapter) {
     elements.settingsStatus.textContent = settingsStatus
       ? settingsStatus.kind === "error" ? errorText(settingsStatus) : t(settingsStatus.key)
       : "";
-    elements.providerSave.disabled = settingsPending;
+    elements.sharedConnection.hidden = provider.shared_available !== true;
+    elements.sharedUse.disabled = settingsPending || sharedPending || provider.connection_source === "shared";
+    elements.sharedUse.textContent = t(sharedPending ? "sharedConnectionPending" : "sharedConnection");
+    elements.providerSave.disabled = settingsPending || sharedPending;
     elements.providerSave.textContent = t(settingsPending ? "savingSettings" : "saveSettings");
   }
 
@@ -2892,9 +2914,36 @@ export function createAssistant(adapter) {
     render();
   }
 
+  async function useSharedConnection() {
+    if (settingsPending || sharedPending || provider.shared_available !== true || provider.connection_source === "shared") return;
+    sharedPending = true;
+    settingsStatus = { key: "sharedConnectionPending", kind: "info" };
+    renderSettings();
+    try {
+      provider = {
+        ...(await adapter.api("/api/v1/agent/settings/shared", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: "{}"
+        })),
+        loaded: true
+      };
+      elements.providerKey.value = "";
+      providerStatus = null;
+      settingsStatus = { key: "sharedConnectionSaved", kind: "success" };
+      const { entry } = current();
+      if (entry) entry.status = null;
+    } catch (error) {
+      settingsStatus = { key: error.code || "request_failed", kind: "error" };
+    } finally {
+      sharedPending = false;
+      render();
+    }
+  }
+
   async function saveSettings(event) {
     event.preventDefault();
-    if (settingsPending) return;
+    if (settingsPending || sharedPending) return;
     const baseUrl = elements.providerUrl.value.trim();
     const model = elements.providerModel.value.trim();
     let valid = Boolean(model);
@@ -3044,6 +3093,7 @@ export function createAssistant(adapter) {
     if (paper) cancelTurn(paper.id, entry);
   });
   elements.settingsForm.addEventListener("submit", saveSettings);
+  elements.sharedUse.addEventListener("click", useSharedConnection);
 
   if (!deviceMode) void sourcePreparation.load();
   loadProvider();
@@ -3072,8 +3122,9 @@ export function createAssistant(adapter) {
       elements.clearCancel.textContent = t("clearDialogCancel");
       elements.message.setAttribute("aria-label", t("messageLabel"));
       elements.message.placeholder = t("placeholder");
-      elements.settingsToggle.textContent = t("settings");
+      elements.settingsToggle.textContent = `${t("personalConnection")} · ${t("settings")}`;
       elements.settingsHelp.textContent = t("settingsHelp");
+      elements.sharedHelp.textContent = t("sharedConnectionHelp");
       elements.settingsForm.querySelector('label[for="assistant-provider-url"]').textContent = t("providerUrl");
       elements.settingsForm.querySelector('label[for="assistant-provider-model"]').textContent = t("providerModel");
       elements.settingsForm.querySelector('label[for="assistant-provider-key"]').textContent = t("providerKey");

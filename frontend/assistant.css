@@ -843,11 +843,40 @@
 }
 
 #assistant-settings-toggle {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  box-sizing: border-box;
   padding: 8px 0;
   color: var(--ui-text-soft);
   font-size: 12px;
   font-weight: 650;
   cursor: pointer;
+}
+
+.assistant-shared-connection {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin-bottom: 8px;
+}
+
+.assistant-shared-connection[hidden] {
+  display: none;
+}
+
+#assistant-shared-use {
+  flex: none;
+  min-height: 44px;
+}
+
+#assistant-shared-help {
+  flex: 1 1 180px;
+  margin: 0;
+  color: var(--ui-text-muted);
+  font-size: 11px;
+  line-height: 1.5;
 }
 
 .assistant-settings-form {

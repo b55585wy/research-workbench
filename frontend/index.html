@@ -980,6 +980,10 @@
           <summary id="assistant-settings-toggle">本地模型设置</summary>
           <form id="assistant-settings-form" class="assistant-settings-form">
             <p id="assistant-settings-help">设置仅保存在此研究工作台的私有配置中。</p>
+            <div id="assistant-shared-connection" class="assistant-shared-connection" hidden>
+              <button id="assistant-shared-use" class="button button-quiet" type="button">平台连接</button>
+              <p id="assistant-shared-help">返回平台连接只会清除当前空间已保存的个人连接。</p>
+            </div>
             <label for="assistant-provider-url">API 地址（HTTPS）</label>
             <input id="assistant-provider-url" type="url" inputmode="url" autocomplete="off" placeholder="https://…">
             <label for="assistant-provider-model">模型</label>

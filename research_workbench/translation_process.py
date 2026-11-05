@@ -61,8 +61,17 @@ def own_process_tree():
 
 
 class TranslationSupervisor:
-    def __init__(self, service, runtime_root=None, agent_config=None):
+    def __init__(self, service, runtime_root=None, agent_config=None,
+                 shared_model_config=None, guest_model_policy=False,
+                 shared_model_forbidden_root=None):
         self.service, self.runtime_root, self.agent_config = service, runtime_root, agent_config
+        # Operator shared connection path (never the secret).  ``None`` keeps the
+        # original owner/worker resolution unchanged unless the guest policy flag
+        # applies the fixed official endpoint to a personal file as well.
+        self.shared_model_config = shared_model_config
+        self.guest_model_policy = bool(guest_model_policy)
+        # Guest spaces root: the worker applies the same outside-spaces rule.
+        self.shared_model_forbidden_root = shared_model_forbidden_root
         self.root = service.store.root / '.translation-worker'
         self.root.mkdir(exist_ok=True)
         self.process = None
@@ -127,6 +136,15 @@ class TranslationSupervisor:
                 command += ['--translation-runtime', str(self.runtime_root)]
             if self.agent_config:
                 command += ['--agent-config', str(self.agent_config)]
+            if self.shared_model_config:
+                # Path only: the worker resolves the shared key itself.
+                command += ['--shared-model-config',
+                            str(self.shared_model_config)]
+            if self.shared_model_forbidden_root:
+                command += ['--shared-model-forbidden-root',
+                            str(self.shared_model_forbidden_root)]
+            if self.guest_model_policy:
+                command += ['--guest-model-policy']
             self.log = (self.root / '.worker.log').open('ab')
             env = {k: v for k, v in os.environ.items() if k.upper() not in ('PYTHONPATH', 'PYTHONHOME')}
             self.process = subprocess.Popen(command, cwd=Path(__file__).resolve().parents[1],

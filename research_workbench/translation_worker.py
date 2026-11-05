@@ -11,7 +11,6 @@ import threading
 import time
 from uuid import UUID
 
-from .agent_provider import ModelConnection
 from .analysis_process import WorkerBusy, WorkerLease
 from .store import Store
 from .translation import Translations
@@ -44,6 +43,13 @@ def execute_job(service, row, args, stop):
         command += ['--translation-runtime', str(args.translation_runtime)]
     if args.agent_config:
         command += ['--agent-config', str(args.agent_config)]
+    if args.shared_model_config:
+        command += ['--shared-model-config', str(args.shared_model_config)]
+    if args.shared_model_forbidden_root:
+        command += ['--shared-model-forbidden-root',
+                    str(args.shared_model_forbidden_root)]
+    if args.guest_model_policy:
+        command += ['--guest-model-policy']
     process = None
     try:
         process = subprocess.Popen(command, cwd=Path(__file__).resolve().parents[1],
@@ -82,10 +88,18 @@ def main():
     parser.add_argument('--token', type=UUID, required=True)
     parser.add_argument('--translation-runtime', type=Path)
     parser.add_argument('--agent-config', type=Path)
+    parser.add_argument('--shared-model-config', type=Path)
+    parser.add_argument('--shared-model-forbidden-root', type=Path)
+    parser.add_argument('--guest-model-policy', action='store_true')
     args = parser.parse_args()
     tree = own_process_tree()
     store = Store(args.data)
-    service = Translations(store, ModelConnection(store.root, args.agent_config),
+    from .shared_model import SharedFallbackModelConnection
+    provider = SharedFallbackModelConnection.from_paths(
+        store.root, args.agent_config, args.shared_model_config,
+        guest_policy=args.guest_model_policy,
+        forbidden_root=args.shared_model_forbidden_root)
+    service = Translations(store, provider,
                            TranslationRuntime(args.translation_runtime))
     stop = threading.Event()
 

@@ -42,10 +42,16 @@ from starlette.concurrency import run_in_threadpool
 
 from .agent_provider import ModelConnection, NoRedirect
 from .models import WorkspaceError
+from .shared_model import SharedModel, shared_connection_status
 from .selection_translation import SYSTEM_PROMPT
 
 DEVICE_AI_PATH = '/device/ai/selection-translation'
+DEVICE_CONNECTION_PATH = '/device/ai/connection'
 PROVIDER_BASE_URL = 'https://api.deepseek.com/v1'
+
+SOURCE_HEADER = b'x-research-model-source'
+SOURCE_SHARED = 'shared'
+SOURCE_PERSONAL = 'personal'
 
 MAX_BODY_BYTES = 16384
 MAX_TEXT_CHARS = 3000
@@ -90,6 +96,13 @@ FAILED_CODE = 'device_ai_failed'
 FAILED_MESSAGE = '翻译未完成，请稍后重试。'
 METHOD_CODE = 'method_not_allowed'
 METHOD_MESSAGE = '请使用 POST 提交翻译请求。'
+CONNECTION_METHOD_MESSAGE = '请使用 GET 获取连接状态。'
+SOURCE_CODE = 'device_model_source_invalid'
+SOURCE_MESSAGE = '模型来源请求头无效。'
+SHARED_UNAVAILABLE_CODE = 'device_shared_model_unavailable'
+SHARED_UNAVAILABLE_MESSAGE = '平台连接暂不可用，请使用自己的 Key。'
+SHARED_CHANGED_CODE = 'device_shared_model_changed'
+SHARED_CHANGED_MESSAGE = '平台模型已变更，请刷新连接后重试。'
 
 
 class DeviceSelectionTranslationRequest(BaseModel):
@@ -423,6 +436,62 @@ def credential_from_scope(scope):
     return match.group(1) if match is not None else None
 
 
+def requested_model_source(scope):
+    """Return ``None`` (legacy), ``'shared'``, ``'personal'`` or raise.
+
+    A duplicate or unknown source header is rejected instead of being resolved
+    to an ambiguous default.
+    """
+    values = [value for key, value in scope.get('headers', ())
+              if key.lower() == SOURCE_HEADER]
+    if not values:
+        return None
+    if len(values) != 1:
+        raise _failure(SOURCE_CODE, SOURCE_MESSAGE, 422)
+    try:
+        decoded = values[0].decode('latin-1')
+    except UnicodeDecodeError:  # pragma: no cover - latin-1 always decodes
+        raise _failure(SOURCE_CODE, SOURCE_MESSAGE, 422) from None
+    if decoded not in (SOURCE_SHARED, SOURCE_PERSONAL):
+        raise _failure(SOURCE_CODE, SOURCE_MESSAGE, 422)
+    return decoded
+
+
+def _has_authorization(scope):
+    return any(key.lower() == b'authorization'
+               for key, _ in scope.get('headers', ()))
+
+
+def resolve_device_access(scope, shared_model=None,
+                          credential_message=CREDENTIAL_MESSAGE):
+    """Resolve the credential a device request may use.
+
+    Returns ``(credential, shared_config)``.  ``shared_config`` is the resolved
+    operator configuration for a shared request and ``None`` otherwise; the
+    caller compares the confirmed model against it before any provider call.
+    Shared requests must not carry any Authorization header, and malformed or
+    duplicate Authorization never silently becomes the site credential.
+    """
+    source = requested_model_source(scope)
+    if source == SOURCE_SHARED:
+        if _has_authorization(scope):
+            raise _failure(SOURCE_CODE, SOURCE_MESSAGE, 422)
+        config = shared_model.load() if shared_model is not None else None
+        if config is None:
+            raise _failure(SHARED_UNAVAILABLE_CODE, SHARED_UNAVAILABLE_MESSAGE,
+                           503)
+        return config['api_key'], config
+    credential = credential_from_scope(scope)
+    if credential is None:
+        raise _failure(CREDENTIAL_CODE, credential_message, 401)
+    return credential, None
+
+
+def shared_model_mismatch(payload, shared_config):
+    """True when an explicitly shared request names another model."""
+    return shared_config is not None and payload.model != shared_config['model']
+
+
 def json_media_type(request):
     raw = request.headers.get('content-type')
     if raw is None:
@@ -449,13 +518,15 @@ async def _read_bounded_body(request, limit=MAX_BODY_BYTES):
     return bytes(body)
 
 
-def _endpoint(relay):
+def _endpoint(relay, shared_model=None):
     async def translate(request: Request):
         if not json_media_type(request):
             return _error(MEDIA_CODE, MEDIA_MESSAGE, 415)
-        credential = credential_from_scope(request.scope)
-        if credential is None:
-            return _error(CREDENTIAL_CODE, CREDENTIAL_MESSAGE, 401)
+        try:
+            credential, shared_config = resolve_device_access(
+                request.scope, shared_model)
+        except WorkspaceError as error:
+            return _error(error.code, error.message, error.status)
         try:
             body = await _read_bounded_body(request)
         except WorkspaceError as error:
@@ -464,6 +535,8 @@ def _endpoint(relay):
             payload = DeviceSelectionTranslationRequest.model_validate_json(body)
         except ValidationError:
             return _error(VALIDATION_CODE, VALIDATION_MESSAGE, 422)
+        if shared_model_mismatch(payload, shared_config):
+            return _error(SHARED_CHANGED_CODE, SHARED_CHANGED_MESSAGE, 409)
         try:
             result = await run_in_threadpool(
                 relay.translate, credential, payload)
@@ -473,29 +546,53 @@ def _endpoint(relay):
     return translate
 
 
+def _connection_endpoint(shared_model):
+    async def connection():
+        # Capability only: no configuration read beyond validity, no upstream
+        # call, no credential and no response cache.
+        return _json(shared_connection_status(shared_model), 200)
+    return connection
+
+
 def _method_not_allowed():
     return _error(METHOD_CODE, METHOD_MESSAGE, 405, {'Allow': 'POST'})
 
 
-def install_device_ai_routes(app, relay=None):
+def _connection_method_not_allowed():
+    return _error(METHOD_CODE, CONNECTION_METHOD_MESSAGE, 405,
+                  {'Allow': 'GET'})
+
+
+
+def install_device_ai_routes(app, relay=None, shared_model=None):
     """Install the shared device relay routes before the static mount.
 
     One relay instance serves both the selected-text translation endpoint and
     the explicit question endpoint, so their admission slots and terminal
-    receipts are shared.
+    receipts are shared.  ``shared_model`` is the operator resolver used for the
+    explicit shared source and the read-only connection status; ``None`` keeps
+    the owner/local device path personal-only.
     """
     from .device_question import (
         DEVICE_QUESTION_PATH, install_device_question_route)
 
     relay = relay or DeviceAiRelay()
     app.state.device_ai = relay
+    app.state.device_shared_model = shared_model
     app.add_middleware(
-        DeviceAiBoundary, paths=(DEVICE_AI_PATH, DEVICE_QUESTION_PATH))
-    app.add_api_route(DEVICE_AI_PATH, _endpoint(relay), methods=['POST'],
-                      include_in_schema=False)
+        DeviceAiBoundary,
+        paths=(DEVICE_AI_PATH, DEVICE_QUESTION_PATH, DEVICE_CONNECTION_PATH))
+    app.add_api_route(DEVICE_CONNECTION_PATH, _connection_endpoint(shared_model),
+                      methods=['GET'], include_in_schema=False)
+    app.add_api_route(
+        DEVICE_CONNECTION_PATH, _connection_method_not_allowed,
+        methods=['POST', 'HEAD', 'OPTIONS', 'PUT', 'PATCH', 'DELETE'],
+        include_in_schema=False)
+    app.add_api_route(DEVICE_AI_PATH, _endpoint(relay, shared_model),
+                      methods=['POST'], include_in_schema=False)
     app.add_api_route(
         DEVICE_AI_PATH, _method_not_allowed,
         methods=['GET', 'HEAD', 'OPTIONS', 'PUT', 'PATCH', 'DELETE'],
         include_in_schema=False)
-    install_device_question_route(app, relay)
+    install_device_question_route(app, relay, shared_model=shared_model)
     return relay

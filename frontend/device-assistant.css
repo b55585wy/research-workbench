@@ -243,6 +243,35 @@
   padding-top: 8px;
 }
 
+.device-assistant-source {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+
+.device-assistant-source-option {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 44px;
+  color: var(--ui-text-soft);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.device-assistant-source-option input {
+  width: 18px;
+  height: 18px;
+  min-height: 18px;
+  margin: 0;
+}
+
+.device-assistant-capability {
+  color: var(--ui-text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .device-assistant-fee {
   padding: 9px 10px;
   border: 1px solid var(--ui-border);
@@ -323,6 +352,30 @@
 .device-assistant [hidden],
 .assistant-panel[data-device-assistant="true"] [hidden] {
   display: none !important;
+}
+
+.device-assistant .device-assistant-source-option {
+  display: flex;
+  flex: 1 1 140px;
+  align-items: center;
+  min-width: 140px;
+  min-height: 44px;
+  gap: 8px;
+}
+
+.device-assistant .device-assistant-source-option input[type="radio"] {
+  flex: 0 0 18px;
+  width: 18px;
+  min-width: 18px;
+  max-width: 18px;
+  height: 18px;
+  min-height: 18px;
+  margin: 0;
+  padding: 0;
+}
+
+.device-assistant .device-assistant-source-option span {
+  white-space: nowrap;
 }
 
 @media (max-width: 640px) {

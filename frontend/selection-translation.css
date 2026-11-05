@@ -331,6 +331,53 @@
   box-sizing: border-box;
 }
 
+.device-ai-source,
+.device-ai-source-option {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+}
+
+.device-ai-source-option {
+  min-height: 44px;
+  color: var(--ui-text-soft);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.device-ai-source-option input {
+  width: 18px;
+  height: 18px;
+  min-height: 18px;
+  margin: 0;
+}
+
+.device-ai .device-ai-source-option {
+  flex: 1 1 140px;
+  min-width: 140px;
+  flex-wrap: nowrap;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.device-ai .device-ai-source-option input[type="radio"] {
+  flex: 0 0 18px;
+  width: 18px;
+  min-width: 18px;
+  max-width: 18px;
+  height: 18px;
+  min-height: 18px;
+  margin: 0;
+  padding: 0;
+}
+
+.device-ai-capability {
+  color: var(--ui-text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .device-ai-notices {
   display: grid;
   gap: 5px;
