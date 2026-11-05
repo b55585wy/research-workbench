@@ -2,7 +2,8 @@ Server deployment and current status: [SERVER-DEPLOYMENT.md](SERVER-DEPLOYMENT.m
 
 # research workspace
 
-当前代码/前端：v0.69.0，公开后端保持 v0.64.0；入口为 https://itsyiyi.com/ 与 https://5ai.life/，两边用户资料独立。
+当前代码/前端：v0.70.0，公开后端保持 v0.64.0；入口为 https://itsyiyi.com/ 与 https://5ai.life/，两边用户资料独立。
+[离线程序更新复用](OFFLINE-CACHE-REUSE.md)已上线：按新清单校验并复用完整旧包中的相同文件，缺失或损坏才下载；升级失败保留旧版，首次访问仍需准备程序。
 [连续滚动与批注弹窗](READER-CONTINUOUS-LAYOUT.md)已修复：阅读区恢复内部滚动、翻页与位置恢复；普通图形仅保留颜色、线宽和保存/取消，文本框仍可输入文字。
 [绘图加载修复](CHART-RENDERER-LOADING.md)已上线：修正版本化资源与协议地址混淆导致的预览/保存报错，进入绘图区时后台准备组件，同页复用及刷新缓存已验证。手机助手按需输入的修复保留。
 本轮修正[笔记与批注弹层](NOTES-ACTION-LAYOUT.md)：菜单不再越出屏幕或被笔记栏遮盖，批注编辑框避开手机底部导航，保留键盘操作和草稿。
