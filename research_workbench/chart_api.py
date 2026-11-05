@@ -2,11 +2,51 @@ from typing import Literal
 from uuid import UUID
 from fastapi import APIRouter,Request
 from fastapi.responses import JSONResponse,Response
+from pydantic import ValidationError
+from .agent_store import canonical
 from .chart_models import ChartCreate,ChartMutation
+from .chart_skill_models import MAX_SKILL_BYTES,ChartSkillCreate,ChartSkillVersionCreate
 from .chart_export import build_chart_export
+from .models import WorkspaceError
 from .reading_export import ExportResponse
 
 router=APIRouter(prefix='/api/v1')
+
+
+async def skill_payload(request,model):
+    raw=await request.body()
+    if len(raw)>MAX_SKILL_BYTES:raise WorkspaceError('chart_skill_invalid','绘图 skill 文件过大。',422)
+    try:return model.model_validate_json(raw)
+    except ValidationError:raise WorkspaceError('chart_skill_invalid','请检查绘图 skill 内容。',422) from None
+
+
+@router.get('/chart-skills')
+def skill_list(request:Request):return request.app.state.charts.skills.list()
+
+
+@router.get('/chart-skills/{skill_id}')
+def skill_get(skill_id:UUID,request:Request):return request.app.state.charts.skills.get(str(skill_id))
+
+
+@router.post('/chart-skills')
+async def skill_create(request:Request):
+    payload=await skill_payload(request,ChartSkillCreate)
+    value,created=request.app.state.charts.skills.create(payload)
+    return JSONResponse(value,status_code=201 if created else 200)
+
+
+@router.post('/chart-skills/{skill_id}/versions')
+async def skill_version(skill_id:UUID,request:Request):
+    payload=await skill_payload(request,ChartSkillVersionCreate)
+    value,created=request.app.state.charts.skills.versions(str(skill_id),payload)
+    return JSONResponse(value,status_code=201 if created else 200)
+
+
+@router.get('/chart-skills/{skill_id}/export')
+def skill_export(skill_id:UUID,request:Request):
+    spec,name=request.app.state.charts.skills.export(str(skill_id))
+    return Response(canonical(spec).encode(),media_type='application/json',
+        headers={'Content-Disposition':f'attachment; filename="{name}"','Cache-Control':'no-store'})
 
 
 @router.get('/charts/capabilities')

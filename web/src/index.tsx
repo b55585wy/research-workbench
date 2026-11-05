@@ -10,6 +10,7 @@ export type {
 export { mountNoteControls, mountNoteFilters } from "./note-controls";
 export { mountNotesWorkspace } from "./features/notes-workspace";
 export { mountResearchShell } from "./features/research-shell";
+export { mountChartSkills } from "./features/chart-skills";
 export type {
   MountNotesWorkspaceOptions, NotesWorkspaceHandle, NotesWorkspaceModel,
   NotesWorkspaceHosts, NotesWorkspaceSection

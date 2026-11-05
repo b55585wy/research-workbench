@@ -1,0 +1,101 @@
+.chart-skills {
+  min-width: 0;
+  max-width: 100%;
+  color: var(--ui-text);
+  font: inherit;
+  font-size: 12px;
+}
+
+.chart-skills *, .chart-skills *::before, .chart-skills *::after { box-sizing: border-box; }
+.chart-skill-toolbar, .chart-skill-actions, .chart-skill-editor-actions, .chart-skill-swatches,
+.chart-skill-editor-heading, .chart-skill-formats {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.chart-skill-toolbar { align-items: flex-end; }
+.chart-skill-toolbar > .chart-skill-field { flex: 1 1 168px; }
+.chart-skill-field { display: grid; min-width: 0; gap: 4px; font-weight: 600; }
+.chart-skills input:not([type="checkbox"]):not([type="color"]):not([type="file"]),
+.chart-skills select, .chart-skills textarea {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 36px;
+  padding: 8px;
+  border: 1px solid var(--ui-input-border);
+  border-radius: 3px;
+  background: var(--ui-input-bg);
+  color: var(--ui-text);
+  font: inherit;
+  font-weight: 400;
+}
+.chart-skills textarea { resize: vertical; }
+.chart-skills button, .chart-skill-icon {
+  min-height: 36px;
+  padding: 8px 12px;
+  border: 1px solid var(--ui-border);
+  border-radius: 3px;
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  font: inherit;
+  cursor: pointer;
+}
+.chart-skills .chart-skill-icon {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  padding: 8px;
+}
+.chart-skill-icon svg { width: 18px; height: 18px; pointer-events: none; }
+.chart-skill-file { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+.chart-skills :focus-visible, .chart-skill-import:focus-within {
+  outline: 2px solid var(--ui-focus, #0072b2);
+  outline-offset: 2px;
+}
+.chart-skills button:hover:not(:disabled), .chart-skill-import:hover:not(.is-disabled) {
+  border-color: var(--ui-text-muted);
+}
+.chart-skills :disabled, .chart-skill-import.is-disabled { opacity: .6; cursor: not-allowed; }
+.chart-skills fieldset:disabled :disabled { opacity: 1; }
+.chart-skill-editor {
+  min-width: 0;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--ui-border);
+}
+.chart-skill-editor-heading { margin-bottom: 12px; color: var(--ui-text-soft); }
+.chart-skill-editor-heading span { color: var(--ui-text-muted); font-weight: 400; }
+.chart-skill-editor-fields { display: grid; gap: 12px; min-width: 0; margin: 0; padding: 0; border: 0; }
+.chart-skill-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.chart-skill-palette, .chart-skill-formats { min-width: 0; margin: 0; padding: 8px; border: 1px solid var(--ui-border); }
+.chart-skill-palette legend, .chart-skill-formats legend { padding: 0 4px; color: var(--ui-text-soft); }
+.chart-skill-swatches { margin-top: 8px; }
+.chart-skill-swatch { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; }
+.chart-skills input[type="color"] { width: 32px; height: 32px; padding: 0; border: 1px solid var(--ui-border); border-radius: 50%; background: transparent; cursor: pointer; }
+.chart-skills input[type="color"]::-webkit-color-swatch-wrapper { padding: 3px; }
+.chart-skills input[type="color"]::-webkit-color-swatch { border: 0; border-radius: 50%; }
+.chart-skills input[type="color"]::-moz-color-swatch { border: 0; border-radius: 50%; }
+.chart-skill-formats label { display: inline-flex; align-items: center; gap: 4px; min-height: 32px; cursor: pointer; }
+.chart-skills input[type="checkbox"] { width: 16px; height: 16px; margin: 4px; accent-color: var(--ui-focus, #0072b2); }
+.chart-skill-editor-actions { margin-top: 12px; }
+.chart-skill-status, .chart-skill-error, .chart-skill-requirement, .chart-skill-pending {
+  margin: 8px 0 0;
+  color: var(--ui-text-muted);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.chart-skill-status button { margin: 4px 0 4px 8px; }
+.chart-skill-requirement { margin: 0; }
+.chart-skill-error { color: var(--ui-danger); }
+.chart-skill-pending p { margin: 0; }
+@media (max-width: 480px) {
+  .chart-skills button, .chart-skills .chart-skill-icon, .chart-skill-swatch { min-height: 44px; }
+  .chart-skills .chart-skill-icon, .chart-skill-swatch { width: 44px; }
+  .chart-skill-formats label { min-height: 44px; }
+  .chart-skill-actions { gap: 4px; }
+  .chart-skill-grid { gap: 8px; }
+}

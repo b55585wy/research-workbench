@@ -15,6 +15,7 @@ from .image_sources import checked_bytes
 from .library import read_metadata
 from .models import WorkspaceError
 from .chart_validation import projection as validate_projection
+from .chart_skills import ChartSkills
 
 ROOT=Path(__file__).resolve().parents[1]
 PROBE=Path(__file__).with_name('chart_probe.py')
@@ -48,6 +49,7 @@ def recipe(kind):
 class Charts:
     def __init__(self,store,datasets,analysis,timeout=8):
         self.store,self.datasets,self.analysis=store,datasets,analysis
+        self.skills=ChartSkills(store)
         self.timeout=timeout;self.slots=threading.BoundedSemaphore(2)
         self.asset_root=ROOT/'frontend/vendor/plotly/4.2.0'
         manifest=json.loads((self.asset_root/'manifest.json').read_text(encoding='utf-8'))
@@ -62,7 +64,8 @@ class Charts:
     def capabilities(self):
         self.check_renderer()
         return {'items':[{'id':k,'title':v,'recipe_sha256':recipe(k)['sha256']} for k,v in KINDS.items()],
-            'renderer':self.renderer,'limits':{'data_bytes':MAX_DATA,'charts_per_document':20,'rows':50000},'arbitrary_code':False}
+            'renderer':self.renderer,'limits':{'data_bytes':MAX_DATA,'charts_per_document':20,'rows':50000},'arbitrary_code':False,
+            'custom_skills':True}
 
     @staticmethod
     def row(connection,document_id,identifier):
@@ -98,6 +101,12 @@ class Charts:
         fields=payload.model_dump(mode='json');document,row,dataset=self.source(connection,document_id,fields)
         if fields['recipe_sha256']!=recipe(fields['kind'])['sha256']:raise WorkspaceError('chart_recipe_changed','绘图计算版本已改变，请重新预览。',409)
         if fields['renderer_sha256']!=self.renderer['sha256']:raise WorkspaceError('chart_renderer_changed','绘图组件版本已改变，请重新预览。',409)
+        snapshot=None
+        if payload.skill is not None:
+            snapshot=self.skills.snapshot(connection,payload.skill)
+            chart=snapshot['spec']['chart']
+            if chart['kind']!=fields['kind'] or chart['bins']!=fields['bins']:
+                raise WorkspaceError('chart_skill_changed','绘图 skill 与图表类型或分箱不一致。',409)
         self.check_renderer();analysis=None
         if fields['kind']=='analysis_counts':
             analysis=self.analysis_source(connection,document_id,fields['analysis_id'],dataset);columns=analysis['columns']
@@ -105,7 +114,7 @@ class Charts:
         allowed={c['name'] for c in dataset['columns'] if c['numeric']}
         valid=(fields['x'] in {c['name'] for c in dataset['columns']} and fields['y'] in allowed) if fields['kind']=='grouped_points' else set(columns).issubset(allowed)
         if not valid:raise WorkspaceError('invalid_columns','请选择有效分组列和有限数值列，或图型要求的数值列。',422)
-        return fields,document,row,dataset,analysis,columns
+        return fields,document,row,dataset,analysis,columns,snapshot
 
     def compute(self,row,fields,columns):
         if not self.slots.acquire(False):raise WorkspaceError('chart_busy','正在准备其他图表，请稍后重试。',429)
@@ -129,7 +138,7 @@ class Charts:
         finally:self.slots.release()
 
     def prepare_in(self,connection,document_id,payload):
-        fields,document,row,dataset,analysis,columns=self.validate(connection,document_id,payload)
+        fields,document,row,dataset,analysis,columns,snapshot=self.validate(connection,document_id,payload)
         projection=self.compute(row,fields,columns)
         self.source(connection,document_id,fields)
         if fields['recipe_sha256']!=recipe(fields['kind'])['sha256']:raise WorkspaceError('chart_recipe_changed','绘图计算版本已改变，请重新预览。',409)
@@ -141,14 +150,15 @@ class Charts:
         value={'format':'research-chart/v1','document_id':document_id,'dataset_id':dataset['id'],'dataset_sha256':dataset['sha256'],
             'analysis_id':fields['analysis_id'],'kind':fields['kind'],'title':fields['title'],'spec':spec,
             'recipe_sha256':fields['recipe_sha256'],'renderer_sha256':fields['renderer_sha256'],**projection}
+        if snapshot is not None:value['skill_snapshot']=snapshot
         data=canonical(value).encode()
         if len(data)>MAX_DATA:raise WorkspaceError('chart_too_large','图表数据过大，请减少记录。',413)
-        return fields,document,dataset,value,data
+        return fields,document,dataset,value,data,snapshot
 
     def record(self,row,dataset_name=None):
         fields=json.loads(row['spec_json']);spec={k:fields[k] for k in ('kind','title','analysis_id','x','y','bins')}
         prefix=f"/api/v1/documents/{row['document_id']}/charts/{row['id']}"
-        return {'id':row['id'],'document_id':row['document_id'],'source_sha256':fields['source_sha256'],
+        result={'id':row['id'],'document_id':row['document_id'],'source_sha256':fields['source_sha256'],
             'dataset_id':row['dataset_id'],'dataset_name':dataset_name or fields['dataset_name'],'dataset_sha256':fields['dataset_sha256'],
             'analysis_id':row['analysis_id'],'kind':fields['kind'],'title':fields['title'],'spec':spec,
             'recipe':{'id':fields['kind']+'-v1','version':1,'sha256':fields['recipe_sha256']},'renderer':fields['renderer'],
@@ -156,11 +166,15 @@ class Charts:
             'created_at':row['created_at'],'updated_at':row['updated_at'],'deleted_at':row['deleted_at'],
             'data_sha256':row['data_sha256'],'data_byte_size':row['data_byte_size'],'data_url':prefix+'/data',
             'viewer_url':f"/?document={row['document_id']}&chart={row['id']}",'export_url':prefix+'/export'}
+        if fields.get('skill_snapshot') is not None:result['skill_snapshot']=fields['skill_snapshot']
+        return result
 
     def preview(self,document_id,payload):
         with self.store.connection() as connection:
-            connection.execute('BEGIN');fields,doc,dataset,value,data=self.prepare_in(connection,document_id,payload)
-        stored={**fields,'source_sha256':doc['sha256'],'dataset_name':dataset['original_filename'],'renderer':self.renderer}
+            connection.execute('BEGIN');fields,doc,dataset,value,data,snapshot=self.prepare_in(connection,document_id,payload)
+        stored={key:item for key,item in fields.items() if key!='skill'}
+        stored.update(source_sha256=doc['sha256'],dataset_name=dataset['original_filename'],renderer=self.renderer)
+        if snapshot is not None:stored['skill_snapshot']=snapshot
         raw={'id':str(payload.request_id),'document_id':document_id,'dataset_id':dataset['id'],'analysis_id':fields['analysis_id'],
             'spec_json':canonical(stored),'summary_json':canonical(value['summary']),'origin':'preview','revision':0,'created_at':None,
             'updated_at':None,'deleted_at':None,'data_sha256':hashlib.sha256(data).hexdigest(),'data_byte_size':len(data)}
@@ -175,8 +189,10 @@ class Charts:
             self.data_in(connection,document_id,old['id']);return self.record(old),False
         if connection.execute('SELECT COUNT(*) FROM charts WHERE document_id=?',(document_id,)).fetchone()[0]>=20:
             raise WorkspaceError('chart_quota','这篇文献的图表记录已达上限（包含可恢复记录）。',413)
-        fields,doc,dataset,value,data=self.prepare_in(connection,document_id,payload)
-        stored={**fields,'source_sha256':doc['sha256'],'dataset_name':dataset['original_filename'],'renderer':self.renderer};stamp=now()
+        fields,doc,dataset,value,data,snapshot=self.prepare_in(connection,document_id,payload)
+        stored={key:item for key,item in fields.items() if key!='skill'}
+        stored.update(source_sha256=doc['sha256'],dataset_name=dataset['original_filename'],renderer=self.renderer);stamp=now()
+        if snapshot is not None:stored['skill_snapshot']=snapshot
         probe=projection_probe(fields['kind'])
         stored['calculation_sources']={'chart-projection.py':probe.read_bytes().decode('utf-8'),'tabular.py':probe.with_name('tabular.py').read_bytes().decode('utf-8')}
         connection.execute('INSERT INTO charts VALUES (?,?,?,?,?,?,?,?,?, ?,1,?,?,NULL)',(str(payload.request_id),document_id,dataset['id'],fields['analysis_id'],signature,
@@ -198,6 +214,11 @@ class Charts:
     def data_in(self,connection,document_id,identifier,allow_deleted=False):
         row=self.row(connection,document_id,identifier);fields=json.loads(row['spec_json'])
         if row['deleted_at'] and not allow_deleted:raise WorkspaceError('chart_deleted','图表已删除，可从已删除列表恢复。',409)
+        snapshot=fields.get('skill_snapshot')
+        if snapshot is not None:
+            self.skills.frozen(snapshot)
+            skill_chart=snapshot['spec']['chart']
+            if skill_chart['kind']!=fields['kind'] or skill_chart['bins']!=fields['bins']:raise changed()
         document,_,dataset=self.source(connection,document_id,fields)
         if document['sha256']!=fields['source_sha256']:raise changed()
         if fields['analysis_id']:self.analysis_source(connection,document_id,fields['analysis_id'],dataset)
@@ -207,6 +228,13 @@ class Charts:
         try:
             spec={k:fields[k] for k in ('kind','title','analysis_id','x','y','bins')}
             if value['summary']!=json.loads(row['summary_json']) or value['spec']!=spec:raise changed()
+            if snapshot is None:
+                if 'skill_snapshot' in value:raise changed()
+            else:
+                artifact=value.get('skill_snapshot')
+                if artifact is None:raise changed()
+                self.skills.frozen(artifact)
+                if artifact!=snapshot:raise changed()
             for key in ('document_id','dataset_id','analysis_id','kind','title','recipe_sha256','renderer_sha256','dataset_sha256'):
                 expected=row[key] if key in ('document_id','dataset_id','analysis_id') else fields[key]
                 if value[key]!=expected:raise changed()

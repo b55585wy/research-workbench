@@ -170,15 +170,27 @@
       return;
     }
     var styleId = document.documentElement.dataset.chartStyle || document.documentElement.dataset.style || "default";
-    var styled = window.ResearchChartStyles.apply(built, styleId);
+    var snapshot = artifact.skill_snapshot;
+    if (snapshot && (!window.ResearchChartStyles.validSkillSnapshot(snapshot) || snapshot.spec.chart.kind !== artifact.kind || snapshot.spec.chart.bins !== artifact.spec.bins)) {
+      fail("The saved figure skill is invalid. The static table remains available.");
+      return;
+    }
+    var styled = window.ResearchChartStyles.apply(built, snapshot || styleId, plot.clientWidth);
+    var imageAllowed = !snapshot || snapshot.spec.exports.includes("png");
+    var dimensions = snapshot ? { width: snapshot.spec.style.width, height: snapshot.spec.style.height } : {};
     window.Plotly.react(plot, styled.traces, styled.layout, {
       responsive: true,
       displaylogo: false,
       scrollZoom: true,
       showTips: false,
-      toImageButtonOptions: { format: "png", filename: "research-chart", scale: 2 }
+      modeBarButtonsToRemove: imageAllowed ? [] : ["toImage"],
+      toImageButtonOptions: Object.assign({ format: "png", filename: "research-chart", scale: snapshot ? 1 : 2 }, dimensions)
     }).catch(function () {
       fail("The interactive chart could not be drawn. The static table remains available.");
+    });
+    if (snapshot) window.addEventListener("resize", function () {
+      var fit = window.ResearchChartStyles.apply(built, snapshot, plot.clientWidth).layout;
+      window.Plotly.relayout(plot, { width: fit.width, height: fit.height });
     });
   }
 

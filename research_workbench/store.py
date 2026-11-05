@@ -447,6 +447,11 @@ SCHEMA = SCHEMA[:SCHEMA.rindex('COMMIT;')] + TRANSLATION_RUN_SCHEMA + '\nPRAGMA 
 # stays exactly as deployed.
 from .note_mastery_schema import SCHEMA as NOTE_MASTERY_SCHEMA
 SCHEMA = SCHEMA[:SCHEMA.rindex('COMMIT;')] + NOTE_MASTERY_SCHEMA + '\nPRAGMA user_version=28;\nCOMMIT;'
+# Version 29 adds two append-only tables for reusable chart skills.  Existing
+# chart records, artifacts and fixed renderer hashes are untouched; a recipe is
+# only referenced explicitly by a new chart request.
+from .chart_skill_schema import SCHEMA as CHART_SKILL_SCHEMA
+SCHEMA = SCHEMA[:SCHEMA.rindex('COMMIT;')] + CHART_SKILL_SCHEMA + '\nPRAGMA user_version=29;\nCOMMIT;'
 
 
 def timestamp():
@@ -473,7 +478,7 @@ class Store:
         self.exports.mkdir(exist_ok=True)
         self.database = self.root / 'workspace.sqlite3'
         with self.connection() as connection:
-            if connection.execute('PRAGMA user_version').fetchone()[0] > 28:
+            if connection.execute('PRAGMA user_version').fetchone()[0] > 29:
                 raise RuntimeError('Database requires a newer application')
             from .study_migration import install
             install(connection,SCHEMA)

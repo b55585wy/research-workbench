@@ -1,3 +1,5 @@
+import { frozenChartSkill, chartSkillReference, chartSkillsMatch, chartSkillAllows, chartSkillImageOptions, visibleChartSkill } from "/chart-skill-state.js";
+
 const MAX_ARTIFACT_BYTES = 4 * 1024 * 1024;
 const RENDERER_URL = "/vendor/plotly/4.2.0/plotly-strict.min.js";
 const HEX_64 = /^[0-9a-f]{64}$/;
@@ -92,6 +94,10 @@ const messages = {
     svg: "下载 SVG",
     style: "图表风格",
     styleNote: "切换样式不会改变数据。",
+    skillSnapshot: "使用保存时的 skill：{name} · v{revision}",
+    chart_skill_invalid: "绘图 skill 配置无效，请重新选择。",
+    chart_skill_changed: "绘图 skill 已更新或与当前图型不匹配，请重新选择并预览。",
+    chart_skill_export_unavailable: "此 skill 未包含所选导出格式。",
     defaultStyle: "默认",
     activeChart: "当前图表",
     chartProposal: "图表提案",
@@ -199,6 +205,10 @@ const messages = {
     svg: "Download SVG",
     style: "Chart style",
     styleNote: "Changing the style preserves the data.",
+    skillSnapshot: "Saved skill: {name} · v{revision}",
+    chart_skill_invalid: "The figure skill is invalid. Select it again.",
+    chart_skill_changed: "The figure skill changed or does not match this chart. Select it again and preview.",
+    chart_skill_export_unavailable: "This skill does not include the selected export format.",
     defaultStyle: "Default",
     activeChart: "Active chart",
     chartProposal: "Chart proposal",
@@ -385,7 +395,7 @@ function validateArtifact(artifact, expected) {
     artifact.dataset_sha256 === expected.dataset_sha256 && artifact.analysis_id === (expected.analysis_id ?? null) &&
     artifact.kind === kind && artifact.title === title && sameValue(artifact.spec, spec) &&
     artifact.recipe_sha256 === recipeHash && artifact.renderer_sha256 === rendererHash &&
-    validSummary(artifact.summary) && validSeries(artifact);
+    validSummary(artifact.summary) && validSeries(artifact) && chartSkillsMatch(artifact, expected);
 }
 
 async function readBoundedJson(response, record) {
@@ -512,6 +522,7 @@ export function createCharts(adapter) {
     // The default visual preset still applies when storage is unavailable.
   }
   let capabilitiesPromise = null;
+  let skillSupport = false;
   let resizeObserver = null;
   let plotHost = null;
   let plotView = null;
@@ -596,6 +607,7 @@ export function createCharts(adapter) {
         x: numeric[0] || "",
         y: numeric[1] || "",
         bins: 20,
+        skillSnapshot: null,
         version: 0,
         previewOperation: null,
         saveOperation: null,
@@ -661,7 +673,8 @@ export function createCharts(adapter) {
       y: ["scatter", "grouped_points"].includes(draft.kind) ? draft.y : null,
       bins: draft.kind === "histogram" ? draft.bins : null,
       recipe_sha256: recipe.recipe_sha256,
-      renderer_sha256: capabilities.renderer.sha256
+      renderer_sha256: capabilities.renderer.sha256,
+      ...(draft.skillSnapshot ? { skill: chartSkillReference(draft) } : {})
     };
   }
 
@@ -674,6 +687,8 @@ export function createCharts(adapter) {
           !["analysis_counts", "histogram", "scatter", "grouped_points"].every((kind) => body.items.some((item) => item.id === kind && HEX_64.test(item.recipe_sha256 || "")))) {
           throw new Error("invalidCapabilities");
         }
+        skillSupport = body.custom_skills === true;
+        adapter.skillsChanged?.();
         return body;
       }).catch((error) => {
         capabilitiesPromise = null;
@@ -735,6 +750,7 @@ export function createCharts(adapter) {
     if (elements.title.value !== (draft?.title || "")) elements.title.value = draft?.title || "";
     elements.bins.value = String(draft?.bins || 20);
     for (const control of [elements.dataset, elements.analysis, elements.kind, elements.title, elements.x, elements.y, elements.bins]) control.disabled = locked;
+    if (draft?.skillSnapshot) { elements.kind.disabled = true; elements.bins.disabled = true; }
     elements.analysis.hidden = draft?.kind !== "analysis_counts";
     elements.analysis.labels?.[0] && (elements.analysis.labels[0].hidden = elements.analysis.hidden);
     elements.x.hidden = draft?.kind === "analysis_counts";
@@ -774,7 +790,7 @@ export function createCharts(adapter) {
       actions.append(chartButton("restore-chart", t(pending ? "restoring" : "restore"), () => mutateLifecycle(entry, chart, "restore"), pending));
     } else {
       actions.append(
-        chartButton("export-chart", t(exporting ? "exporting" : "export"), () => exportChart(entry, chart), exporting),
+        chartButton("export-chart", t(exporting ? "exporting" : "export"), () => exportChart(entry, chart), exporting || !chartSkillAllows(chart.skill_snapshot, "offline")),
         chartButton("clone-chart", t("clone"), () => cloneChart(entry, chart), pending),
         chartButton("chart-note", t("note"), () => citeChart(entry, chart), pending),
         chartButton("delete-chart", t(pending ? "deleting" : "delete"), () => mutateLifecycle(entry, chart, "delete"), pending)
@@ -817,9 +833,12 @@ export function createCharts(adapter) {
     renderViewContext(entry);
     const unavailable = !entry?.view?.renderReady || entry.view.pending || !entry.view.host?.isConnected;
     elements.style.value = styleId;
-    elements.style.disabled = !entry?.view?.artifact || Boolean(entry.view.pending);
-    elements.png.disabled = unavailable;
-    elements.svg.disabled = unavailable;
+    const snapshot = entry?.view?.artifact?.skill_snapshot;
+    elements.style.disabled = !entry?.view?.artifact || Boolean(entry.view.pending) || Boolean(snapshot);
+    elements.styleNote.textContent = snapshot ? t("skillSnapshot", { name: snapshot.spec.name, revision: snapshot.revision }) : t("styleNote");
+    elements.png.disabled = unavailable || !chartSkillAllows(snapshot, "png");
+    elements.svg.disabled = unavailable || !chartSkillAllows(snapshot, "svg");
+    adapter.skillsChanged?.();
   }
 
   function appendField(list, label, value) {
@@ -906,13 +925,15 @@ export function createCharts(adapter) {
       if (!host.clientWidth) return deferHiddenRender();
       const figure = figureFor(view.artifact, { valid: language === "zh" ? "非缺失" : "Valid", missing: language === "zh" ? "缺失" : "Missing", rows: t("rows") });
       if (!window.ResearchChartStyles?.apply) throw new Error("renderFailed");
-      const styled = window.ResearchChartStyles.apply(figure, styleId);
+      const snapshot = view.artifact.skill_snapshot;
+      const styled = window.ResearchChartStyles.apply(figure, snapshot || styleId, host.clientWidth);
       await Plotly.react(host, styled.traces, styled.layout, {
         responsive: true,
         displaylogo: false,
         scrollZoom: true,
         showTips: false,
-        toImageButtonOptions: { format: "png", filename: "research-chart", scale: 2 }
+        modeBarButtonsToRemove: snapshot && !chartSkillAllows(snapshot, "png") ? ["toImage"] : [],
+        toImageButtonOptions: { format: "png", filename: "research-chart", ...(!snapshot || chartSkillAllows(snapshot, "png") ? chartSkillImageOptions(snapshot, "png") : { scale: 2 }) }
       });
       if (!isCurrentRender()) {
         try { Plotly.purge(host); } catch { /* Already detached. */ }
@@ -920,7 +941,10 @@ export function createCharts(adapter) {
         return false;
       }
       resizeObserver = new ResizeObserver(() => {
-        if (isCurrentRender() && host.clientWidth) Plotly.Plots.resize(host);
+        if (!isCurrentRender() || !host.clientWidth) return;
+        if (!snapshot) { Plotly.Plots.resize(host); return; }
+        const fit = window.ResearchChartStyles.apply(figure, snapshot, host.clientWidth).layout;
+        Plotly.relayout(host, { width: fit.width, height: fit.height });
       });
       resizeObserver.observe(host);
       view.pending = false;
@@ -996,7 +1020,8 @@ export function createCharts(adapter) {
         return;
       }
       if (!response?.chart || response.chart.id !== body.request_id || response.chart.origin !== "preview" || response.chart.revision !== 0 ||
-        !validateArtifact(response.data, { ...body, document_id: documentId })) throw new Error("invalidArtifact");
+        !validateArtifact(response.data, { ...body, document_id: documentId, skill_snapshot: draft.skillSnapshot || undefined }) ||
+        !chartSkillsMatch(response.data, response.chart)) throw new Error("invalidArtifact");
       operation.artifact = response.data;
       operation.descriptor = response.chart;
       const view = { kind: "preview", origin: "draft", artifact: response.data, record: response.chart, renderer: capabilities.renderer, pending: true, renderReady: false, host: null, operation };
@@ -1179,6 +1204,7 @@ export function createCharts(adapter) {
       x: chart.spec.x || "",
       y: chart.spec.y || "",
       bins: chart.spec.bins || 20,
+      skillSnapshot: frozenChartSkill(chart.skill_snapshot),
       version: 0,
       previewOperation: null,
       saveOperation: null,
@@ -1207,12 +1233,14 @@ export function createCharts(adapter) {
 
   async function exportChart(entry, chart) {
     if (!entry || chart.deleted_at || entry.exporting.has(chart.id)) return;
+    if (!chartSkillAllows(chart.skill_snapshot, "offline")) return;
     const documentId = chart.document_id;
     entry.exporting.add(chart.id);
     entry.status = { key: "exporting", kind: "info" };
     render();
     try {
-      const response = await adapter.checkedFetch(`/api/v1/documents/${encodeURIComponent(documentId)}/charts/${encodeURIComponent(chart.id)}/export?style=${encodeURIComponent(styleId)}`);
+      const query = chart.skill_snapshot ? "" : `?style=${encodeURIComponent(styleId)}`;
+      const response = await adapter.checkedFetch(`/api/v1/documents/${encodeURIComponent(documentId)}/charts/${encodeURIComponent(chart.id)}/export${query}`);
       const url = URL.createObjectURL(await response.blob());
       const link = make("a");
       link.href = url;
@@ -1388,7 +1416,8 @@ export function createCharts(adapter) {
   function downloadChart(format) {
     const view = currentEntry()?.view;
     if (!view?.renderReady || view.pending || !view.host?.isConnected || !window.Plotly) return;
-    window.Plotly.downloadImage(view.host, { format, scale: 2, filename: `research-chart-${styleId}` });
+    if (!chartSkillAllows(view.artifact.skill_snapshot, format)) return;
+    window.Plotly.downloadImage(view.host, { format, ...chartSkillImageOptions(view.artifact.skill_snapshot, format), filename: `research-chart-${view.artifact.skill_snapshot ? "custom" : styleId}` });
   }
   elements.png.addEventListener("click", () => downloadChart("png"));
   elements.svg.addEventListener("click", () => downloadChart("svg"));
@@ -1401,6 +1430,31 @@ export function createCharts(adapter) {
   });
 
   return {
+    getSkillModel() {
+      const entry = currentEntry(), draft = entry?.draft;
+      return { language, ownerId: currentId, available: skillSupport && Boolean(currentId),
+        busy: Boolean(draft?.pendingPreview || draft?.pendingSave || draft?.saveFailed || entry?.view?.pending),
+        selected: visibleChartSkill(draft, entry?.view?.artifact) };
+    },
+    selectSkill(value) {
+      const entry = currentEntry();
+      if (!entry || !skillSupport) return false;
+      const draft = ensureDraft(entry);
+      if (draft.pendingPreview || draft.pendingSave || draft.saveFailed) return false;
+      const snapshot = frozenChartSkill(value);
+      invalidateDraft(draft);
+      draft.skillSnapshot = snapshot;
+      if (snapshot) { draft.kind = snapshot.spec.chart.kind; draft.bins = snapshot.spec.chart.bins || 20; }
+      syncFields(entry, draft);
+      if (draft.kind === "analysis_counts") draft.analysisId = entry.jobs.find((job) => job.dataset_id === draft.datasetId && job.status === "succeeded" && isDescriptiveJob(job))?.id || null;
+      entry.view = null;
+      entry.activeChartId = null;
+      purgePlot();
+      renderArtifactDetails(null);
+      adapter.contextChanged?.();
+      render();
+      return true;
+    },
     applyLanguage(nextLanguage) {
       language = nextLanguage;
       elements.panel.querySelector("summary").textContent = t("panel");

@@ -50,6 +50,7 @@ function fixture() {
     readerShapes: { updateControls() {}, cancel: () => { events.shapeCancels += 1; },
       hasUnsavedChanges: () => flags.shapeDirty },
     assistant: { contextChanged() {}, isClearPending: () => flags.clearPending },
+    chartSkills: null,
     analysis: { hasPending: () => flags.analysisPending }, presentations: { hasPending: () => flags.presentationPending },
     dataImports: { isImportPending: () => flags.importPending }, study: { hasPending: () => flags.studyPending },
     selectionTranslation: { selectionChanged() {} },
@@ -81,6 +82,18 @@ function fixture() {
   return { ...sandbox, sandbox, events, flags, draft, otherDraft, images, uploadedImages, highlightNodes,
     browserSelection, setText, owned };
 }
+
+test("skill editing is checked before navigation; declined or pending preparation preserves the current owner", () => {
+  for (const allowed of [false, true]) {
+    const f = fixture();
+    let calls = 0;
+    f.sandbox.chartSkills = { hasUnsavedWork: () => true, prepareNavigation: () => { calls++; return allowed; } };
+    assert.equal(f.prepareContextNavigation(), allowed);
+    assert.equal(calls, 1);
+    assert.equal(f.state.document.id, "a");
+    assert.equal(f.events.writes, 0);
+  }
+});
 
 test("cancel clears only this draft, its pointer/capture/text/highlight and image choices; a new selection works", () => {
   const f = fixture();

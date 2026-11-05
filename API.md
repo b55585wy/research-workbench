@@ -1,3 +1,13 @@
+# v0.64 custom chart skills
+
+`/api/v1/chart-skills` supports GET latest versions and POST `{request_id,spec}`;
+`/{id}` reads latest; `/{id}/versions` POST `{request_id,expected_revision,spec}` appends;
+`/{id}/export` exports spec only. Closed schema `research-chart-skill/v1`, immutable
+versions, scoped SQLite29, idempotent receipts and chart snapshot compatibility are
+documented in [CUSTOM-CHART-SKILLS.md](CUSTOM-CHART-SKILLS.md).
+Existing ChartCreate optionally accepts `skill:{id,revision,sha256}`; omitted/null
+does not alter legacy signatures. New records/artifacts freeze `skill_snapshot`.
+
 # v0.61 reader-source and independent note mastery
 
 GET `/api/v1/documents/{id}/reader-source` returns a no-store

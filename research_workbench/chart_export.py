@@ -45,14 +45,23 @@ def markup(chart,data,style='default',include_styles=False):
 
 
 def build_chart_export(service,document_id,identifier,style=None):
+    if style is not None and style not in STYLE_IDS:raise WorkspaceError('chart_style_invalid','请选择支持的图表样式。',422)
+    chart,data=service.data(document_id,identifier);service.check_renderer()
+    snapshot=chart.get('skill_snapshot')
     helper=None
-    if style is not None:
-        if style not in STYLE_IDS:raise WorkspaceError('chart_style_invalid','请选择支持的图表样式。',422)
+    if snapshot is not None:
+        if style is not None:
+            raise WorkspaceError('chart_skill_changed','这张图表已固定绘图 skill，不能覆盖样式。',409)
+        if 'offline' not in snapshot['spec']['exports']:
+            raise WorkspaceError('chart_skill_changed','这个绘图 skill 未包含离线导出格式。',409)
         helper=STYLE_DIR/'chart-styles.js'
         if not helper.is_file():raise WorkspaceError('chart_style_unavailable','离线样式组件尚未部署，请稍后重试。',503)
-    chart,data=service.data(document_id,identifier);service.check_renderer()
+    elif style is not None:
+        helper=STYLE_DIR/'chart-styles.js'
+        if not helper.is_file():raise WorkspaceError('chart_style_unavailable','离线样式组件尚未部署，请稍后重试。',503)
     if chart['renderer']['sha256']!=service.renderer['sha256']:raise WorkspaceError('chart_renderer_changed','此图表需要对应版本的绘图组件。',409)
     chosen='default' if style is None else style
+    include_styles=helper is not None
     dataset=service.datasets.get(document_id,chart['dataset_id']);source=service.datasets.path(document_id,dataset['id'])
     suffix='.tsv' if dataset['original_filename'].lower().endswith('.tsv') else '.csv'
     provenance={k:v for k,v in chart.items() if k not in ('data_url','viewer_url','export_url')}
@@ -63,9 +72,11 @@ def build_chart_export(service,document_id,identifier,style=None):
         with tempfile.NamedTemporaryFile(dir=service.store.exports,suffix='.zip',delete=False) as temporary:pending=Path(temporary.name)
         with zipfile.ZipFile(pending,'w',compression=zipfile.ZIP_DEFLATED) as archive:
             writer=ArchiveWriter(archive);writer.text('chart.json',data);writer.text('specification.json',canonical(chart['spec']).encode())
-            writer.text('provenance.json',canonical(provenance).encode());writer.text('chart.html',markup(chart,data,chosen,style is not None))
-            if style is not None:
-                writer.text('chart-styles.js',helper.read_bytes());writer.text('style.json',canonical(style_payload(chosen)).encode())
+            writer.text('provenance.json',canonical(provenance).encode());writer.text('chart.html',markup(chart,data,chosen,include_styles))
+            if include_styles:
+                writer.text('chart-styles.js',helper.read_bytes())
+                if snapshot is not None:writer.text('skill.json',canonical(snapshot).encode())
+                else:writer.text('style.json',canonical(style_payload(chosen)).encode())
             if owner.get('kind')=='study':writer.text('study.json',canonical(owner).encode())
             writer.file('source'+suffix,source,dataset['sha256'],dataset['byte_size'])
             for name,raw in service.datasets.selections.export_files(document_id,dataset['id']).items():writer.text(name,raw)

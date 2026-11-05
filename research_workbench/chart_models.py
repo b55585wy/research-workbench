@@ -1,6 +1,7 @@
 from typing import Literal
 from uuid import UUID
-from pydantic import BaseModel,ConfigDict,Field,field_validator,model_validator
+from pydantic import BaseModel,ConfigDict,Field,field_validator,model_serializer,model_validator
+from .chart_skill_models import ChartSkillReference
 from .models import VersionedMutation
 
 ChartKind=Literal['analysis_counts','histogram','scatter','grouped_points']
@@ -19,6 +20,13 @@ class ChartCreate(BaseModel):
     bins:int|None=Field(default=None,strict=True,ge=2,le=50)
     recipe_sha256:str=Field(pattern='^[a-f0-9]{64}$')
     renderer_sha256:str=Field(pattern='^[a-f0-9]{64}$')
+    skill:ChartSkillReference|None=None
+
+    @model_serializer(mode='wrap')
+    def compatible_serialization(self,handler):
+        value=handler(self)
+        if value.get('skill') is None:value.pop('skill',None)
+        return value
 
     @field_validator('title')
     @classmethod

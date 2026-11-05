@@ -6,6 +6,7 @@ import { formatAnalysisNote } from "/analysis-note.js";
 import { createDatasetSelection } from "/dataset-selection.js";
 import { createDataImports } from "/data-imports.js";
 import { createCharts } from "/charts.js";
+import { createChartSkills } from "/chart-skills.js";
 import { createPresentations } from "/presentations.js";
 import { createWorkspace } from "/workspace.js";
 import { createDataNavigation } from "/data-navigation.js";
@@ -55,7 +56,7 @@ const MAX_DEVICE_PIXEL_RATIO = 2;
 const MAX_FILE_BYTES = 20 * 1024 * 1024;
 const ZOOM_MIN = 0.4;
 const ZOOM_MAX = 3;
-const APP_VERSION = "0.63.0";
+const APP_VERSION = "0.64.0";
 const PDF_RANGE_CHUNK_SIZE = 64 * 1024;
 const PDF_LOADING_HINT_DELAY = 12_000;
 
@@ -1296,6 +1297,7 @@ let analysis = null;
 let datasetSelection = null;
 let dataImports = null;
 let charts = null;
+let chartSkills = null;
 let presentations = null;
 let workspace = null;
 let notesWorkspace = null;
@@ -4230,7 +4232,10 @@ function prepareContextNavigation(draftNavigation = null) {
   captureCurrentDraft();
   captureCurrentMetadataDraft();
   const blocker = contextNavigationBlocker();
-  if (!blocker) return noteDraftControls.prepareNavigation(draftNavigation);
+  if (!blocker) {
+    if (chartSkills?.hasUnsavedWork() && chartSkills.prepareNavigation() !== true) return false;
+    return noteDraftControls.prepareNavigation(draftNavigation);
+  }
   if (blocker === "navigationRichDraftError") workspace?.showNotes();
   setStatus(blocker, blocker === "navigationPendingWrite" || blocker === "navigationConversationClear" ? "info" : "error");
   return false;
@@ -9055,6 +9060,7 @@ dataImports = createDataImports({
 });
 
 charts = createCharts({
+  skillsChanged: () => chartSkills?.update(),
   api,
   checkedFetch,
   getDocument: () => state.document,
@@ -9070,6 +9076,19 @@ charts = createCharts({
   chartOpened: showChartInUrl,
   addChartCitation
 });
+
+if (!deviceMode) {
+  chartSkills = createChartSkills({
+    container: $("chart-skills-host"),
+    getModel: () => charts.getSkillModel(),
+    api,
+    onSelect: (snapshot) => {
+      if (state.document?.id === charts.getSkillModel().ownerId) charts.selectSkill(snapshot);
+    }
+  });
+  void chartSkills.load();
+}
+window.addEventListener("pagehide", (event) => { if (!event.persisted) chartSkills?.destroy(); });
 
 presentations = createPresentations({
   api,
