@@ -500,7 +500,7 @@
 }
 
 @media (max-width: 1500px) {
-  .reader-toolbar :is(#zoom-fit-page, #reader-fullscreen) {
+  .reader-toolbar #zoom-fit-page {
     display: none;
   }
 }
