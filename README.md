@@ -2,7 +2,8 @@ Server deployment and current status: [SERVER-DEPLOYMENT.md](SERVER-DEPLOYMENT.m
 
 # research workspace
 
-当前代码/前端：v0.67.1，公开后端保持 v0.64.0；入口为 https://itsyiyi.com/ 与 https://5ai.life/，两边用户资料独立。手机打开助手不再自动聚焦输入框，主动点击后输入，电脑输入行为保留。
+当前代码/前端：v0.68.0，公开后端保持 v0.64.0；入口为 https://itsyiyi.com/ 与 https://5ai.life/，两边用户资料独立。
+[绘图加载修复](CHART-RENDERER-LOADING.md)已上线：修正版本化资源与协议地址混淆导致的预览/保存报错，进入绘图区时后台准备组件，同页复用及刷新缓存已验证。手机助手按需输入的修复保留。
 本轮修正[笔记与批注弹层](NOTES-ACTION-LAYOUT.md)：菜单不再越出屏幕或被笔记栏遮盖，批注编辑框避开手机底部导航，保留键盘操作和草稿。
 [桌面/手机按钮布局](BUTTON-LAYOUT.md)已重排：桌面主导航与栏边开关分开，手机使用紧凑功能选择器和当前内容面板导航；笔记标签与编辑图标同排。
 [医学生示例数据引导](MEDICAL-TEACHING-DATA.md)已上线：预览合成数据、明确导入、真实分析、保存图表和可编辑 PPT，按实际运行环境开放方法。
