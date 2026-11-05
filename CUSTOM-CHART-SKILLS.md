@@ -2,7 +2,7 @@
 
 在服务器资料的“科研绘图”中，通过“绘图 skill”旁的加号新建配置，或导入已导出的 JSON。
 配置保存后选择数据字段、预览，再保存图表。原默认／Nature／Cell 预设保留；本机资料的数据分析尚未接入，不能在本机模式使用此功能。
-上线状态以 [发布记录](UPDATE-POLICY.md) 为准。
+已在 https://itsyiyi.com/ 与 https://5ai.life/ 上线，前后端均为 v0.64.0；发布核对见 [UPDATE-POLICY.md](UPDATE-POLICY.md)。
 
 ## 实际支持的规则
 
@@ -27,7 +27,7 @@ Nature/Cell 是视觉预设，不代表期刊官方认可或自动满足投稿�
 | 原生适配 | `frontend/chart-skills.js`、`chart-skill-state.js`、`chart-styles.js` | 生命周期、当前显示与草稿的规则归属、受控样式应用 |
 | 集成 | `frontend/charts.js`、`app.js`、`index.html`、`web/src/index.tsx` | 现有图表草稿、导航保护、组件装配与构建 |
 
-`mountChartSkills`／`createChartSkills` 提供 `load/update/destroy/hasUnsavedWork/prepareNavigation`；
+`mountChartSkills` 提供 `update/destroy/hasUnsavedWork/prepareNavigation`，桥接 `createChartSkills` 额外提供 `load`；
 其中 `prepareNavigation` 与现有宿主一致，返回同步 boolean。取消离开保留编辑，保存进行中或结果未确认时不能静默离开。
 保存失败后保留原编号和请求体，只能明确重试或放弃；延迟响应不能选择到另一份资料。
 React 只拥有独立宿主，不持有图表内部状态；样式不会修改源数据或计算结果。

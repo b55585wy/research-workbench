@@ -1,5 +1,37 @@
 # 更新与访问连续性
 
+## 2026-11-05：v0.64.0 自定义绘图 skill 已发布到双站
+
+`itsyiyi.com` 与 `5ai.life` 均已发布后端 v0.64.0、前端 `ui-0.64.0-7f38f22d001cd439`。
+实际发布源码 `05c8826d11734b88265464ef732de01af05d3a21`（包含功能提交 `4739076`）。
+源码包1722个文件，SHA-256 `c52670c30c31792fe2164fc50d9f982a3e43af7b2007834850471262dc4782dc`；
+前端 ZIP SHA-256 `63c5b204632ee8a24eb3cbdee26b80820d1abf91c63f90ed4747579c872e0c8c`。
+
+支持结构化绘图配置的新建、导入导出、追加版本、图表快照及 PNG/SVG/离线导出。
+范围、模块接口和限制见 [CUSTOM-CHART-SKILLS.md](CUSTOM-CHART-SKILLS.md)。
+后端99项检查、前端/桥接/导航/样式91项检查通过；1项环境相关跳过、1项基线过时断言未纳入。
+TypeScript、生产构建、私有真实浏览器、实际导出及断网重放通过；未调用真实产品模型。
+
+本轮包含后端更新。两站先检查任务空闲，再临时返回带 Retry-After 的503、排空 HTTP、
+备份资料、追加 SQLite29 的两张配置表及索引、核对原表行内容，切换源码与前端后恢复入口。
+没有强行终止运行中的分析/模型任务；48个既有工作区的原表行内容在切换前后均一致。
+原 PDF 未改写，平台/个人 Key 配置未修改。后端发布仍有短暂维护窗口，不等同纯前端零重启切换。
+
+| 入口 | 游客后端进程 | 维护窗口 | 保持的进程 |
+| --- | --- | --- | --- |
+| https://itsyiyi.com/ | 28246 → 30149 | 5.37秒 | Caddy 13133 / 原个人服务13400 |
+| https://5ai.life/ | 90186 → 126164 | 4.33秒 | Caddy 2710 |
+
+两站源码链接均指向 `/opt/research-workspace/releases/0.64.0-05c8826d1173`。
+部署记录：`/opt/research-workspace/downloads/custom-chart-skills-v064/DEPLOYMENT-STATUS.json`。
+旧站备份：`/var/backups/research-workspace/before-custom-chart-skills-v0640-1793887648/guest-spaces.tar.gz`；
+新站备份：`/var/backups/research-workspace/before-custom-chart-skills-v0640-1793888010/guest-spaces.tar.gz`。
+同目录保留旧前端指针和代理配置。发布开放前，仅空的新表可自动回退；开放后必须保持 schema29 兼容，不能恢复旧备份覆盖新写入。
+
+外网只读核对根入口、`/device/`、10项关键资源哈希、原试读 PDF 字节、上一版脚本及共享连接可用状态。
+两站真实 Chrome 均加载新版并导出 `mountChartSkills`，390像素无横向溢出、无脚本异常。
+没有创建生产验收游客或资料。上一版 `ui-0.63.0-f83d9f33ce1eef2e` 静态资源保留，旧页面未被强制刷新。
+
 ## 2026-11-05：v0.63.0 组件化前端已发布到双站
 
 `itsyiyi.com` 与 `5ai.life` 均为 `ui-0.63.0-f83d9f33ce1eef2e`，后端仍运行 v0.62.0。
