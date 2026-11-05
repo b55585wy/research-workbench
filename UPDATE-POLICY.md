@@ -1,5 +1,20 @@
 # 更新与访问连续性
 
+## 2026-11-05：v0.58.0 平台连接发布
+
+双站已更新至源码 `f7b3d3140f56cf2a3697cd832d4d504ec693d706`、前端 `ui-0.58.0-5f9acfb5744afb32`。
+平台 DeepSeek 默认共用、个人配置优先，见 [完整核对记录](SERVER-MODEL-CONNECTION.md)。
+schema27、原始文件、游客记录和归属未变；代理/原owner进程保持。新旧站分别备份与发布，没有同步用户资料。
+
+| 入口 | 数据核对：空间/文献/笔记 | 成功切换窗口 | 备份 |
+|---|---|---|---|
+| https://5ai.life/ | 9 / 5 / 4，前后表内容指纹一致 | 4.37秒 | `/var/backups/research-workspace/before-shared-model-v0580-1793837184/guest-spaces.tar.gz` |
+| https://itsyiyi.com/ | 32 / 8 / 0，前后表内容指纹一致 | 5.39秒 | `/var/backups/research-workspace/before-shared-model-v0580-1793837340/guest-spaces.tar.gz` |
+
+旧站第一次校验因私有目录不可遍历而回滚，随后使用独立组可遍历目录发布成功，未放宽原私有目录。
+两站部署记录均在 `/opt/research-workspace/downloads/shared-deepseek-v1/DEPLOYMENT-STATUS.json`。
+旧站原空间上限仍为32，未为验收清理或增加游客空间。后端升级仍有维护窗口，前端兼容更新机制保持。
+
 2026-11-04 状态：线上两个入口仍为 v0.55.1。加载提示 v0.55.2 与前端独立发布机制
 v0.55.3 已在本地核对，未更新线上服务。本轮不重启服务器，不强制用户刷新。
 
