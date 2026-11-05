@@ -89,7 +89,10 @@ type Confirmation =
 
 const strings = {
   zh: {
-    continuous: "连续翻译",
+    continuous: "翻译",
+    startCurrent: "翻译本页",
+    more: "整篇或页码范围",
+    history: "翻译记录",
     current: "当前页",
     whole: "整篇文献",
     range: "页码范围",
@@ -112,17 +115,17 @@ const strings = {
     feeNotice: "确认后，所选页面会发送给已配置的模型服务，可能产生服务商费用。",
     resumeNotice: "继续只会处理尚未完成的页面；所选范围会发送给已配置的模型服务，可能产生服务商费用。",
     confirmScope: (pages: string, count: number, language: string) => `发送范围：第 ${pages} 页，共 ${count} 页；语言：${language}。`,
-    saved: "连续翻译记录",
-    noSaved: "暂无连续翻译记录",
-    refresh: "刷新记录",
-    loadingList: "正在读取连续翻译记录…",
-    listFailed: "无法读取连续翻译记录。",
-    loadingRun: "正在读取这一页的已存译文…",
+    saved: "翻译记录",
+    noSaved: "暂无翻译记录",
+    refresh: "刷新",
+    loadingList: "正在读取翻译记录…",
+    listFailed: "无法读取翻译记录。",
+    loadingRun: "正在读取已存译文…",
     loadFailed: "无法读取这条记录或所选页面，请重试。",
     requestFailed: "操作未完成，请重试。",
-    network: "无法连接本地服务。请求可能已提交；请使用同一请求重试。",
-    invalidPages: "请输入 1 至 200 个不重复的有效页码；范围不能超出实际文献页数。",
-    unsupported: "当前服务尚不支持连续翻译。已保存记录仍可读取，早期翻译入口保持不变。",
+    network: "连接结果不确定；请使用同一请求重试。",
+    invalidPages: "请输入有效页码，范围不能超出文献页数或 200 页上限。",
+    unsupported: "当前服务不支持批量翻译；已保存译文仍可阅读。",
     wholeTooLarge: "整篇翻译一次最多授权 200 页。此文献超出上限，请改用明确的页码范围；系统不会自动截断。",
     queued: "排队中",
     running: "翻译中",
@@ -148,7 +151,10 @@ const strings = {
     language: (language: RunTargetLanguage) => language === "zh" ? "中文" : "英文"
   },
   en: {
-    continuous: "Continuous translation",
+    continuous: "Translation",
+    startCurrent: "Translate this page",
+    more: "Whole paper or page range",
+    history: "Translation history",
     current: "Current page",
     whole: "Whole paper",
     range: "Page range",
@@ -157,31 +163,31 @@ const strings = {
     target: "Translate into",
     chinese: "Chinese",
     english: "English",
-    review: "Review and start",
-    confirmStart: "Confirm sending and start",
-    confirmResume: "Confirm sending and continue",
-    cancelConfirmation: "Back to edit",
+    review: "Review scope",
+    confirmStart: "Confirm and start",
+    confirmResume: "Confirm and continue",
+    cancelConfirmation: "Back",
     stop: "Stop further translation",
     stopping: "Stopping…",
     continue: "Continue translation",
     starting: "Submitting…",
     resuming: "Continuing…",
     retry: "Retry same request",
-    retryHint: "If the network result is uncertain, the exact same request is retained to prevent duplicate operations.",
-    feeNotice: "After confirmation, the selected pages are sent to the configured model provider and provider charges may apply.",
-    resumeNotice: "Continuing only processes incomplete pages. The selected scope is sent to the configured model provider and provider charges may apply.",
-    confirmScope: (pages: string, count: number, language: string) => `Sending pages ${pages} (${count} total) in ${language}.`,
-    saved: "Continuous translation history",
-    noSaved: "No continuous translations yet",
-    refresh: "Refresh history",
-    loadingList: "Reading continuous translation history…",
-    listFailed: "Continuous translation history could not be read.",
-    loadingRun: "Reading the saved translation for this page…",
+    retryHint: "The same request is retained after an uncertain network result.",
+    feeNotice: "The selected pages will be sent to the configured model provider; charges may apply.",
+    resumeNotice: "Only incomplete pages will be sent to the configured model provider; charges may apply.",
+    confirmScope: (pages: string, count: number, language: string) => `Pages ${pages} (${count} total) · ${language}.`,
+    saved: "Translation history",
+    noSaved: "No translations yet",
+    refresh: "Refresh",
+    loadingList: "Reading translation history…",
+    listFailed: "Translation history could not be read.",
+    loadingRun: "Reading the saved translation…",
     loadFailed: "This record or selected page could not be read. Try again.",
     requestFailed: "The operation was not completed. Try again.",
-    network: "The local service could not be reached. The request may have been submitted; retry the same request.",
-    invalidPages: "Enter 1 to 200 distinct valid pages within the actual paper. Nothing is truncated automatically.",
-    unsupported: "This service does not support continuous translation yet. Saved results remain readable, and earlier translation is still available.",
+    network: "The connection result is uncertain; retry the same request.",
+    invalidPages: "Enter valid pages within the paper and the 200-page limit.",
+    unsupported: "Batch translation is unavailable; saved translations remain readable.",
     wholeTooLarge: "Whole-paper translation authorizes at most 200 pages. Choose an explicit page range instead; the paper will not be truncated automatically.",
     queued: "Queued",
     running: "Running",
@@ -298,7 +304,7 @@ function preferredPage(run: TranslationRun, currentPage: number) {
   return run.pages.includes(currentPage) ? currentPage : run.pages[0];
 }
 
-export function TranslationRunPanel({ document, currentPage, language, capabilities, api, onOpenSettings, onSelectionChange, renderResults }: {
+export function TranslationRunPanel({ document, currentPage, language, capabilities, api, onOpenSettings, onSelectionChange, renderResults, externalRun = null }: {
   document: RunDocument;
   currentPage: number;
   language: "zh" | "en";
@@ -307,6 +313,7 @@ export function TranslationRunPanel({ document, currentPage, language, capabilit
   onOpenSettings: () => void;
   onSelectionChange: (run: TranslationRun | null) => void;
   renderResults: (run: TranslationRun) => ReactNode;
+  externalRun?: TranslationRun | null;
 }) {
   const copy = strings[language];
   const documentKey = `${document.id}:${document.sha256}`;
@@ -315,6 +322,7 @@ export function TranslationRunPanel({ document, currentPage, language, capabilit
   const generationRef = useRef(0);
   const scopeControllerRef = useRef<AbortController | null>(null);
   const operationRef = useRef(0);
+  const operationLockRef = useRef<number | null>(null);
   const [selectionMode, setSelectionMode] = useState<"current" | "whole" | "range">("current");
   const [pageInput, setPageInput] = useState(String(currentPage || 1));
   const [targetLanguage, setTargetLanguage] = useState<RunTargetLanguage>(language);
@@ -322,6 +330,10 @@ export function TranslationRunPanel({ document, currentPage, language, capabilit
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [selectedRun, setSelectedRun] = useState<TranslationRun | null>(null);
   const [selectedPage, setSelectedPage] = useState<number | null>(null);
+  const selectedRunIdRef = useRef(selectedRunId);
+  const selectedRunRef = useRef(selectedRun);
+  selectedRunIdRef.current = selectedRunId;
+  selectedRunRef.current = selectedRun;
   const [listLoading, setListLoading] = useState(true);
   const [listError, setListError] = useState(false);
   const [listRetry, setListRetry] = useState(0);
@@ -339,6 +351,7 @@ export function TranslationRunPanel({ document, currentPage, language, capabilit
   useEffect(() => {
     generationRef.current += 1;
     operationRef.current += 1;
+    operationLockRef.current = null;
     scopeControllerRef.current?.abort();
     const controller = new AbortController();
     scopeControllerRef.current = controller;
@@ -364,6 +377,18 @@ export function TranslationRunPanel({ document, currentPage, language, capabilit
   }, [selectedRun, onSelectionChange]);
 
   useEffect(() => {
+    if (!externalRun || !runInScope(externalRun, document)) return;
+    const page = externalRun.result_pages[0]?.page || preferredPage(externalRun, currentPageRef.current);
+    setConfirmation(null);
+    setOperationError(null);
+    setDetailError(false);
+    setSelectedRunId(externalRun.id);
+    setSelectedPage(page);
+    setSelectedRun(externalRun);
+    setRuns((current) => upsertRun(current, externalRun));
+  }, [externalRun]);
+
+  useEffect(() => {
     const controller = new AbortController();
     const ticket = generationRef.current;
     let active = true;
@@ -376,9 +401,13 @@ export function TranslationRunPanel({ document, currentPage, language, capabilit
       const items = Array.isArray(body.items)
         ? body.items.filter((run): run is TranslationRun => runInScope(run, document)).slice(0, 20)
         : [];
-      setRuns(items);
+      const retained = selectedRunRef.current?.id === selectedRunIdRef.current ? selectedRunRef.current : null;
+      const nextItems = retained && !items.some((run) => run.id === retained.id)
+        ? [retained, ...items].slice(0, 20)
+        : items;
+      setRuns(nextItems);
       setSelectedRunId((current) => {
-        const preferred = items.find((run) => run.id === current) || items[0];
+        const preferred = nextItems.find((run) => run.id === current) || nextItems[0];
         if (!preferred) {
           setSelectedPage(null);
           setSelectedRun(null);
@@ -409,6 +438,10 @@ export function TranslationRunPanel({ document, currentPage, language, capabilit
   useEffect(() => {
     if (!selectedRunId || !selectedPage) {
       setSelectedRun(null);
+      setDetailLoading(false);
+      return;
+    }
+    if (selectedRun?.id === selectedRunId && validRunDetail(selectedRun, selectedRunId, selectedPage)) {
       setDetailLoading(false);
       return;
     }
@@ -479,9 +512,10 @@ export function TranslationRunPanel({ document, currentPage, language, capabilit
   }, [documentKey, selectedRun?.id, selectedRun?.status, selectedPage]);
 
   async function submitDraft(draft: RequestDraft) {
-    if (pendingAction || draft.documentId !== document.id || draft.sourceSha256 !== document.sha256) return;
+    if (operationLockRef.current !== null || pendingAction || draft.documentId !== document.id || draft.sourceSha256 !== document.sha256) return;
     const ticket = generationRef.current;
     const action = ++operationRef.current;
+    operationLockRef.current = action;
     setRequestDraft(draft);
     setConfirmation(null);
     setPendingAction(draft.kind);
@@ -513,15 +547,34 @@ export function TranslationRunPanel({ document, currentPage, language, capabilit
         setOperationError(code);
       }
     } finally {
-      if (generationRef.current === ticket && action === operationRef.current) setPendingAction(null);
+      if (operationLockRef.current === action) {
+        operationLockRef.current = null;
+        if (generationRef.current === ticket && action === operationRef.current) setPendingAction(null);
+      }
     }
   }
 
+  function startCurrentPage() {
+    if (requestDraft || pendingAction || confirmation || !Number.isInteger(currentPage) || currentPage < 1 || currentPage > document.pageCount) return;
+    setOperationError(null);
+    void submitDraft({
+      kind: "create",
+      documentId: document.id,
+      sourceSha256: document.sha256,
+      payload: {
+        request_id: crypto.randomUUID(),
+        source_sha256: document.sha256,
+        pages: [currentPage],
+        target_language: targetLanguage,
+        confirmed: true
+      }
+    });
+  }
+
   function reviewCreate() {
-    if (requestDraft || pendingAction || confirmation) return;
+    if (requestDraft || pendingAction || confirmation || selectionMode === "current") return;
     let pages: number[] | null;
-    if (selectionMode === "current") pages = [currentPage];
-    else if (selectionMode === "whole") pages = wholeTooLarge ? null : Array.from({ length: document.pageCount }, (_, index) => index + 1);
+    if (selectionMode === "whole") pages = wholeTooLarge ? null : Array.from({ length: document.pageCount }, (_, index) => index + 1);
     else pages = parsePages(pageInput, document.pageCount, runMaxPages);
     if (!pages || pages.length > 200 || pages.some((page) => page < 1 || page > document.pageCount)) {
       setOperationError(wholeTooLarge && selectionMode === "whole" ? "whole_too_large" : "invalid_pages");
@@ -591,37 +644,9 @@ export function TranslationRunPanel({ document, currentPage, language, capabilit
           : requestDraft?.kind === "resume"
             ? copy.continueFailed
             : copy.requestFailed;
-  const processedMissing = selectedRun ? Math.max(0, selectedRun.processed_pages - selectedRun.completed_pages) : 0;
-  const waiting = selectedRun ? Math.max(0, selectedRun.total_pages - selectedRun.processed_pages) : 0;
-
   return (
     <div className="translation-run-view">
-      <form className="translation-form translation-run-form" onSubmit={(event) => {
-        event.preventDefault();
-        reviewCreate();
-      }}>
-        <fieldset className="translation-page-choice" disabled={controlsDisabled || Boolean(confirmation)}>
-          <legend className="sr-only">{copy.rangeLabel}</legend>
-          <label>
-            <input type="radio" name="translation-run-pages" checked={selectionMode === "current"} onChange={() => setSelectionMode("current")} />
-            <span>{copy.current} · {currentPage}</span>
-          </label>
-          <label title={wholeTooLarge ? copy.wholeTooLarge : undefined}>
-            <input type="radio" name="translation-run-pages" checked={selectionMode === "whole"} disabled={wholeTooLarge} onChange={() => setSelectionMode("whole")} />
-            <span>{copy.whole} · {document.pageCount}</span>
-          </label>
-          <label>
-            <input type="radio" name="translation-run-pages" checked={selectionMode === "range"} onChange={() => setSelectionMode("range")} />
-            <span>{copy.range}</span>
-          </label>
-        </fieldset>
-        {selectionMode === "whole" && wholeTooLarge && <p className="translation-page-limit">{copy.wholeTooLarge}</p>}
-        {selectionMode === "range" && (
-          <label className="translation-field" htmlFor="translation-run-page-input">
-            <span>{copy.rangeLabel}</span>
-            <input id="translation-run-page-input" value={pageInput} placeholder={copy.rangePlaceholder} autoComplete="off" disabled={controlsDisabled || Boolean(confirmation)} onChange={(event) => setPageInput(event.target.value)} />
-          </label>
-        )}
+      <div className="translation-current-action">
         <label className="translation-field" htmlFor="translation-run-target-language">
           <span>{copy.target}</span>
           <select id="translation-run-target-language" value={targetLanguage} disabled={controlsDisabled || Boolean(confirmation)} onChange={(event) => setTargetLanguage(event.target.value as RunTargetLanguage)}>
@@ -629,28 +654,15 @@ export function TranslationRunPanel({ document, currentPage, language, capabilit
             <option value="en">{copy.english}</option>
           </select>
         </label>
-        {!confirmation && !requestDraft && (
-          <div className="translation-start-row">
-            <button className="button button-primary" type="submit" disabled={!capabilities?.ready || !capabilities.run_support || controlsDisabled}>{copy.review}</button>
-          </div>
+        {requestDraft?.kind === "create" ? (
+          <button className="button button-primary translation-current-button" type="button" disabled={Boolean(pendingAction)} onClick={() => void submitDraft(requestDraft)}>{pendingAction === "create" ? copy.starting : copy.retry}</button>
+        ) : (
+          <button className="button button-primary translation-current-button" type="button" disabled={!capabilities?.ready || !capabilities.run_support || controlsDisabled || Boolean(confirmation)} onClick={startCurrentPage}>
+            {pendingAction === "create" ? copy.starting : copy.startCurrent}
+          </button>
         )}
-        {confirmation && confirmationPages && confirmationLanguage && !requestDraft && (
-          <div className="translation-run-confirmation" role="group" aria-label={confirmation.kind === "create" ? copy.confirmStart : copy.confirmResume}>
-            <strong>{copy.confirmScope(formatRunPages(confirmationPages), confirmationPages.length, copy.language(confirmationLanguage))}</strong>
-            <p>{confirmation.kind === "create" ? copy.feeNotice : copy.resumeNotice}</p>
-            <div className="translation-start-row">
-              <button className="button button-primary" type="button" disabled={controlsDisabled} onClick={confirmOperation}>{confirmation.kind === "create" ? copy.confirmStart : copy.confirmResume}</button>
-              <button className="button button-secondary" type="button" disabled={controlsDisabled} onClick={() => setConfirmation(null)}>{copy.cancelConfirmation}</button>
-            </div>
-          </div>
-        )}
-        {requestDraft?.kind === "create" && (
-          <div className="translation-start-row">
-            <button className="button button-primary" type="button" disabled={Boolean(pendingAction)} onClick={() => void submitDraft(requestDraft)}>{pendingAction === "create" ? copy.starting : copy.retry}</button>
-          </div>
-        )}
-        {requestDraft && <p className="translation-retry-hint">{copy.retryHint}</p>}
-      </form>
+      </div>
+      {requestDraft && !pendingAction && <p className="translation-retry-hint">{copy.retryHint}</p>}
 
       {capabilities && (!capabilities.ready || !capabilities.run_support) && (
         <div className="translation-unavailable" role="status">
@@ -660,25 +672,71 @@ export function TranslationRunPanel({ document, currentPage, language, capabilit
       )}
       {operationError && <p className="translation-status" data-kind="error" role="alert">{operationMessage}</p>}
 
-      <div className="translation-saved-row translation-run-history">
-        <label htmlFor="translation-run-history">{copy.saved}</label>
-        <div>
-          <select id="translation-run-history" value={selectedRunId || ""} disabled={!runs.length || controlsDisabled} onChange={(event) => {
-            const run = runs.find((item) => item.id === event.target.value);
-            setConfirmation(null);
-            setOperationError(null);
-            setSelectedRun(null);
-            setSelectedRunId(run?.id || null);
-            setSelectedPage(run ? preferredPage(run, currentPageRef.current) : null);
-          }}>
-            {!runs.length && <option value="">{copy.noSaved}</option>}
-            {runs.map((run) => <option value={run.id} key={run.id}>{formatRunPages(run.pages)} · {copy.language(run.target_language)} · {copy[run.status]}</option>)}
-          </select>
-          <button className="button button-quiet" type="button" disabled={listLoading || controlsDisabled} onClick={() => setListRetry((value) => value + 1)}>{copy.refresh}</button>
+      <details className="translation-options">
+        <summary>{copy.more}</summary>
+        <form className="translation-form translation-run-form" onSubmit={(event) => {
+          event.preventDefault();
+          reviewCreate();
+        }}>
+          <fieldset className="translation-page-choice" disabled={controlsDisabled || Boolean(confirmation)}>
+            <legend className="sr-only">{copy.rangeLabel}</legend>
+            <label title={wholeTooLarge ? copy.wholeTooLarge : undefined}>
+              <input type="radio" name="translation-run-pages" checked={selectionMode === "whole"} disabled={wholeTooLarge} onChange={() => setSelectionMode("whole")} />
+              <span>{copy.whole} · {document.pageCount}</span>
+            </label>
+            <label>
+              <input type="radio" name="translation-run-pages" checked={selectionMode === "range"} onChange={() => setSelectionMode("range")} />
+              <span>{copy.range}</span>
+            </label>
+          </fieldset>
+          {selectionMode === "whole" && wholeTooLarge && <p className="translation-page-limit">{copy.wholeTooLarge}</p>}
+          {selectionMode === "range" && (
+            <label className="translation-field" htmlFor="translation-run-page-input">
+              <span>{copy.rangeLabel}</span>
+              <input id="translation-run-page-input" value={pageInput} placeholder={copy.rangePlaceholder} autoComplete="off" disabled={controlsDisabled || Boolean(confirmation)} onChange={(event) => setPageInput(event.target.value)} />
+            </label>
+          )}
+          {!confirmation && !requestDraft && (
+            <div className="translation-start-row">
+              <button className="button button-secondary" type="submit" disabled={!capabilities?.ready || !capabilities.run_support || controlsDisabled || selectionMode === "current"}>{copy.review}</button>
+            </div>
+          )}
+        </form>
+      </details>
+
+      {confirmation && confirmationPages && confirmationLanguage && !requestDraft && (
+        <div className="translation-run-confirmation" role="group" aria-label={confirmation.kind === "create" ? copy.confirmStart : copy.confirmResume}>
+          <strong>{copy.confirmScope(formatRunPages(confirmationPages), confirmationPages.length, copy.language(confirmationLanguage))}</strong>
+          <p>{confirmation.kind === "create" ? copy.feeNotice : copy.resumeNotice}</p>
+          <div className="translation-start-row">
+            <button className="button button-primary" type="button" disabled={controlsDisabled} onClick={confirmOperation}>{confirmation.kind === "create" ? copy.confirmStart : copy.confirmResume}</button>
+            <button className="button button-secondary" type="button" disabled={controlsDisabled} onClick={() => setConfirmation(null)}>{copy.cancelConfirmation}</button>
+          </div>
         </div>
-      </div>
-      {listLoading && <p className="translation-status" role="status">{copy.loadingList}</p>}
-      {listError && <p className="translation-status" data-kind="error" role="alert">{copy.listFailed}</p>}
+      )}
+
+      <details className="translation-history">
+        <summary>{copy.history}</summary>
+        <div className="translation-saved-row translation-run-history">
+          <label htmlFor="translation-run-history">{copy.saved}</label>
+          <div>
+            <select id="translation-run-history" value={selectedRunId || ""} disabled={!runs.length || controlsDisabled} onChange={(event) => {
+              const run = runs.find((item) => item.id === event.target.value);
+              setConfirmation(null);
+              setOperationError(null);
+              setSelectedRun(null);
+              setSelectedRunId(run?.id || null);
+              setSelectedPage(run ? preferredPage(run, currentPageRef.current) : null);
+            }}>
+              {!runs.length && <option value="">{copy.noSaved}</option>}
+              {runs.map((run) => <option value={run.id} key={run.id}>{formatRunPages(run.pages)} · {copy.language(run.target_language)} · {copy[run.status]}</option>)}
+            </select>
+            <button className="button button-quiet" type="button" disabled={listLoading || controlsDisabled} onClick={() => setListRetry((value) => value + 1)}>{copy.refresh}</button>
+          </div>
+        </div>
+        {listLoading && <p className="translation-status" role="status">{copy.loadingList}</p>}
+        {listError && <p className="translation-status" data-kind="error" role="alert">{copy.listFailed}</p>}
+      </details>
       {detailLoading && <p className="translation-status" role="status">{copy.loadingRun}</p>}
       {detailError && (
         <p className="translation-status" data-kind="error" role="alert">{copy.loadFailed} <button className="translation-source-link" type="button" onClick={() => setDetailRetry((value) => value + 1)}>{copy.retry}</button></p>
@@ -702,12 +760,12 @@ export function TranslationRunPanel({ document, currentPage, language, capabilit
               }}>{copy.continue}</button>
             )}
           </div>
-          <div className="translation-progress translation-run-progress" role="status" aria-live="polite">
-            <p>{copy[selectedRun.stage]} · {copy.processed(selectedRun.processed_pages, selectedRun.total_pages)}</p>
-            <progress max={Math.max(1, selectedRun.total_pages)} value={selectedRun.processed_pages} />
-            <p>{copy.completedProgress(selectedRun.completed_pages, selectedRun.total_pages)}</p>
-            <p>{copy.unavailable(processedMissing)} {copy.waiting(waiting)}</p>
-          </div>
+          {activeStatuses.has(selectedRun.status) && (
+            <div className="translation-progress translation-run-progress" role="status" aria-live="polite">
+              <p>{copy[selectedRun.stage]} · {copy.completedProgress(selectedRun.completed_pages, selectedRun.total_pages)}</p>
+              <progress max={Math.max(1, selectedRun.total_pages)} value={selectedRun.processed_pages} />
+            </div>
+          )}
           {requestDraft && requestDraft.kind !== "create" && (
             <div className="translation-start-row translation-run-control-retry">
               <button className="button button-primary" type="button" disabled={Boolean(pendingAction)} onClick={() => void submitDraft(requestDraft)}>
@@ -724,7 +782,6 @@ export function TranslationRunPanel({ document, currentPage, language, capabilit
             }}>
               {selectedRun.pages.map((page) => <option value={page} key={page}>{page}</option>)}
             </select>
-            <small>{copy.viewPageHint}</small>
           </label>
           {renderResults(selectedRun)}
         </section>

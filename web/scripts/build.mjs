@@ -18,6 +18,8 @@ const sourceFiles = [
   "src/header-settings.tsx",
   "src/guest-access.tsx",
   "src/translation.tsx",
+  "src/translation-runs.tsx",
+  "src/translation-library.tsx",
   "src/flow-reading.tsx",
   "src/flow-sentences.ts",
   "src/source-preparation.tsx"

@@ -67,6 +67,12 @@ export function createTranslationBridge({
     update(model) {
       return handle?.update(model) || false;
     },
+    async openRecord(request) {
+      if (!request || !["run", "job"].includes(request.kind) || !request.id || !request.documentId || !request.sourceSha256) return false;
+      if (!handle && !(await load())) return false;
+      if (destroyed || !handle?.openRecord) return false;
+      return handle.openRecord(request);
+    },
     destroy() {
       if (destroyed) return;
       destroyed = true;

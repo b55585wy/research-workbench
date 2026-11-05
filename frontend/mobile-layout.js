@@ -275,6 +275,14 @@ if (main && documents && notes && assistant) {
     });
   }
 
+  byId("translation-library-open").addEventListener("click", () => {
+    if (!phoneActive || nativeMode() !== "reading") return;
+    userNavigated = true;
+    clearPendingDocument();
+    if (!assistant.hidden) closeAssistant();
+    showPane("reader");
+  });
+
   documents.addEventListener("click", (event) => {
     const button = event.target.closest(".document-open, .search-result-open");
     if (!button || button.disabled || !phoneActive) return;

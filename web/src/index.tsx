@@ -12,8 +12,17 @@ export type {
   MountTranslationPanelOptions,
   TranslationPanelCallbacks,
   TranslationPanelHandle,
-  TranslationPanelModel
+  TranslationPanelModel,
+  TranslationRecordRequest
 } from "./translation";
+export { mountTranslationLibrary } from "./translation-library";
+export type {
+  MountTranslationLibraryOptions,
+  TranslationLibraryCallbacks,
+  TranslationLibraryHandle,
+  TranslationLibraryItem,
+  TranslationLibraryModel
+} from "./translation-library";
 export { mountFlowReader } from "./flow-reading";
 export type {
   FlowReaderCallbacks,

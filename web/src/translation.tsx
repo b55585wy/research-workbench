@@ -115,8 +115,17 @@ export interface MountTranslationPanelOptions {
   onMounted?: () => void;
 }
 
+export interface TranslationRecordRequest {
+  kind: "run" | "job";
+  id: string;
+  documentId: string;
+  sourceSha256: string;
+  pages: number[];
+}
+
 export interface TranslationPanelHandle {
   update: (model: TranslationPanelModel) => boolean;
+  openRecord: (request: TranslationRecordRequest) => Promise<boolean>;
   destroy: () => void;
 }
 
@@ -125,6 +134,7 @@ interface TranslationRegistration {
   panelContainer: HTMLElement;
   root: Root;
   callbacks: TranslationPanelCallbacks;
+  opener: ((request: TranslationRecordRequest) => Promise<boolean>) | null;
   active: boolean;
 }
 
@@ -134,13 +144,13 @@ const activeStatuses = new Set<JobStatus>(["queued", "running"]);
 
 const strings = {
   zh: {
-    translate: "翻译页面",
+    translate: "翻译",
     translation: "译文",
     readingMode: "阅读模式",
     originalMode: "原文",
-    dualMode: "双栏",
+    dualMode: "对照",
     translatedMode: "译文",
-    showDual: "在双栏中查看",
+    showDual: "对照查看",
     noSavedTranslation: "没有可用的已保存译文。",
     currentPageAbsent: "当前页不在这条已完成的翻译记录中。",
     stillTranslating: "翻译仍在进行；已完成的页面可以切换显示。",
@@ -155,6 +165,12 @@ const strings = {
     chinese: "中文",
     english: "英文",
     start: "开始翻译",
+    startCurrent: "翻译本页",
+    more: "指定页码",
+    confirmRange: "确认翻译所选页面",
+    reviewRange: "核对页码",
+    cancelConfirmation: "返回",
+    backToRuns: "返回翻译记录",
     starting: "正在提交…",
     retryRequest: "重试同一请求",
     loading: "正在读取翻译设置和已保存记录…",
@@ -211,13 +227,13 @@ const strings = {
     sourceLanguage: (language: TargetLanguage) => language === "zh" ? "中文" : "英文"
   },
   en: {
-    translate: "Translate pages",
+    translate: "Translate",
     translation: "Translation",
     readingMode: "Reading mode",
     originalMode: "Original",
-    dualMode: "Dual",
+    dualMode: "Compare",
     translatedMode: "Translated",
-    showDual: "View in dual mode",
+    showDual: "Compare",
     noSavedTranslation: "No saved translation is available.",
     currentPageAbsent: "The current page is not in this completed translation.",
     stillTranslating: "Translation is still running; completed pages can be displayed.",
@@ -232,6 +248,12 @@ const strings = {
     chinese: "Chinese",
     english: "English",
     start: "Start translation",
+    startCurrent: "Translate this page",
+    more: "Selected pages",
+    confirmRange: "Confirm selected pages",
+    reviewRange: "Review pages",
+    cancelConfirmation: "Back",
+    backToRuns: "Back to translation history",
     starting: "Submitting…",
     retryRequest: "Retry same request",
     loading: "Loading translation settings and saved runs…",
@@ -439,11 +461,9 @@ function TranslationResults({ job, copy, onSource, onExcerpt, excerptPending = f
   excerptPending?: boolean;
 }) {
   const pages = [...jobResults(job)].sort((a, b) => a.page - b.page);
-  const hasVisuals = pages.some((page) => Array.isArray(page.blocks) && page.blocks.some((block) => !["text", "title", "caption"].includes(block.kind)));
   if (!pages.length) return <p className="translation-empty">{copy.noResults}</p>;
   return (
     <div className="translation-results">
-      {hasVisuals && <p className="translation-visual-notice">{copy.visualNotice}</p>}
       {pages.map((page) => {
         const blocks = Array.isArray(page.blocks) ? [...page.blocks].sort((a, b) => a.order - b.order) : [];
         return (
@@ -477,11 +497,12 @@ function TranslationResults({ job, copy, onSource, onExcerpt, excerptPending = f
   );
 }
 
-function TranslationExperience({ model, callbacks, controlsContainer, panelContainer }: {
+function TranslationExperience({ model, callbacks, controlsContainer, panelContainer, registerOpener }: {
   model: TranslationPanelModel;
   callbacks: TranslationPanelCallbacks;
   controlsContainer: HTMLElement;
   panelContainer: HTMLElement;
+  registerOpener: (opener: ((request: TranslationRecordRequest) => Promise<boolean>) | null) => void;
 }) {
   const copy = strings[model.language];
   const document = model.document;
@@ -494,6 +515,8 @@ function TranslationExperience({ model, callbacks, controlsContainer, panelConta
   const generationRef = useRef(0);
   const scopeControllerRef = useRef<AbortController | null>(null);
   const jobActionRef = useRef(0);
+  const operationRef = useRef(0);
+  const operationLockRef = useRef<number | null>(null);
   const excerptActionRef = useRef(0);
   const toggleRef = useRef<HTMLButtonElement>(null);
   const [capabilities, setCapabilities] = useState<TranslationCapabilities | null>(null);
@@ -502,8 +525,9 @@ function TranslationExperience({ model, callbacks, controlsContainer, panelConta
   const [jobsError, setJobsError] = useState<string | null>(null);
   const [selectedJob, setSelectedJob] = useState<TranslationJob | null>(null);
   const [selectedRun, setSelectedRun] = useState<TranslationRun | null>(null);
+  const [externalRun, setExternalRun] = useState<TranslationRun | null>(null);
   const [historyView, setHistoryView] = useState<"run" | "legacy">("run");
-  const [selectionMode, setSelectionMode] = useState<"current" | "pages">("current");
+  const [legacyConfirmation, setLegacyConfirmation] = useState<{ pages: number[]; targetLanguage: TargetLanguage } | null>(null);
   const [pageInput, setPageInput] = useState(String(model.currentPage || 1));
   const [targetLanguage, setTargetLanguage] = useState<TargetLanguage>(model.language);
   const [requestDraft, setRequestDraft] = useState<TranslationRequest | null>(null);
@@ -513,8 +537,10 @@ function TranslationExperience({ model, callbacks, controlsContainer, panelConta
   const [pollError, setPollError] = useState(false);
   const visibleLegacyJob = activeScope && document && selectedJob && jobInScope(selectedJob, document) ? selectedJob : null;
   const visibleRun = activeScope && document && selectedRun && runInScope(selectedRun, document) ? selectedRun : null;
-  const visibleJob: TranslationJob | null = historyView === "run" ? visibleRun : visibleLegacyJob;
-  const visibleSourceJobId = historyView === "run"
+  const useRuns = capabilities?.run_support !== false || Boolean(visibleRun);
+  const runView = historyView === "run" && useRuns;
+  const visibleJob: TranslationJob | null = runView ? visibleRun : visibleLegacyJob;
+  const visibleSourceJobId = runView
     ? visibleRun?.result_pages.find((page) => page.status === "completed")?.job_id || ""
     : visibleLegacyJob?.id || "";
   const handleRunSelection = useCallback((run: TranslationRun | null) => {
@@ -524,6 +550,8 @@ function TranslationExperience({ model, callbacks, controlsContainer, panelConta
 
   useEffect(() => {
     generationRef.current += 1;
+    operationRef.current += 1;
+    operationLockRef.current = null;
     excerptActionRef.current += 1;
     scopeControllerRef.current?.abort();
     setMode("dual");
@@ -534,8 +562,9 @@ function TranslationExperience({ model, callbacks, controlsContainer, panelConta
     setJobsError(null);
     setSelectedJob(null);
     setSelectedRun(null);
+    setExternalRun(null);
     setHistoryView("run");
-    setSelectionMode("current");
+    setLegacyConfirmation(null);
     setPageInput(String(model.currentPage || 1));
     setTargetLanguage(model.language);
     setRequestDraft(null);
@@ -581,6 +610,8 @@ function TranslationExperience({ model, callbacks, controlsContainer, panelConta
 
   useEffect(() => {
     const ticket = ++generationRef.current;
+    operationRef.current += 1;
+    operationLockRef.current = null;
     scopeControllerRef.current?.abort();
     const controller = new AbortController();
     scopeControllerRef.current = controller;
@@ -644,7 +675,7 @@ function TranslationExperience({ model, callbacks, controlsContainer, panelConta
   }, [activeScope]);
 
   useEffect(() => {
-    if (historyView !== "legacy" || !activeScope || !document || !isActive(selectedJob)) return;
+    if (runView || !activeScope || !document || !isActive(selectedJob)) return;
     const scope = activeScope;
     const scopeDocument = document;
     const jobId = (selectedJob as TranslationJob).id;
@@ -687,13 +718,15 @@ function TranslationExperience({ model, callbacks, controlsContainer, panelConta
       if (timer) clearTimeout(timer);
       controller?.abort();
     };
-  }, [activeScope, historyView, selectedJob?.id, selectedJob?.status]);
+  }, [activeScope, runView, selectedJob?.id, selectedJob?.status]);
 
   async function submitTranslation(request: TranslationRequest) {
-    if (!activeScope || !document || pendingAction || request.documentId !== document.id || request.sourceSha256 !== document.sha256) return;
+    if (!activeScope || !document || operationLockRef.current !== null || pendingAction || request.documentId !== document.id || request.sourceSha256 !== document.sha256) return;
     const scope = activeScope;
     const scopeDocument = document;
     const ticket = generationRef.current;
+    const operation = ++operationRef.current;
+    operationLockRef.current = operation;
     const action = ++jobActionRef.current;
     setRequestDraft(request);
     setPendingAction("start");
@@ -720,16 +753,24 @@ function TranslationExperience({ model, callbacks, controlsContainer, panelConta
         setOperationError(code);
       }
     } finally {
-      if (generationRef.current === ticket && scopeRef.current === scope && action === jobActionRef.current) setPendingAction(null);
+      if (operationLockRef.current === operation) {
+        operationLockRef.current = null;
+        if (generationRef.current === ticket && scopeRef.current === scope && action === jobActionRef.current) setPendingAction(null);
+      }
     }
   }
 
-  function startFromForm() {
-    if (!document || requestDraft || pendingAction) return;
+  function startFromForm(currentOnly: boolean) {
+    if (!document || requestDraft || pendingAction || legacyConfirmation) return;
     const maxPages = Math.min(5, capabilities?.max_pages || 5);
-    const pages = selectionMode === "current" ? [model.currentPage] : parsePages(pageInput, document.pageCount, maxPages);
+    const pages = currentOnly ? [model.currentPage] : parsePages(pageInput, document.pageCount, maxPages);
     if (!pages) {
       setOperationError("invalid_pages");
+      return;
+    }
+    setOperationError(null);
+    if (!currentOnly) {
+      setLegacyConfirmation({ pages, targetLanguage });
       return;
     }
     void submitTranslation({
@@ -744,12 +785,31 @@ function TranslationExperience({ model, callbacks, controlsContainer, panelConta
     });
   }
 
+  function confirmLegacyRange() {
+    if (!document || !legacyConfirmation || requestDraft || pendingAction) return;
+    const confirmation = legacyConfirmation;
+    setLegacyConfirmation(null);
+    void submitTranslation({
+      documentId: document.id,
+      sourceSha256: document.sha256,
+      payload: {
+        request_id: crypto.randomUUID(),
+        source_sha256: document.sha256,
+        pages: [...confirmation.pages],
+        target_language: confirmation.targetLanguage
+      }
+    });
+  }
+
   async function openSaved(jobId: string) {
-    if (historyView !== "legacy" || !activeScope || !document || !jobId || pendingAction) return;
+    if (!activeScope || !document || !jobId || pendingAction) return;
     const scope = activeScope;
     const scopeDocument = document;
     const ticket = generationRef.current;
     const action = ++jobActionRef.current;
+    setHistoryView("legacy");
+    setExternalRun(null);
+    setLegacyConfirmation(null);
     setPendingAction("open");
     setOperationError(null);
     try {
@@ -758,7 +818,7 @@ function TranslationExperience({ model, callbacks, controlsContainer, panelConta
         { signal: scopeControllerRef.current?.signal }
       );
       if (generationRef.current !== ticket || scopeRef.current !== scope || action !== jobActionRef.current) return;
-      if (!jobInScope(job, scopeDocument)) throw new Error("request_failed");
+      if (!jobInScope(job, scopeDocument) || job.id !== jobId) throw new Error("request_failed");
       setSelectedJob(job);
     } catch (error) {
       if (!isAbort(error) && generationRef.current === ticket && scopeRef.current === scope && action === jobActionRef.current) {
@@ -769,12 +829,72 @@ function TranslationExperience({ model, callbacks, controlsContainer, panelConta
     }
   }
 
+  async function openExternalRecord(request: TranslationRecordRequest): Promise<boolean> {
+    if (
+      !activeScope || !document || pendingAction
+      || request.documentId !== document.id || request.sourceSha256 !== document.sha256
+      || !request.id || !Array.isArray(request.pages) || !request.pages.length
+      || request.pages.some((page) => !Number.isInteger(page) || page < 1 || page > document.pageCount)
+    ) return false;
+    const scope = activeScope;
+    const scopeDocument = document;
+    const ticket = generationRef.current;
+    const action = ++jobActionRef.current;
+    excerptActionRef.current += 1;
+    setPendingAction("open");
+    setOperationError(null);
+    setLegacyConfirmation(null);
+    setHistoryView(request.kind === "run" ? "run" : "legacy");
+    changeMode("dual");
+    try {
+      if (request.kind === "run") {
+        const page = request.pages.includes(model.currentPage) ? model.currentPage : request.pages[0];
+        const run = await callbacks.api<TranslationRun>(`/api/v1/translation-runs/${encodeURIComponent(request.id)}?page=${page}`, {
+          signal: scopeControllerRef.current?.signal
+        });
+        if (generationRef.current !== ticket || scopeRef.current !== scope || action !== jobActionRef.current) return false;
+        if (
+          !runInScope(run, scopeDocument) || run.id !== request.id
+          || run.result_pages.length > 1 || run.result_pages.some((result) => result.page !== page
+            || !["completed", "unavailable", "failed"].includes(result.status)
+            || typeof result.job_id !== "string" || !result.job_id || !Array.isArray(result.blocks))
+        ) throw new Error("request_failed");
+        setSelectedJob(null);
+        setSelectedRun(run);
+        setExternalRun(run);
+      } else {
+        const job = await callbacks.api<TranslationJob>(`/api/v1/translations/${encodeURIComponent(request.id)}`, {
+          signal: scopeControllerRef.current?.signal
+        });
+        if (generationRef.current !== ticket || scopeRef.current !== scope || action !== jobActionRef.current) return false;
+        if (!jobInScope(job, scopeDocument) || job.id !== request.id) throw new Error("request_failed");
+        setExternalRun(null);
+        setSelectedRun(null);
+        setSelectedJob(job);
+        setJobs((current) => upsertJob(current, job));
+      }
+      return true;
+    } catch (error) {
+      if (!isAbort(error) && generationRef.current === ticket && scopeRef.current === scope && action === jobActionRef.current) {
+        setOperationError(`open:${errorCode(error)}`);
+      }
+      return false;
+    } finally {
+      if (generationRef.current === ticket && scopeRef.current === scope && action === jobActionRef.current) setPendingAction(null);
+    }
+  }
+
+  registerOpener(openExternalRecord);
+  useEffect(() => () => registerOpener(null), []);
+
   async function cancelSelected() {
-    if (historyView !== "legacy" || !activeScope || !document || !selectedJob || !isActive(selectedJob) || pendingAction) return;
+    if (runView || !activeScope || !document || !selectedJob || !isActive(selectedJob) || operationLockRef.current !== null || pendingAction) return;
     const scope = activeScope;
     const scopeDocument = document;
     const jobId = selectedJob.id;
     const ticket = generationRef.current;
+    const operation = ++operationRef.current;
+    operationLockRef.current = operation;
     const action = ++jobActionRef.current;
     setPendingAction("cancel");
     setOperationError(null);
@@ -794,7 +914,10 @@ function TranslationExperience({ model, callbacks, controlsContainer, panelConta
         setOperationError(`cancel:${errorCode(error)}`);
       }
     } finally {
-      if (generationRef.current === ticket && scopeRef.current === scope && action === jobActionRef.current) setPendingAction(null);
+      if (operationLockRef.current === operation) {
+        operationLockRef.current = null;
+        if (generationRef.current === ticket && scopeRef.current === scope && action === jobActionRef.current) setPendingAction(null);
+      }
     }
   }
 
@@ -826,7 +949,7 @@ function TranslationExperience({ model, callbacks, controlsContainer, panelConta
     const callback = callbacks.onExcerpt;
     if (!callback || pendingExcerpt || !activeScope || scopeRef.current !== activeScope || !document || !visibleJob) return;
     const resultPage = jobResults(visibleJob).find((item) => item.page === page && item.status === "completed");
-    const excerptJobId = historyView === "run" ? resultPage?.job_id : visibleJob.id;
+    const excerptJobId = runView ? resultPage?.job_id : visibleJob.id;
     const rect = block.rect == null ? null : block.rect;
     const validRect = rect === null || (
       [rect.x, rect.y, rect.width, rect.height].every(Number.isFinite)
@@ -950,29 +1073,14 @@ function TranslationExperience({ model, callbacks, controlsContainer, panelConta
       }}
     >
       <header className="translation-header">
-        <div>
-          <h2 id="translation-heading">{copy.translation}</h2>
-          <p>{copy.ready}</p>
-        </div>
+        <h2 id="translation-heading">{copy.translation}</h2>
         <button className="button button-quiet translation-close" type="button" aria-label={copy.close} title={copy.close} onClick={closePanel}>×</button>
       </header>
 
       {!capabilities && !capabilitiesError && <p className="translation-status" role="status">{copy.loading}</p>}
       {capabilitiesError && <p className="translation-status" data-kind="error" role="alert">{copy.capabilitiesFailed}</p>}
-      <div className="translation-history-tabs" role="group" aria-label={copy.savedRuns}>
-        <button className="button button-quiet" type="button" aria-pressed={historyView === "run"} onClick={() => {
-          setHistoryView("run");
-          setOperationError(null);
-        }}>{copy.continuous}</button>
-        <button className="button button-quiet" type="button" aria-pressed={historyView === "legacy"} onClick={() => {
-          excerptActionRef.current += 1;
-          setSelectedRun(null);
-          setHistoryView("legacy");
-          setOperationError(null);
-        }}>{copy.legacy}</button>
-      </div>
 
-      {historyView === "run" ? (
+      {runView ? (
         <>
           <TranslationRunPanel
             document={document}
@@ -982,6 +1090,7 @@ function TranslationExperience({ model, callbacks, controlsContainer, panelConta
             api={callbacks.api}
             onOpenSettings={openSettings}
             onSelectionChange={handleRunSelection}
+            externalRun={externalRun}
             renderResults={(run) => (
               <TranslationResults
                 job={run}
@@ -992,131 +1101,160 @@ function TranslationExperience({ model, callbacks, controlsContainer, panelConta
               />
             )}
           />
-          {operationError === "excerpt" && <p className="translation-status" data-kind="error" role="alert">{copy.excerptFailed}</p>}
+          {operationError && <p className="translation-status" data-kind="error" role="alert">{operationMessage}</p>}
+          <details className="translation-history">
+            <summary>{copy.savedRuns}</summary>
+            <div className="translation-saved-row">
+              <label htmlFor="translation-saved-runs">{copy.savedRuns}</label>
+              <select
+                id="translation-saved-runs"
+                value=""
+                disabled={!jobs.length || Boolean(pendingAction)}
+                onChange={(event) => void openSaved(event.target.value)}
+              >
+                <option value="">{copy.noSavedRuns}</option>
+                {jobs.map((job) => <option value={job.id} key={job.id}>{runLabel(job, copy, model.language)}</option>)}
+              </select>
+            </div>
+            {jobsError && <p className="translation-status" data-kind="error" role="alert">{copy.listFailed}</p>}
+          </details>
         </>
       ) : (
         <>
-      <form className="translation-form" onSubmit={(event) => {
-        event.preventDefault();
-        startFromForm();
-      }}>
-        <fieldset className="translation-page-choice" disabled={formDisabled}>
-          <legend className="sr-only">{copy.pagesLabel}</legend>
-          <label>
-            <input type="radio" name="translation-pages" checked={selectionMode === "current"} onChange={() => setSelectionMode("current")} />
-            <span>{copy.currentPage} · {model.currentPage}</span>
-          </label>
-          <label>
-            <input type="radio" name="translation-pages" checked={selectionMode === "pages"} onChange={() => setSelectionMode("pages")} />
-            <span>{copy.selectedPages}</span>
-          </label>
-        </fieldset>
-        {selectionMode === "pages" && (
-          <label className="translation-field" htmlFor="translation-page-input">
-            <span>{copy.pagesLabel}</span>
-            <input
-              id="translation-page-input"
-              value={pageInput}
-              placeholder={copy.pagesPlaceholder}
-              inputMode="text"
-              autoComplete="off"
-              disabled={formDisabled}
-              onChange={(event) => setPageInput(event.target.value)}
-            />
-          </label>
-        )}
-        <label className="translation-field" htmlFor="translation-target-language">
-          <span>{copy.targetLanguage}</span>
-          <select id="translation-target-language" value={targetLanguage} disabled={formDisabled} onChange={(event) => setTargetLanguage(event.target.value as TargetLanguage)}>
-            <option value="zh">{copy.chinese}</option>
-            <option value="en">{copy.english}</option>
-          </select>
-        </label>
-        <div className="translation-start-row">
-          {requestDraft ? (
-            <button className="button button-primary" type="button" disabled={Boolean(pendingAction)} onClick={() => void submitTranslation(requestDraft)}>
-              {pendingAction === "start" ? copy.starting : copy.retryRequest}
-            </button>
-          ) : (
-            <button className="button button-primary" type="submit" disabled={!capabilities?.ready || Boolean(pendingAction)}>
-              {pendingAction === "start" ? copy.starting : copy.start}
-            </button>
+          {useRuns && (
+            <button className="button button-quiet translation-back" type="button" onClick={() => {
+              setHistoryView("run");
+              setOperationError(null);
+            }}>{copy.backToRuns}</button>
           )}
-        </div>
-        {requestDraft && <p className="translation-retry-hint">{copy.retryHint}</p>}
-      </form>
-
-      {capabilities && !capabilities.ready && (
-        <div className="translation-unavailable" role="status">
-          <p>{capabilities.reason || copy.unavailable}</p>
-          {!capabilities.model_ready && <button className="button button-secondary" type="button" onClick={openSettings}>{copy.openSettings}</button>}
-        </div>
-      )}
-
-      <div className="translation-saved-row">
-        <label htmlFor="translation-saved-runs">{copy.savedRuns}</label>
-        <select
-          id="translation-saved-runs"
-          value={visibleJob?.id || ""}
-          disabled={!jobs.length || Boolean(pendingAction)}
-          onChange={(event) => void openSaved(event.target.value)}
-        >
-          {!jobs.length && <option value="">{copy.noSavedRuns}</option>}
-          {jobs.map((job) => <option value={job.id} key={job.id}>{runLabel(job, copy, model.language)}</option>)}
-        </select>
-      </div>
-      {jobsError && <p className="translation-status" data-kind="error" role="alert">{copy.listFailed}</p>}
-      {operationError && <p className="translation-status" data-kind="error" role="alert">{operationMessage}</p>}
-      {pollError && <p className="translation-status" role="status">{copy.pollFailed}</p>}
-
-      {visibleJob ? (
-        <section className="translation-job" aria-label={copy.translation}>
-          <div className="translation-job-summary">
-            <div>
-              <strong>{copy[visibleJob.status]}</strong>
-              <p>{copy.pageRange(formatPages(visibleJob.pages), visibleJob.total_pages)}</p>
-            </div>
-            {!isActive(visibleJob) && ["failed", "partial", "cancelled", "interrupted"].includes(visibleJob.status) && (
-              <button
-                className="button button-secondary"
-                type="button"
-                disabled={Boolean(requestDraft) || Boolean(pendingAction)}
-                onClick={() => void submitTranslation({
-                  documentId: visibleJob.document_id,
-                  sourceSha256: visibleJob.source_sha256,
-                  payload: {
-                    request_id: crypto.randomUUID(),
-                    source_sha256: visibleJob.source_sha256,
-                    pages: [...visibleJob.pages],
-                    target_language: visibleJob.target_language
-                  }
-                })}
-              >
-                {copy.retryJob}
+          <div className="translation-current-action">
+            <label className="translation-field" htmlFor="translation-target-language">
+              <span>{copy.targetLanguage}</span>
+              <select id="translation-target-language" value={targetLanguage} disabled={formDisabled || Boolean(legacyConfirmation)} onChange={(event) => setTargetLanguage(event.target.value as TargetLanguage)}>
+                <option value="zh">{copy.chinese}</option>
+                <option value="en">{copy.english}</option>
+              </select>
+            </label>
+            {!requestDraft && (
+              <button className="button button-primary translation-current-button" type="button" disabled={!capabilities?.ready || Boolean(pendingAction) || Boolean(legacyConfirmation)} onClick={() => startFromForm(true)}>
+                {pendingAction === "start" ? copy.starting : copy.startCurrent}
+              </button>
+            )}
+            {requestDraft && (
+              <button className="button button-primary translation-current-button" type="button" disabled={Boolean(pendingAction)} onClick={() => void submitTranslation(requestDraft)}>
+                {pendingAction === "start" ? copy.starting : copy.retryRequest}
               </button>
             )}
           </div>
-          {isActive(visibleJob) && (
-            <div className="translation-progress" role="status" aria-live="polite">
-              <p>{copy[visibleJob.stage]} · {copy.progress(visibleJob.completed_pages, visibleJob.total_pages)}</p>
-              <progress max={Math.max(1, visibleJob.total_pages)} value={visibleJob.completed_pages} />
-              <button className="button button-secondary" type="button" disabled={Boolean(pendingAction)} onClick={() => void cancelSelected()}>
-                {pendingAction === "cancel" ? copy.cancelling : copy.cancel}
-              </button>
+          {requestDraft && !pendingAction && <p className="translation-retry-hint">{copy.retryHint}</p>}
+
+          {capabilities && !capabilities.ready && (
+            <div className="translation-unavailable" role="status">
+              <p>{capabilities.reason || copy.unavailable}</p>
+              {!capabilities.model_ready && <button className="button button-secondary" type="button" onClick={openSettings}>{copy.openSettings}</button>}
             </div>
           )}
-          {visibleJob.error && <p className="translation-status" data-kind="error" role="alert">{visibleJob.error.message || copy.jobError}</p>}
-          <TranslationResults
-            job={visibleJob}
-            copy={copy}
-            onSource={source}
-            onExcerpt={callbacks.onExcerpt ? excerpt : undefined}
-            excerptPending={Boolean(pendingExcerpt)}
-          />
-        </section>
-      ) : (
-        <p className="translation-empty">{copy.empty}</p>
-      )}
+
+          <details className="translation-options">
+            <summary>{copy.more}</summary>
+            <form className="translation-form" onSubmit={(event) => {
+              event.preventDefault();
+              startFromForm(false);
+            }}>
+              <label className="translation-field" htmlFor="translation-page-input">
+                <span>{copy.pagesLabel}</span>
+                <input
+                  id="translation-page-input"
+                  value={pageInput}
+                  placeholder={copy.pagesPlaceholder}
+                  inputMode="text"
+                  autoComplete="off"
+                  disabled={formDisabled || Boolean(legacyConfirmation)}
+                  onChange={(event) => setPageInput(event.target.value)}
+                />
+              </label>
+              <div className="translation-start-row">
+                <button className="button button-secondary" type="submit" disabled={!capabilities?.ready || formDisabled || Boolean(legacyConfirmation)}>{copy.reviewRange}</button>
+              </div>
+            </form>
+          </details>
+          {legacyConfirmation && !requestDraft && (
+            <div className="translation-run-confirmation" role="group" aria-label={copy.confirmRange}>
+              <strong>{copy.pageRange(formatPages(legacyConfirmation.pages), legacyConfirmation.pages.length)} · {copy.sourceLanguage(legacyConfirmation.targetLanguage)}</strong>
+              <div className="translation-start-row">
+                <button className="button button-primary" type="button" disabled={formDisabled} onClick={confirmLegacyRange}>{copy.confirmRange}</button>
+                <button className="button button-secondary" type="button" disabled={formDisabled} onClick={() => setLegacyConfirmation(null)}>{copy.cancelConfirmation}</button>
+              </div>
+            </div>
+          )}
+
+          <details className="translation-history">
+            <summary>{copy.savedRuns}</summary>
+            <div className="translation-saved-row">
+              <label htmlFor="translation-saved-runs">{copy.savedRuns}</label>
+              <select
+                id="translation-saved-runs"
+                value={visibleLegacyJob?.id || ""}
+                disabled={!jobs.length || Boolean(pendingAction)}
+                onChange={(event) => void openSaved(event.target.value)}
+              >
+                {!jobs.length && <option value="">{copy.noSavedRuns}</option>}
+                {jobs.map((job) => <option value={job.id} key={job.id}>{runLabel(job, copy, model.language)}</option>)}
+              </select>
+            </div>
+            {jobsError && <p className="translation-status" data-kind="error" role="alert">{copy.listFailed}</p>}
+          </details>
+          {operationError && <p className="translation-status" data-kind="error" role="alert">{operationMessage}</p>}
+          {pollError && <p className="translation-status" role="status">{copy.pollFailed}</p>}
+
+          {visibleLegacyJob ? (
+            <section className="translation-job" aria-label={copy.translation}>
+              <div className="translation-job-summary">
+                <div>
+                  <strong>{copy[visibleLegacyJob.status]}</strong>
+                  <p>{copy.pageRange(formatPages(visibleLegacyJob.pages), visibleLegacyJob.total_pages)}</p>
+                </div>
+                {!isActive(visibleLegacyJob) && ["failed", "partial", "cancelled", "interrupted"].includes(visibleLegacyJob.status) && (
+                  <button
+                    className="button button-secondary"
+                    type="button"
+                    disabled={Boolean(requestDraft) || Boolean(pendingAction)}
+                    onClick={() => void submitTranslation({
+                      documentId: visibleLegacyJob.document_id,
+                      sourceSha256: visibleLegacyJob.source_sha256,
+                      payload: {
+                        request_id: crypto.randomUUID(),
+                        source_sha256: visibleLegacyJob.source_sha256,
+                        pages: [...visibleLegacyJob.pages],
+                        target_language: visibleLegacyJob.target_language
+                      }
+                    })}
+                  >
+                    {copy.retryJob}
+                  </button>
+                )}
+              </div>
+              {isActive(visibleLegacyJob) && (
+                <div className="translation-progress" role="status" aria-live="polite">
+                  <p>{copy[visibleLegacyJob.stage]} · {copy.progress(visibleLegacyJob.completed_pages, visibleLegacyJob.total_pages)}</p>
+                  <progress max={Math.max(1, visibleLegacyJob.total_pages)} value={visibleLegacyJob.completed_pages} />
+                  <button className="button button-secondary" type="button" disabled={Boolean(pendingAction)} onClick={() => void cancelSelected()}>
+                    {pendingAction === "cancel" ? copy.cancelling : copy.cancel}
+                  </button>
+                </div>
+              )}
+              {visibleLegacyJob.error && <p className="translation-status" data-kind="error" role="alert">{visibleLegacyJob.error.message || copy.jobError}</p>}
+              <TranslationResults
+                job={visibleLegacyJob}
+                copy={copy}
+                onSource={source}
+                onExcerpt={callbacks.onExcerpt ? excerpt : undefined}
+                excerptPending={Boolean(pendingExcerpt)}
+              />
+            </section>
+          ) : (
+            <p className="translation-empty">{copy.noSavedTranslation}</p>
+          )}
         </>
       )}
     </div>
@@ -1127,7 +1265,15 @@ function TranslationExperience({ model, callbacks, controlsContainer, panelConta
 
 function render(registration: TranslationRegistration, model: TranslationPanelModel) {
   registration.root.render(
-    <TranslationExperience model={model} callbacks={registration.callbacks} controlsContainer={registration.controlsContainer} panelContainer={registration.panelContainer} />
+    <TranslationExperience
+      model={model}
+      callbacks={registration.callbacks}
+      controlsContainer={registration.controlsContainer}
+      panelContainer={registration.panelContainer}
+      registerOpener={(opener) => {
+        registration.opener = opener;
+      }}
+    />
   );
 }
 
@@ -1168,6 +1314,7 @@ export function mountTranslationPanel({
     panelContainer,
     root: createRoot(controlsContainer),
     callbacks,
+    opener: null,
     active: true
   };
   controlsOwners.set(controlsContainer, registration);
@@ -1183,6 +1330,17 @@ export function mountTranslationPanel({
       ) return false;
       render(registration, nextModel);
       return true;
+    },
+    async openRecord(request) {
+      if (
+        !registration.active
+        || controlsOwners.get(controlsContainer) !== registration
+        || panelOwners.get(panelContainer) !== registration
+        || !registration.opener
+        || !request || !["run", "job"].includes(request.kind)
+        || !request.id || !request.documentId || !request.sourceSha256
+      ) return false;
+      return registration.opener(request);
     },
     destroy() {
       destroy(registration);

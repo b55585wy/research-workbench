@@ -800,3 +800,11 @@ of compact UTF-8 recursively sorted JSON over question/materials/history/
 answer_language/model only. Responses are no-store; no CORS widening or storage
 migration. Admission is shared with device selection translation, receipts are
 domain-separated. See [device AI](DEVICE-AI.md) for exact limits and actual checks.
+
+## Translation library (v0.60.0, additive read API)
+
+`GET /api/v1/library/translations?limit=20&offset=0&q=` reads only the current Store.
+`limit` is 1..50, `offset` is 0..100000, and `q` is at most 200 characters; invalid bounds return 422.
+The response is `{items,total,limit,offset}`. Each item contains `kind` (`run` or `job`), `id`, `document_id`, `source_sha256`, `title`, `target_language`, `pages`, `status`, `completed_pages`, `total_pages`, `created_at`, and `updated_at`.
+Search uses the current metadata title. Ordering is `created_at DESC, id DESC, kind`. Child jobs represented by runs and trashed/replaced/study owners are excluded.
+This endpoint does not load translated blocks, parse files, call a model, create work, or write a row; SQL remains schema27. Reopening uses the existing exact run/job GET endpoints and source guards.

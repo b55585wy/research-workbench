@@ -23,6 +23,7 @@ import { createReaderObjectMenu } from "/reader-object-menu.js";
 import { createReaderShapes, shapeBounds } from "/reader-shapes.js";
 import { createWorkspaceShellBridge } from "/workspace-shell-bridge.js";
 import { createTranslationBridge } from "/translation-bridge.js";
+import { createTranslationLibrary } from "/translation-library.js";
 import { createTranslationOverlay } from "/translation-overlay.js";
 import { createFlowReadingBridge } from "/flow-reading-bridge.js";
 import { isDeviceMode, mapDeviceAssetUrl } from "/device-context.js";
@@ -58,13 +59,17 @@ const messages = {
     themeDoraemonBlue: "哆啦A梦蓝",
     documents: "文献",
     upload: "上传 PDF",
-    emptyDocuments: "还没有文献。上传 PDF，或打开两页示例开始阅读。",
+    emptyDocuments: "还没有文献。上传 PDF，或打开示例论文开始阅读。",
     sample: "试读示例",
     sampleDocumentTitle: "阅读示例",
     reader: "阅读器",
     emptyReader: "从左侧选择一篇文献开始阅读。",
     fitWidth: "适应宽度",
-    translatePages: "翻译页面",
+    translatePages: "翻译",
+    translations: "译文",
+    translationLibrary: "我的资源：译文",
+    translationLibraryFailed: "无法打开译文列表，请重试。",
+    readerTools: "批注与导出工具",
     translationUnavailable: "翻译功能暂不可用，原文阅读不受影响。",
     page: "页码",
     notes: "笔记",
@@ -527,13 +532,17 @@ const messages = {
     themeDoraemonBlue: "Doraemon blue",
     documents: "Papers",
     upload: "Upload PDF",
-    emptyDocuments: "No papers yet. Upload a PDF or open the two-page sample to start reading.",
+    emptyDocuments: "No papers yet. Upload a PDF or open the sample paper to start reading.",
     sample: "Try the sample",
     sampleDocumentTitle: "Reading sample",
     reader: "Reader",
     emptyReader: "Choose a paper on the left to start reading.",
     fitWidth: "Fit width",
-    translatePages: "Translate pages",
+    translatePages: "Translate",
+    translations: "Translations",
+    translationLibrary: "My resources: Translations",
+    translationLibraryFailed: "The translation list could not be opened. Try again.",
+    readerTools: "Annotation and export tools",
     translationUnavailable: "Translation is unavailable. The original reader is unaffected.",
     page: "Page",
     notes: "Notes",
@@ -1077,6 +1086,8 @@ const elements = {
   translationControls: $("translation-controls"),
   translationPanel: $("translation-panel"),
   translationFallback: $("translation-fallback"),
+  translationLibrary: $("translation-library"),
+  translationLibraryOpen: $("translation-library-open"),
   readerEmpty: $("reader-empty"),
   readerOpenOriginal: $("reader-open-original"),
   readerLoading: $("reader-loading"),
@@ -1240,6 +1251,7 @@ const state = {
   selectedAnnotationId: null,
   status: null,
   translationOpen: false,
+  translationLibraryOpen: false,
   translationUnavailable: false,
   resizeFrame: null
 };
@@ -1289,6 +1301,13 @@ const translation = createTranslationBridge({
   onOpenSettings: openTranslationSettings,
   onExcerpt: deviceMode ? undefined : handleTranslationExcerpt,
   onMounted: syncTranslationLayout
+});
+const translationLibrary = createTranslationLibrary({
+  container: elements.translationLibrary,
+  getModel: () => ({ language: state.language, open: state.translationLibraryOpen }),
+  api,
+  onOpen: openLibraryTranslation,
+  onClose: () => setTranslationLibraryOpen(false)
 });
 let translationPresentationMode = "dual";
 const translationOverlay = createTranslationOverlay({
@@ -1511,6 +1530,7 @@ function applyLanguage() {
   readerFind?.applyLanguage();
   readerShapes?.applyLanguage();
   selectionTranslation?.applyLanguage();
+  syncTranslationLibraryLayout();
   deviceUI?.render();
 }
 
@@ -1790,6 +1810,56 @@ function setTranslationOpen(open) {
   state.translationOpen = Boolean(open && state.pdf && state.document && !isStudy());
   syncTranslationLayout();
   translation.update(translationModel());
+}
+
+function syncTranslationLibraryLayout() {
+  const open = Boolean(!deviceMode && state.translationLibraryOpen && workspace?.getMode() === "reading");
+  elements.translationLibraryOpen.hidden = deviceMode;
+  elements.translationLibraryOpen.setAttribute("aria-expanded", String(open));
+  elements.translationLibrary.hidden = !open;
+  elements.translationLibrary.closest(".reader-panel").dataset.translationLibraryOpen = String(open);
+  translationLibrary.update({ language: state.language, open });
+}
+
+async function setTranslationLibraryOpen(open, options = {}) {
+  const wasOpen = state.translationLibraryOpen;
+  state.translationLibraryOpen = Boolean(!deviceMode && open && workspace?.getMode() === "reading");
+  syncTranslationLibraryLayout();
+  if (state.translationLibraryOpen) {
+    const loaded = await translationLibrary.load();
+    if (!state.translationLibraryOpen) return;
+    if (!loaded) {
+      state.translationLibraryOpen = false;
+      syncTranslationLibraryLayout();
+      setStatus("translationLibraryFailed", "error");
+    }
+  } else if (wasOpen && options.restoreFocus !== false && !elements.translationLibraryOpen.hidden) {
+    elements.translationLibraryOpen.focus({ preventScroll: true });
+  }
+}
+
+async function openLibraryTranslation(item) {
+  if (
+    deviceMode || !item || !["run", "job"].includes(item.kind)
+    || !item.id || !item.document_id || !item.source_sha256
+    || !Array.isArray(item.pages) || !item.pages.length
+    || item.pages.some((page) => !Number.isInteger(page) || page < 1)
+  ) return false;
+  const openedDocument = await openDocument(item.document_id, { workspace: "reading", explicitIntent: true });
+  if (
+    openedDocument === false || !state.pdf || workspace?.getMode() !== "reading"
+    || state.document?.id !== item.document_id || state.document?.sha256 !== item.source_sha256
+  ) return false;
+  const opened = await translation.openRecord({
+    kind: item.kind,
+    id: item.id,
+    documentId: item.document_id,
+    sourceSha256: item.source_sha256,
+    pages: [...item.pages]
+  });
+  if (!opened) return false;
+  await setTranslationLibraryOpen(false);
+  return true;
 }
 
 function deactivateFlow() {
@@ -7455,17 +7525,33 @@ async function normalizeLegacySampleMetadata(document, sampleSha256) {
   applyMetadataSnapshot(document.id, saved);
 }
 
+function validateSampleManifest(manifest) {
+  const invalid = () => { throw new ApiError("request_failed"); };
+  if (!manifest || typeof manifest !== "object" || Array.isArray(manifest) || Object.keys(manifest).length !== 7) invalid();
+  const { title, filename, sha256, page_count: pageCount, year, journal, doi } = manifest;
+  if (typeof title !== "string" || !title.length || title.length > 300 || title.trim() !== title || /[\x00-\x1F\x7F]/.test(title)) invalid();
+  if (typeof filename !== "string" || filename !== `${title}.pdf` || filename.length > 255 || /[<>:"/\\|?*\x00-\x1F\x7F]/.test(filename)) invalid();
+  if (typeof sha256 !== "string" || !/^[0-9a-f]{64}$/.test(sha256)) invalid();
+  if (!Number.isInteger(pageCount) || pageCount < 1 || pageCount > 10000) invalid();
+  if (!Number.isInteger(year) || year < 1000 || year > 9999) invalid();
+  if (typeof journal !== "string" || !journal.length || journal.length > 300 || journal.trim() !== journal) invalid();
+  if (typeof doi !== "string" || doi.length > 300 || !/^10\.\d{4,9}\/\S+$/.test(doi)) invalid();
+  return { title, filename, sha256 };
+}
+
 async function openSample() {
   if (state.pendingUpload) return;
   state.pendingUpload = true;
   renderDocumentDetails();
   setStatus("uploadingSample");
   try {
+    const manifest = validateSampleManifest(await api("/assets/sample.json"));
     const response = await checkedFetch("/assets/sample.pdf");
     const blob = await response.blob();
     const digest = await crypto.subtle.digest("SHA-256", await blob.arrayBuffer());
     const sampleSha256 = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
-    const file = new File([blob], "reading-sample.pdf", { type: "application/pdf" });
+    if (sampleSha256 !== manifest.sha256) throw new ApiError("request_failed");
+    const file = new File([blob], manifest.filename, { type: "application/pdf" });
     state.pendingUpload = false;
     const document = await uploadFile(file);
     if (!document || document.sha256 !== sampleSha256) return;
@@ -7624,6 +7710,7 @@ elements.uploadButton.addEventListener("click", () => {
   if (!state.pendingUpload) elements.uploadInput.click();
 });
 elements.sample.addEventListener("click", openSample);
+elements.translationLibraryOpen.addEventListener("click", () => void setTranslationLibraryOpen(true));
 elements.pageFirst.addEventListener("click", () => goToPage(1));
 elements.pagePrev.addEventListener("click", () => goToPage(state.page - 1));
 elements.pageNext.addEventListener("click", () => goToPage(state.page + 1));
@@ -8416,7 +8503,9 @@ workspace = createWorkspace({
   modeRendered: (mode) => {
     dataNavigation?.setMode(mode);
     if (mode !== "reading" && state.flowActive) deactivateFlow();
+    if (mode !== "reading") state.translationLibraryOpen = false;
     selectionTranslation?.contextChanged();
+    syncTranslationLibraryLayout();
     syncTranslationLayout();
     translation.update(translationModel());
     syncFlowLayout();

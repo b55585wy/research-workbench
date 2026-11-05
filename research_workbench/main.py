@@ -171,6 +171,7 @@ def create_app(data_root=None, validator=None, renderer=None, *, agent_provider=
     from .translation_process import TranslationSupervisor
     from .translation_api import router as translation_router
     from .translation_run_api import router as translation_run_router
+    from .translation_library_api import router as translation_library_router
     translation_root = translation_runtime or os.environ.get('RESEARCH_TRANSLATION_RUNTIME')
     translations = Translations(store, provider, TranslationRuntime(translation_root))
     translation_supervisor = TranslationSupervisor(translations, translation_root,
@@ -251,6 +252,7 @@ def create_app(data_root=None, validator=None, renderer=None, *, agent_provider=
     app.state.translations = translations
     app.include_router(translation_router)
     app.include_router(translation_run_router)
+    app.include_router(translation_library_router)
     app.state.selection_translation = selection_translation
     app.include_router(selection_translation_router)
     app.state.reading_pages = reading_pages
