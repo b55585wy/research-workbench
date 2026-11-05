@@ -8,6 +8,8 @@ const MAX_ASSET_BYTES = 20 * 1024 * 1024;
 const MAX_TOTAL_BYTES = 100 * 1024 * 1024;
 const MAX_ASSETS = 5000;
 const DOWNLOAD_CONCURRENCY = 4;
+const REUSE_CACHE_LIMIT = 2;
+const REUSE_SCAN_LIMIT = 8;
 const NAVIGATION_TIMEOUT = 4000;
 const WORKER_PATH = new URL(self.location.href).pathname;
 const MANIFEST_URL = new URL("./offline-manifest.json", import.meta.url);
@@ -36,16 +38,16 @@ async function postProgress(force = false) {
   const now = Date.now();
   if (!force && now - lastProgressPost < 250) return;
   lastProgressPost = now;
-  await broadcast({ type: "offline-progress", ...progress });
+  await broadcast({ type: "offline-progress", ...progress }).catch(() => {});
 }
 
 function responseError(code) {
   return Object.assign(new Error(code), { code });
 }
 
-async function fetchBounded(url, maximumBytes) {
+async function fetchBounded(url, maximumBytes, cachePolicy = "no-store") {
   const response = await fetch(url, {
-    cache: "no-store",
+    cache: cachePolicy,
     credentials: "same-origin",
     redirect: "error"
   });
@@ -119,8 +121,64 @@ async function digest(body) {
   return Array.from(new Uint8Array(hash), (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-async function cacheAsset(cache, asset) {
-  const { response, body } = await fetchBounded(asset.url, MAX_ASSET_BYTES);
+async function reuseCandidates() {
+  try {
+    const candidates = [];
+    const names = (await caches.keys()).filter((name) => /^research-workspace-offline-v1:ui-[a-zA-Z0-9][a-zA-Z0-9._-]{0,95}:[0-9a-f-]{36}$/.test(name)).slice(-REUSE_SCAN_LIMIT);
+    for (const name of names.reverse()) {
+      const release = name.slice(CACHE_PREFIX.length).split(":")[0];
+      if (!RELEASE_PATTERN.test(release)) continue;
+      const cache = await caches.open(name);
+      if (!await cache.match("/device/") || !await cache.match("/")) continue;
+      candidates.push({ cache, prefix: `/_ui/${release}/` });
+      if (candidates.length === REUSE_CACHE_LIMIT) break;
+    }
+    return candidates;
+  } catch {
+    return [];
+  }
+}
+
+async function cachedBody(response, expectedBytes) {
+  const reader = response.body?.getReader();
+  if (!reader) return expectedBytes === 0 ? new ArrayBuffer(0) : null;
+  const body = new Uint8Array(expectedBytes);
+  let offset = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (offset + value.byteLength > expectedBytes) {
+        await reader.cancel();
+        return null;
+      }
+      body.set(value, offset);
+      offset += value.byteLength;
+    }
+    return offset === expectedBytes ? body.buffer : null;
+  } finally {
+    reader.releaseLock();
+  }
+}
+
+async function reusedAsset(asset, prefix, candidates) {
+  const name = asset.url.slice(prefix.length);
+  for (const candidate of candidates) {
+    try {
+      const response = await candidate.cache.match(`${candidate.prefix}${name}`);
+      if (!response || response.status !== 200) continue;
+      const body = await cachedBody(response, asset.bytes);
+      if (body && await digest(body) === asset.sha256) return { response, body };
+    } catch {
+      // Cache eviction or unreadable bytes keep the normal download path.
+    }
+  }
+  return null;
+}
+
+async function cacheAsset(cache, asset, prefix, candidates) {
+  const { response, body } = await reusedAsset(asset, prefix, candidates)
+    || await fetchBounded(asset.url, MAX_ASSET_BYTES, "default");
   if (body.byteLength !== asset.bytes || await digest(body) !== asset.sha256) throw responseError("asset_verification");
   const headers = {
     "Content-Type": response.headers.get("Content-Type") || "application/octet-stream",
@@ -143,20 +201,30 @@ async function prepare() {
   }
   const validated = validateManifest(manifest);
   const release = manifest.release;
+  const candidates = await reuseCandidates();
   const name = `${cacheName(release)}:${crypto.randomUUID()}`;
   progress = { state: "preparing", release, completed: 0, total: manifest.assets.length, loadedBytes: 0, totalBytes: validated.totalBytes };
   await postProgress(true);
   const cache = await caches.open(name);
   try {
     let next = 0;
+    let failure = null;
     async function download() {
-      while (next < manifest.assets.length) {
+      while (!failure && next < manifest.assets.length) {
         const index = next;
         next += 1;
-        await cacheAsset(cache, manifest.assets[index]);
+        try {
+          await cacheAsset(cache, manifest.assets[index], validated.prefix, candidates);
+        } catch (error) {
+          failure ||= error;
+          throw error;
+        }
       }
     }
-    await Promise.all(Array.from({ length: Math.min(DOWNLOAD_CONCURRENCY, manifest.assets.length) }, () => download()));
+    const downloads = await Promise.allSettled(Array.from({ length: Math.min(DOWNLOAD_CONCURRENCY, manifest.assets.length) }, () => download()));
+    if (failure) throw failure;
+    const rejected = downloads.find((result) => result.status === "rejected");
+    if (rejected) throw rejected.reason;
     for (const entry of [manifest.entries.device, manifest.entries.choice]) {
       await cache.put(entry.url, new Response(entry.html, {
         status: 200,
