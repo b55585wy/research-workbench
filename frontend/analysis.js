@@ -1759,9 +1759,11 @@ export function createAnalysis(adapter) {
     renderJobs(entry);
     renderResult(entry);
     adapter.datasetSelectionChanged?.(currentId, dataset || null);
+    adapter.teachingChanged?.();
   }
 
   function invalidateConfirmation(entry) {
+    entry.planRevision = (entry.planRevision || 0) + 1;
     if (entry.confirmation && !entry.confirmation.pending) {
       entry.confirmation = null;
       if (["previewing", "previewReady", "previewFailed", "ttest_preview_required", "correlation_preview_required"].includes(entry.status?.key)) entry.status = null;
@@ -2829,6 +2831,51 @@ export function createAnalysis(adapter) {
       elements.result.setAttribute("aria-label", t("jobs"));
       notebook.applyLanguage(nextLanguage);
       render();
+    },
+    getTeachingState() {
+      const entry = currentEntry();
+      return { ownerId: currentId, dataset: selectedDataset(entry), jobs: entry?.jobs.slice() || [],
+        methods: methodCatalog?.items || null, engines: entry?.runtime?.engines || null,
+        revision: entry?.planRevision || 0, loading: Boolean(entry?.loadController || entry?.methodStatus?.key === "methodLoading"),
+        busy: Boolean(entry?.upload || entry?.confirmation) };
+    },
+    applyTeachingDataset(documentId, dataset, plan) {
+      const entry = currentEntry();
+      if (!entry || currentId !== documentId || entry.upload || entry.confirmation?.pending) return false;
+      selectDataset(entry, dataset, { resetColumns: true, documentId });
+      entry.method = plan.method;
+      entry.engine = plan.method === "describe" ? "python" : "r";
+      entry.selectedColumns = new Set(plan.columns);
+      entry.selectedJobId = null;
+      entry.shared = false;
+      if (plan.method === "ttest_paired") Object.assign(pairedDraft(entry), {
+        unit: plan.unit, first: plan.first, second: plan.second,
+        alternative: "two_sided", confidence: 0.95, pairedConfirmed: false
+      });
+      if (plan.method === "correlation") Object.assign(correlationDraft(entry), {
+        first: plan.first, second: plan.second, kind: "pearson",
+        alternative: "two_sided", confidence: 0.95, independentConfirmed: false
+      });
+      if (plan.method === "ttest_independent") {
+        const draft = ttestDraft(entry);
+        clearTtestGroups(draft);
+        Object.assign(draft, { outcome: plan.columns[0], groupColumn: plan.groupColumn,
+          variant: "welch", alternative: "two_sided", confidence: 0.95, independentConfirmed: false });
+        const pending = loadTtestGroups(entry, draft);
+        const revision = entry.planRevision, generation = adapter.getNavigationGeneration?.();
+        void pending.then(() => {
+          if (entry !== currentEntry() || currentId !== documentId || revision !== entry.planRevision ||
+              generation !== adapter.getNavigationGeneration?.() || selectedDataset(entry)?.id !== dataset.id) return;
+          const labels = draft.groups.map((item) => item.label);
+          if (labels.includes(plan.group1) && labels.includes(plan.group2)) {
+            draft.group1 = plan.group1;
+            draft.group2 = plan.group2;
+            render();
+          }
+        });
+      }
+      render();
+      return true;
     },
     getSelectedDataset() {
       return selectedDataset(currentEntry());

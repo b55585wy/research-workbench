@@ -839,6 +839,7 @@ export function createCharts(adapter) {
     elements.png.disabled = unavailable || !chartSkillAllows(snapshot, "png");
     elements.svg.disabled = unavailable || !chartSkillAllows(snapshot, "svg");
     adapter.skillsChanged?.();
+    adapter.teachingChanged?.();
   }
 
   function appendField(list, label, value) {
@@ -1435,6 +1436,35 @@ export function createCharts(adapter) {
       return { language, ownerId: currentId, available: skillSupport && Boolean(currentId),
         busy: Boolean(draft?.pendingPreview || draft?.pendingSave || draft?.saveFailed || entry?.view?.pending),
         selected: visibleChartSkill(draft, entry?.view?.artifact) };
+    },
+    getTeachingCharts(documentId) {
+      return papers.get(documentId)?.charts.slice() || [];
+    },
+    getTeachingRevision(documentId) {
+      const entry = papers.get(documentId);
+      return `${entry?.openSequence || 0}/${entry?.draft?.version || 0}/${entry?.activeChartId || ""}`;
+    },
+    prepareTeachingChart(documentId, dataset, plan, title) {
+      if (currentId !== documentId) return false;
+      const entry = currentEntry();
+      if (!entry.datasets.some((item) => item.id === dataset.id && item.sha256 === dataset.sha256)) return false;
+      const draft = ensureDraft(entry);
+      if (draft.pendingPreview || draft.pendingSave || draft.saveFailed || entry.view?.pending) return false;
+      const same = draft.datasetId === dataset.id && draft.kind === plan.kind && draft.title === title &&
+        draft.x === plan.x && draft.y === (plan.y || "") && !draft.skillSnapshot;
+      if (same) return true;
+      if ((draft.title || draft.skillSnapshot || entry.view?.kind === "preview") &&
+          !window.confirm(language === "zh" ? "用教学示例替换当前图表草稿？已保存的图表不受影响。" : "Replace the current chart draft with this teaching example? Saved charts are retained.")) return false;
+      invalidateDraft(draft);
+      Object.assign(draft, { datasetId: dataset.id, analysisId: null, kind: plan.kind, title,
+        x: plan.x, y: plan.y || "", bins: plan.bins || 20, skillSnapshot: null });
+      entry.view = null;
+      entry.activeChartId = null;
+      purgePlot();
+      renderArtifactDetails(null);
+      adapter.contextChanged?.();
+      render();
+      return true;
     },
     selectSkill(value) {
       const entry = currentEntry();

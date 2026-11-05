@@ -270,9 +270,11 @@ export function createPresentations(adapter) {
       papers.set(documentId, {
         sources: { note: [], chart: [], analysis: [] },
         sourceSignature: null,
+        sourcesReady: false,
         selected: { note: new Set(), chart: new Set(), analysis: new Set() },
         selectionExplicit: false,
         title: String(documentTitle || (language === "zh" ? "研究汇报" : "Research presentation")).slice(0, 120),
+        initialTitle: String(documentTitle || (language === "zh" ? "研究汇报" : "Research presentation")).slice(0, 120),
         style: "default",
         context: null,
         contextStale: false,
@@ -281,6 +283,7 @@ export function createPresentations(adapter) {
         outline: null,
         outlineOrigin: "suggested",
         outlineEdited: false,
+        draftRevision: 0,
         aiRequestId: null,
         capabilities: null,
         pending: null,
@@ -609,6 +612,7 @@ export function createPresentations(adapter) {
       return;
     }
     const sequence = ++entry.loadSequence;
+    entry.sourcesReady = false;
     const navigationGeneration = adapter.getNavigationGeneration?.();
     setStatus(entry, "loading");
     render();
@@ -632,6 +636,7 @@ export function createPresentations(adapter) {
     if (capabilities.status === "fulfilled") entry.capabilities = capabilities.value;
     applyDefaultSelection(entry, documentId);
     const failed = [capabilities, notes, charts, analyses].find((result) => result.status === "rejected");
+    entry.sourcesReady = !failed;
     if (failed) setStatus(entry, errorKey(failed.reason, "loadFailed"), "error", () => reload(documentId));
     else if (entry.status?.key === "loading") entry.status = null;
     render();
@@ -642,7 +647,7 @@ export function createPresentations(adapter) {
       !validSources(body.sources, selected) || !validOutline(body.suggested_outline, body.sources)) throw new Error("invalidResponse");
   }
 
-  async function previewContext(entry) {
+  async function previewContext(entry, { preserveOutline = false } = {}) {
     if (!entry || entry.pending || selectionProblem(entry) || entry.capabilities?.available !== true) return;
     const documentId = currentId;
     const selected = selectors(entry);
@@ -664,7 +669,7 @@ export function createPresentations(adapter) {
       if (entry.operation !== operation || version !== entry.contextVersion || navigationGeneration !== adapter.getNavigationGeneration?.()) return;
       const previousHash = entry.context?.source_sha256;
       const previousSources = entry.context?.sources || [];
-      const replaceOutline = !entry.outline || entry.contextSelectionKey !== selectionKey;
+      const replaceOutline = !entry.outline || !preserveOutline && entry.contextSelectionKey !== selectionKey;
       entry.context = { source_sha256: body.source_sha256, sources: clone(body.sources), text: body.text };
       entry.contextStale = false;
       entry.contextSelectionKey = selectionKey;
@@ -680,7 +685,7 @@ export function createPresentations(adapter) {
       setStatus(entry, "contextReady", "success");
     } catch (error) {
       markSourceChanged(entry, error);
-      if (entry.operation === operation && version === entry.contextVersion) setStatus(entry, errorKey(error, "contextFailed"), "error", () => previewContext(entry));
+      if (entry.operation === operation && version === entry.contextVersion) setStatus(entry, errorKey(error, "contextFailed"), "error", () => previewContext(entry, { preserveOutline }));
     } finally {
       if (entry.operation === operation) {
         entry.operation = null;
@@ -810,7 +815,50 @@ export function createPresentations(adapter) {
     if (elements.panel.open && currentId) reload(currentId);
   });
 
+  // Source refreshes must not count as edits to a user's draft.
+  for (const type of ["input", "change"]) elements.panel.addEventListener(type, () => {
+    const entry = currentEntry();
+    if (entry) entry.draftRevision += 1;
+  }, true);
+  elements.panel.addEventListener("click", (event) => {
+    const button = event.target.closest?.("button");
+    if (button && (elements.slides.contains(button) || button === elements.addSlide)) {
+      const entry = currentEntry();
+      if (entry) entry.draftRevision += 1;
+    }
+  }, true);
+
   return {
+    async prepareTeachingSources(documentId, dataset, analysis, chart, title) {
+      if (currentId !== documentId || currentEntry()?.pending) return false;
+      const before = currentEntry();
+      const revision = before.draftRevision;
+      const generation = adapter.getNavigationGeneration?.();
+      await reload(documentId);
+      const entry = currentEntry();
+      if (currentId !== documentId || generation !== adapter.getNavigationGeneration?.() || !entry?.sourcesReady || entry.pending ||
+          entry !== before || revision !== entry.draftRevision) return false;
+      const belongs = (item, source) => item.id === source.id && item.document_id === documentId &&
+        item.dataset_id === dataset.id && item.dataset_sha256 === dataset.sha256;
+      if (!entry.sources.analysis.some((item) => belongs(item, analysis)) || !entry.sources.chart.some((item) => belongs(item, chart))) return false;
+      const same = entry.title === title && !entry.selected.note.size && entry.selected.analysis.size === 1 &&
+        entry.selected.analysis.has(analysis.id) && entry.selected.chart.size === 1 && entry.selected.chart.has(chart.id);
+      if (same && entry.outline) {
+        if (!contextCurrent(entry)) await previewContext(entry, { preserveOutline: true });
+        return currentId === documentId && generation === adapter.getNavigationGeneration?.() && contextCurrent(entry);
+      }
+      const hasDraft = entry.outline || entry.selectionExplicit || entry.title !== entry.initialTitle;
+      if (hasDraft && !window.confirm(language === "zh" ? "用本例的分析和图表重新准备汇报？当前草稿将被替换。" : "Prepare a presentation from this example's analysis and chart? This replaces the current draft.")) return false;
+      invalidateContext(entry);
+      entry.title = title;
+      entry.selectionExplicit = true;
+      entry.selected = { note: new Set(), analysis: new Set([analysis.id]), chart: new Set([chart.id]) };
+      entry.outline = null;
+      entry.outlineEdited = false;
+      render();
+      await previewContext(entry);
+      return currentId === documentId && generation === adapter.getNavigationGeneration?.() && Boolean(entry.context && entry.outline && !entry.contextStale);
+    },
     applyLanguage(nextLanguage) {
       language = nextLanguage;
       elements.panel.querySelector("summary").textContent = t("panel");

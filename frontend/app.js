@@ -7,6 +7,8 @@ import { createDatasetSelection } from "/dataset-selection.js";
 import { createDataImports } from "/data-imports.js";
 import { createCharts } from "/charts.js";
 import { createChartSkills } from "/chart-skills.js";
+import { createTeachingData } from "/teaching-data.js";
+import { createTeachingWorkflow } from "/teaching-workflow.js";
 import { createPresentations } from "/presentations.js";
 import { createWorkspace } from "/workspace.js";
 import { createDataNavigation } from "/data-navigation.js";
@@ -1298,6 +1300,7 @@ let datasetSelection = null;
 let dataImports = null;
 let charts = null;
 let chartSkills = null;
+let teachingData = null;
 let presentations = null;
 let workspace = null;
 let notesWorkspace = null;
@@ -4233,6 +4236,7 @@ function prepareContextNavigation(draftNavigation = null) {
   captureCurrentMetadataDraft();
   const blocker = contextNavigationBlocker();
   if (!blocker) {
+    if (teachingData?.hasUnsavedWork() && teachingData.prepareNavigation() !== true) return false;
     if (chartSkills?.hasUnsavedWork() && chartSkills.prepareNavigation() !== true) return false;
     return noteDraftControls.prepareNavigation(draftNavigation);
   }
@@ -4247,6 +4251,7 @@ function invalidateWorkspaceModeIntent(intent = null) {
   workspaceModePending = false;
   workspaceDraftNavigation = null;
   workspace?.setModePending(false);
+  teachingData?.update();
 }
 
 function beginWorkspaceModeIntent() {
@@ -4256,6 +4261,7 @@ function beginWorkspaceModeIntent() {
   workspaceModePending = true;
   workspaceDraftNavigation = draftNavigation;
   workspace?.setModePending(true);
+  teachingData?.update();
   return intent;
 }
 
@@ -4264,6 +4270,7 @@ function finishWorkspaceModeIntent(intent) {
   workspaceModePending = false;
   workspaceDraftNavigation = null;
   workspace?.setModePending(false);
+  teachingData?.update();
 }
 
 function readDataSelection() {
@@ -4397,18 +4404,19 @@ async function openReadingWorkspace() {
 }
 
 async function navigateResearchArea(area) {
-  if (!["reading", "analysis", "charts", "presentations"].includes(area)) return;
-  if (deviceMode && area !== "reading") return;
+  if (!["reading", "analysis", "charts", "presentations"].includes(area)) return false;
+  if (deviceMode && area !== "reading") return false;
   const before = workspaceModeIntent;
   if (area === "reading") await openReadingWorkspace();
   else await openDataWorkspace(area);
   const expectedMode = area === "reading" ? "reading" : "data";
   if (before === workspaceModeIntent || workspace.getMode() !== expectedMode ||
-      area !== "reading" && workspace.getTool() !== area) return;
+      area !== "reading" && workspace.getTool() !== area) return false;
   if (area === "charts" && state.document) void charts?.reload(state.document.id);
-  if (!window.matchMedia("(max-width: 820px)").matches) return;
+  if (!window.matchMedia("(max-width: 820px)").matches) return true;
   if (!$("assistant-panel").hidden) $("assistant-close").click();
   $("documents-panel").querySelector(".mobile-pane-back")?.click();
+  return true;
 }
 
 function openCatalogItem(item) {
@@ -9007,6 +9015,7 @@ imageViewer = createImageViewer({
 
 if (!deviceMode) {
 analysis = createAnalysis({
+  teachingChanged: () => teachingData?.update(),
   api,
   checkedFetch,
   getDocument: () => state.document,
@@ -9016,7 +9025,7 @@ analysis = createAnalysis({
   onJobOpened: showAnalysisInUrl,
   onDatasetOpened: showDatasetInUrl,
   startImport: (file) => dataImports?.startImport(file),
-  isImportPending: () => dataImports?.isImportPending() || false,
+  isImportPending: () => dataImports?.isImportPending() || teachingData?.hasUnsavedWork() || false,
   datasetContextChanged: (documentId, datasetId, analysisId) => {
     researchRecord?.sourceChanged();
     charts?.syncDataset(documentId, datasetId, analysisId);
@@ -9051,7 +9060,7 @@ dataImports = createDataImports({
   getLanguage: () => state.language,
   getNavigationGeneration: () => workspace.getNavigationGeneration(),
   reviewVisibilityChanged: (documentId, open, reveal) => workspace.setImportReview(documentId, open, reveal),
-  importStateChanged: () => analysis.refreshUpload(),
+  importStateChanged: () => { analysis.refreshUpload(); teachingData?.update(); },
   datasetConfirmed: (documentId, dataset, navigationGeneration) => {
     analysis.openImportedDataset(documentId, dataset, { select: navigationGeneration === workspace.getNavigationGeneration() });
     if (state.document?.id === documentId) charts?.reload(documentId);
@@ -9060,6 +9069,7 @@ dataImports = createDataImports({
 });
 
 charts = createCharts({
+  teachingChanged: () => teachingData?.update(),
   skillsChanged: () => chartSkills?.update(),
   api,
   checkedFetch,
@@ -9100,6 +9110,28 @@ presentations = createPresentations({
   getSelectedAnalysis: (documentId) => analysis.getSelectedAnalysis(documentId),
   getCurrentChart: (documentId) => charts.getCurrentChart(documentId)
 });
+
+if (!deviceMode) {
+  const teachingWorkflow = createTeachingWorkflow({
+    analysis, charts, presentations, checkedFetch,
+    getContext: () => ({ ownerId: state.document?.id || null, sha256: state.document?.sha256 || null,
+      generation: workspace.getNavigationGeneration(), language: state.language, available: !deviceMode,
+      busy: Boolean(workspaceModePending || dataImports?.isImportPending()) }),
+    navigate: navigateResearchArea,
+    isArea: (area) => workspace.getMode() === "data" && workspace.getTool() === area,
+    sourcesChanged: (documentId) => {
+      if (state.document?.id === documentId) void charts.reload(documentId);
+      dataNavigation?.sourcesChanged(documentId);
+    }
+  });
+  teachingData = createTeachingData({
+    container: $("teaching-data-host"), getModel: teachingWorkflow.getModel,
+    onImport: teachingWorkflow.importExample, onContinue: teachingWorkflow.continueExample,
+    onRefresh: teachingWorkflow.refresh, onLockChange: () => analysis.refreshUpload()
+  });
+  void teachingData.load();
+}
+window.addEventListener("pagehide", (event) => { if (!event.persisted) teachingData?.destroy(); });
 
 researchRecord = createResearchRecord({
   api,
