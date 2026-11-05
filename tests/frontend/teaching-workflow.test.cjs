@@ -34,7 +34,7 @@ test("wrong response ID, owner, bytes/profile and failed status never select a d
   }
 });
 test("owner/source/navigation/plan drift retains verified record in origin without taking over current work", async () => {
-  for (const change of [f => f.context.ownerId = "other", f => f.context.sha256 = "changed", f => f.context.generation++, f => f.native.revision++]) {
+  for (const change of [f => f.context.ownerId = "other", f => f.context.sha256 = "changed", f => f.context.generation++, f => f.native.revision++, f => f.native.busy = true]) {
     const f = fixture(); f.setReply(async () => { change(f); return { ok: true, json: async () => dataset() }; });
     assert.equal((await f.workflow.importExample(f.command)).status, "stale");
     assert.deepEqual(f.calls.find(c => c[0] === "retain").slice(1), [owner, dataset(), { select: false }]);

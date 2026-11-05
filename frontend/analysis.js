@@ -2841,7 +2841,7 @@ export function createAnalysis(adapter) {
     },
     applyTeachingDataset(documentId, dataset, plan) {
       const entry = currentEntry();
-      if (!entry || currentId !== documentId || entry.upload || entry.confirmation?.pending) return false;
+      if (!entry || currentId !== documentId || entry.upload || entry.confirmation) return false;
       selectDataset(entry, dataset, { resetColumns: true, documentId });
       entry.method = plan.method;
       entry.engine = plan.method === "describe" ? "python" : "r";

@@ -71,7 +71,7 @@ const messages = {
     documents: "文献",
     upload: "上传 PDF",
     emptyDocuments: "还没有文献。上传 PDF，或打开示例论文开始阅读。",
-    sample: "试读示例",
+    sample: "试读论文",
     sampleDocumentTitle: "阅读示例",
     reader: "阅读器",
     emptyReader: "从左侧选择一篇文献开始阅读。",
@@ -554,7 +554,7 @@ const messages = {
     documents: "Papers",
     upload: "Upload PDF",
     emptyDocuments: "No papers yet. Upload a PDF or open the sample paper to start reading.",
-    sample: "Try the sample",
+    sample: "Sample paper",
     sampleDocumentTitle: "Reading sample",
     reader: "Reader",
     emptyReader: "Choose a paper on the left to start reading.",
@@ -7883,7 +7883,7 @@ function validateSampleManifest(manifest) {
 }
 
 async function openSample() {
-  if (state.pendingUpload) return;
+  if (state.pendingUpload || !prepareContextNavigation()) return;
   state.pendingUpload = true;
   renderDocumentDetails();
   setStatus("uploadingSample");

@@ -138,10 +138,13 @@
               <span data-i18n="upload">上传 PDF</span>
             </button>
             <input id="upload-input" data-testid="upload-input" type="file" accept="application/pdf,.pdf" hidden>
+            <button id="sample-open" class="button button-secondary sample-open-button" type="button" data-testid="sample-open">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 5v15M3 4.5c3-1 6-.5 9 1.5 3-2 6-2.5 9-1.5V19c-3-1-6-.5-9 1.5C9 18.5 6 18 3 19Z"/></svg>
+              <span data-i18n="sample">试读论文</span>
+            </button>
           </div>
           <div id="documents-empty" class="empty-state">
             <p data-i18n="emptyDocuments">还没有文献。上传 PDF，或打开示例论文开始阅读。</p>
-            <button id="sample-open" class="button button-secondary" type="button" data-testid="sample-open" data-i18n="sample">试读示例</button>
           </div>
           <ul id="documents-list" class="documents-list" data-testid="documents-list" aria-label="已保存文献"></ul>
         <details id="library-trash" class="library-trash sidebar-subgroup">

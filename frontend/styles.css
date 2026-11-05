@@ -488,6 +488,9 @@ h3 {
   background: var(--ui-surface-subtle);
 }
 
+.sample-open-button { display: inline-flex; align-items: center; gap: 8px; }
+.sample-open-button svg { width: 16px; height: 16px; flex: 0 0 auto; }
+
 .document-actions-menu {
   position: fixed;
   z-index: 1000;

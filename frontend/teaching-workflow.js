@@ -40,7 +40,7 @@ export function createTeachingWorkflow(adapter) {
   function sameContext(stamp) {
     const now = adapter.getContext(), native = adapter.analysis.getTeachingState();
     return now.ownerId === stamp.ownerId && now.sha256 === stamp.sha256 && now.generation === stamp.generation &&
-      native.ownerId === stamp.ownerId && native.revision === stamp.revision;
+      native.ownerId === stamp.ownerId && native.revision === stamp.revision && !native.busy;
   }
 
   async function importExample(command) {
