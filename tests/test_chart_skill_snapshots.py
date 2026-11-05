@@ -145,7 +145,6 @@ def test_tampered_recipe_snapshot_is_rejected(tmp_path):
         assert damaged.status_code==409 and damaged.json()['detail']['code']=='chart_skill_changed'
         assert c.get(chart['export_url']).status_code==409
 
-
 @pytest.mark.parametrize('revision',[1.0,True])
 def test_artifact_snapshot_is_validated_before_equality(tmp_path,revision):
     with workspace(tmp_path) as (c,app,doc,_):
