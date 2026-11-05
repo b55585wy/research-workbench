@@ -15,6 +15,7 @@ const sourceFiles = [
   "vite.config.ts",
   "scripts/build.mjs",
   "src/index.tsx",
+  "src/header-settings.tsx",
   "src/guest-access.tsx",
   "src/translation.tsx",
   "src/flow-reading.tsx",

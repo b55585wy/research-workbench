@@ -2,6 +2,11 @@ import { flushSync } from "react-dom";
 import { createRoot, type Root } from "react-dom/client";
 import { GuestIdentity } from "./guest-access";
 
+export { mountHeaderSettings } from "./header-settings";
+export type {
+  HeaderSettingsHandle,
+  MountHeaderSettingsOptions
+} from "./header-settings";
 export { mountTranslationPanel } from "./translation";
 export type {
   MountTranslationPanelOptions,

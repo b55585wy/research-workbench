@@ -1011,33 +1011,56 @@ export function createStudy(adapter) {
     }
   }
 
-  function addCitation(kind, item, text) {
+  function citationSnapshot() {
     const owner = currentDocument();
-    if (!owner) return false;
+    if (!owner) return null;
+    captureCurrentDraft();
+    const draft = ensureDraft(owner);
+    return {
+      ownerId: owner.id,
+      text: draft.text,
+      operation: draft.operation,
+      source: JSON.stringify(draft.source)
+    };
+  }
+
+  function addCitation(kind, item, text, expected = null) {
+    const owner = currentDocument();
+    if (!owner) return expected ? { status: "blocked", reason: "stale" } : false;
     const entry = entryFor(owner.id);
-    if (entry.notePending || entry.mutations.size || entry.edit) return false;
-    byId("note-editor-group").open = true;
+    if (entry.notePending || entry.mutations.size || entry.edit) return expected ? { status: "blocked", reason: "pending" } : false;
+    if (!expected) byId("note-editor-group").open = true;
     const summary = kind === "analysis" && Array.isArray(item?.outputs)
       ? item.outputs.find((output) => output?.name === "summary.json")
       : null;
     const hash = kind === "analysis" ? summary?.sha256 : item?.data_sha256;
     const source = copySource({ kind, id: item?.id, sha256: hash });
     if (!source) {
+      if (expected) return { status: "blocked", reason: "invalid" };
       setNoteStatus(entry, { key: "citationUnavailable", kind: "error" });
       renderDraft();
       return false;
     }
     const draft = ensureDraft(owner);
-    if (draft.text.includes(`${kind}=${item.id}`)) return true;
+    if (expected) {
+      captureCurrentDraft();
+      if (expected.ownerId !== owner.id || expected.text !== draft.text || expected.operation !== draft.operation || expected.source !== JSON.stringify(draft.source)) {
+        return { status: "blocked", reason: "stale" };
+      }
+    }
+    if (draft.text.includes(`${kind}=${item.id}`)) return expected ? { status: "duplicate" } : true;
     const separator = draft.text ? (draft.text.endsWith("\n") ? "\n" : "\n\n") : "";
-    draft.text += `${separator}${text}`;
+    const combined = `${draft.text}${separator}${text}`;
+    if (expected && combined.length > 10000) return { status: "blocked", reason: "tooLong" };
+    draft.text = combined;
     draft.source = source;
     draft.operation = null;
     draft.saveFailed = false;
+    byId("note-editor-group").open = true;
     setNoteStatus(entry, null);
     renderDraft();
     elements.noteText.focus();
-    return true;
+    return expected ? { status: "added" } : true;
   }
 
   async function openNote(noteId) {
@@ -1192,6 +1215,7 @@ export function createStudy(adapter) {
       if (currentId) renderDraft();
     },
     addCitation,
+    citationSnapshot,
     openNote,
     hasPending(documentId) {
       const entry = entries.get(documentId);

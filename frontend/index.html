@@ -37,6 +37,8 @@
   <link rel="stylesheet" href="/offline-ui.css">
   <link rel="stylesheet" href="/status-notice.css">
   <link rel="stylesheet" href="/sidebar-navigation.css">
+  <link rel="stylesheet" href="/ui-foundation.css">
+  <link rel="stylesheet" href="/translation-mobile.css">
 </head>
 <body>
   <section id="startup-status" class="startup-status" role="status" aria-live="polite" aria-atomic="true" data-state="loading">
@@ -67,6 +69,7 @@
       </label>
       <button id="language-toggle" class="button button-quiet language-toggle" type="button" data-testid="language-toggle" aria-label="Switch to English">EN</button>
     </div>
+    <div id="header-settings"></div>
   </header>
 
   <div id="app-status" class="app-status" data-testid="app-status" role="status" aria-live="polite" aria-atomic="true" hidden>
@@ -94,8 +97,14 @@
           <label for="library-search-input" class="library-search-label" data-i18n="searchLabel">搜索研究、文献和笔记</label>
           <div class="library-search-row">
             <input id="library-search-input" data-testid="library-search-input" type="search" maxlength="200" autocomplete="off" data-i18n-placeholder="searchPlaceholder" placeholder="搜索研究、标题、作者、DOI 或笔记">
-            <button id="library-search-submit" class="button button-secondary" type="submit" data-testid="library-search-submit" data-i18n="searchSubmit">搜索</button>
-            <button id="library-search-clear" class="button button-quiet" type="button" data-testid="library-search-clear" data-i18n="searchClear" disabled>清除</button>
+            <button id="library-search-submit" class="button button-secondary" type="submit" data-testid="library-search-submit" data-i18n-aria="searchSubmit" aria-label="搜索" title="搜索">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true" focusable="false"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/></svg>
+              <span data-i18n="searchSubmit">搜索</span>
+            </button>
+            <button id="library-search-clear" class="button button-quiet" type="button" data-testid="library-search-clear" data-i18n-aria="searchClear" aria-label="清除" title="清除" disabled>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="m7 7 10 10M17 7 7 17"/></svg>
+              <span data-i18n="searchClear">清除</span>
+            </button>
           </div>
         </form>
         <div id="library-search-status" class="library-search-status" data-testid="library-search-status" role="status" aria-live="polite" hidden>
@@ -110,7 +119,10 @@
             <h2 id="documents-heading" data-i18n="documents">文献</h2>
           </summary>
           <div class="panel-heading paper-library-actions">
-            <button id="upload-button" class="button button-primary upload-button" type="button" data-i18n="upload">上传 PDF</button>
+            <button id="upload-button" class="button button-primary upload-button" type="button">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 16V4m-4 4 4-4 4 4M5 15v5h14v-5"/></svg>
+              <span data-i18n="upload">上传 PDF</span>
+            </button>
             <input id="upload-input" data-testid="upload-input" type="file" accept="application/pdf,.pdf" hidden>
           </div>
           <div id="documents-empty" class="empty-state">
@@ -576,7 +588,7 @@
         <ul id="study-deleted-notes-list" class="notes-list" aria-label="已删除研究笔记"></ul>
       </details>
 
-      <details id="image-library" class="image-library" open>
+      <details id="image-library" class="image-library">
         <summary id="image-library-toggle">图片库</summary>
         <div class="image-library-body">
           <p id="image-library-help" class="image-library-help">上传 PNG、JPEG 或 WebP 图片，并明确选择用于新笔记或助手。</p>
@@ -1286,6 +1298,7 @@
   <script src="/vendor/assistant-markdown/texmath.js"></script>
   <script src="/vendor/assistant-markdown/purify.min.js"></script>
   <script src="/chart-styles.js"></script>
+  <script type="module" src="/header-settings.js"></script>
   <script type="module" src="/app.js?v=0.55.4"></script>
   <script type="module" src="/mobile-layout.js?v=0.53.0"></script>
   <script type="module" src="/reader-mobile-tools.js?v=0.53.0"></script>

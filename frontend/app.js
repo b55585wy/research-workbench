@@ -2,6 +2,7 @@ import * as pdfjsLib from "/pdf-engine.js?v=0.52.0";
 import { createImageLibrary } from "/image-library.js";
 import { createImageViewer } from "/image-viewer.js";
 import { createAnalysis } from "/analysis.js?integration=tfus-source-v1";
+import { formatAnalysisNote } from "/analysis-note.js";
 import { createDatasetSelection } from "/dataset-selection.js";
 import { createDataImports } from "/data-imports.js";
 import { createCharts } from "/charts.js";
@@ -59,6 +60,7 @@ const messages = {
     upload: "上传 PDF",
     emptyDocuments: "还没有文献。上传 PDF，或打开两页示例开始阅读。",
     sample: "试读示例",
+    sampleDocumentTitle: "阅读示例",
     reader: "阅读器",
     emptyReader: "从左侧选择一篇文献开始阅读。",
     fitWidth: "适应宽度",
@@ -527,6 +529,7 @@ const messages = {
     upload: "Upload PDF",
     emptyDocuments: "No papers yet. Upload a PDF or open the two-page sample to start reading.",
     sample: "Try the sample",
+    sampleDocumentTitle: "Reading sample",
     reader: "Reader",
     emptyReader: "Choose a paper on the left to start reading.",
     fitWidth: "Fit width",
@@ -7418,12 +7421,38 @@ async function uploadFile(file) {
     renderDocuments();
     await openDocument(document.id, { force: true });
     setStatus(status === 200 ? "alreadyInLibrary" : "uploaded", "success");
+    return document;
   } catch (error) {
     setStatus(error.code || "request_failed", "error", {}, () => uploadFile(file));
   } finally {
     state.pendingUpload = false;
     renderDocumentDetails();
   }
+}
+
+async function normalizeLegacySampleMetadata(document, sampleSha256) {
+  const legacyTitle = "synrise-neuro-synthetic-sample";
+  const legacyFilename = "synrise-neuro-synthetic-sample.pdf";
+  if (document.title !== legacyTitle || document.original_filename !== legacyFilename) return;
+  const metadata = await api(`/api/v1/documents/${encodeURIComponent(document.id)}/metadata`);
+  if (metadata.id !== document.id || metadata.sha256 !== sampleSha256 || metadata.original_filename !== legacyFilename) return;
+  applyMetadataSnapshot(document.id, metadata);
+  if (metadata.title !== legacyTitle || !Number.isInteger(metadata.revision)) return;
+  const title = t("sampleDocumentTitle");
+  const saved = await api(`/api/v1/documents/${encodeURIComponent(document.id)}/metadata`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      request_id: crypto.randomUUID(),
+      expected_revision: metadata.revision,
+      title,
+      authors: metadata.authors,
+      year: metadata.year,
+      doi: metadata.doi
+    })
+  });
+  if (saved.id !== document.id || saved.sha256 !== sampleSha256 || saved.original_filename !== legacyFilename) return;
+  applyMetadataSnapshot(document.id, saved);
 }
 
 async function openSample() {
@@ -7434,9 +7463,13 @@ async function openSample() {
   try {
     const response = await checkedFetch("/assets/sample.pdf");
     const blob = await response.blob();
-    const file = new File([blob], "synrise-neuro-synthetic-sample.pdf", { type: "application/pdf" });
+    const digest = await crypto.subtle.digest("SHA-256", await blob.arrayBuffer());
+    const sampleSha256 = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+    const file = new File([blob], "reading-sample.pdf", { type: "application/pdf" });
     state.pendingUpload = false;
-    await uploadFile(file);
+    const document = await uploadFile(file);
+    if (!document || document.sha256 !== sampleSha256) return;
+    await normalizeLegacySampleMetadata(document, sampleSha256);
   } catch (error) {
     state.pendingUpload = false;
     renderDocumentDetails();
@@ -8193,60 +8226,87 @@ async function openChart(documentId, chartId) {
 }
 
 async function addAnalysisCitation(documentId, job) {
-  if (state.document?.id !== documentId) await openDocument(documentId);
-  if (state.document?.id !== documentId || state.pendingSaves > 0 || state.pendingMutations.size > 0 || state.editDrafts.has(documentId)) return false;
+  const navigationGeneration = workspace.getNavigationGeneration();
+  const studyOwner = isStudy();
+  const language = state.language;
+  if (state.document?.id !== documentId || job?.document_id !== documentId) return { status: "blocked", reason: "stale" };
+  if (state.pendingSaves > 0 || state.pendingMutations.size > 0 || state.editDrafts.has(documentId) || richText?.hasUnpreservedChanges()) {
+    return { status: "blocked", reason: "pending" };
+  }
+  captureCurrentDraft();
+  const draft = studyOwner ? null : ensureDraft(documentId);
+  const snapshot = studyOwner ? study?.citationSnapshot() : JSON.stringify({
+    text: draft.text,
+    richContent: draft.richContent,
+    page: draft.page,
+    rect: draft.rect,
+    sourceSegments: draft.sourceSegments,
+    includeExcerpt: draft.includeExcerpt
+  });
+  if (!snapshot) return { status: "blocked", reason: "stale" };
   const url = new URL(window.location.origin + "/");
-  setOwnerInUrl(url, documentId);
+  setOwnerInUrl(url, documentId, studyOwner);
   url.searchParams.set("analysis", job.id);
   url.searchParams.set("workspace", "data");
   url.searchParams.set("tool", "analysis");
-  const isPaired = job.method === "ttest_paired";
-  const isCorrelation = job.method === "correlation";
-  const method = job.method === "ttest_independent" ? "Independent-samples t-test" : isPaired ? "Paired t-test" : isCorrelation ? "Correlation analysis" : "Descriptive analysis";
-  let citation = `Analysis: ${method} · ${job.dataset_name}\n${url.pathname}${url.search}`;
-  if (isCorrelation) {
-    const result = job.result || {};
-    const test = result.test || {};
-    const kind = test.kind || job.correlation?.kind || "pearson";
-    const columns = Array.isArray(test.columns) ? test.columns : Array.isArray(result.pairs?.columns) ? result.pairs.columns : job.columns || [];
-    const coefficient = test.coefficient || (kind === "spearman" ? "rho" : "r");
-    const interval = test.ci ? `[${test.ci.lower ?? "—"}, ${test.ci.upper ?? "—"}]` : "Unavailable";
-    citation = `Analysis: ${method} · ${job.dataset_name}\nColumns: ${columns[0] || "—"}, ${columns[1] || "—"}\nMethod: ${kind === "spearman" ? "Spearman" : "Pearson"}\n${coefficient}: ${test.estimate ?? "—"} · p: ${test.p_value ?? "—"}\nComplete pairs: ${result.counts?.used ?? "—"} · Excluded pairs: ${result.counts?.excluded ?? "—"}\nConfidence interval: ${interval}\nCorrelation does not imply causation.\n${url.pathname}${url.search}`;
-  }
-  if (isPaired) {
-    const result = job.result || {};
-    const test = result.test || {};
-    const pairing = result.pairing || {};
-    const columns = Array.isArray(test.columns) ? test.columns : Array.isArray(pairing.columns) ? pairing.columns : job.columns || [];
-    const first = columns[0] || "—";
-    const second = columns[1] || "—";
-    const unit = test.unit_column || pairing.unit_column || job.paired?.unit_column || "—";
-    const counts = result.counts || {};
-    citation = `Analysis: ${method} · ${job.dataset_name}\nPaired columns: ${first}, ${second}\nUnit ID: ${unit}\nDifference (first − second): ${first} − ${second}\nComplete pairs: ${counts.used ?? "—"} · Excluded pairs: ${counts.excluded ?? "—"}\n${url.pathname}${url.search}`;
-  }
-  if (isStudy()) {
-    workspace?.showNotes();
-    return study?.addCitation("analysis", job, citation) || false;
-  }
-  const draft = ensureDraft(documentId);
-  if (draft.text.includes(`analysis=${job.id}`)) return true;
-  const separator = draft.text ? (draft.text.endsWith("\n") ? "\n" : "\n\n") : "";
-  draft.text += `${separator}${citation}`;
-  if (draft.richContent && Array.isArray(draft.richContent.ops)) {
-    const ops = JSON.parse(JSON.stringify(draft.richContent.ops));
-    const last = ops.at(-1);
-    if (typeof last?.insert === "string" && last.insert.endsWith("\n")) {
-      last.insert = last.insert.slice(0, -1);
-      if (!last.insert && !last.attributes) ops.pop();
+  try {
+    const notebook = await api(`/api/v1/documents/${encodeURIComponent(documentId)}/analyses/${encodeURIComponent(job.id)}/notebook`);
+    if (state.document?.id !== documentId || isStudy() !== studyOwner || workspace.getNavigationGeneration() !== navigationGeneration) {
+      return { status: "blocked", reason: "stale" };
     }
-    ops.push({ insert: `${separator}${citation}\n` });
-    draft.richContent.ops = ops;
+    const citation = formatAnalysisNote(job, notebook, `${url.pathname}${url.search}`, language);
+    if (state.pendingSaves > 0 || state.pendingMutations.size > 0 || state.editDrafts.has(documentId) || richText?.hasUnpreservedChanges()) {
+      return { status: "blocked", reason: "pending" };
+    }
+    if (studyOwner) {
+      const result = study?.addCitation("analysis", job, citation, snapshot) || { status: "blocked", reason: "stale" };
+      if (result.status === "added") workspace?.showNotes();
+      return result;
+    }
+    captureCurrentDraft();
+    const currentSnapshot = JSON.stringify({
+      text: draft.text,
+      richContent: draft.richContent,
+      page: draft.page,
+      rect: draft.rect,
+      sourceSegments: draft.sourceSegments,
+      includeExcerpt: draft.includeExcerpt
+    });
+    if (state.drafts.get(documentId) !== draft || snapshot !== currentSnapshot) return { status: "blocked", reason: "stale" };
+    if (draft.text.includes(`analysis=${job.id}`)) return { status: "duplicate" };
+    const separator = draft.text ? (draft.text.endsWith("\n") ? "\n" : "\n\n") : "";
+    const combined = `${draft.text}${separator}${citation}`;
+    if (combined.length > 10000) return { status: "blocked", reason: "tooLong" };
+    let richContent = draft.richContent;
+    if (richContent) {
+      if (!Array.isArray(richContent.ops)) return { status: "blocked", reason: "stale" };
+      const ops = JSON.parse(JSON.stringify(richContent.ops));
+      const last = ops.at(-1);
+      if (typeof last?.insert === "string" && last.insert.endsWith("\n")) {
+        last.insert = last.insert.slice(0, -1);
+        if (!last.insert && !last.attributes) ops.pop();
+      }
+      ops.push({ insert: `${separator}${citation}\n` });
+      richContent = { ...richContent, ops };
+      if (ops.length > 512 || new TextEncoder().encode(JSON.stringify(richContent)).length > 65536) {
+        return { status: "blocked", reason: "tooLong" };
+      }
+    }
+    richText?.close({ restoreFocus: false });
+    draft.text = combined;
+    draft.richContent = richContent;
+    if (draft.page === null) {
+      draft.page = state.page;
+      draft.rect = null;
+    }
+    invalidateRequestId(draft);
+    workspace?.showNotes();
+    renderDraft();
+    richText?.focus();
+    return { status: "added" };
+  } catch (error) {
+    return { status: "blocked", reason: error?.code === "invalid_analysis_note" ? "invalid" : "failed" };
   }
-  invalidateRequestId(draft);
-  workspace?.showNotes();
-  renderDraft();
-  elements.noteText.focus();
-  return true;
 }
 
 async function addChartCitation(documentId, chart) {

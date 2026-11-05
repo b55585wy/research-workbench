@@ -153,8 +153,15 @@ const messages = {
     software: "实际计算软件",
     resultTtestNote: "以下结果不包含显著性结论，也不表示正态性或其他前提已得到验证。",
     warnings: "保存的提醒",
-    note: "引用到新笔记草稿",
-    noteAdded: "分析链接已追加到新笔记草稿，尚未保存。",
+    note: "结果加入笔记",
+    noteAdding: "正在读取并核对已保存结果…",
+    noteAdded: "已核对的结果已追加到新笔记草稿，尚未保存。",
+    noteDuplicate: "当前草稿已包含这项分析，未重复追加。",
+    noteStale: "工作区或笔记草稿已变化，未追加内容。请核对后重新点击。",
+    noteBlocked: "请先完成当前笔记保存或编辑，再加入结果；现有草稿未更改。",
+    noteTooLong: "加入后将超过 10000 字，未更改现有草稿。请先精简草稿。",
+    noteInvalid: "已保存的 Notebook 与当前分析不匹配或内容无效，未追加。请重新打开分析后重试。",
+    noteFailed: "无法读取已核对的结果，未更改草稿。请重试。",
     missingCompleteCases: "缺失处理：仅使用结果和分组均完整的行",
     ttest_preview_required: "必须先成功预览当前完整请求。",
     ttest_groups_invalid: "请从实际标签中选择两个不同的分组。",
@@ -405,8 +412,15 @@ const messages = {
     software: "Actual computation software",
     resultTtestNote: "These results include no significance verdict and do not claim that normality or other assumptions have been verified.",
     warnings: "Saved reminders",
-    note: "Add citation to new note draft",
-    noteAdded: "The analysis link was appended to the new note draft; it is not saved.",
+    note: "Add results to note",
+    noteAdding: "Reading and checking saved results…",
+    noteAdded: "Checked results were appended to the new note draft; they are not saved.",
+    noteDuplicate: "This analysis is already included in the current draft; nothing was repeated.",
+    noteStale: "The workspace or note draft changed. Nothing was added; review and click again.",
+    noteBlocked: "Finish the current note save or edit first. The existing draft is unchanged.",
+    noteTooLong: "Adding these results would exceed 10,000 characters. Shorten the draft first; nothing was changed.",
+    noteInvalid: "The saved Notebook does not match this analysis or is invalid. Nothing was added; reopen the analysis and retry.",
+    noteFailed: "Checked results could not be read. The draft is unchanged; try again.",
     missingCompleteCases: "Missing data: only rows with both outcome and group present are used",
     ttest_preview_required: "The exact current request must be previewed successfully first.",
     ttest_groups_invalid: "Choose two different groups from the actual labels.",
@@ -1654,15 +1668,37 @@ export function createAnalysis(adapter) {
     elements.result.append(make("h3", "", job.dataset_name), make("p", "analysis-job-result-status", `${t(job.status)} · ${methodName(job.method)} · ${engineName(job.engine)}`));
     if (job.status === "succeeded") {
       const actions = make("div", "analysis-result-actions");
+      const noteButton = jobButton("analysis-note", entry.notePending ? t("noteAdding") : t("note"), async () => {
+        if (entry.notePending) return;
+        const documentId = currentId;
+        entry.notePending = job.id;
+        entry.noteStatus = { jobId: job.id, key: "noteAdding", kind: "info" };
+        renderResult(entry);
+        try {
+          const result = await adapter.addAnalysisCitation?.(documentId, job);
+          const key = result?.status === "added" ? "noteAdded"
+            : result?.status === "duplicate" ? "noteDuplicate"
+              : result?.reason === "stale" ? "noteStale"
+                : result?.reason === "pending" ? "noteBlocked"
+                  : result?.reason === "tooLong" ? "noteTooLong"
+                    : result?.reason === "invalid" ? "noteInvalid" : "noteFailed";
+          entry.noteStatus = { jobId: job.id, key, kind: result?.status === "added" ? "success" : result?.status === "duplicate" ? "info" : "error" };
+        } catch {
+          entry.noteStatus = { jobId: job.id, key: "noteFailed", kind: "error" };
+        } finally {
+          if (entry.notePending === job.id) entry.notePending = null;
+          if (entry === currentEntry()) renderResult(entry);
+        }
+      }, Boolean(entry.notePending));
+      const noteStatus = make("p", "analysis-result-note", entry.noteStatus?.jobId === job.id ? t(entry.noteStatus.key) : "");
+      noteStatus.setAttribute("role", "status");
+      noteStatus.setAttribute("aria-live", "polite");
+      noteStatus.setAttribute("aria-atomic", "true");
+      if (entry.noteStatus?.jobId === job.id) noteStatus.dataset.kind = entry.noteStatus.kind;
       actions.append(
         jobButton("view-notebook", t("viewNotebook"), () => notebook.open(currentId, job)),
-        jobButton("analysis-note", t("note"), async () => {
-          const added = await adapter.addAnalysisCitation?.(currentId, job);
-          if (added && entry === currentEntry()) {
-            entry.status = { key: "noteAdded", kind: "success" };
-            renderStatus();
-          }
-        })
+        noteButton,
+        noteStatus
       );
       elements.result.append(actions);
     }

@@ -3879,6 +3879,20 @@ h3 {
   line-height: 1.65;
 }
 
+.flow-bilingual-pair {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+}
+
+.flow-bilingual-pair .flow-bilingual-original {
+  color: var(--ui-text-soft);
+}
+
+.flow-bilingual-pair .flow-bilingual-translation {
+  color: var(--ui-text);
+}
+
 .flow-find-match {
   padding: 0;
   background: rgb(250 204 21 / 42%);
