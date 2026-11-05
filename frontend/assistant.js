@@ -935,6 +935,12 @@ export function createAssistant(adapter) {
     help: elements.windowHelp
   });
 
+  function focusAssistant() {
+    const touchLayout = window.matchMedia("(max-width: 820px), (pointer: coarse)").matches;
+    const target = touchLayout ? elements.close : elements.message;
+    target.focus({ preventScroll: true });
+  }
+
   const tasks = createTaskClient({
     api: adapter.api,
     getDocument: adapter.getDocument,
@@ -1349,7 +1355,7 @@ export function createAssistant(adapter) {
       elements.toggle.setAttribute("aria-expanded", "true");
       windowControls.show();
       render();
-      elements.message.focus();
+      focusAssistant();
     }
     return "added";
   }
@@ -1525,7 +1531,7 @@ export function createAssistant(adapter) {
     elements.toggle.setAttribute("aria-expanded", "true");
     windowControls.show();
     render();
-    elements.message.focus();
+    focusAssistant();
     return "added";
   }
 
@@ -3012,7 +3018,7 @@ export function createAssistant(adapter) {
     elements.toggle.setAttribute("aria-expanded", String(open));
     if (open) {
       windowControls.show();
-      elements.message.focus();
+      focusAssistant();
     } else {
       referencePicker.close();
       sourcePreparation.reset();
@@ -3076,7 +3082,7 @@ export function createAssistant(adapter) {
     sourcePreparationGeneration += 1;
     tasks.conversationChanged(paper.id, null);
     render();
-    elements.message.focus();
+    focusAssistant();
   });
   elements.history.addEventListener("change", () => {
     const { paper, entry } = current();
@@ -3162,7 +3168,7 @@ export function createAssistant(adapter) {
       elements.toggle.setAttribute("aria-expanded", "true");
       windowControls.show();
       render();
-      elements.message.focus();
+      focusAssistant();
       return true;
     },
     isClearPending(documentId) {
