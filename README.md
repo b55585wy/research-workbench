@@ -2,8 +2,10 @@ Server deployment and current status: [SERVER-DEPLOYMENT.md](SERVER-DEPLOYMENT.m
 
 # research workspace
 
-当前代码：v0.64.0，入口为 https://itsyiyi.com/ 与 https://5ai.life/，两边用户资料独立。
-v0.64.0 已在双站上线[自定义科研绘图 skill](CUSTOM-CHART-SKILLS.md)：结构化规则、配置导入导出、版本与图表冻结快照；前后端均为 v0.64.0，核对见[发布记录](UPDATE-POLICY.md)。
+当前代码/前端：v0.65.1，公开后端保持 v0.64.0；入口为 https://itsyiyi.com/ 与 https://5ai.life/，两边用户资料独立。
+[医学生示例数据引导](MEDICAL-TEACHING-DATA.md)已上线：预览合成数据、明确导入、真实分析、保存图表和可编辑 PPT，按实际运行环境开放方法。
+资料栏的「试读论文」入口常驻，可打开指定的20页 SLC13A3 论文；旧测试文献及批注保留。本轮仅切换前端，未重启后端。
+v0.64.0 已在双站上线[自定义科研绘图 skill](CUSTOM-CHART-SKILLS.md)：结构化规则、配置导入导出、版本与图表冻结快照；当前版本核对见[发布记录](UPDATE-POLICY.md)。
 v0.63.0 将主要功能导航和笔记视图拆为 React 组件，简化翻译与资料入口，助手引用在当前工作区定位。见[组件边界与验收](UI-COMPONENT-REFACTOR.md)。该轮以前端独立发布、后端保持 v0.62.0，当前版本以上述最新记录为准。
 此前的[选区旁截图操作与统一数据侧栏](SIDEBAR-CAPTURE-ACTIONS.md)保留。
 [取消笔记与离开确认、桌面常显工具、透明文本框](NOTE-DRAFT-CANCEL.md)，以及阅读缓存、星级、翻译与试读资料沿用。实际上线状态见[发布记录](UPDATE-POLICY.md)。

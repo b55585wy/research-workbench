@@ -1,8 +1,8 @@
 # research workspace：近期任务计划
 
 更新：2026-11-05。用户最新排序：先做医工交叉相关能力，再继续阅读主线。
-最新双站前后端均为 v0.64.0：[自定义科研绘图 skill 首版](CUSTOM-CHART-SKILLS.md) 已上线，配置可导入导出、追加版本并冻结到图表。保留 v0.63 的 React 主导航、笔记视图、翻译和引用定位；当前前端由 Codex 实现，后端由 DeepSeek 官方 API 实现。实际核对见 [发布记录](UPDATE-POLICY.md)。
-**今日剩余计划以 [2026-11-05 今日计划](TODAY-PLAN-2026-11-05.md) 为准：自定义绘图 skill A 已完成，下一步医学生示例数据引导 B；笔记控制器仅作后续有界抽取。以下已交付项目不再重复排期。**
+最新双站前端 v0.65.1、后端 v0.64.0：[医学生示例数据引导](MEDICAL-TEACHING-DATA.md)与常驻试读入口已上线；[自定义科研绘图 skill 首版](CUSTOM-CHART-SKILLS.md)保持可用，配置可导入导出、追加版本并冻结到图表。保留 v0.63 的 React 主导航、笔记视图、翻译和引用定位；当前前端由 Codex 实现，后端由 DeepSeek 官方 API 实现。实际核对见 [发布记录](UPDATE-POLICY.md)。
+**今日剩余计划以 [2026-11-05 今日计划](TODAY-PLAN-2026-11-05.md) 为准：A、B 已完成，下一步 C 为笔记控制器的有界抽取。以下已交付项目不再重复排期。**
 最新反馈的翻译简化、工作区入口/区别说明和助手原页引用修正已随 v0.63.0 完成；自定义 skill 首版也已随 v0.64.0 完成。
 上一轮 v0.61.0：已读 PDF 缓存、独立掌握星级、笔记图标/颜色圆点、折叠筛选、简洁译文展示。缓存仍先核对当前工作区和来源，不替代本机正式存储。见 [功能与有界核对](CACHE-NOTES.md) 和 [发布记录](UPDATE-POLICY.md)。
 多 Agent 当前已按后端、笔记/翻译 UI、阅读缓存三个任务包独立实现并由 Codex 集成。下一批工程拆分先提取完整 notes controller 与 reader loader/controller；保留 URL、来源坐标、草稿、revision 和存储隔离。完整计划见 [PARALLEL-AGENTS.md](PARALLEL-AGENTS.md)。
