@@ -2,7 +2,7 @@ Server deployment and current status: [SERVER-DEPLOYMENT.md](SERVER-DEPLOYMENT.m
 
 # research workspace
 
-当前版本：v0.59.0，入口为 https://itsyiyi.com/ 与 https://5ai.life/，两边用户资料独立。
+当前版本：v0.60.0，入口为 https://itsyiyi.com/ 与 https://5ai.life/，两边用户资料独立。
 当前代码 v0.60.0 增加[逐句中英对照、精简翻译入口与真实试读论文](SENTENCE-TRANSLATION.md)，历史译文集中在资源列表；实际上线状态见[发布记录](UPDATE-POLICY.md)。
 可选择浏览器本机资料或服务器游客空间。本机资料保存在 IndexedDB；选区翻译和明确文字问答须预览确认，数据导入/分析尚未接入本机模式。
 加载提示、版本化前端发布和[完全离线启动](OFFLINE-START.md)均已上线。联网打开入口页或服务器工作区，
