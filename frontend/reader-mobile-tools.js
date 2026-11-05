@@ -50,6 +50,7 @@ if (readerPanel && toolbar) {
     fitWidth: '<path d="M4 8V4h4M16 4h4v4M20 16v4h-4M8 20H4v-4M8 12h8m-3-3 3 3-3 3m-2-6-3 3 3 3"/>',
     fitPage: '<rect x="5" y="3" width="14" height="18" rx="1"/><path d="M8 8h8M8 12h8M8 16h5"/>',
     fullscreen: '<path d="M8 3H3v5M16 3h5v5M21 16v5h-5M8 21H3v-5"/>',
+    fullscreenExit: '<path d="M3 8h5V3M16 3v5h5M21 16h-5v5M8 21v-5H3"/>',
     undo: '<path d="m9 7-5 5 5 5M5 12h8a6 6 0 0 1 6 6"/>',
     redo: '<path d="m15 7 5 5-5 5M19 12h-8a6 6 0 0 0-6 6"/>',
     capture: '<path d="M8 3H3v5M16 3h5v5M21 16v5h-5M8 21H3v-5M8 8h8v8H8z"/>',
@@ -192,7 +193,7 @@ if (readerPanel && toolbar) {
   const textAnnotationToolbar = toolbar.querySelector(".text-annotation-toolbar");
   let pdfSelectionSnapshot = null;
   const flowLockedIds = new Set([
-    "page-first", "page-last", "zoom-out", "zoom-in", "zoom-fit", "zoom-fit-page", "reader-fullscreen",
+    "page-first", "page-last", "zoom-out", "zoom-in", "zoom-fit", "zoom-fit-page",
     "annotation-undo", "annotation-redo", "reader-region-mode", "export-reading-record", "export-annotated-pdf",
     "reader-shape-rectangle", "reader-shape-arrow", "reader-shape-line", "reader-shape-ellipse", "reader-shape-ink", "reader-shape-textbox"
   ]);
@@ -298,6 +299,7 @@ if (readerPanel && toolbar) {
 
   addProxy(pageSection.grid, byId("page-first"), "first", { preferAria: true });
   addProxy(pageSection.grid, byId("page-last"), "last", { preferAria: true });
+  addProxy(pageSection.grid, navigationToggle, "directory", { preferAria: true });
   addProxy(viewSection.grid, byId("zoom-out"), "zoomOut", { keepOpen: true, preferAria: true });
   const zoomOutput = document.createElement("output");
   zoomOutput.className = "reader-mobile-zoom-value";
@@ -306,6 +308,10 @@ if (readerPanel && toolbar) {
   addProxy(viewSection.grid, byId("zoom-fit"), "fitWidth");
   addProxy(viewSection.grid, byId("zoom-fit-page"), "fitPage");
   const fullscreenProxy = addProxy(viewSection.grid, byId("reader-fullscreen"), "fullscreen", { preferAria: true });
+  const fullscreenPrimary = addProxy(primaryActions, byId("reader-fullscreen"), "fullscreen", { preferAria: true, keepOpen: true });
+  fullscreenPrimary.id = "reader-mobile-fullscreen";
+  fullscreenPrimary.classList.add("reader-mobile-trigger");
+  primaryActions.insertBefore(fullscreenPrimary, moreTrigger);
   addProxy(viewSection.grid, translationToggle, "translate", { flowLock: true });
   addProxy(exportSection.grid, byId("export-reading-record"), "exportRecord");
   addProxy(exportSection.grid, byId("export-annotated-pdf"), "exportPdf");
@@ -360,7 +366,13 @@ if (readerPanel && toolbar) {
       if (pressed === null) proxy.removeAttribute("aria-pressed");
       else setAttribute(proxy, "aria-pressed", pressed);
     }
-    setAttribute(fullscreenProxy, "aria-pressed", Boolean(document.fullscreenElement));
+    const full = byId("reader-fullscreen").getAttribute("aria-pressed") === "true";
+    for (const proxy of [fullscreenProxy, fullscreenPrimary]) {
+      setAttribute(proxy, "aria-pressed", String(full));
+      if (proxy.dataset.fullscreenIcon === String(full)) continue;
+      proxy.dataset.fullscreenIcon = String(full);
+      proxy.firstElementChild.replaceWith(icon(full ? "fullscreenExit" : "fullscreen"));
+    }
     const annotationNatives = [
       byId("annotation-undo"), byId("annotation-redo"), byId("text-annotation-highlight"), byId("text-annotation-underline"),
       byId("reader-region-mode"), ...Array.from(toolbar.querySelectorAll(".reader-shape-tools button"))

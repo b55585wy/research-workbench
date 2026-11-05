@@ -32,6 +32,7 @@ interface FlowDocument {
 
 export interface FlowReaderModel {
   visible: boolean;
+  fullscreen?: boolean;
   language: FlowLanguage;
   document: FlowDocument | null;
   currentPage: number;
@@ -117,6 +118,7 @@ export interface FlowReaderCallbacks {
   onOpenOriginal: (page: number, rect: FlowRect | null, id: string, hash: string) => Promise<boolean>;
   onPageViewed: (page: number, id: string, hash: string) => void;
   onRequestTranslation: (page: number, id: string, hash: string) => void;
+  onToggleFullscreen?: (trigger: HTMLButtonElement) => void;
 }
 
 export interface MountFlowReaderOptions {
@@ -144,6 +146,8 @@ const visualKinds = new Set(["image", "table", "formula"]);
 const strings = {
   zh: {
     heading: "段落阅读",
+    fullscreen: "阅读全屏",
+    exitFullscreen: "退出全屏",
     original: "原文",
     translated: "已存译文",
     bilingual: "双语对照",
@@ -206,6 +210,8 @@ const strings = {
   },
   en: {
     heading: "Paragraph reading",
+    fullscreen: "Reading fullscreen",
+    exitFullscreen: "Exit fullscreen",
     original: "Original",
     translated: "Saved translation",
     bilingual: "Bilingual",
@@ -553,7 +559,7 @@ function findInPages(pages: SourcePage[], query: string, mode: TextMode, transla
   return matches;
 }
 
-type FlowIconName = "return" | "previous" | "next" | "settings" | "search" | "up" | "down";
+type FlowIconName = "return" | "previous" | "next" | "settings" | "search" | "up" | "down" | "expand" | "collapse";
 
 function FlowIcon({ name }: { name: FlowIconName }) {
   return (
@@ -565,6 +571,8 @@ function FlowIcon({ name }: { name: FlowIconName }) {
       {name === "down" && <path d="m4 8 6 6 6-6" />}
       {name === "settings" && <><path d="M3 5h14M3 10h14M3 15h14" /><path d="M7 3v4M13 8v4M8 13v4" /></>}
       {name === "search" && <><circle cx="8.5" cy="8.5" r="5" /><path d="m12 12 4.5 4.5" /></>}
+      {name === "expand" && <path d="M7 3H3v4M13 3h4v4M17 13v4h-4M7 17H3v-4" />}
+      {name === "collapse" && <path d="M3 7h4V3M13 3v4h4M17 13h-4v4M7 17v-4H3" />}
     </svg>
   );
 }
@@ -1039,15 +1047,25 @@ function FlowReader({ model, callbacks }: { model: FlowReaderModel; callbacks: F
           <h2>{copy.heading}</h2>
           <p title={document.title || copy.untitled}>{document.title || copy.untitled}</p>
         </div>
-        <button
-          className="button button-secondary flow-icon-button"
-          type="button"
-          aria-label={copy.returnPdf}
-          title={copy.returnPdf}
-          onClick={() => void callbacks.onOpenOriginal(viewedPage, null, document.id, document.sha256)}
-        >
-          <FlowIcon name="return" />
-        </button>
+        <div className="flow-header-actions">
+          <button
+            className="button button-secondary flow-icon-button"
+            type="button"
+            aria-label={copy.returnPdf}
+            title={copy.returnPdf}
+            onClick={() => void callbacks.onOpenOriginal(viewedPage, null, document.id, document.sha256)}
+          >
+            <FlowIcon name="return" />
+          </button>
+          {callbacks.onToggleFullscreen && <button
+            className="button button-quiet flow-icon-button flow-fullscreen-toggle"
+            type="button"
+            aria-label={model.fullscreen ? copy.exitFullscreen : copy.fullscreen}
+            title={model.fullscreen ? copy.exitFullscreen : copy.fullscreen}
+            aria-pressed={Boolean(model.fullscreen)}
+            onClick={(event) => callbacks.onToggleFullscreen?.(event.currentTarget)}
+          ><FlowIcon name={model.fullscreen ? "collapse" : "expand"} /></button>}
+        </div>
       </header>
       <div className="flow-controls">
         <div className="flow-text-modes" role="group" aria-label={copy.textModeLabel}>

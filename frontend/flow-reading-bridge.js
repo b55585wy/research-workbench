@@ -48,6 +48,7 @@ export function createFlowReadingBridge({
   goToSource,
   onPageViewed,
   onRequestTranslation,
+  onToggleFullscreen,
   onMounted,
   bundleBase = "/vendor/workspace-shell"
 }) {
@@ -223,7 +224,8 @@ export function createFlowReadingBridge({
             getVisual,
             onOpenOriginal: goToSource,
             onPageViewed,
-            onRequestTranslation
+            onRequestTranslation,
+            onToggleFullscreen
           },
           onMounted
         });

@@ -1,0 +1,82 @@
+.flow-header-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+}
+
+html.reader-fullscreen-active,
+html.reader-fullscreen-active body {
+  overflow: hidden;
+}
+
+html.reader-fullscreen-active #reader-panel.reader-fullscreen-panel {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 120;
+  display: flex !important;
+  flex-direction: column;
+  width: 100% !important;
+  height: 100vh !important;
+  height: 100dvh !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  margin: 0;
+  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+  border: 0;
+  border-radius: 0;
+  overflow: hidden;
+  background: var(--ui-surface);
+}
+
+.reader-fullscreen-panel > :is(.reader-heading-row, .metadata-panel, .reader-progress-status) {
+  display: none;
+}
+
+.reader-fullscreen-panel .reader-translation-layout,
+.reader-fullscreen-panel .flow-reader-host {
+  flex: 1;
+  min-height: 0;
+}
+
+.reader-fullscreen-panel[data-flow-active="true"] > .reader-toolbar {
+  display: none;
+}
+
+.reader-fullscreen-panel .flow-header {
+  padding-block: 4px;
+}
+
+.reader-fullscreen-panel .flow-heading-wrap h2 {
+  display: none;
+}
+
+.reader-fullscreen-panel .flow-heading-wrap p {
+  margin: 0;
+}
+
+html.reader-fullscreen-active .mobile-primary-navigation {
+  display: none;
+}
+
+@media (max-width: 820px) {
+  html.reader-mobile-tools-active .reader-toolbar #reader-navigation-toggle {
+    display: none;
+  }
+
+  html.reader-mobile-tools-active #reader-mobile-fullscreen {
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+    min-height: 44px;
+    padding: 0;
+  }
+
+  #reader-mobile-fullscreen > :not(svg) {
+    display: none;
+  }
+
+  .reader-fullscreen-panel .reader-mobile-sheet {
+    bottom: max(8px, env(safe-area-inset-bottom, 0px));
+  }
+}

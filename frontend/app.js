@@ -41,6 +41,7 @@ import { createReaderCaptureActions } from "/reader-capture-actions.js";
 import { createAssistantPdfNavigator } from "/assistant-pdf-navigation.js";
 import { createNotesWorkspace } from "/notes-workspace.js";
 import { createResearchShell } from "/research-shell.js";
+import { createReaderFullscreen, captureFlowPosition, createFlowPositionRestorer } from "/reader-fullscreen.js";
 
 window.workbenchStartup?.stage("workspace");
 pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf-worker-compat.js?v=0.52.0";
@@ -1320,6 +1321,7 @@ let readerFind = null;
 let selectionTranslation = null;
 let readerObjects = null;
 let readerShapes = null;
+let readerFullscreen = null;
 let lastReadingDocumentId = null;
 let lastDataDocumentId = null;
 let lastDataSelection = { datasetId: null, analysisId: null, chartId: null };
@@ -1400,7 +1402,8 @@ const flowReader = createFlowReadingBridge({
   getDocument: () => state.document && !isStudy() ? state.document : null,
   goToSource: goToFlowSource,
   onPageViewed: flowPageViewed,
-  onRequestTranslation: openFlowTranslation
+  onRequestTranslation: openFlowTranslation,
+  onToggleFullscreen: (trigger) => void readerFullscreen?.toggle(trigger)
 });
 elements.translationControls.addEventListener("translation-presentation-change", (event) => {
   const snapshot = event.detail;
@@ -1945,6 +1948,7 @@ function flowReaderModel() {
   const paper = state.document && !isStudy() ? state.document : null;
   return {
     visible: Boolean(state.flowActive && paper && state.pdf && workspace?.getMode() === "reading"),
+    fullscreen: Boolean(readerFullscreen?.isActive()),
     language: state.language,
     document: paper ? {
       id: paper.id,
@@ -3462,6 +3466,7 @@ function renderDocumentDetails() {
   elements.zoomFit.setAttribute("aria-pressed", String(state.zoomMode === "fit"));
   elements.zoomFitPage.disabled = !hasPdf;
   elements.readerFullscreen.disabled = !hasPdf;
+  readerFullscreen?.update();
   const annotationDisabled = !hasPdf || state.pendingSaves > 0 || state.pendingMutations.size > 0;
   const shapeUnsaved = Boolean(readerShapes?.hasUnsavedChanges?.());
   const historyCounts = document ? annotationHistory.counts(document.id) : { undo: 0, redo: 0 };
@@ -8137,26 +8142,27 @@ elements.zoomFitPage.addEventListener("click", async () => {
     if (state.pdf === pdf && state.document?.id === documentId && state.loadSequence === loadSequence) setStatus(error.code || "renderFailed", "error", {}, () => requestRender());
   }
 });
-let fullscreenAnchor = null;
-elements.readerFullscreen.addEventListener("click", async () => {
-  const panel = document.querySelector(".reader-panel");
-  fullscreenAnchor = captureReaderAnchor();
-  try {
-    if (document.fullscreenElement) await document.exitFullscreen();
-    else if (panel.requestFullscreen) await panel.requestFullscreen();
-    else throw new Error("unsupported");
-  } catch {
-    fullscreenAnchor = null;
-    setStatus("fullscreenFailed", "error");
-  }
+const fullscreenFlowPosition = createFlowPositionRestorer({
+  isCurrent: (snapshot) => snapshot.document === state.document && state.flowActive
 });
-document.addEventListener("fullscreenchange", () => {
-  const active = Boolean(document.fullscreenElement);
-  elements.readerFullscreen.textContent = t(active ? "exitFullscreen" : "readerFullscreen");
-  elements.readerFullscreen.setAttribute("aria-label", t(active ? "exitFullscreen" : "readerFullscreen"));
-  const anchor = fullscreenAnchor;
-  fullscreenAnchor = null;
-  if (state.pdf) void requestRender(anchor);
+readerFullscreen = createReaderFullscreen({
+  panel: elements.readerStage.closest(".reader-panel"),
+  button: elements.readerFullscreen,
+  getLabel: (active) => t(active ? "exitFullscreen" : "readerFullscreen"),
+  capture: () => ({
+    document: state.document,
+    flow: state.flowActive,
+    position: state.flowActive ? captureFlowPosition(elements.flowReader.querySelector(".flow-scroll")) : captureReaderAnchor()
+  }),
+  onChange: ({ snapshot }) => {
+    flowReader.update(flowReaderModel());
+    if (!snapshot || snapshot.document !== state.document || snapshot.flow !== state.flowActive) return;
+    if (state.flowActive) fullscreenFlowPosition.schedule(snapshot);
+    else {
+      fullscreenFlowPosition.cancel();
+      if (state.pdf) void requestRender(snapshot.position);
+    }
+  }
 });
 elements.viewMode.addEventListener("change", () => {
   if (!state.pdf) return;
@@ -8882,6 +8888,7 @@ workspace = createWorkspace({
   modeSelected: (mode) => mode === "data" ? openDataWorkspace() : openReadingWorkspace(),
   modeRendered: (mode) => {
     dataNavigation?.setMode(mode);
+    if (mode !== "reading") void readerFullscreen?.exit({ restoreFocus: false });
     if (mode !== "reading" && state.flowActive) deactivateFlow();
     if (mode !== "reading") state.translationLibraryOpen = false;
     selectionTranslation?.contextChanged();
