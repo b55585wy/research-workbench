@@ -126,6 +126,83 @@
   margin: 8px 0 0;
 }
 
+@media (min-width: 821px) {
+  .reader-toolbar {
+    flex-direction: row;
+  }
+
+  .reader-secondary-tools {
+    position: static;
+    flex: 1 1 100%;
+    min-width: 0;
+    max-width: 100%;
+    margin-left: 0;
+  }
+
+  .reader-secondary-tools > summary,
+  .reader-secondary-tools .reader-draw-menu > summary {
+    display: none;
+  }
+
+  .reader-secondary-tools-panel {
+    position: static;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .reader-secondary-tools-panel .reader-source-controls {
+    display: contents;
+  }
+
+  .reader-secondary-tools .reader-draw-menu {
+    position: static;
+    display: flex;
+    flex: 0 1 auto;
+    flex-wrap: wrap;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .reader-secondary-tools .reader-shape-tool-menu,
+  .reader-secondary-tools .reader-draw-menu:not([open]) > .reader-shape-tool-menu {
+    position: static;
+    display: flex;
+    flex: 0 1 auto;
+    flex-wrap: wrap;
+    gap: 4px;
+    min-width: 0;
+    max-width: 100%;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .reader-secondary-tools-panel :is(.export-reading-record, .annotated-pdf-export) {
+    min-width: 0;
+    max-width: 100%;
+    margin: 0;
+  }
+
+  .reader-secondary-tools-panel :is(.reader-shape-tool-menu .button, .export-reading-record, .annotated-pdf-export .button) {
+    min-width: 0;
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}
+
 .translation-library-nav {
   padding: 4px 12px;
 }

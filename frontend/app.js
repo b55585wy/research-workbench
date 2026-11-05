@@ -33,11 +33,13 @@ import { offlineSupport } from "/offline-client.js";
 import { serverPdfCache } from "/server-pdf-cache.js";
 import { collectPdfTextSelection, formatSelectionQuote, sourceSegmentsFor } from "/cross-page-selection.js";
 import { createSelectionTranslation } from "/selection-translation.js";
+import { createNoteDraftControls, createNoteDraftHistory } from "/note-draft-controls.js";
 
 window.workbenchStartup?.stage("workspace");
 pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf-worker-compat.js?v=0.52.0";
 
 const deviceMode = isDeviceMode();
+const noteDraftHistory = createNoteDraftHistory(window);
 if (deviceMode) document.documentElement.dataset.storageMode = "device";
 let deviceRepository = null;
 let deviceReadyPromise = null;
@@ -49,7 +51,7 @@ const MAX_DEVICE_PIXEL_RATIO = 2;
 const MAX_FILE_BYTES = 20 * 1024 * 1024;
 const ZOOM_MIN = 0.4;
 const ZOOM_MAX = 3;
-const APP_VERSION = "0.61.0";
+const APP_VERSION = "0.62.0";
 const PDF_RANGE_CHUNK_SIZE = 64 * 1024;
 const PDF_LOADING_HINT_DELAY = 12_000;
 
@@ -193,6 +195,11 @@ const messages = {
     viewImage: "查看 / 批注",
     editMode: "编辑已保存笔记 · 来源位置保持不变",
     editCancel: "取消编辑",
+    noteCancel: "取消笔记",
+    noteDiscardConfirm: "放弃当前未保存的笔记及临时选择吗？",
+    editDiscardConfirm: "放弃当前笔记的未保存修改及临时选择吗？",
+    noteDraftPending: "操作尚未完成，请稍后再取消或离开。",
+    noteDraftRetryRequired: "保存结果尚未确认，请先重试保存，再取消或离开。",
     saveEdit: "保存修改",
     retryEdit: "重试保存修改",
     reviewExplainer: "引文原文核对状态与掌握程度分别记录。",
@@ -670,6 +677,11 @@ const messages = {
     viewImage: "View / annotate",
     editMode: "Editing a saved note · source location stays unchanged",
     editCancel: "Cancel edit",
+    noteCancel: "Cancel note",
+    noteDiscardConfirm: "Discard the current unsaved note and its temporary selections?",
+    editDiscardConfirm: "Discard unsaved changes to this note and its temporary selections?",
+    noteDraftPending: "An operation is still in progress. Wait before cancelling or leaving.",
+    noteDraftRetryRequired: "The save is not yet confirmed. Retry saving before cancelling or leaving.",
     saveEdit: "Save changes",
     retryEdit: "Retry saving changes",
     reviewExplainer: "Quoted-source checks and mastery are tracked separately.",
@@ -1127,6 +1139,7 @@ const elements = {
   richTextPlain: $("rich-text-plain"),
   richTextDraftStatus: $("rich-text-draft-status"),
   noteSave: $("note-save"),
+  noteCancel: $("note-cancel"),
   excerptSave: $("excerpt-save"),
   regionMode: $("reader-region-mode"),
   pageNote: $("page-note"),
@@ -1258,6 +1271,7 @@ const state = {
   highlight: null,
   highlightRevealId: null,
   regionActive: false,
+  regionDraftOwner: null,
   regionCapture: null,
   selection: null,
   selectedAnnotationId: null,
@@ -1293,6 +1307,18 @@ let lastDataDocumentId = null;
 let lastDataSelection = { datasetId: null, analysisId: null, chartId: null };
 let workspaceModeIntent = 0;
 let workspaceModePending = false;
+let workspaceDraftNavigation = null;
+
+const noteDraftControls = createNoteDraftControls({
+  capture: captureCurrentDraft,
+  getContext: currentNoteDraftContext,
+  confirm: (mode) => window.confirm(t(mode === "edit" ? "editDiscardConfirm" : "noteDiscardConfirm")),
+  blocked: (key) => {
+    if (key === "navigationRichDraftError") workspace?.showNotes();
+    setStatus(key, "info");
+  },
+  discard: discardCurrentNoteDraft
+});
 
 const workspaceShell = createWorkspaceShellBridge({
   identityContainer: elements.identity,
@@ -1760,6 +1786,7 @@ function invalidateRequestId(draft) {
 function highlightDraft(documentId, page, rect, sourceSegments = null) {
   state.highlight = {
     id: `draft-source-${documentId}`,
+    draftOwner: state.editDrafts.get(documentId) || ensureDraft(documentId),
     document_id: documentId,
     page,
     rect: rect ? [...rect] : null,
@@ -1767,6 +1794,84 @@ function highlightDraft(documentId, page, rect, sourceSegments = null) {
   };
   state.highlightRevealId = null;
   drawHighlight();
+}
+
+function noteDraftOwns(temporary, draft) {
+  return Boolean(temporary?.draftOwner === draft &&
+    (!temporary.documentId || temporary.documentId === state.document?.id) &&
+    (!temporary.sourceSha || temporary.sourceSha === state.document?.sha256));
+}
+
+function currentNoteDraftContext() {
+  const document = state.document;
+  if (!document || isStudy()) return null;
+  const editDraft = state.editDrafts.get(document.id);
+  const draft = editDraft || ensureDraft(document.id);
+  const owns = (temporary) => noteDraftOwns(temporary, draft);
+  const capture = owns(state.regionCapture) ? state.regionCapture : null;
+  const selection = owns(state.selection) ? state.selection : null;
+  const textSelection = owns(state.capturedTextSelection) ? state.capturedTextSelection : null;
+  return {
+    document, documentId: document.id, sourceSha: document.sha256,
+    scope: `${deviceMode ? "device" : "server"}:${window.location.pathname}`,
+    loadGeneration: state.loadSequence,
+    navigationGeneration: workspace?.getNavigationGeneration(),
+    mode: editDraft ? "edit" : "create", draft,
+    imageIds: editDraft ? [] : imageLibrary?.getNoteSelection(document.id) || [],
+    capture, selection, textSelection,
+    highlight: owns(state.highlight) ? state.highlight : null,
+    regionActive: state.regionActive && state.regionDraftOwner === draft,
+    richError: Boolean(richText?.hasUnpreservedChanges?.()),
+    pending: state.pendingSaves > 0 || state.pendingMutations.size > 0 || state.pendingExcerpts.size > 0 ||
+      Boolean(state.regionCapture?.pending),
+    retryRequired: Boolean((draft.saveFailed && !draft.conflicted) || draft.imageFailed || capture?.error),
+    navigationBlocked: contextNavigationBlocker(draft)
+  };
+}
+
+function renderNoteDraftCancel() {
+  const context = currentNoteDraftContext();
+  elements.noteCancel.hidden = !context || context.mode === "edit";
+  elements.noteCancel.disabled = noteDraftControls.getState().disabled;
+}
+
+function discardCurrentNoteDraft(context, { navigation }) {
+  richText?.close({ restoreFocus: false });
+  if (context.mode === "edit") state.editDrafts.delete(context.documentId);
+  else state.drafts.set(context.documentId, makeEmptyDraft());
+  if (context.capture) state.regionCapture = null;
+  if (context.regionActive || context.selection) {
+    const selection = context.selection;
+    if (selection?.overlay?.hasPointerCapture?.(selection.pointerId)) selection.overlay.releasePointerCapture(selection.pointerId);
+    setRegionMode(false);
+    state.pointerDragPage = null;
+  }
+  if (context.textSelection) {
+    state.capturedTextSelection = null;
+    selectionTranslation?.selectionChanged(null);
+    const selection = window.getSelection();
+    if (selection?.anchorNode && elements.readerStage.contains(selection.anchorNode)) selection.removeAllRanges();
+    resetTextAnnotationToolbar();
+  }
+  const temporaryHighlight = context.highlight && state.highlight === context.highlight && (
+    state.highlight.id === `draft-source-${context.documentId}` ||
+    state.highlight.id === `reader-capture-${context.documentId}`
+  );
+  if (temporaryHighlight) {
+    const highlightId = state.highlight.id;
+    state.highlight = null;
+    state.highlightRevealId = null;
+    elements.readerStage.querySelectorAll(".source-highlight").forEach((node) => {
+      if (node.dataset.noteId === highlightId) node.remove();
+    });
+  }
+  if (context.imageIds.length) imageLibrary?.clearNoteSelection(context.documentId, context.imageIds);
+  clearStatus();
+  renderDocumentDetails();
+  renderDraft();
+  renderNotes();
+  assistant?.contextChanged();
+  if (!navigation) richText?.focus();
 }
 
 function workspaceShellModel() {
@@ -3364,6 +3469,7 @@ function renderRegionCapture() {
 }
 
 function renderDraft() {
+  renderNoteDraftCancel();
   if (isStudy()) {
     elements.regionDraft.hidden = true;
     elements.readerRegionMode.disabled = true;
@@ -4042,29 +4148,36 @@ function cancelDocumentWork() {
   clearHighlights();
 }
 
-function prepareContextNavigation() {
-  captureCurrentDraft();
-  captureCurrentMetadataDraft();
+function contextNavigationBlocker(draft = null) {
   const documentId = state.document?.id;
+  draft ||= documentId && !isStudy() ? state.editDrafts.get(documentId) || ensureDraft(documentId) : null;
   const pendingWrite = Boolean(
     state.pendingSaves > 0 ||
     state.pendingMutations.size > 0 ||
     state.pendingMetadata.size > 0 ||
     state.pendingExcerpts.size > 0 ||
+    state.regionCapture?.pending ||
     documentId && study?.hasPending(documentId) ||
     documentId && analysis?.hasPending?.(documentId) ||
     documentId && presentations?.hasPending?.(documentId) ||
     dataImports?.isImportPending?.()
   );
-  if (pendingWrite) setStatus("navigationPendingWrite", "info");
-  else if (documentId && assistant?.isClearPending?.(documentId)) setStatus("navigationConversationClear", "info");
-  else if (readerShapes?.hasUnsavedChanges?.()) setStatus("navigationDrawing", "error");
-  else if (state.regionCapture) setStatus("navigationScreenshot", "error");
-  else if (state.selection) setStatus("navigationSelection", "error");
-  else if (richText?.hasUnpreservedChanges?.()) {
-    workspace?.showNotes();
-    setStatus("navigationRichDraftError", "error");
-  } else return true;
+  if (pendingWrite) return "navigationPendingWrite";
+  if (documentId && assistant?.isClearPending?.(documentId)) return "navigationConversationClear";
+  if (readerShapes?.hasUnsavedChanges?.()) return "navigationDrawing";
+  if (state.regionCapture && !noteDraftOwns(state.regionCapture, draft)) return "navigationScreenshot";
+  if (state.selection && !noteDraftOwns(state.selection, draft)) return "navigationSelection";
+  if (richText?.hasUnpreservedChanges?.()) return "navigationRichDraftError";
+  return null;
+}
+
+function prepareContextNavigation(draftNavigation = null) {
+  captureCurrentDraft();
+  captureCurrentMetadataDraft();
+  const blocker = contextNavigationBlocker();
+  if (!blocker) return noteDraftControls.prepareNavigation(draftNavigation);
+  if (blocker === "navigationRichDraftError") workspace?.showNotes();
+  setStatus(blocker, blocker === "navigationPendingWrite" || blocker === "navigationConversationClear" ? "info" : "error");
   return false;
 }
 
@@ -4072,13 +4185,16 @@ function invalidateWorkspaceModeIntent(intent = null) {
   if (intent !== null && intent === workspaceModeIntent) return;
   workspaceModeIntent += 1;
   workspaceModePending = false;
+  workspaceDraftNavigation = null;
   workspace?.setModePending(false);
 }
 
 function beginWorkspaceModeIntent() {
-  if (workspaceModePending || !prepareContextNavigation()) return null;
+  const draftNavigation = {};
+  if (workspaceModePending || !prepareContextNavigation(draftNavigation)) return null;
   const intent = ++workspaceModeIntent;
   workspaceModePending = true;
+  workspaceDraftNavigation = draftNavigation;
   workspace?.setModePending(true);
   return intent;
 }
@@ -4086,6 +4202,7 @@ function beginWorkspaceModeIntent() {
 function finishWorkspaceModeIntent(intent) {
   if (intent !== workspaceModeIntent) return;
   workspaceModePending = false;
+  workspaceDraftNavigation = null;
   workspace?.setModePending(false);
 }
 
@@ -4265,10 +4382,11 @@ async function openDocument(documentId, options = {}) {
   if (options.modeIntent != null && options.modeIntent !== workspaceModeIntent) return false;
   invalidateWorkspaceModeIntent(options.modeIntent ?? null);
   const navigationIntent = workspaceModeIntent;
+  const draftNavigation = options.draftNavigation || (options.modeIntent != null ? workspaceDraftNavigation || {} : {});
   const knownTarget = state.documents.find((item) => item.id === documentId) || state.studies.find((item) => item.id === documentId);
   const requestedMode = options.workspace || (options.noteId || options.imageLink ? "reading" : options.analysisId || options.datasetId || options.chartId || knownTarget?.kind === "study" ? "data" : null);
   const contextChanging = Boolean(state.document && (state.document.id !== documentId || requestedMode && requestedMode !== workspace?.getMode()));
-  if (contextChanging && !prepareContextNavigation()) return false;
+  if (contextChanging && !prepareContextNavigation(draftNavigation)) return false;
   if (state.document?.id !== documentId) translationOverlay.clear();
   const explicitIntent = Boolean(options.explicitIntent || options.noteId || options.imageLink || options.analysisId || options.datasetId || options.chartId);
   if (explicitIntent || state.document && state.document.id !== documentId) cancelReaderProgressRestore();
@@ -4290,7 +4408,7 @@ async function openDocument(documentId, options = {}) {
     }
     const resolvedMode = options.workspace || (options.noteId || options.imageLink ? "reading" : options.analysisId || options.datasetId || options.chartId || document?.kind === "study" ? "data" : null);
     const resolveContextChanging = Boolean(state.document && (state.document.id !== documentId || resolvedMode && resolvedMode !== workspace?.getMode()));
-    if (resolveContextChanging && !prepareContextNavigation()) return false;
+    if (resolveContextChanging && !prepareContextNavigation(draftNavigation)) return false;
     if (navigationIntent !== workspaceModeIntent) return false;
     if (!document) {
       showMissingDocument();
@@ -4344,7 +4462,7 @@ async function openDocument(documentId, options = {}) {
 
   if (navigationIntent !== workspaceModeIntent) return false;
   const navigationContextChanging = Boolean(state.document && (state.document.id !== documentId || mode !== workspace?.getMode()));
-  if (navigationContextChanging && !prepareContextNavigation()) return false;
+  if (navigationContextChanging && !prepareContextNavigation(draftNavigation)) return false;
   if (navigationIntent !== workspaceModeIntent) return false;
   workspace?.reveal(mode, { tool, showNotes: Boolean(options.noteId || options.imageLink) });
   captureCurrentDraft();
@@ -5502,6 +5620,10 @@ function readPdfTextSelection() {
     geometry: pdfSelectionGeometry,
     toolbarPage: state.page
   });
+  if (collected) {
+    collected.draftOwner = state.editDrafts.get(state.document.id) || ensureDraft(state.document.id);
+    collected.sourceSha = state.document.sha256;
+  }
   if (collected && !collected.source_segments) {
     const record = state.readerPages.get(collected.page);
     if (record && state.activePageRecord !== record) activateReaderPage(record);
@@ -5533,6 +5655,7 @@ function updateTextAnnotationToolbar() {
   selectionTranslation?.selectionChanged(selected);
   if (selected) closeSelectedAnnotation();
   state.capturedTextSelection = selected;
+  renderNoteDraftCancel();
   if (!selected || state.pendingSaves > 0 || state.pendingMutations.size > 0) {
     resetTextAnnotationToolbar();
     return;
@@ -6405,6 +6528,7 @@ async function openNote(noteId, options = {}) {
 function setRegionMode(active) {
   if (active) readerShapes?.cancel();
   state.regionActive = Boolean(active && state.pdf && state.document);
+  state.regionDraftOwner = state.regionActive ? state.editDrafts.get(state.document.id) || ensureDraft(state.document.id) : null;
   readerShapes?.updateControls();
   elements.regionMode.setAttribute("aria-pressed", String(state.regionActive));
   renderReaderActionLabel(elements.regionMode, state.regionActive ? "cancelRegion" : "regionMode");
@@ -6415,6 +6539,7 @@ function setRegionMode(active) {
   });
   elements.anchorHelp.textContent = state.regionActive ? t("regionInstructions") : t("anchorHelp");
   if (!state.regionActive) cancelSelection();
+  renderNoteDraftCancel();
 }
 
 function eventPoint(event, overlay = state.selection?.overlay || elements.overlay) {
@@ -6527,6 +6652,7 @@ async function handleReaderObjectAction(record, object, action) {
   }
   state.regionCapture = {
     documentId: owner.id,
+    draftOwner: state.editDrafts.get(owner.id) || ensureDraft(owner.id),
     sourceSha: owner.sha256,
     page: record.pageNumber,
     rect: [...object.rect],
@@ -6569,6 +6695,7 @@ async function captureShape(interaction, target) {
   }
   const capture = {
     shape: true,
+    draftOwner: state.editDrafts.get(owner.id) || ensureDraft(owner.id),
     shapeNoteId: note.id,
     shapeRevision: note.revision,
     shapeKind: note.shape_annotation.kind,
@@ -6749,6 +6876,7 @@ function finishSelection(event) {
   const rect = [left / point.width, top / point.height, (left + width) / point.width, (top + height) / point.height];
   state.regionCapture = {
     documentId,
+    draftOwner: state.editDrafts.get(documentId) || ensureDraft(documentId),
     sourceSha: owner.sha256,
     page,
     rect,
@@ -6965,10 +7093,6 @@ async function submitSave(includeExcerpt = false) {
     rect: draft.rect ? [...draft.rect] : null,
     text: draft.text.trim()
   };
-  if (!await addSourceSegments(payload, draft.sourceSegments)) {
-    setStatus("crossPageSelection", "error");
-    return;
-  }
   if (draft.richContent) payload.rich_content = JSON.parse(JSON.stringify(draft.richContent));
   if (imageIds.length) payload.image_ids = imageIds;
   let noteSaved = false;
@@ -6980,6 +7104,10 @@ async function submitSave(includeExcerpt = false) {
   setStatus(includeImage ? "savingImage" : "saving");
 
   try {
+    if (!await addSourceSegments(payload, draft.sourceSegments)) {
+      setStatus("crossPageSelection", "error");
+      return;
+    }
     const endpoint = imageIds.length ? "image-notes" : "notes";
     const note = await api(`/api/v1/documents/${encodeURIComponent(document.id)}/${endpoint}`, {
       method: "POST",
@@ -7068,6 +7196,7 @@ function startEditNote(document, note) {
     note: { ...note },
     text: note.text,
     richContent: noteState.rich_content ? JSON.parse(JSON.stringify(noteState.rich_content)) : null,
+    originalRichContent: noteState.rich_content ? JSON.parse(JSON.stringify(noteState.rich_content)) : null,
     richContentChanged: false,
     expectedRevision: noteState.revision,
     requestId: null,
@@ -7082,16 +7211,7 @@ function startEditNote(document, note) {
 }
 
 function cancelEditNote() {
-  if (!state.document) return;
-  const editDraft = state.editDrafts.get(state.document.id);
-  if (!editDraft || state.pendingMutations.has(mutationKey(state.document.id, editDraft.noteId))) return;
-  richText?.close({ restoreFocus: false });
-  state.editDrafts.delete(state.document.id);
-  clearStatus();
-  renderDocumentDetails();
-  renderDraft();
-  renderNotes();
-  elements.noteText.focus();
+  noteDraftControls.cancel("edit");
 }
 
 async function submitEditSave() {
@@ -8045,6 +8165,7 @@ elements.noteForm.addEventListener("submit", (event) => {
   submitSave();
 });
 elements.editCancel.addEventListener("click", cancelEditNote);
+elements.noteCancel.addEventListener("click", () => noteDraftControls.cancel("create"));
 elements.excerptSave.addEventListener("click", () => submitSave(true));
 elements.notesFilterQuery.addEventListener("input", () => {
   if (!state.document || isStudy()) return;
@@ -8110,6 +8231,9 @@ elements.readerStage.addEventListener("pointerdown", (event) => {
   const point = eventPoint(event, overlay);
   state.selection = {
     pointerId: event.pointerId,
+    documentId: state.document.id,
+    sourceSha: state.document.sha256,
+    draftOwner: state.editDrafts.get(state.document.id) || ensureDraft(state.document.id),
     record,
     overlay,
     activeSelection: record.activeSelection,
@@ -8175,7 +8299,6 @@ document.addEventListener("keydown", (event) => {
 window.addEventListener("pagehide", flushReaderProgress);
 
 window.addEventListener("popstate", () => {
-  invalidateWorkspaceModeIntent();
   const params = new URLSearchParams(window.location.search);
   const studyId = params.get("study");
   const documentId = studyId || params.get("document");
@@ -8186,6 +8309,10 @@ window.addEventListener("popstate", () => {
   const chartId = params.get("chart");
   const hasExplicitMode = params.has("workspace") || ["note", "analysis", "dataset", "chart", "image_source"].some((key) => params.has(key));
   const mode = studyId && !hasExplicitMode ? "data" : workspace?.modeForParams(params) || "reading";
+  const draftNavigation = {};
+  const contextChanging = (state.document?.id || null) !== documentId || mode !== workspace?.getMode();
+  if (!noteDraftHistory.traverse(() => !contextChanging || prepareContextNavigation(draftNavigation))) return;
+  invalidateWorkspaceModeIntent();
   const tool = chartId || params.get("tool") === "charts" ? "charts" : "analysis";
   const imageLink = studyId ? null : readImageLink(params);
   const validPage = mode === "reading" && page && state.document?.id === documentId && page <= state.document.page_count;
@@ -8239,6 +8366,7 @@ window.addEventListener("popstate", () => {
       imageLink: mode === "reading" ? imageLink || null : null,
       workspace: mode,
       tool,
+      draftNavigation,
       preserveUrl: true
     });
   }

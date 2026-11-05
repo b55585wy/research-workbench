@@ -329,6 +329,18 @@ def textbox_shape(page, note, writer, budget):
     height = math.hypot(*vertical)
     rendered = render_textbox(shape, note['text'], width, height, budget)
 
+    # The antialiased glyph coverage is a same-sized DeviceGray soft mask, so the ink plane
+    # stays invisible outside the text and the page content beneath stays visible. /SMask
+    # needs PDF 1.4; the writer header is already raised to at least 1.7 above.
+    mask = StreamObject()
+    mask.set_data(rendered['mask'])
+    mask.update({NameObject('/Type'): NameObject('/XObject'), NameObject('/Subtype'): NameObject('/Image'),
+                 NameObject('/Width'): NumberObject(rendered['pixel_width']),
+                 NameObject('/Height'): NumberObject(rendered['pixel_height']),
+                 NameObject('/ColorSpace'): NameObject('/DeviceGray'),
+                 NameObject('/BitsPerComponent'): NumberObject(8),
+                 NameObject('/Filter'): NameObject('/FlateDecode')})
+    mask_ref = writer._add_object(mask)
     image = StreamObject()
     image.set_data(rendered['data'])
     image.update({NameObject('/Type'): NameObject('/XObject'), NameObject('/Subtype'): NameObject('/Image'),
@@ -336,7 +348,8 @@ def textbox_shape(page, note, writer, budget):
                   NameObject('/Height'): NumberObject(rendered['pixel_height']),
                   NameObject('/ColorSpace'): NameObject('/DeviceRGB'),
                   NameObject('/BitsPerComponent'): NumberObject(8),
-                  NameObject('/Filter'): NameObject('/FlateDecode')})
+                  NameObject('/Filter'): NameObject('/FlateDecode'),
+                  NameObject('/SMask'): mask_ref})
     image_ref = writer._add_object(image)
     form = DecodedStreamObject()
     commands = ['q',
@@ -349,8 +362,10 @@ def textbox_shape(page, note, writer, budget):
                  NameObject('/Resources'): DictionaryObject({NameObject('/XObject'): DictionaryObject(
                      {NameObject('/Im0'): image_ref})})})
     ink = TEXTBOX_COLORS[shape['color']].lstrip('#')
-    value = FreeText(rect=rect, text=note_contents(note), border_color=None, background_color='ffffff',
-                     font_size=f"{shape['font_size']}pt", font_color=ink)
+    # No /C background: the text box must not paint over the page. Transparency comes from
+    # the /SMask above, not from an annotation opacity trick.
+    value = FreeText(rect=rect, text=note_contents(note), border_color=None,
+                     background_color=None, font_size=f"{shape['font_size']}pt", font_color=ink)
     channels = [int(ink[index:index + 2], 16) / 255 for index in (0, 2, 4)]
     helvetica = getattr(writer, '_synrise_helvetica', None)
     if helvetica is None:

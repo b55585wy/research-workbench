@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS note_shape_annotations (
 );
 '''
 COLORS = {'yellow': '#ffe069', 'green': '#91dab1', 'blue': '#91c8f6', 'pink': '#efa9cf'}
-# Dark inks keep white-box text readable; these are the only accepted textbox colors.
+# These are the supported text-box ink colors.
 TEXTBOX_COLORS = {'black': '#1f2937', 'blue': '#1d4ed8', 'green': '#166534', 'red': '#b91c1c'}
 KIND_LABELS = {'rectangle': '矩形 / rectangle', 'arrow': '箭头 / arrow', 'textbox': '文本框 / textbox',
                'line': '直线 / line', 'ellipse': '圆形 / ellipse', 'ink': '手绘 / freehand'}

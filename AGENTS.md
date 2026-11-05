@@ -3,10 +3,11 @@
 This is our own research application, separate from workbench-web. User authorized
 the PDF reading / source-linked notes slice on 2026-10-30. ChatGPT plans; Codex owns
 engineering tasks, contracts, implementation coordination, integration and acceptance.
-OMP's latest selected profile is deepseek-kimi: DeepSeek official API is the
-default backend client and Kimi is the default frontend client. Codex owns
+OMP's latest selected profile is deepseek-codex (2026-11-05): DeepSeek official API
+is the default backend client and Codex is the default frontend client. Codex owns
 architecture, decomposition, coordination and acceptance. This supersedes the
-earlier all-codex default. Read C:/Users/wangyi/.omp/agent/role-routing.json
+earlier deepseek-kimi selection; saved alternatives remain available.
+Read C:/Users/wangyi/.omp/agent/role-routing.json
 before dispatch. Follow the global policy
 in C:/Users/wangyi/.codex/AGENTS.md, including authorized quota fallback:
 backend Codex -> DeepSeek official; frontend Codex/Kimi -> DeepSeek official.

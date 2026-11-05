@@ -96,8 +96,6 @@ export function layoutTextbox(text, fontSize, width, height) {
 
 export function drawTextboxCanvas(context, layout, x, y, scale, color) {
   context.save();
-  context.fillStyle = "#ffffff";
-  context.fillRect(x, y, layout.width * scale, layout.height * scale);
   context.beginPath();
   context.rect(x, y, layout.width * scale, layout.height * scale);
   context.clip();

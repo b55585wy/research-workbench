@@ -380,7 +380,7 @@ export function createReaderShapes(adapter) {
         line.textContent = layout.lines[index];
         text.append(line);
       }
-      group.append(svgElement("rect", { class: "reader-shape-visual reader-textbox-background", x, y, width: w, height: h, fill: "#ffffff", stroke: "none" }), clip, text);
+      group.append(svgElement("rect", { class: "reader-shape-visual reader-textbox-background", x, y, width: w, height: h, fill: "transparent", stroke: "none" }), clip, text);
       hit = svgElement("rect", { class: "reader-shape-hit", x, y, width: w, height: h, fill: "transparent", stroke: "none", style: "pointer-events:all" });
     } else if (shape.kind === "ellipse") {
       const attributes = {

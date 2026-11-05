@@ -1,9 +1,13 @@
-"""Bounded system-font layout and RGB raster appearance for saved PDF text boxes.
+"""Bounded system-font layout and transparent raster appearance for saved PDF text boxes.
 
 Pillow is imported lazily inside the fixed PDF worker path so ordinary web requests never
 load an imaging stack. Wrapping and fit checks use the real raster font at its fractional
 size, and every drawn line's glyph ink is verified against the outer box; no whitespace-only
 wrapping, automatic shrinking, truncation or font substitution is performed.
+
+The appearance is a solid ink plane plus a same-sized DeviceGray coverage mask: glyph
+antialiasing lives entirely in the alpha channel, so unpainted pixels stay transparent and
+never hide the page content beneath a text box.
 """
 import math
 from pathlib import Path
@@ -189,7 +193,13 @@ def layout(shape, body, width, height, raster, font):
 
 
 def render(shape, body, width, height, budget):
-    """Return a Flate-compressed DeviceRGB bitmap for one saved text box."""
+    """Return the Flate-compressed ink plane and DeviceGray alpha mask for one text box.
+
+    The ink plane is the selected text color over the whole bounded raster, and the coverage
+    mask is an antialiased grayscale glyph bitmap of exactly the same pixel size. The worker
+    attaches the mask as the image /SMask, so the PDF shows colored text on a transparent
+    background instead of white hiding the original page.
+    """
     from PIL import Image, ImageDraw
     if not isinstance(body, str) or not body.strip():
         raise ValueError('Empty text box body')
@@ -204,13 +214,17 @@ def render(shape, body, width, height, budget):
     lines, x, baselines = layout(shape, body, width, height, raster, font)
     ink = TEXTBOX_COLORS[shape['color']]
     rgb = tuple(int(ink[index:index + 2], 16) for index in (1, 3, 5))
-    image = Image.new('RGB', (pixel_width, pixel_height), 'white')
+    # Drawing coverage into an L image keeps the raster font's antialiasing as per-pixel
+    # alpha; nothing is painted where there is no glyph ink.
+    image = Image.new('L', (pixel_width, pixel_height), 0)
     try:
         draw = ImageDraw.Draw(image)
         for line, baseline in zip(lines, baselines):
-            draw.text((x, baseline), line, font=font, fill=rgb, anchor='ls')
-        data = zlib.compress(image.tobytes(), 6)
+            draw.text((x, baseline), line, font=font, fill=255, anchor='ls')
+        mask = zlib.compress(image.tobytes(), 6)
     finally:
         image.close()
-    return {'data': data, 'pixel_width': pixel_width, 'pixel_height': pixel_height,
+    # A constant-color plane is exact, bounded and compresses to a few hundred bytes.
+    data = zlib.compress(bytes(rgb) * (pixel_width * pixel_height), 6)
+    return {'data': data, 'mask': mask, 'pixel_width': pixel_width, 'pixel_height': pixel_height,
             'width': width, 'height': height}
