@@ -423,4 +423,3 @@ def test_supervisor_forwards_the_operator_path_not_the_secret(
     assert command[command.index('--shared-model-forbidden-root') + 1] == str(
         tmp_path / 'guests')
     assert SHARED_KEY not in ' '.join(command)
-

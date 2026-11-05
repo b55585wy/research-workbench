@@ -173,6 +173,16 @@
   padding: 0;
 }
 
+.data-workspace > .presentations-panel {
+  margin-top: 16px;
+  background: transparent;
+}
+
+.data-workspace > .presentations-panel > summary,
+.data-workspace > .presentations-panel > .presentations-body {
+  padding-inline: 0;
+}
+
 .analysis-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr);

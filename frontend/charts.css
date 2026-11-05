@@ -130,6 +130,10 @@
   margin-top: 6px;
 }
 
+.chart-view-actions .button {
+  min-height: 44px;
+}
+
 #chart-summary h3,
 #chart-details h3 {
   margin: 12px 0 6px;
@@ -237,6 +241,33 @@
   font-size: 12px;
   font-weight: 650;
   cursor: pointer;
+}
+
+.chart-style-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  color: var(--ui-text-soft);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+#chart-style {
+  min-height: 44px;
+  padding: 6px 24px 6px 8px;
+  border: 1px solid var(--ui-input-border);
+  border-radius: 3px;
+  background: var(--ui-input-bg);
+  color: var(--ui-text);
+}
+
+.chart-style-note {
+  margin: 4px 0 0;
+  color: var(--ui-text-muted);
+  font-size: 10px;
+  line-height: 1.5;
+  text-align: right;
 }
 
 @media (max-width: 480px) {

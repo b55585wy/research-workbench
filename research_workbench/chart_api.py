@@ -1,3 +1,4 @@
+from typing import Literal
 from uuid import UUID
 from fastapi import APIRouter,Request
 from fastapi.responses import JSONResponse,Response
@@ -45,6 +46,6 @@ def restore(document_id:UUID,chart_id:UUID,payload:ChartMutation,request:Request
 
 
 @router.get('/documents/{document_id}/charts/{chart_id}/export')
-def export(document_id:UUID,chart_id:UUID,request:Request):
-    path,name=build_chart_export(request.app.state.charts,str(document_id),str(chart_id))
+def export(document_id:UUID,chart_id:UUID,request:Request,style:Literal['default','nature','cell']|None=None):
+    path,name=build_chart_export(request.app.state.charts,str(document_id),str(chart_id),style)
     return ExportResponse(path,media_type='application/zip',filename=name)

@@ -20,6 +20,7 @@
   <link rel="stylesheet" href="/statistics.css">
   <link rel="stylesheet" href="/analysis-notebook.css">
   <link rel="stylesheet" href="/charts.css">
+  <link rel="stylesheet" href="/presentations.css">
   <link rel="stylesheet" href="/research-record.css">
   <link rel="stylesheet" href="/study.css">
   <link rel="stylesheet" href="/vendor/assistant-markdown/katex.min.css">
@@ -591,7 +592,14 @@
       <details id="analysis-panel" class="analysis-panel">
         <summary>数据与分析</summary>
         <div class="analysis-body">
-          <p class="analysis-help">导入 CSV、TSV、SAV 或 ZSAV，选择描述统计或独立样本 t 检验，并核对固定分析代码。结果不构成科学结论。</p>
+          <p class="analysis-help">导入 CSV、TSV、SAV 或 ZSAV，按研究目标选择已有分析，预览并明确确认后检查或保存结果。结果不构成科学结论。</p>
+          <ol class="analysis-flow" aria-label="分析步骤">
+            <li id="analysis-flow-import">导入数据</li>
+            <li id="analysis-flow-review">核对字段、行单位与缺失</li>
+            <li id="analysis-flow-goal">选择研究目标</li>
+            <li id="analysis-flow-confirm">预览并确认实际分析</li>
+            <li id="analysis-flow-result">检查并保存结果</li>
+          </ol>
           <div class="analysis-upload-row">
             <button id="dataset-upload-button" class="button button-primary" type="button" disabled>导入数据</button>
             <input id="dataset-upload-input" type="file" accept="text/csv,text/tab-separated-values,.csv,.tsv,.sav,.zsav" hidden>
@@ -601,6 +609,7 @@
           <select id="dataset-select" disabled></select>
           <button id="analysis-assistant-plan" class="button button-secondary" type="button" aria-describedby="analysis-assistant-plan-help" disabled>让助手规划分析</button>
           <p id="analysis-assistant-plan-help" class="analysis-assistant-plan-help">请先明确共享所选数据的预览。</p>
+          <p id="analysis-review-help" class="analysis-review-help">核对字段含义、每一行代表的观察单位，以及非缺失和缺失数量。</p>
           <div id="dataset-preview" class="analysis-preview"></div>
           <details id="dataset-selection" class="dataset-selection">
             <summary id="dataset-selection-toggle">筛选数据</summary>
@@ -667,7 +676,7 @@
               </div>
             </section>
           </section>
-          <label id="analysis-method-label" class="analysis-label" for="analysis-method">分析方法</label>
+          <label id="analysis-method-label" class="analysis-label" for="analysis-method">研究目标 / 分析方法</label>
           <select id="analysis-method" disabled>
             <option value="describe">描述统计</option>
             <option value="ttest_independent">独立样本 t 检验</option>
@@ -683,11 +692,6 @@
             <input id="dataset-share" type="checkbox" disabled>
             <span>向助手提供此数据的预览</span>
           </label>
-          <label id="analysis-engine-label" class="analysis-label" for="analysis-engine">分析语言</label>
-          <select id="analysis-engine" disabled>
-            <option value="python">Python</option>
-            <option value="r">R</option>
-          </select>
           <section id="ttest-options" class="ttest-options" aria-label="独立样本 t 检验设置" hidden>
             <label class="analysis-label" for="ttest-outcome">数值结果变量</label>
             <select id="ttest-outcome" disabled></select>
@@ -772,11 +776,22 @@
             <p class="ttest-assumptions">请核对同一观察对象测量、观测独立性、异常值和所选方法的前提；相关不表示因果。</p>
             <button id="analysis-correlation-preview" class="button button-secondary" type="button" disabled>预览完整数据与固定代码</button>
           </section>
-          <div class="analysis-runtime" role="status"></div>
-          <button id="analysis-prepare" class="button button-secondary" type="button" disabled>查看并准备运行</button>
+          <details id="analysis-advanced" class="analysis-advanced">
+            <summary id="analysis-advanced-summary">高级：运行引擎与固定代码</summary>
+            <label id="analysis-engine-label" class="analysis-label" for="analysis-engine">运行引擎（自动选择）</label>
+            <select id="analysis-engine" disabled>
+              <option value="python">Python</option>
+              <option value="r">R</option>
+            </select>
+            <div class="analysis-runtime" role="status"></div>
+          </details>
+          <button id="analysis-prepare" class="button button-secondary" type="button" disabled>预览实际分析并核对</button>
           <section id="analysis-confirmation" class="analysis-confirmation" aria-label="运行确认" hidden>
             <div class="analysis-confirmation-details"></div>
-            <pre id="analysis-code" class="analysis-code" tabindex="0"></pre>
+            <details id="analysis-code-disclosure" class="analysis-code-disclosure">
+              <summary id="analysis-code-summary">查看固定分析代码</summary>
+              <pre id="analysis-code" class="analysis-code" tabindex="0"></pre>
+            </details>
             <div class="analysis-confirmation-actions">
               <button id="analysis-cancel-confirm" class="button button-quiet" type="button">取消</button>
               <button id="analysis-confirm" class="button button-primary" type="button">确认运行</button>
@@ -833,8 +848,17 @@
             <p id="chart-view-context" role="status" aria-live="polite" aria-atomic="true" hidden></p>
             <div id="chart-plot"></div>
             <div class="chart-view-actions">
+              <label id="chart-style-label" class="chart-style-label" for="chart-style">图表风格
+                <select id="chart-style">
+                  <option value="default">默认</option>
+                  <option value="nature">Nature</option>
+                  <option value="cell">Cell</option>
+                </select>
+              </label>
               <button id="chart-png" class="button button-quiet" type="button" disabled>下载 PNG</button>
+              <button id="chart-svg" class="button button-quiet" type="button" disabled>下载 SVG</button>
             </div>
+            <p id="chart-style-note" class="chart-style-note">Nature / Cell 为视觉预设，不表示符合期刊投稿规范。</p>
             <div id="chart-summary"></div>
             <div id="chart-details"></div>
           </section>
@@ -844,6 +868,50 @@
             <summary>已删除图表</summary>
             <ul id="charts-deleted-list" class="charts-list" aria-label="已删除图表"></ul>
           </details>
+        </div>
+      </details>
+
+      <details id="presentations-panel" class="presentations-panel">
+        <summary>AI 大纲与可编辑 PPT</summary>
+        <div class="presentations-body">
+          <p id="presentations-help" class="presentations-help">仅使用当前文献中明确选择的已保存笔记、已完成分析和图表。先预览来源，再决定是否使用 AI。</p>
+          <label class="presentations-field" for="presentation-title">演示标题
+            <input id="presentation-title" type="text" maxlength="120" required autocomplete="off">
+          </label>
+          <label class="presentations-field" for="presentation-style">视觉风格
+            <select id="presentation-style">
+              <option value="default">默认</option>
+              <option value="nature">Nature</option>
+              <option value="cell">Cell</option>
+            </select>
+          </label>
+          <p id="presentations-style-note" class="presentations-style-note">Nature / Cell 为视觉预设，不表示符合期刊投稿规范。</p>
+          <div id="presentation-sources"></div>
+          <div class="presentations-actions">
+            <button id="presentation-context-preview" class="button button-secondary" type="button" disabled>预览所选来源</button>
+          </div>
+          <div id="presentation-status" class="presentations-status" role="status" aria-live="polite"></div>
+          <details id="presentation-context" class="presentations-context" hidden>
+            <summary>所选来源与完整上下文</summary>
+            <ul id="presentation-context-sources" class="presentations-context-sources"></ul>
+            <pre id="presentation-context-text" class="presentations-context-text" tabindex="0"></pre>
+            <p id="presentation-context-hash" class="presentations-context-hash"></p>
+          </details>
+          <p id="presentation-ai-warning" class="presentations-ai-warning"></p>
+          <div class="presentations-actions">
+            <button id="presentation-ai" class="button button-secondary" type="button" disabled>使用 AI 生成大纲</button>
+          </div>
+          <section id="presentation-outline" class="presentations-outline" aria-label="可编辑演示大纲" hidden>
+            <p id="presentation-outline-kind" class="presentations-outline-kind"></p>
+            <div id="presentation-slides"></div>
+            <div class="presentations-actions">
+              <button id="presentation-add-slide" class="button button-quiet" type="button" disabled>添加幻灯片</button>
+            </div>
+          </section>
+          <div class="presentations-actions">
+            <button id="presentation-export" class="button button-primary" type="button" disabled>下载可编辑 PPTX</button>
+          </div>
+          <p id="presentation-download-note" class="presentations-muted presentations-download-note">下载不会调用 AI，也不会作为新的服务器项目保存。</p>
         </div>
       </details>
 
@@ -1217,6 +1285,7 @@
   <script src="/vendor/assistant-markdown/katex.min.js"></script>
   <script src="/vendor/assistant-markdown/texmath.js"></script>
   <script src="/vendor/assistant-markdown/purify.min.js"></script>
+  <script src="/chart-styles.js"></script>
   <script type="module" src="/app.js?v=0.55.4"></script>
   <script type="module" src="/mobile-layout.js?v=0.53.0"></script>
   <script type="module" src="/reader-mobile-tools.js?v=0.53.0"></script>

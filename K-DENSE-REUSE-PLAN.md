@@ -5,6 +5,10 @@
 这里实际记录的是 Scientific Agent Skills 和 K-Dense BYOK；K-Dense Web 未列作本次开源源码来源。
 其他候选见 [开源来源总表](TASK-PLAN.md#开源来源与产品关系)，近期安排见 [近期计划](NEAR-TERM-PLAN.md)。
 
+2026-11-05进展：已将 scientific-visualization 的视觉指导适配到现有受控 Plotly 图表，增加默认/Nature/Cell预设与SVG导出；
+PPT文件生成复用 python-pptx，不是复制整套技能或完整应用。分析引导、实际图表与PPT的本地验收见 [实施记录](MEDICAL-STUDENT-ANALYSIS.md)。
+EDA/统计诊断脚本、BYOK研究编排和完整技能加载仍是后续候选，不能把本轮视觉预设写成这些能力已接入。
+
 ## 两个来源
 
 - [Scientific Agent Skills](https://github.com/K-Dense-AI/scientific-agent-skills)：包、数据库及研究流程的操作说明，部分目录另有可执行脚本。说明、代码、依赖和运行权限需分开确认。

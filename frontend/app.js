@@ -5,6 +5,7 @@ import { createAnalysis } from "/analysis.js?integration=tfus-source-v1";
 import { createDatasetSelection } from "/dataset-selection.js";
 import { createDataImports } from "/data-imports.js";
 import { createCharts } from "/charts.js";
+import { createPresentations } from "/presentations.js";
 import { createWorkspace } from "/workspace.js";
 import { createDataNavigation } from "/data-navigation.js";
 import { createAssistant } from "/assistant.js?v=0.52.0";
@@ -1248,6 +1249,7 @@ let analysis = null;
 let datasetSelection = null;
 let dataImports = null;
 let charts = null;
+let presentations = null;
 let workspace = null;
 let dataNavigation = null;
 let readerWorkspaceVisible = false;
@@ -1496,6 +1498,7 @@ function applyLanguage() {
   datasetSelection?.applyLanguage(state.language);
   dataImports?.applyLanguage(state.language);
   charts?.applyLanguage(state.language);
+  presentations?.applyLanguage(state.language);
   workspace?.applyLanguage(state.language);
   dataNavigation?.applyLanguage(state.language);
   assistant?.applyLanguage(state.language);
@@ -3892,6 +3895,7 @@ function prepareContextNavigation() {
     state.pendingExcerpts.size > 0 ||
     documentId && study?.hasPending(documentId) ||
     documentId && analysis?.hasPending?.(documentId) ||
+    documentId && presentations?.hasPending?.(documentId) ||
     dataImports?.isImportPending?.()
   );
   if (pendingWrite) setStatus("navigationPendingWrite", "info");
@@ -3966,6 +3970,7 @@ function clearActiveDocument(mode = "reading") {
   analysis?.reload(null);
   dataImports?.reload(null);
   charts?.reload(null);
+  presentations?.reload(null);
   assistant?.documentChanged(null);
   workspace?.documentChanged();
   updateUrl(null, null, true, mode);
@@ -4213,6 +4218,7 @@ async function openDocument(documentId, options = {}) {
   analysis?.reload(documentId);
   dataImports?.reload(documentId);
   charts?.reload(documentId);
+  presentations?.reload(documentId);
   const restoredSelection = restorePassiveDataSelection(documentId, options);
   if (options.datasetId && !restoredSelection) analysis?.openDataset(options.datasetId, { preserveUrl: options.preserveUrl });
   if (options.analysisId && !restoredSelection) analysis?.openJob(options.analysisId, { preserveUrl: options.preserveUrl });
@@ -4664,6 +4670,7 @@ async function loadNoteStates(document, sequence, signal) {
   renderNotes();
   renderTextAnnotations();
   readerShapes?.render();
+  presentations?.sourcesChanged(document.id);
 }
 
 async function loadExcerpts(document, sequence, signal) {
@@ -7951,6 +7958,7 @@ window.addEventListener("popstate", () => {
     analysis?.reload(null);
     dataImports?.reload(null);
     charts?.reload(null);
+    presentations?.reload(null);
     assistant?.documentChanged(null);
     workspace?.documentChanged();
     if (imageLink === false) setStatus("invalidImageLink", "error");
@@ -8099,7 +8107,11 @@ async function openImageProposal(documentId, proposal) {
 async function refreshAfterAgent(documentId) {
   const studyOwner = state.document?.id === documentId && isStudy();
   const tasks = studyOwner ? [] : [imageLibrary?.reload(documentId), imageViewer?.refreshIfCurrent(documentId)];
-  tasks.push(state.document?.id === documentId ? analysis?.reload(documentId) : null, state.document?.id === documentId ? charts?.reload(documentId) : null);
+  tasks.push(
+    state.document?.id === documentId ? analysis?.reload(documentId) : null,
+    state.document?.id === documentId ? charts?.reload(documentId) : null,
+    state.document?.id === documentId ? presentations?.sourcesChanged(documentId) : null
+  );
   if (state.document?.id === documentId) {
     const document = state.document;
     const sequence = state.loadSequence;
@@ -8465,6 +8477,7 @@ analysis = createAnalysis({
   },
   sourcesChanged: (documentId) => {
     if (state.document?.id === documentId) charts?.reload(documentId);
+    presentations?.sourcesChanged(documentId);
     dataNavigation?.sourcesChanged(documentId);
   }
 });
@@ -8505,8 +8518,20 @@ charts = createCharts({
     if (state.document?.id === documentId && datasetId) analysis.alignDataset(datasetId);
   },
   contextChanged: () => assistant?.contextChanged(),
+  sourcesChanged: (documentId) => presentations?.sourcesChanged(documentId),
   chartOpened: showChartInUrl,
   addChartCitation
+});
+
+presentations = createPresentations({
+  api,
+  checkedFetch,
+  getDocument: () => state.document,
+  getLanguage: () => state.language,
+  getNavigationGeneration: () => workspace.getNavigationGeneration(),
+  getDataSelection: readDataSelection,
+  getSelectedAnalysis: (documentId) => analysis.getSelectedAnalysis(documentId),
+  getCurrentChart: (documentId) => charts.getCurrentChart(documentId)
 });
 
 researchRecord = createResearchRecord({
@@ -8550,6 +8575,7 @@ study = createStudy({
       deleted_at: note.deleted_at || null
     };
     state.noteStates = [noteState, ...state.noteStates.filter((item) => item.id !== note.id)];
+    presentations?.sourcesChanged(owner.id);
   },
   noteStateChanged(owner, savedState) {
     if (state.document?.id !== owner.id) return;
@@ -8557,9 +8583,11 @@ study = createStudy({
     state.notes = savedState.deleted_at
       ? state.notes.filter((item) => item.id !== savedState.id)
       : [{ ...savedState }, ...state.notes.filter((item) => item.id !== savedState.id)];
+    presentations?.sourcesChanged(owner.id);
   },
   notePurged(owner, noteId) {
     applyNotePurge(owner, noteId);
+    presentations?.sourcesChanged(owner.id);
   }
 });
 

@@ -165,7 +165,13 @@
       return;
     }
     var built = figure(artifact);
-    window.Plotly.react(plot, built.traces, built.layout, {
+    if (!window.ResearchChartStyles || typeof window.ResearchChartStyles.apply !== "function") {
+      fail("The interactive chart style is unavailable. The static table remains available.");
+      return;
+    }
+    var styleId = document.documentElement.dataset.chartStyle || document.documentElement.dataset.style || "default";
+    var styled = window.ResearchChartStyles.apply(built, styleId);
+    window.Plotly.react(plot, styled.traces, styled.layout, {
       responsive: true,
       displaylogo: false,
       scrollZoom: true,

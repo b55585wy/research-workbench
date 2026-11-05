@@ -516,6 +516,62 @@
   cursor: pointer;
 }
 
+.analysis-flow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  gap: 5px;
+  margin: 0 0 12px;
+  padding: 0;
+  color: var(--ui-text-soft);
+  font-size: 11px;
+  line-height: 1.35;
+  list-style: none;
+  counter-reset: analysis-step;
+}
+
+.analysis-flow li {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border: 1px solid var(--ui-border);
+  border-radius: 4px;
+  background: var(--ui-surface-subtle);
+  counter-increment: analysis-step;
+}
+
+.analysis-flow li::before {
+  flex: none;
+  content: counter(analysis-step);
+  color: var(--ui-text-muted);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.analysis-review-help {
+  margin: 10px 0 0;
+  color: var(--ui-text-muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.analysis-advanced,
+.analysis-code-disclosure {
+  margin-top: 10px;
+  border-top: 1px solid var(--ui-border);
+}
+
+.analysis-advanced > summary,
+.analysis-code-disclosure > summary {
+  min-height: 44px;
+  padding: 10px 0 4px;
+  color: var(--ui-text-soft);
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
 @media (max-width: 480px) {
   .analysis-body,
   .analysis-panel > summary {

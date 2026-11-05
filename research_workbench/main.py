@@ -203,6 +203,9 @@ def create_app(data_root=None, validator=None, renderer=None, *, agent_provider=
     from .charts import Charts
     from .chart_api import router as chart_router
     charts=Charts(store,datasets,analysis)
+    from .presentation_service import Presentations
+    from .presentation_api import router as presentation_router
+    presentations=Presentations(store,datasets,analysis,charts,provider)
     from .research_records import ResearchRecords
     from .record_api import router as record_router
     records=ResearchRecords(store,datasets,analysis,charts)
@@ -265,6 +268,7 @@ def create_app(data_root=None, validator=None, renderer=None, *, agent_provider=
     app.include_router(library_lifecycle_router)
     app.state.image_annotations=image_annotations
     app.state.charts=charts
+    app.state.presentations=presentations
     app.state.records=records
     app.state.studies=studies
     app.state.data_workspace=data_workspace
@@ -275,6 +279,7 @@ def create_app(data_root=None, validator=None, renderer=None, *, agent_provider=
     app.include_router(data_workspace_router)
     app.include_router(record_router)
     app.include_router(chart_router)
+    app.include_router(presentation_router)
     app.include_router(data_import_router)
     app.add_middleware(LocalBoundary)
     install_image_annotation_routes(app,image_annotations)

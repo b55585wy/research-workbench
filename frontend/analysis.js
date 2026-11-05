@@ -12,15 +12,25 @@ const TFUS_SHA256_PATTERN = /^[0-9a-fA-F]{64}$/;
 const messages = {
   zh: {
     panel: "数据与分析",
-    help: "导入 CSV、TSV、SAV 或 ZSAV，选择描述统计、t 检验或相关分析，并核对固定分析代码。结果不构成科学结论。",
+    help: "导入 CSV、TSV、SAV 或 ZSAV，按研究目标选择已有分析，预览并明确确认后检查或保存结果。结果不构成科学结论。",
+    flowAria: "分析步骤",
+    flowImport: "导入数据",
+    flowReview: "核对字段",
+    flowGoal: "选择目标",
+    flowConfirm: "确认运行",
+    flowResult: "查看结果",
+    reviewHelp: "核对字段含义、每一行代表的观察单位，以及非缺失和缺失数量。",
+    advanced: "高级：运行引擎与固定代码",
+    codeReview: "查看固定分析代码",
     upload: "导入数据",
     selectDataset: "选择数据",
     noDataset: "尚未选择数据",
     noDatasets: "请先导入 CSV、TSV、SAV 或 ZSAV 数据。",
     columns: "分析数值列",
     share: "向助手提供此数据的预览",
-    engine: "分析语言",
-    prepare: "查看并准备运行",
+    engine: "运行引擎（自动选择）",
+    prepare: "预览实际分析并核对",
+    methodGoal: "研究目标 / 分析方法",
     confirm: "确认运行",
     retry: "按原请求重试",
     cancel: "取消",
@@ -93,7 +103,7 @@ const messages = {
     analysis_unavailable: "分析服务当前不可用。",
     method: "分析方法",
     describe: "描述统计",
-    ttestIndependent: "独立样本 t 检验（r-stats）",
+    ttestIndependent: "独立样本 t 检验",
     methodLoading: "正在读取可用分析方法…",
     methodFailed: "无法读取分析方法，请重试。",
     methodUnavailable: "独立样本 t 检验当前不可用。",
@@ -158,7 +168,7 @@ const messages = {
     selectionParentLink: "打开父数据",
     selectionRowsLink: "查看逐行来源映射",
     selectionDictionaryNote: "原始 SPSS 字典和缺失值规则保留在父数据中；派生表的缺失值数量会重新计算。",
-    ttestPaired: "配对 t 检验（r-stats）",
+    ttestPaired: "配对 t 检验",
     pairedMethodUnavailable: "配对 t 检验当前不可用。",
     pairedUnit: "唯一配对单位 ID 列",
     pairedFirst: "第 1 个数值列",
@@ -188,7 +198,7 @@ const messages = {
     pairedDifference: "均值差（第 1 列 − 第 2 列）",
     pairedResultNote: "以下配对结果不包含显著性结论，也不表示配对设计、差值正态性、不同单位之间的独立性或科学有效性已得到验证。",
     pairedIdentity: "配对标识：精确、唯一、非空",
-    correlation: "相关分析（r-stats）",
+    correlation: "相关分析",
     correlationMethodUnavailable: "相关分析当前不可用。",
     correlationFirst: "第 1 个数值列（X）",
     correlationSecond: "第 2 个数值列（Y）",
@@ -254,15 +264,25 @@ const messages = {
   },
   en: {
     panel: "Data & analysis",
-    help: "Import CSV, TSV, SAV, or ZSAV, choose descriptive statistics, a t-test, or correlation analysis, and review the fixed code. Results are not scientific conclusions.",
+    help: "Import CSV, TSV, SAV, or ZSAV, choose an existing analysis by research goal, then preview, explicitly confirm, and inspect or save the result. Results are not scientific conclusions.",
+    flowAria: "Analysis steps",
+    flowImport: "Import",
+    flowReview: "Review fields",
+    flowGoal: "Goal",
+    flowConfirm: "Confirm",
+    flowResult: "Results",
+    reviewHelp: "Review field meanings, the observational unit represented by each row, and non-missing and missing counts.",
+    advanced: "Advanced: runtime and fixed code",
+    codeReview: "Review fixed analysis code",
     upload: "Import data",
     selectDataset: "Choose data",
     noDataset: "No data selected",
     noDatasets: "Import CSV, TSV, SAV, or ZSAV data first.",
     columns: "Numeric columns to analyze",
     share: "Provide a preview of this data to the assistant",
-    engine: "Analysis language",
-    prepare: "Review and prepare run",
+    engine: "Runtime (selected automatically)",
+    prepare: "Preview and review actual analysis",
+    methodGoal: "Research goal / analysis method",
     confirm: "Confirm run",
     retry: "Retry exact request",
     cancel: "Cancel",
@@ -335,7 +355,7 @@ const messages = {
     analysis_unavailable: "The analysis service is currently unavailable.",
     method: "Analysis method",
     describe: "Descriptive statistics",
-    ttestIndependent: "Independent-samples t-test (r-stats)",
+    ttestIndependent: "Independent-samples t-test",
     methodLoading: "Loading available analysis methods…",
     methodFailed: "Analysis methods could not be loaded. Try again.",
     methodUnavailable: "The independent-samples t-test is currently unavailable.",
@@ -400,7 +420,7 @@ const messages = {
     selectionParentLink: "Open parent data",
     selectionRowsLink: "View row-level source mapping",
     selectionDictionaryNote: "The parent data retains the original SPSS dictionary and missing-value rules; missing-value counts are recalculated for the derived table.",
-    ttestPaired: "Paired t-test (r-stats)",
+    ttestPaired: "Paired t-test",
     pairedMethodUnavailable: "The paired t-test is currently unavailable.",
     pairedUnit: "Unique pairing unit ID column",
     pairedFirst: "First numeric column",
@@ -430,7 +450,7 @@ const messages = {
     pairedDifference: "Mean difference (first − second)",
     pairedResultNote: "These paired results include no significance verdict and do not claim that the paired design, normality of differences, independence across units, or scientific validity has been verified.",
     pairedIdentity: "Pairing identity: exact, unique, nonempty",
-    correlation: "Correlation analysis (r-stats)",
+    correlation: "Correlation analysis",
     correlationMethodUnavailable: "Correlation analysis is currently unavailable.",
     correlationFirst: "First numeric column (X)",
     correlationSecond: "Second numeric column (Y)",
@@ -1008,6 +1028,7 @@ export function createAnalysis(adapter) {
     const isPaired = entry?.method === "ttest_paired";
     const isCorrelation = entry?.method === "correlation";
     const isStatMethod = isTTest || isPaired || isCorrelation;
+    if (entry) entry.engine = isStatMethod ? "r" : "python";
     const independentInfo = methodInfo(entry, "ttest_independent");
     const pairedInfo = methodInfo(entry, "ttest_paired");
     const correlationInfo = methodInfo(entry, "correlation");
@@ -1028,7 +1049,7 @@ export function createAnalysis(adapter) {
     elements.correlationOptions.hidden = !isCorrelation;
     elements.methodStatus.replaceChildren();
     const unavailableKey = isCorrelation ? "correlationMethodUnavailable" : isPaired ? "pairedMethodUnavailable" : "methodUnavailable";
-    const status = entry?.methodStatus || (methodCatalog && (!info?.available || !info.library?.available) ? { key: info?.available ? "libraryUnavailable" : unavailableKey, kind: "error", retry: () => discoverMethods(entry, true) } : null);
+    const status = entry?.methodStatus || (isStatMethod && methodCatalog && (!info?.available || !info.library?.available) ? { key: info?.available ? "libraryUnavailable" : unavailableKey, kind: "error", retry: () => discoverMethods(entry, true) } : null);
     if (status) {
       elements.methodStatus.dataset.kind = status.kind || "info";
       elements.methodStatus.append(make("span", "", errorText(status, "methodFailed")));
@@ -1146,7 +1167,7 @@ export function createAnalysis(adapter) {
       elements.engine.append(option);
     }
     elements.engine.value = entry?.engine || "python";
-    elements.engine.disabled = !entry?.runtime || Boolean(entry?.confirmation?.pending);
+    elements.engine.disabled = true;
     elements.runtime.replaceChildren();
     if (!entry?.runtime) {
       elements.runtime.dataset.kind = "error";
@@ -2718,8 +2739,15 @@ export function createAnalysis(adapter) {
       language = nextLanguage;
       elements.panel.querySelector("summary").textContent = t("panel");
       elements.panel.querySelector(".analysis-help").textContent = t("help");
+      elements.panel.querySelector(".analysis-flow").setAttribute("aria-label", t("flowAria"));
+      for (const [id, key] of [["analysis-flow-import", "flowImport"], ["analysis-flow-review", "flowReview"], ["analysis-flow-goal", "flowGoal"], ["analysis-flow-confirm", "flowConfirm"], ["analysis-flow-result", "flowResult"]]) {
+        byId(id).textContent = t(key);
+      }
+      byId("analysis-review-help").textContent = t("reviewHelp");
+      byId("analysis-advanced-summary").textContent = t("advanced");
+      byId("analysis-code-summary").textContent = t("codeReview");
       elements.panel.querySelector('label[for="dataset-select"]').textContent = t("selectDataset");
-      elements.panel.querySelector('label[for="analysis-method"]').textContent = t("method");
+      elements.panel.querySelector('label[for="analysis-method"]').textContent = t("methodGoal");
       elements.panel.querySelector('label[for="analysis-engine"]').textContent = t("engine");
       elements.panel.querySelector('label[for="ttest-outcome"]').textContent = t("outcome");
       elements.panel.querySelector('label[for="ttest-group-column"]').textContent = t("groupColumn");
@@ -2784,6 +2812,11 @@ export function createAnalysis(adapter) {
       const sharedDatasetId = entry?.shared && selectedDataset(entry) ? entry.selectedDatasetId : null;
       const job = jobFor(entry, entry?.selectedJobId);
       return sharedDatasetId && job?.dataset_id === sharedDatasetId ? job.id : null;
+    },
+    getSelectedAnalysis(documentId) {
+      const entry = entryFor(documentId);
+      const job = jobFor(entry, entry.selectedJobId);
+      return job?.status === "succeeded" ? job : null;
     },
     hasPending(documentId) {
       const entry = documentId ? entryFor(documentId) : currentEntry();

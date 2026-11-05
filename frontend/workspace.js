@@ -14,7 +14,7 @@ const messages = {
     dataTitle: "数据工作区",
     dataSection: "数据",
     resultsSection: "结果",
-    manualSettings: "手动设置分析",
+    manualSettings: "选择分析目标",
     projectMaterials: "项目资料",
     dataHelp: "导入或选择当前文献的数据并核对前 5 行预览。助手仅使用你明确共享的预览。",
     studyDataHelp: "导入或选择当前项目的数据并核对前 5 行预览。助手仅使用你明确共享的预览。",
@@ -41,7 +41,7 @@ const messages = {
     dataTitle: "Data workspace",
     dataSection: "Data",
     resultsSection: "Results",
-    manualSettings: "Manual analysis settings",
+    manualSettings: "Choose analysis goal",
     projectMaterials: "Project materials",
     dataHelp: "Import or choose data for the current paper and review the 5-row preview. The assistant receives only the preview you explicitly share.",
     studyDataHelp: "Import or choose data for the current project and review the 5-row preview. The assistant receives only the preview you explicitly share.",
@@ -134,7 +134,7 @@ export function createWorkspace(adapter) {
     byId("notes-empty"),
     byId("notes-list")
   ]);
-  dataWorkspace.append(imports, analysis, charts);
+  dataWorkspace.append(imports, analysis, charts, byId("presentations-panel"));
   const importHistory = make("details", "data-import-history");
   const importSummary = make("summary");
   importHistory.id = "data-import-history";
@@ -148,9 +148,10 @@ export function createWorkspace(adapter) {
   analysisOverview.setAttribute("aria-labelledby", dataHeading.id);
   analysisOverview.append(dataHeading);
   const analysisSettings = make("details", "analysis-settings");
-  const analysisSettingsSummary = make("summary", "", "手动设置分析");
+  const analysisSettingsSummary = make("summary", "", "选择分析目标");
   const analysisSettingsBody = make("div", "analysis-settings-body");
   analysisSettings.append(analysisSettingsSummary, analysisSettingsBody);
+  analysisSettings.open = true;
   const analysisResults = make("section", "analysis-results");
   const resultsHeading = make("h3", "analysis-section-heading", "结果");
   resultsHeading.id = "analysis-results-heading";
@@ -161,6 +162,7 @@ export function createWorkspace(adapter) {
   analysisBody.append(analysisLayout);
   moveMany(analysisOverview, [
     analysisBody.querySelector(".analysis-help"),
+    analysisBody.querySelector(".analysis-flow"),
     analysisBody.querySelector(".analysis-upload-row"),
     byId("dataset-upload-status"),
     analysisBody.querySelector('label[for="dataset-select"]'),
@@ -176,12 +178,10 @@ export function createWorkspace(adapter) {
     byId("analysis-method"),
     byId("analysis-method-status"),
     byId("analysis-columns-fieldset"),
-    byId("analysis-engine-label"),
-    byId("analysis-engine"),
     byId("ttest-options"),
     byId("analysis-paired-fields"),
     byId("analysis-correlation-fields"),
-    analysisBody.querySelector(".analysis-runtime"),
+    byId("analysis-advanced"),
     byId("analysis-prepare"),
     byId("analysis-confirmation")
   ]);

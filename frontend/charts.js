@@ -89,6 +89,10 @@ const messages = {
     savedBadge: "已保存 · 只读",
     empty: "还没有已保存图表。",
     png: "下载 PNG",
+    svg: "下载 SVG",
+    style: "图表风格",
+    styleNote: "切换样式不会改变数据。",
+    defaultStyle: "默认",
     activeChart: "当前图表",
     chartProposal: "图表提案",
     proposalDataset: "数据",
@@ -192,6 +196,10 @@ const messages = {
     savedBadge: "Saved · read-only",
     empty: "No saved charts yet.",
     png: "Download PNG",
+    svg: "Download SVG",
+    style: "Chart style",
+    styleNote: "Changing the style preserves the data.",
+    defaultStyle: "Default",
     activeChart: "Active chart",
     chartProposal: "Chart proposal",
     proposalDataset: "Data",
@@ -487,11 +495,22 @@ export function createCharts(adapter) {
     plot: byId("chart-plot"),
     summary: byId("chart-summary"),
     details: byId("chart-details"),
-    png: byId("chart-png")
+    style: byId("chart-style"),
+    styleLabel: byId("chart-style-label"),
+    styleNote: byId("chart-style-note"),
+    png: byId("chart-png"),
+    svg: byId("chart-svg")
   };
   const papers = new Map();
   let currentId = null;
   let language = adapter.getLanguage();
+  let styleId = "default";
+  try {
+    const stored = localStorage.getItem("research-chart-style");
+    if (window.ResearchChartStyles?.ids.includes(stored)) styleId = stored;
+  } catch {
+    // The default visual preset still applies when storage is unavailable.
+  }
   let capabilitiesPromise = null;
   let resizeObserver = null;
   let plotHost = null;
@@ -796,7 +815,11 @@ export function createCharts(adapter) {
     renderStatus(entry);
     renderLists(entry);
     renderViewContext(entry);
-    elements.png.disabled = !entry?.view?.renderReady || entry.view.pending || !entry.view.host?.isConnected;
+    const unavailable = !entry?.view?.renderReady || entry.view.pending || !entry.view.host?.isConnected;
+    elements.style.value = styleId;
+    elements.style.disabled = !entry?.view?.artifact || Boolean(entry.view.pending);
+    elements.png.disabled = unavailable;
+    elements.svg.disabled = unavailable;
   }
 
   function appendField(list, label, value) {
@@ -858,6 +881,7 @@ export function createCharts(adapter) {
     purgePlot();
     view.pending = true;
     view.renderReady = false;
+    if (view.operation) view.operation.renderReady = false;
     const host = make("div", "chart-render-host");
     view.host = host;
     plotHost = host;
@@ -881,7 +905,9 @@ export function createCharts(adapter) {
       if (!isCurrentRender()) return false;
       if (!host.clientWidth) return deferHiddenRender();
       const figure = figureFor(view.artifact, { valid: language === "zh" ? "非缺失" : "Valid", missing: language === "zh" ? "缺失" : "Missing", rows: t("rows") });
-      await Plotly.react(host, figure.traces, figure.layout, {
+      if (!window.ResearchChartStyles?.apply) throw new Error("renderFailed");
+      const styled = window.ResearchChartStyles.apply(figure, styleId);
+      await Plotly.react(host, styled.traces, styled.layout, {
         responsive: true,
         displaylogo: false,
         scrollZoom: true,
@@ -1020,6 +1046,7 @@ export function createCharts(adapter) {
       if (!chart || chart.id !== operation.body.request_id || chart.document_id !== documentId || chart.deleted_at ||
         !validateArtifact(previewOperation.artifact, chart)) throw new Error("request_failed");
       entry.charts = [chart, ...entry.charts.filter((item) => item.id !== chart.id)];
+      adapter.sourcesChanged?.(documentId);
       if (currentId === documentId && entry.view === view && entry.draft === draft && draft.saveOperation === operation && sequence === entry.openSequence && navigationGeneration === adapter.getNavigationGeneration?.()) {
         entry.activeChartId = chart.id;
         view.kind = "saved";
@@ -1185,7 +1212,7 @@ export function createCharts(adapter) {
     entry.status = { key: "exporting", kind: "info" };
     render();
     try {
-      const response = await adapter.checkedFetch(`/api/v1/documents/${encodeURIComponent(documentId)}/charts/${encodeURIComponent(chart.id)}/export`);
+      const response = await adapter.checkedFetch(`/api/v1/documents/${encodeURIComponent(documentId)}/charts/${encodeURIComponent(chart.id)}/export?style=${encodeURIComponent(styleId)}`);
       const url = URL.createObjectURL(await response.blob());
       const link = make("a");
       link.href = url;
@@ -1226,6 +1253,7 @@ export function createCharts(adapter) {
         body: JSON.stringify(operation.body)
       });
       entry.charts = entry.charts.map((item) => item.id === chart.id ? updated : item);
+      adapter.sourcesChanged?.(chart.document_id);
       if (updated.deleted_at && entry.activeChartId === updated.id) {
         entry.activeChartId = null;
         if (entry.view?.record?.id === updated.id) {
@@ -1357,10 +1385,19 @@ export function createCharts(adapter) {
     const entry = currentEntry();
     if (entry) cancelDraft(entry);
   });
-  elements.png.addEventListener("click", () => {
+  function downloadChart(format) {
     const view = currentEntry()?.view;
     if (!view?.renderReady || view.pending || !view.host?.isConnected || !window.Plotly) return;
-    window.Plotly.downloadImage(view.host, { format: "png", scale: 2, filename: "research-chart" });
+    window.Plotly.downloadImage(view.host, { format, scale: 2, filename: `research-chart-${styleId}` });
+  }
+  elements.png.addEventListener("click", () => downloadChart("png"));
+  elements.svg.addEventListener("click", () => downloadChart("svg"));
+  elements.style.addEventListener("change", () => {
+    if (!window.ResearchChartStyles?.ids.includes(elements.style.value)) return;
+    styleId = elements.style.value;
+    try { localStorage.setItem("research-chart-style", styleId); } catch { /* Session preference remains applied. */ }
+    const entry = currentEntry();
+    if (entry?.view?.artifact) displayArtifact(entry, entry.view);
   });
 
   return {
@@ -1374,7 +1411,11 @@ export function createCharts(adapter) {
         if (label) label.textContent = t(key);
       }
       elements.title.placeholder = t("titlePlaceholder");
+      elements.styleLabel.firstChild.textContent = t("style");
+      elements.style.querySelector('option[value="default"]').textContent = t("defaultStyle");
+      elements.styleNote.textContent = t("styleNote");
       elements.png.textContent = t("png");
+      elements.svg.textContent = t("svg");
       render();
       const entry = currentEntry();
       if (entry?.view?.artifact) displayArtifact(entry, entry.view);
@@ -1388,6 +1429,10 @@ export function createCharts(adapter) {
       const entry = entryFor(documentId);
       const chart = entry.charts.find((item) => item.id === entry.activeChartId && !item.deleted_at);
       return chart && chart.dataset_id === adapter.getSharedDatasetId?.() ? chart : null;
+    },
+    getCurrentChart(documentId) {
+      const entry = entryFor(documentId);
+      return entry.charts.find((item) => item.id === entry.activeChartId && !item.deleted_at) || null;
     },
     clearActiveChart(documentId) {
       const entry = entryFor(documentId);
