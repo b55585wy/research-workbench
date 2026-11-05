@@ -1,0 +1,204 @@
+.research-shell-host {
+  display: none;
+}
+
+.research-shell-layout {
+  min-width: 0;
+}
+
+html:not([data-research-shell="ready"]) .reader-heading-row {
+  display: flex;
+}
+
+html[data-research-shell="ready"] .workspace-modebar,
+html[data-research-shell="ready"] #data-tool-switch {
+  display: none;
+}
+
+html[data-research-shell="ready"] #assistant-toggle {
+  display: none;
+}
+
+html[data-research-shell="ready"] .research-shell-host:not([hidden]) {
+  display: block;
+  min-width: 0;
+  background: var(--ui-surface);
+}
+
+.research-shell {
+  color: var(--ui-text);
+  font-size: var(--ui-font-metadata, 12px);
+  line-height: var(--ui-line-body, 1.5);
+}
+
+.research-shell-areas,
+.research-shell-panels {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 8px;
+}
+
+.research-shell-panels {
+  border-top: 1px solid var(--ui-border);
+}
+
+.research-shell-button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 0;
+  min-height: 56px;
+  padding: 8px 4px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ui-text-soft);
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+.research-shell-button svg {
+  flex: none;
+  width: var(--ui-icon-size, 20px);
+  height: var(--ui-icon-size, 20px);
+}
+
+.research-shell-label {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.research-shell-label-compact {
+  display: none;
+}
+
+.research-shell-button:hover {
+  background: var(--ui-surface-subtle);
+}
+
+.research-shell-button[aria-current="page"] {
+  border-color: var(--ui-border-strong);
+  background: var(--ui-surface-subtle);
+  color: var(--ui-primary);
+  font-weight: 600;
+}
+
+.research-shell-button:focus-visible {
+  outline: 2px solid var(--ui-focus);
+  outline-offset: -2px;
+}
+
+.research-shell-button:disabled {
+  cursor: wait;
+  opacity: .55;
+}
+
+.data-workspace[data-tool="presentations"] > .presentations-panel {
+  margin-top: 0;
+  border: 0;
+}
+
+.data-workspace[data-tool="presentations"] > .presentations-panel > summary {
+  display: none;
+}
+
+.data-workspace[data-tool="presentations"] > .presentations-panel > .presentations-body {
+  padding-top: 0;
+}
+
+@media (min-width: 821px) {
+  html[data-research-shell="ready"] .research-shell-layout {
+    display: grid;
+    grid-template-columns: 88px minmax(0, 1fr);
+    align-items: start;
+  }
+
+  html[data-research-shell="ready"] .research-shell-host {
+    position: sticky;
+    top: 0;
+    max-height: 100dvh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border-right: 1px solid var(--ui-border);
+  }
+
+  html[data-research-shell="ready"] .research-shell-layout > .workspace {
+    --research-library-width: clamp(180px, 18vw, 240px);
+    --research-notes-width: clamp(240px, 24vw, 320px);
+    min-width: 0;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  html[data-research-shell="ready"] .research-shell-layout > .workspace[data-library-visible="true"] {
+    grid-template-columns: var(--research-library-width) minmax(0, 1fr);
+  }
+}
+
+@media (min-width: 1101px) {
+  html[data-research-shell="ready"] .research-shell-layout > .workspace[data-notes-visible="true"] {
+    grid-template-columns: minmax(0, 1fr) var(--research-notes-width);
+  }
+
+  html[data-research-shell="ready"] .research-shell-layout > .workspace[data-library-visible="true"][data-notes-visible="true"] {
+    grid-template-columns: var(--research-library-width) minmax(0, 1fr) var(--research-notes-width);
+  }
+}
+
+@media (max-width: 820px) {
+  .research-shell-layout {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  html[data-research-shell="ready"] .research-shell-host {
+    flex: none;
+    width: 100%;
+    overflow: hidden;
+    border-bottom: 1px solid var(--ui-border);
+  }
+
+  .research-shell-areas {
+    flex-direction: row;
+    gap: 4px;
+    padding: 4px 8px;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: thin;
+  }
+
+  .research-shell-area {
+    flex: 1 1 0;
+    flex-direction: column;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 8px;
+    gap: 4px;
+  }
+
+  .research-shell-area .research-shell-label-full { display: none; }
+  .research-shell-area .research-shell-label-compact { display: inline; }
+
+  .research-shell-label {
+    white-space: nowrap;
+    overflow-wrap: normal;
+  }
+
+  .research-shell-panels {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .research-shell-button {
+    transition: none;
+  }
+}

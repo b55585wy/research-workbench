@@ -20,21 +20,33 @@
 
       <section class="storage-choice-intro" aria-labelledby="storage-choice-title">
         <h1 id="storage-choice-title">选择资料保存位置</h1>
-        <p>选择本次研究工作区使用的存储位置。</p>
+        <p>两种位置都支持 PDF 阅读与笔记，在线功能和找回方式不同。</p>
       </section>
 
       <nav class="storage-options" aria-label="资料保存位置">
-        <a class="storage-option" href="/device/">
-          <span class="storage-option-title">本机资料</span>
-          <span class="storage-option-description">PDF、图片和笔记保存在当前浏览器；请导出备份，清理浏览器会丢失资料。</span>
-          <span class="storage-option-action" aria-hidden="true">进入本机资料 <span class="storage-option-arrow">→</span></span>
-        </a>
+        <section class="storage-option" aria-labelledby="device-option-title">
+          <h2 class="storage-option-title" id="device-option-title">本机资料</h2>
+          <dl class="storage-option-features">
+            <div><dt>保存</dt><dd>PDF、图片和笔记仅保存在此浏览器。</dd></div>
+            <div><dt>阅读</dt><dd>PDF 阅读、批注与笔记；准备就绪后可离线。</dd></div>
+            <div><dt>在线</dt><dd>选中文字翻译与明确提交的文字问答，需联网和模型连接。</dd></div>
+            <div><dt>限制</dt><dd>暂不支持整篇翻译、数据导入、分析及 PPT 工作流。</dd></div>
+            <div><dt>找回</dt><dd>请导出备份；清理浏览器会丢失资料。</dd></div>
+          </dl>
+          <a class="storage-option-action" href="/device/">进入本机资料 <span class="storage-option-arrow" aria-hidden="true">→</span></a>
+        </section>
 
-        <a class="storage-option" href="/?storage=server">
-          <span class="storage-option-title">服务器资料</span>
-          <span class="storage-option-description">资料保存在服务器，可使用在线研究助手和分析；每位访客独立空间。</span>
-          <span class="storage-option-action" aria-hidden="true">进入服务器资料 <span class="storage-option-arrow">→</span></span>
-        </a>
+        <section class="storage-option" aria-labelledby="server-option-title">
+          <h2 class="storage-option-title" id="server-option-title">服务器资料</h2>
+          <dl class="storage-option-features">
+            <div><dt>保存</dt><dd>资料保存在服务器，每位访客空间独立。</dd></div>
+            <div><dt>阅读</dt><dd>PDF 阅读、批注与笔记；需联网。</dd></div>
+            <div><dt>在线</dt><dd>整篇翻译、研究助手、数据分析、图表与 PPT 工作流。</dd></div>
+            <div><dt>限制</dt><dd>不跨服务器同步，也不自动备份。</dd></div>
+            <div><dt>找回</dt><dd>请保存恢复码，换浏览器返回此服务器空间时需要。</dd></div>
+          </dl>
+          <a class="storage-option-action" href="/?storage=server">进入服务器资料 <span class="storage-option-arrow" aria-hidden="true">→</span></a>
+        </section>
       </nav>
 
       <footer class="storage-choice-footer">

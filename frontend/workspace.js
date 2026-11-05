@@ -4,6 +4,7 @@ const messages = {
     data: "数据分析",
     analysis: "分析",
     charts: "图表",
+    presentations: "汇报 PPT",
     notes: "笔记",
     library: "资料",
     noteEditor: "编辑笔记",
@@ -31,6 +32,7 @@ const messages = {
     data: "Data analysis",
     analysis: "Analysis",
     charts: "Charts",
+    presentations: "Presentation (PPT)",
     notes: "Notes",
     library: "Library",
     noteEditor: "Edit note",
@@ -98,6 +100,7 @@ export function createWorkspace(adapter) {
   const notes = document.querySelector(".notes-panel");
   const analysis = byId("analysis-panel");
   const charts = byId("charts-panel");
+  const presentations = byId("presentations-panel");
   const imports = byId("data-imports");
   const modeReading = byId("workspace-mode-reading");
   const modeData = byId("workspace-mode-data");
@@ -120,6 +123,11 @@ export function createWorkspace(adapter) {
   const studyMaterials = byId("study-materials");
   const analysisTab = byId("data-tool-analysis");
   const chartsTab = byId("data-tool-charts");
+  const presentationsTab = make("button", "data-tool-button");
+  presentationsTab.id = "data-tool-presentations";
+  presentationsTab.type = "button";
+  presentationsTab.setAttribute("aria-controls", "presentations-panel");
+  byId("data-tool-switch").append(presentationsTab);
   const prerequisite = byId("data-prerequisite");
   const analysisBody = analysis.querySelector(".analysis-body");
   const chartsBody = charts.querySelector(".charts-body");
@@ -215,16 +223,33 @@ export function createWorkspace(adapter) {
   byId("study-materials-summary").textContent = t("projectMaterials");
   importSummary.textContent = t("imports");
   let mode = modeForParams(params);
-  let tool = params.get("chart") || params.get("tool") === "charts" ? "charts" : "analysis";
+  let tool = params.get("tool") === "presentations" ? "presentations"
+    : params.get("chart") || params.get("tool") === "charts" ? "charts" : "analysis";
   let importReviewOpen = false;
   let libraryVisible = true;
   const libraryVisibility = { reading: true, data: true };
-  let notesVisible = mode === "reading";
-  const notesVisibility = { reading: true, data: false };
+  let notesVisible = mode === "reading" && adapter.initialNotesVisible !== false;
+  const notesVisibility = { reading: adapter.initialNotesVisible !== false, data: false };
   const focusByMode = new Map();
   let initialized = false;
   let navigationGeneration = 0;
   let modePending = false;
+  let snapshot = null;
+  const listeners = new Set();
+
+  function publishSnapshot() {
+    const owner = adapter.getDocument();
+    const next = {
+      mode, tool, language, libraryVisible, notesVisible, pending: modePending,
+      ownerTitle: owner?.title || owner?.name || owner?.original_filename || ""
+    };
+    if (snapshot && Object.keys(next).every((key) => snapshot[key] === next[key])) return;
+    snapshot = Object.freeze(next);
+    for (const listener of [...listeners]) {
+      try { listener(snapshot); }
+      catch (error) { console.error("Workspace view listener failed", error); }
+    }
+  }
 
   function t(key, values = {}) {
     let text = messages[language]?.[key] || messages.en[key] || key;
@@ -239,6 +264,8 @@ export function createWorkspace(adapter) {
     main.dataset.ownerKind = personalOwner ? "personal" : studyOwner ? "study" : owner ? "paper" : "none";
     modeReading.textContent = t("reading");
     byId("data-workspace-help").textContent = t(personalOwner ? "personalDataHelp" : studyOwner ? "studyDataHelp" : "dataHelp");
+    byId("data-workspace-help").hidden = tool !== "analysis";
+    byId("data-workspace-title").textContent = t(tool === "analysis" ? "dataTitle" : tool);
     prerequisite.textContent = t("prerequisite");
     const context = byId("data-owner-context");
     context.textContent = !owner ? "" : personalOwner ? t("personalContext") : t(studyOwner ? "projectContext" : "paperContext", {
@@ -251,6 +278,7 @@ export function createWorkspace(adapter) {
     if (explicit === "reading") return "reading";
     if (search.has("note") || search.has("image_source")) return "reading";
     if (["analysis", "dataset", "chart"].some((key) => search.has(key))) return "data";
+    if (search.get("tool") === "presentations") return "data";
     return explicit === "data" ? "data" : "reading";
   }
 
@@ -300,6 +328,8 @@ export function createWorkspace(adapter) {
     main.dataset.libraryVisible = String(libraryVisible);
     main.dataset.notesVisible = String(notesVisible);
     dataWorkspace.dataset.tool = tool;
+    byId("data-workspace-title").textContent = t(tool === "charts" ? "charts" : tool === "presentations" ? "presentations" : "data");
+    byId("data-workspace-help").hidden = tool !== "analysis";
     dataWorkspace.dataset.reviewOpen = String(reviewVisible);
     documents.hidden = !libraryVisible;
     reader.hidden = mode !== "reading";
@@ -312,10 +342,16 @@ export function createWorkspace(adapter) {
     modeData.disabled = modePending;
     analysisTab.setAttribute("aria-pressed", String(tool === "analysis"));
     chartsTab.setAttribute("aria-pressed", String(tool === "charts"));
+    presentationsTab.setAttribute("aria-pressed", String(tool === "presentations"));
+    presentationsTab.textContent = t("presentations");
     analysisTab.disabled = modePending;
     chartsTab.disabled = modePending;
+    presentationsTab.disabled = modePending;
     analysis.hidden = tool !== "analysis" || reviewVisible;
     charts.hidden = tool !== "charts";
+    presentations.hidden = tool !== "presentations";
+    if (tool === "presentations") presentations.open = true;
+    imports.hidden = tool === "presentations";
     byId("data-tool-switch").hidden = reviewVisible;
     imports.dataset.reviewOpen = String(reviewVisible);
     importReview.hidden = !reviewVisible || !byId("spss-import-summary").children.length;
@@ -346,6 +382,7 @@ export function createWorkspace(adapter) {
       if (mode === "reading") adapter.readingVisible?.();
       else adapter.toolVisible?.(tool);
     }
+    publishSnapshot();
   }
 
   function rememberFocus() {
@@ -356,7 +393,11 @@ export function createWorkspace(adapter) {
   function restoreFocus() {
     const previous = focusByMode.get(mode);
     if (isVisible(previous)) previous.focus({ preventScroll: true });
-    else (mode === "reading" ? modeReading : modeData).focus({ preventScroll: true });
+    else {
+      const shellCurrent = document.querySelector('.research-shell [aria-current="page"]');
+      const fallback = isVisible(shellCurrent) ? shellCurrent : mode === "reading" ? modeReading : modeData;
+      fallback.focus({ preventScroll: true });
+    }
   }
 
   main.addEventListener("focusin", (event) => {
@@ -389,7 +430,7 @@ export function createWorkspace(adapter) {
   function reveal(nextMode, options = {}) {
     navigationGeneration += 1;
     adapter.navigationChanged?.();
-    const nextTool = options.tool === "charts" ? "charts" : options.tool === "analysis" ? "analysis" : tool;
+    const nextTool = ["analysis", "charts", "presentations"].includes(options.tool) ? options.tool : tool;
     const changed = mode !== nextMode || tool !== nextTool;
     if (changed && initialized) rememberFocus();
     if (mode !== nextMode) {
@@ -426,6 +467,9 @@ export function createWorkspace(adapter) {
     reveal("data", { tool: "charts", updateUrl: true, clearSources: true, reviewOpen: false });
     const documentId = adapter.getDocument()?.id;
     if (documentId) adapter.chartsSelected?.(documentId);
+  });
+  presentationsTab.addEventListener("click", () => {
+    if (!modePending) reveal("data", { tool: "presentations", updateUrl: true, reviewOpen: false });
   });
   libraryToggle.addEventListener("click", () => {
     libraryVisible = !libraryVisible;
@@ -471,13 +515,21 @@ export function createWorkspace(adapter) {
       importSummary.textContent = t("imports");
       dataWorkspace.setAttribute("aria-label", t("dataTitle"));
       byId("workspace-mode-controls").setAttribute("aria-label", `${t("reading")} / ${t("data")}`);
-      byId("data-tool-switch").setAttribute("aria-label", `${t("analysis")} / ${t("charts")}`);
+      byId("data-tool-switch").setAttribute("aria-label", `${t("analysis")} / ${t("charts")} / ${t("presentations")}`);
       render();
     },
     documentChanged() {
       render();
     },
     modeForParams,
+    getSnapshot() {
+      return snapshot;
+    },
+    subscribe(listener) {
+      if (typeof listener !== "function") throw new TypeError("Workspace listener must be a function");
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
     getMode() {
       return mode;
     },
@@ -499,6 +551,7 @@ export function createWorkspace(adapter) {
       notesVisible = true;
       notesVisibility[mode] = true;
       render();
+      adapter.notesSectionRequested?.(section === "saved" ? "saved" : "editor");
     },
     setImportReview(documentId, open, revealReview = false) {
       const currentDocumentId = adapter.getDocument()?.id || null;

@@ -481,6 +481,7 @@ export function createStudy(adapter) {
     elements.noteSave.disabled = pending || entry.mutations.size > 0 || !active.text.trim() || !validSource(edit?.note.source || draft.source);
     elements.noteSave.textContent = t(edit ? (edit.saveFailed ? "retryEdit" : "saveEdit") : (draft.saveFailed ? "retrySave" : "saveNote"));
     statusInto(elements.noteStatus, entry.noteStatus);
+    adapter.noteDraftChanged?.();
   }
 
   function appendRichBody(container, note, noteState) {
@@ -1209,6 +1210,14 @@ export function createStudy(adapter) {
       if (currentId && !isPersonal(document)) loadPapers(document);
     },
     captureCurrentDraft,
+    getNoteDraftState(documentId) {
+      const entry = entries.get(documentId);
+      return {
+        hasDraft: Boolean(entry?.draft?.text),
+        editing: Boolean(entry?.edit),
+        busy: Boolean(entry?.notePending || entry?.mutations.size)
+      };
+    },
     renderDocument,
     renderNotes,
     sourceContextChanged() {

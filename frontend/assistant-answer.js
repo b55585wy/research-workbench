@@ -3,15 +3,56 @@ import { renderAssistantMarkdown } from "/assistant-markdown.js";
 const MAX_COLUMNS = 20;
 const MAX_ROWS = 200;
 
+export function isPdfSourceKind(source) {
+  return ["associated_pdf_page", "pdf_page", "reference_pdf_page"].includes(source?.kind);
+}
+
 export function isPdfPageSource(source) {
-  return Boolean(source && ["associated_pdf_page", "pdf_page", "reference_pdf_page"].includes(source.kind) &&
-    typeof source.document_id === "string" && source.document_id &&
-    Number.isInteger(source.page) && source.page >= 1);
+  if (!isPdfSourceKind(source) || typeof source.document_id !== "string" || !source.document_id.trim() ||
+      /[\u0000-\u0020\u007F]/.test(source.document_id) || !Number.isSafeInteger(source.page) || source.page < 1) return false;
+  try {
+    encodeURIComponent(source.document_id);
+  } catch {
+    return false;
+  }
+  if (source.source_sha256 != null && !/^[0-9a-f]{64}$/.test(source.source_sha256)) return false;
+  if (source.rect != null && (!Array.isArray(source.rect) || source.rect.length !== 4 ||
+      !source.rect.every((value) => Number.isFinite(value) && value >= 0 && value <= 1) ||
+      source.rect[0] >= source.rect[2] || source.rect[1] >= source.rect[3])) return false;
+  return source.url == null || matchesPdfPageUrl(source.url, source);
+}
+
+function matchesPdfPageUrl(href, source) {
+  const parsed = safeLink(href);
+  if (!parsed || parsed.origin !== window.location.origin) return false;
+  if (["/", "/device/"].includes(parsed.pathname) && !parsed.hash) {
+    const entries = [...parsed.searchParams];
+    return entries.length === 2 && parsed.searchParams.getAll("document").length === 1 &&
+      parsed.searchParams.getAll("page").length === 1 && parsed.searchParams.get("document") === source.document_id &&
+      parsed.searchParams.get("page") === String(source.page);
+  }
+  return parsed.pathname === `/api/v1/documents/${encodeURIComponent(source.document_id)}/file` &&
+    !parsed.search && parsed.hash === `#page=${source.page}`;
 }
 
 export function pdfPageApplicationUrl(source) {
   if (!isPdfPageSource(source)) return null;
   return `/?document=${encodeURIComponent(source.document_id)}&page=${source.page}`;
+}
+
+export function bindPdfSourceLink(link, source, onOpenSource) {
+  const href = pdfPageApplicationUrl(source);
+  if (!href) return false;
+  link.href = href;
+  link.removeAttribute("target");
+  link.removeAttribute("rel");
+  link.addEventListener("click", (event) => {
+    if (event.defaultPrevented || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    // A missing/rejected workspace adapter must never reload the page or open a tab.
+    Promise.resolve().then(() => onOpenSource?.(source)).catch(() => false);
+  });
+  return true;
 }
 
 export function onlineDatasetSourceUrl(source) {
@@ -114,7 +155,7 @@ function tableProblem(table, rawSource) {
 function sourceMap(sources) {
   const map = new Map();
   for (const source of Array.isArray(sources) ? sources : []) {
-    if (source && typeof source.ref === "string" && !map.has(source.ref)) map.set(source.ref, source);
+    if (source && typeof source.ref === "string") map.set(source.ref, map.has(source.ref) ? null : source);
   }
   return map;
 }
@@ -122,7 +163,7 @@ function sourceMap(sources) {
 function resolvableSource(source, ref) {
   if (!source || source.ref !== ref || typeof source.document_id !== "string" || !source.document_id) return false;
   if (source.kind === "online_dataset") return Boolean(onlineDatasetSourceUrl(source));
-  return !["associated_pdf_page", "pdf_page", "reference_pdf_page"].includes(source.kind) || isPdfPageSource(source);
+  return !isPdfSourceKind(source) || isPdfPageSource(source);
 }
 
 function appendCitation(container, ref, source, options, usedSources) {
@@ -140,11 +181,14 @@ function appendCitation(container, ref, source, options, usedSources) {
   let control;
   if (isPdfPageSource(source) || onlineDatasetUrl) {
     control = document.createElement("a");
-    control.href = onlineDatasetUrl || pdfPageApplicationUrl(source);
-    control.target = "_blank";
-    control.rel = "noopener noreferrer";
-    control.setAttribute("aria-label", options.t("citationNewTab", { ref, label }));
-    control.title = options.t("citationNewTab", { ref, label });
+    if (onlineDatasetUrl) {
+      control.href = onlineDatasetUrl;
+      control.target = "_blank";
+      control.rel = "noopener noreferrer";
+    } else bindPdfSourceLink(control, source, options.onOpenSource);
+    const key = onlineDatasetUrl ? "citationNewTab" : "citationOpen";
+    control.setAttribute("aria-label", options.t(key, { ref, label }));
+    control.title = options.t(key, { ref, label });
   } else {
     control = document.createElement("button");
     control.type = "button";
@@ -184,6 +228,16 @@ function enhanceCitations(root, options, usedSources, skipTables = false) {
   const citationLinks = [...root.querySelectorAll("a")].filter((link) => {
     if (!/^(?:R\d+(?:\s*,\s*R\d+)*|\[R\d+(?:\s*,\s*R\d+)*\])$/.test(link.textContent || "")) return false;
     if (link.closest("pre, code, .katex, .katex-error, .math, script, style")) return false;
+    const href = link.getAttribute("href");
+    const refs = (link.textContent || "").match(/R\d+/g) || [];
+    if (!refs.every((ref) => {
+      const source = options.sourceByRef.get(ref);
+      if (!resolvableSource(source, ref)) return false;
+      if (isPdfPageSource(source)) return matchesPdfPageUrl(href, source);
+      const expected = safeLink(source.url);
+      const actual = safeLink(href);
+      return expected && actual && expected.href === actual.href;
+    })) return false;
     return !skipTables || !link.closest("table");
   });
   for (const link of citationLinks) {
@@ -214,7 +268,7 @@ function enhanceCitations(root, options, usedSources, skipTables = false) {
 }
 
 function safeLink(href) {
-  if (!href || href.length > 2048 || /[\u0000-\u001F\u007F]/.test(href)) return null;
+  if (typeof href !== "string" || !href || href.length > 2048 || /[\u0000-\u001F\u007F]/.test(href)) return null;
   try {
     const parsed = new URL(href, window.location.origin);
     if (!["http:", "https:", "mailto:"].includes(parsed.protocol) || parsed.username || parsed.password) return null;

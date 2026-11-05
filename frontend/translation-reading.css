@@ -380,14 +380,23 @@
 
 .translation-current-action {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   gap: 8px;
-  padding: 12px;
+  padding: 8px 12px;
   border-bottom: 1px solid var(--ui-border);
 }
 
 .translation-current-action .translation-field {
-  flex: 0 1 128px;
+  flex: 0 1 112px;
+  min-width: 0;
+}
+
+.translation-current-action .translation-field > span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
 }
 
 .translation-current-action .translation-field select {
@@ -397,8 +406,58 @@
 
 .translation-current-button {
   flex: 1 1 auto;
+  min-width: 0;
   min-height: 36px;
-  white-space: nowrap;
+  white-space: normal;
+}
+
+.translation-legacy-options {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.translation-panel-content[hidden] {
+  display: none;
+}
+
+.translation-panel-content :is(button, select, input, summary):focus-visible {
+  outline: 2px solid var(--ui-primary);
+  outline-offset: 2px;
+}
+
+.translation-secondary-heading {
+  margin: 8px 16px 0;
+  color: var(--ui-text-soft);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.translation-run-page-picker {
+  display: inline-flex;
+  align-items: center;
+  margin: 0;
+  max-width: 160px;
+}
+
+.translation-run-page-picker select {
+  min-height: 36px;
+  padding: 4px 8px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.translation-run-progress {
+  margin-block: 0 8px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.translation-job-summary {
+  align-items: center;
+  padding: 8px 16px;
 }
 
 .translation-options > summary,
@@ -500,17 +559,18 @@
   }
 
   .translation-current-action {
-    align-items: stretch;
-    flex-direction: column;
+    align-items: center;
+    flex-direction: row;
   }
 
   .translation-current-action .translation-field {
-    flex-basis: auto;
+    flex: 0 1 104px;
   }
 
   .translation-current-button {
-    flex: none;
-    width: 100%;
+    flex: 1 1 auto;
+    min-width: 0;
+    white-space: normal;
   }
 
   .translation-library-item {

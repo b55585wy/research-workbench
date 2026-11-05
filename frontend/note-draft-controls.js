@@ -10,13 +10,17 @@ function hasRichContent(content) {
   )));
 }
 
+export function noteDraftHasContent(draft) {
+  return Boolean(draft && (draft.text || hasRichContent(draft.richContent)));
+}
+
 export function noteDraftState(context) {
   if (!context) return { changed: false, disabled: true, blocked: null };
   const { draft, mode } = context;
   const contentChanged = mode === "edit"
     ? draft.text !== draft.note.text || JSON.stringify(richOps(draft.richContent, draft.text)) !==
       JSON.stringify(richOps(draft.originalRichContent, draft.note.text))
-    : Boolean(draft.text || hasRichContent(draft.richContent) || draft.page != null || context.imageIds.length);
+    : Boolean(noteDraftHasContent(draft) || draft.page != null || context.imageIds.length);
   const changed = Boolean(contentChanged || context.richError || context.capture || context.selection ||
     context.textSelection || context.regionActive || context.highlight);
   const blocked = context.pending ? "noteDraftPending"

@@ -1,7 +1,7 @@
 import { renderRichHtml } from "/rich-text.js";
 import { createTaskClient } from "/task-client.js";
 import { createAssistantWindow } from "/assistant-window.js";
-import { isPdfPageSource, onlineDatasetSourceUrl, pdfPageApplicationUrl, renderAssistantAnswer } from "/assistant-answer.js";
+import { bindPdfSourceLink, isPdfPageSource, isPdfSourceKind, onlineDatasetSourceUrl, renderAssistantAnswer } from "/assistant-answer.js";
 import { createReferencePicker, normalizeResourceReference, resourceReferenceKey, resourceReferencesFromTurn, resourceReferenceWire } from "/assistant-references.js";
 import { createSourcePreparationBridge } from "/source-preparation-bridge.js";
 
@@ -1555,8 +1555,24 @@ export function createAssistant(adapter) {
     elements.history.disabled = !entry?.conversations.length || entry.loading || Boolean(entry.pendingSend?.pending) || Boolean(entry.pendingDecision) || Boolean(entry.clearing);
   }
 
-  function openTurnSource(source) {
+  let pdfSourceOpening = null;
+
+  async function openTurnSource(source) {
     if (source.kind === "online_dataset") return;
+    if (isPdfSourceKind(source)) {
+      // onOpenPdfSource(source): Promise<boolean> owns current-source checks,
+      // draft guards and navigation generations; false leaves the workspace intact.
+      if (pdfSourceOpening?.source === source || !isPdfPageSource(source) || typeof adapter.onOpenPdfSource !== "function") return false;
+      const opening = { source };
+      pdfSourceOpening = opening;
+      try {
+        return await adapter.onOpenPdfSource(source) === true;
+      } catch {
+        return false;
+      } finally {
+        if (pdfSourceOpening === opening) pdfSourceOpening = null;
+      }
+    }
     if (source.kind === "research_record") adapter.reviewResearchRecord?.(source);
     else adapter.navigateSource(source);
   }
@@ -1674,18 +1690,20 @@ export function createAssistant(adapter) {
     const isResearchRecord = source.kind === "research_record";
     const isPdfPage = isPdfPageSource(source);
     const onlineDatasetUrl = onlineDatasetSourceUrl(source);
-    const isUnverifiedOnlineDataset = source.kind === "online_dataset" && !onlineDatasetUrl;
-    const control = document.createElement(isPdfPage || onlineDatasetUrl ? "a" : isUnverifiedOnlineDataset ? "span" : "button");
+    const isUnverified = (source.kind === "online_dataset" && !onlineDatasetUrl) || (isPdfSourceKind(source) && !isPdfPage);
+    const control = document.createElement(isPdfPage || onlineDatasetUrl ? "a" : isUnverified ? "span" : "button");
     control.className = "assistant-source-button";
     const label = isResearchRecord ? t("reviewResearchRecord") : source.label || source.ref || t("openSource");
     control.textContent = label;
     if (isPdfPage || onlineDatasetUrl) {
-      control.href = onlineDatasetUrl || pdfPageApplicationUrl(source);
-      control.target = "_blank";
-      control.rel = "noopener noreferrer";
+      if (onlineDatasetUrl) {
+        control.href = onlineDatasetUrl;
+        control.target = "_blank";
+        control.rel = "noopener noreferrer";
+      } else bindPdfSourceLink(control, source, openTurnSource);
       control.classList.add("assistant-source-link");
-      control.setAttribute("aria-label", t("citationNewTab", { ref: source.ref || label, label }));
-    } else if (isUnverifiedOnlineDataset) {
+      control.setAttribute("aria-label", t(onlineDatasetUrl ? "citationNewTab" : "citationOpen", { ref: source.ref || label, label }));
+    } else if (isUnverified) {
       control.classList.add("assistant-citation-unverified");
       control.title = t("citationUnverified");
       control.setAttribute("aria-label", `${label}: ${t("citationUnverified")}`);

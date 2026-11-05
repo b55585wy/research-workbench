@@ -24,19 +24,17 @@ const strings = {
   zh: {
     settings: "工作台设置",
     close: "关闭设置",
-    space: "当前空间与存储",
+    space: "空间恢复",
     appearance: "外观与主题",
     language: "语言",
-    openingSpace: "正在打开空间…",
     spaceRecovery: "空间保存与恢复"
   },
   en: {
     settings: "Workspace settings",
     close: "Close settings",
-    space: "Current space and storage",
+    space: "Space recovery",
     appearance: "Appearance and theme",
     language: "Language",
-    openingSpace: "Opening workspace…",
     spaceRecovery: "Space saving and recovery"
   }
 } as const;
@@ -68,7 +66,6 @@ function NativeControlsSlot({ controls }: { controls: HTMLElement }) {
 function HeaderSettings({ container, controls, identity }: Omit<MountHeaderSettingsOptions, "onMounted">) {
   const [open, setOpen] = useState(false);
   const [language, setLanguage] = useState<HeaderSettingsLanguage>(pageLanguage);
-  const [identityText, setIdentityText] = useState("");
   const [hasSpaceAction, setHasSpaceAction] = useState(false);
   const gearRef = useRef<HTMLButtonElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
@@ -77,8 +74,6 @@ function HeaderSettings({ container, controls, identity }: Omit<MountHeaderSetti
 
   useEffect(() => {
     const refresh = () => {
-      const status = identity.querySelector<HTMLElement>(":scope > .local-guest");
-      setIdentityText(status?.textContent?.trim() || "");
       setHasSpaceAction(Boolean(identity.querySelector(":scope > .guest-space-badge")));
     };
     refresh();
@@ -124,7 +119,7 @@ function HeaderSettings({ container, controls, identity }: Omit<MountHeaderSetti
   }, [container, open]);
 
   function openSpaceAction() {
-    setOpen(false);
+    closePanel();
     if (recoveryTimerRef.current !== null) window.clearTimeout(recoveryTimerRef.current);
     recoveryTimerRef.current = window.setTimeout(() => {
       recoveryTimerRef.current = null;
@@ -172,15 +167,12 @@ function HeaderSettings({ container, controls, identity }: Omit<MountHeaderSetti
           </button>
         </header>
         <div className="header-settings-body">
-          <section className="header-settings-space" aria-label={copy.space}>
+          {hasSpaceAction && <section className="header-settings-space" aria-label={copy.space}>
             <h3>{copy.space}</h3>
-            <p className="header-settings-identity">{identityText || copy.openingSpace}</p>
-            {hasSpaceAction && (
-              <button className="button button-secondary header-settings-space-action" type="button" onClick={openSpaceAction}>
-                {copy.spaceRecovery}
-              </button>
-            )}
-          </section>
+            <button className="button button-secondary header-settings-space-action" type="button" onClick={openSpaceAction}>
+              {copy.spaceRecovery}
+            </button>
+          </section>}
           <h3 className="header-settings-appearance-label">{copy.appearance}</h3>
           <NativeControlsSlot controls={controls} />
           <h3 className="header-settings-language-label">{copy.language}</h3>

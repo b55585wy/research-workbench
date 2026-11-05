@@ -1252,6 +1252,21 @@
   width: 44px;
 }
 
+#assistant-full-page {
+  width: 36px;
+  min-width: 36px;
+  min-height: 36px;
+  padding: 8px;
+}
+
+@media (pointer: coarse), (max-width: 480px) {
+  #assistant-full-page {
+    width: 44px;
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
 .assistant-icon-button {
   display: inline-grid;
   place-items: center;

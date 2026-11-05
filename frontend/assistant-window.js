@@ -65,7 +65,21 @@ export function createAssistantWindow({ panel, header, fullPageToggle, resizeHan
     header.setAttribute("aria-label", labels.window || "");
     header.title = labels.moveHelp || "";
     help.textContent = labels.help || "";
-    fullPageToggle.textContent = toggleLabel || "";
+    const icon = fullPage ? "restore" : "expand";
+    fullPageToggle.classList.add("assistant-icon-button");
+    if (fullPageToggle.dataset.icon !== icon) {
+      const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      svg.setAttribute("viewBox", "0 0 24 24");
+      svg.setAttribute("aria-hidden", "true");
+      svg.setAttribute("focusable", "false");
+      const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      path.setAttribute("d", fullPage
+        ? "M4 9h5V4m6 0v5h5M4 15h5v5m6 0v-5h5"
+        : "M9 4H4v5m11-5h5v5M4 15v5h5m6 0h5v-5");
+      svg.append(path);
+      fullPageToggle.replaceChildren(svg);
+      fullPageToggle.dataset.icon = icon;
+    }
     fullPageToggle.setAttribute("aria-label", toggleLabel || "");
     fullPageToggle.title = toggleLabel || "";
     fullPageToggle.setAttribute("aria-pressed", String(fullPage));

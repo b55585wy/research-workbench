@@ -1,0 +1,137 @@
+.notes-workspace {
+  min-width: 0;
+  color: var(--ui-text);
+  font-size: 14px;
+}
+
+.notes-workspace-open[hidden],
+.notes-workspace #rich-text-draft-status {
+  display: none;
+}
+
+.notes-workspace-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.notes-workspace-tabs {
+  display: flex;
+  flex: 1 1 auto;
+  gap: 4px;
+  min-width: 0;
+}
+
+.notes-workspace-tab,
+.notes-workspace-open {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 8px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ui-text-soft);
+  font: inherit;
+  line-height: 1.5;
+  cursor: pointer;
+}
+
+.notes-workspace-tab:hover,
+.notes-workspace-open:hover {
+  background: var(--ui-surface-muted);
+}
+
+.notes-workspace-tab[aria-selected="true"] {
+  border-color: var(--ui-control-selected-border);
+  background: var(--ui-control-selected-bg);
+  color: var(--ui-control-selected-text);
+  font-weight: 600;
+}
+
+.notes-workspace-open {
+  margin-left: auto;
+  border-color: var(--ui-border);
+  background: var(--ui-control-bg);
+  font-size: 12px;
+}
+
+.notes-workspace-open:disabled {
+  color: var(--ui-disabled-text);
+  cursor: not-allowed;
+}
+
+.notes-workspace-tab:focus-visible,
+.notes-workspace-open:focus-visible,
+.notes-workspace-panel:focus-visible {
+  outline: 2px solid var(--ui-focus);
+  outline-offset: 2px;
+}
+
+.notes-workspace-count {
+  color: var(--ui-text-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.notes-workspace-draft {
+  color: var(--ui-primary);
+  font-size: 16px;
+}
+
+.notes-workspace-panel,
+.notes-workspace-native-slot {
+  min-width: 0;
+}
+
+.notes-workspace-panel[hidden] {
+  display: none !important;
+}
+
+.notes-workspace .notes-workspace-native-host {
+  margin: 0;
+  border: 0;
+}
+
+/* Retain the native details name and keyboard toggle without a second heading. */
+.notes-workspace .notes-workspace-native-summary:not(:focus) {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  min-height: 0;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.notes-workspace .notes-workspace-native-summary:focus {
+  min-height: 44px;
+  padding: 8px 12px;
+  outline: 2px solid var(--ui-focus);
+  outline-offset: -2px;
+}
+
+.notes-workspace-status {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+@media (max-width: 480px) {
+  .notes-workspace-toolbar { padding: 8px; }
+  .notes-workspace-tabs { flex: 1 0 100%; }
+  .notes-workspace-tab { flex: 1 1 0; }
+}

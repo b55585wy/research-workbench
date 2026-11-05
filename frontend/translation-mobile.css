@@ -114,6 +114,16 @@
     font-size: 14px;
   }
 
+  .mobile-layout-active #translation-panel :is(button, select, summary),
+  .reader-toolbar .translation-mode-button,
+  .reader-toolbar .translation-mode-notice button {
+    min-height: 44px;
+  }
+
+  .mobile-layout-active #translation-panel :is(.translation-excerpt-action, .translation-source-icon) {
+    min-width: 44px;
+  }
+
   .mobile-layout-active #translation-panel :is(
     .translation-page-limit,
     .translation-retry-hint,

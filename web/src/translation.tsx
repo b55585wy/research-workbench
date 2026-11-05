@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal, flushSync } from "react-dom";
 import { createRoot, type Root } from "react-dom/client";
 import { TranslationRunPanel, runInScope, type TranslationRun } from "./translation-runs";
@@ -152,9 +152,9 @@ const strings = {
     dualMode: "对照",
     translatedMode: "译文",
     showDual: "对照查看",
-    noSavedTranslation: "没有可用的已保存译文。",
-    currentPageAbsent: "当前页不在这条已完成的翻译记录中。",
-    stillTranslating: "翻译仍在进行；已完成的页面可以切换显示。",
+    noSavedTranslation: "暂无译文",
+    currentPageAbsent: "本页暂无译文",
+    stillTranslating: "本页翻译中，原文仍可阅读。",
     partialOverlay: "当前页部分内容未覆盖，原文已保留。",
     unavailableOverlay: "当前页无法安全覆盖，已保留原文。",
     close: "关闭翻译栏",
@@ -177,10 +177,10 @@ const strings = {
     loading: "正在读取翻译设置和已保存记录…",
     unavailable: "翻译暂不可用。",
     openSettings: "打开模型设置",
-    savedRuns: "已保存的翻译",
+    savedRuns: "翻译记录",
     continuous: "连续翻译",
     legacy: "早期翻译",
-    noSavedRuns: "暂无已保存翻译",
+    noSavedRuns: "选择翻译记录",
     loadRunFailed: "无法打开这条翻译记录，请重试。",
     listFailed: "无法读取已保存的翻译。",
     capabilitiesFailed: "无法读取翻译设置。",
@@ -221,7 +221,7 @@ const strings = {
     other: "非文字内容保留在原文中",
     missingTranslation: "此段没有可用译文",
     visualNotice: "公式、图片和其他非文字内容不会被臆译；请通过原文链接核对。",
-    noResults: "这条记录还没有可显示的译文。",
+    noResults: "暂无译文",
     empty: "选择当前页或最多 5 个页面，然后开始翻译。已有记录不会自动重新运行。",
     ready: "原文保持在左侧，译文按原页码显示在右侧。",
     jobError: "翻译未完成。",
@@ -236,9 +236,9 @@ const strings = {
     dualMode: "Compare",
     translatedMode: "Translated",
     showDual: "Compare",
-    noSavedTranslation: "No saved translation is available.",
-    currentPageAbsent: "The current page is not in this completed translation.",
-    stillTranslating: "Translation is still running; completed pages can be displayed.",
+    noSavedTranslation: "No translation yet",
+    currentPageAbsent: "No translation for this page yet",
+    stillTranslating: "This page is being translated. The original remains readable.",
     partialOverlay: "Some content on this page was not overlaid; the original remains visible.",
     unavailableOverlay: "This page cannot be safely overlaid; the original remains visible.",
     close: "Close translation panel",
@@ -250,7 +250,7 @@ const strings = {
     chinese: "Chinese",
     english: "English",
     start: "Start translation",
-    startCurrent: "Translate this page",
+    startCurrent: "Translate current page",
     more: "Selected pages",
     confirmRange: "Confirm selected pages",
     reviewRange: "Review pages",
@@ -258,13 +258,13 @@ const strings = {
     backToRuns: "Back to translation history",
     starting: "Submitting…",
     retryRequest: "Retry same request",
-    loading: "Loading translation settings and saved runs…",
+    loading: "Loading translations…",
     unavailable: "Translation is currently unavailable.",
     openSettings: "Open model settings",
-    savedRuns: "Saved translations",
+    savedRuns: "Translation history",
     continuous: "Continuous translation",
     legacy: "Earlier translations",
-    noSavedRuns: "No saved translations",
+    noSavedRuns: "Choose a translation",
     loadRunFailed: "This saved translation could not be opened. Try again.",
     listFailed: "Saved translations could not be loaded.",
     capabilitiesFailed: "Translation settings could not be loaded.",
@@ -293,7 +293,7 @@ const strings = {
     originalBlock: "Original location",
     pageInformation: "Journal / publication information",
     addExcerptToNote: "Add translation and original to note",
-    addExcerptToAsk: "Add translation and original to Agent draft",
+    addExcerptToAsk: "Add translation and original to assistant draft",
     excerptFailed: "The translation could not be added. Try again; the existing draft was not changed.",
     page: (page: number) => `Page ${page}`,
     noText: "No translatable text was found on this page. It may be scanned or empty.",
@@ -305,7 +305,7 @@ const strings = {
     other: "Non-text content kept in the original",
     missingTranslation: "No translation is available for this paragraph",
     visualNotice: "Formulas, figures, and other non-text content are not invented. Use the original links to inspect them.",
-    noResults: "This run has no translated pages to display yet.",
+    noResults: "No translation yet",
     empty: "Choose the current page or up to 5 pages, then start. Saved runs are never rerun automatically.",
     ready: "The original stays on the left, with translated paragraphs organized by original page on the right.",
     jobError: "The translation was not completed.",
@@ -494,15 +494,16 @@ function TranslationPageInformation({ blocks, page, copy, onSource }: {
   );
 }
 
-function TranslationResults({ job, copy, onSource, onExcerpt, excerptPending = false }: {
+function TranslationResults({ job, copy, onSource, onExcerpt, excerptPending = false, pageNavigation }: {
   job: TranslationJob;
   copy: Copy;
   onSource: (page: number, rect: TranslationRect | null) => void;
   onExcerpt?: (action: TranslationExcerptAction, block: TranslationBlock, page: number) => void;
   excerptPending?: boolean;
+  pageNavigation?: ReactNode;
 }) {
   const pages = [...jobResults(job)].sort((a, b) => a.page - b.page);
-  if (!pages.length) return <p className="translation-empty">{copy.noResults}</p>;
+  if (!pages.length) return <div className="translation-results">{pageNavigation}<p className="translation-empty">{copy.noResults}</p></div>;
   return (
     <div className="translation-results">
       {pages.map((page) => {
@@ -511,7 +512,7 @@ function TranslationResults({ job, copy, onSource, onExcerpt, excerptPending = f
         return (
           <section className="translation-result-page" key={page.page} aria-labelledby={`translation-page-${job.id}-${page.page}`}>
             <header className="translation-page-header">
-              <h3 id={`translation-page-${job.id}-${page.page}`}>{copy.page(page.page)}</h3>
+              <h3 id={`translation-page-${job.id}-${page.page}`}>{pageNavigation || copy.page(page.page)}</h3>
               <button className="translation-source-link" type="button" onClick={() => onSource(page.page, null)}>
                 {copy.original}
               </button>
@@ -568,6 +569,9 @@ function TranslationExperience({ model, callbacks, controlsContainer, panelConta
   const [jobsError, setJobsError] = useState<string | null>(null);
   const [selectedJob, setSelectedJob] = useState<TranslationJob | null>(null);
   const [selectedRun, setSelectedRun] = useState<TranslationRun | null>(null);
+  const runReadingCacheRef = useRef<TranslationRun | null>(null);
+  const readerPageRef = useRef(model.currentPage);
+  readerPageRef.current = model.currentPage;
   const [externalRun, setExternalRun] = useState<TranslationRun | null>(null);
   const [historyView, setHistoryView] = useState<"run" | "legacy">("run");
   const [legacyConfirmation, setLegacyConfirmation] = useState<{ pages: number[]; targetLanguage: TargetLanguage } | null>(null);
@@ -578,17 +582,32 @@ function TranslationExperience({ model, callbacks, controlsContainer, panelConta
   const [pendingExcerpt, setPendingExcerpt] = useState<string | null>(null);
   const [operationError, setOperationError] = useState<string | null>(null);
   const [pollError, setPollError] = useState(false);
-  const visibleLegacyJob = activeScope && document && selectedJob && jobInScope(selectedJob, document) ? selectedJob : null;
-  const visibleRun = activeScope && document && selectedRun && runInScope(selectedRun, document) ? selectedRun : null;
+  const visibleLegacyJob = activeScope && document && selectedJob && jobInScope(selectedJob, document) && selectedJob.target_language === targetLanguage ? selectedJob : null;
+  const visibleRun = activeScope && document && selectedRun && runInScope(selectedRun, document) && selectedRun.target_language === targetLanguage ? selectedRun : null;
   const useRuns = capabilities?.run_support !== false || Boolean(visibleRun);
   const runView = historyView === "run" && useRuns;
   const visibleJob: TranslationJob | null = runView ? visibleRun : visibleLegacyJob;
   const visibleSourceJobId = runView
-    ? visibleRun?.result_pages.find((page) => page.status === "completed")?.job_id || ""
+    ? visibleRun?.result_pages.find((page) => page.page === model.currentPage && page.status === "completed")?.job_id || ""
     : visibleLegacyJob?.id || "";
   const handleRunSelection = useCallback((run: TranslationRun | null) => {
     excerptActionRef.current += 1;
-    setSelectedRun(run);
+    if (!run) {
+      setSelectedRun(null);
+      return;
+    }
+    // Page-filtered reads can be combined only within the same frozen run version.
+    const identity = (value: TranslationRun) => JSON.stringify([
+      value.id, value.document_id, value.source_sha256, value.target_language,
+      value.revision, value.parser, value.model, value.model_fingerprint,
+      value.prompt_version, value.result_schema_version
+    ]);
+    const cached = runReadingCacheRef.current;
+    const pages = cached && identity(cached) === identity(run) ? cached.result_pages : [];
+    const retained = pages.filter((page) => page.page === readerPageRef.current && !run.result_pages.some((next) => next.page === page.page));
+    const merged = { ...run, result_pages: [...retained, ...run.result_pages] };
+    runReadingCacheRef.current = merged;
+    setSelectedRun(merged);
   }, []);
 
   useEffect(() => {
@@ -605,6 +624,7 @@ function TranslationExperience({ model, callbacks, controlsContainer, panelConta
     setJobsError(null);
     setSelectedJob(null);
     setSelectedRun(null);
+    runReadingCacheRef.current = null;
     setExternalRun(null);
     setHistoryView("run");
     setLegacyConfirmation(null);
@@ -642,7 +662,7 @@ function TranslationExperience({ model, callbacks, controlsContainer, panelConta
       jobId: mode === "translated" ? visibleSourceJobId : "",
       currentPage: model.currentPage,
       language: model.language,
-      resultPages: mode === "translated" && visibleSourceJobId && visibleJob ? frozenCompletedPages(visibleJob) : Object.freeze([])
+      resultPages: mode === "translated" && visibleSourceJobId && visibleJob ? Object.freeze(frozenCompletedPages(visibleJob).filter((page) => page.page === model.currentPage)) : Object.freeze([])
     }) : null;
     controlsContainer.dispatchEvent(new CustomEvent("translation-presentation-change", { detail: snapshot }));
   }, [controlsContainer, mode, documentKey, visibleJob, visibleSourceJobId, model.reading, model.currentPage, model.language]);
@@ -862,6 +882,7 @@ function TranslationExperience({ model, callbacks, controlsContainer, panelConta
       );
       if (generationRef.current !== ticket || scopeRef.current !== scope || action !== jobActionRef.current) return;
       if (!jobInScope(job, scopeDocument) || job.id !== jobId) throw new Error("request_failed");
+      setTargetLanguage(job.target_language);
       setSelectedJob(job);
     } catch (error) {
       if (!isAbort(error) && generationRef.current === ticket && scopeRef.current === scope && action === jobActionRef.current) {
@@ -903,6 +924,7 @@ function TranslationExperience({ model, callbacks, controlsContainer, panelConta
             || typeof result.job_id !== "string" || !result.job_id || !Array.isArray(result.blocks))
         ) throw new Error("request_failed");
         setSelectedJob(null);
+        setTargetLanguage(run.target_language);
         setSelectedRun(run);
         setExternalRun(run);
       } else {
@@ -913,6 +935,7 @@ function TranslationExperience({ model, callbacks, controlsContainer, panelConta
         if (!jobInScope(job, scopeDocument) || job.id !== request.id) throw new Error("request_failed");
         setExternalRun(null);
         setSelectedRun(null);
+        setTargetLanguage(job.target_language);
         setSelectedJob(job);
         setJobs((current) => upsertJob(current, job));
       }
@@ -1038,40 +1061,30 @@ function TranslationExperience({ model, callbacks, controlsContainer, panelConta
     }
   }
 
-  const toggle = (
-    <button
-      ref={toggleRef}
-      className="button button-secondary translation-toggle"
-      type="button"
-      aria-controls={panelContainer.id}
-      aria-expanded={model.open && mode === "dual" && model.reading}
-      aria-pressed={model.open && mode === "dual" && model.reading}
-      disabled={!model.reading || !document}
-      onClick={() => model.open && mode === "dual" ? closePanel() : changeMode("dual")}
-    >
-      {copy.translate}
-    </button>
-  );
-  const currentPageCompleted = Boolean(visibleJob && jobResults(visibleJob).some((page) => page.page === model.currentPage && page.status === "completed"));
-  const overlayNotice = !visibleJob
-    ? copy.noSavedTranslation
-    : isActive(visibleJob)
-      ? copy.stillTranslating
-      : !currentPageCompleted
-        ? copy.currentPageAbsent
-        : overlayStatus?.kind === "partial"
-          ? copy.partialOverlay
-          : overlayStatus?.kind === "unavailable"
-            ? copy.unavailableOverlay
-            : null;
+  const currentResult = visibleJob && jobResults(visibleJob).find((page) => page.page === model.currentPage);
+  const currentPageCompleted = currentResult?.status === "completed";
+  function readingNotice() {
+    if (!visibleJob) return copy.noSavedTranslation;
+    if (currentPageCompleted) {
+      if (overlayStatus?.kind === "partial") return copy.partialOverlay;
+      return overlayStatus?.kind === "unavailable" ? copy.unavailableOverlay : null;
+    }
+    if (!visibleJob.pages.includes(model.currentPage)) return copy.currentPageAbsent;
+    if (currentResult?.status === "failed" || visibleJob.status === "failed") return copy.pageFailed;
+    if (currentResult?.status === "unavailable") return copy.pageUnavailable;
+    return isActive(visibleJob) ? copy.stillTranslating : copy.currentPageAbsent;
+  }
+  const overlayNotice = readingNotice();
   const controls = (
     <>
-      {toggle}
       <div className="translation-mode-control" role="group" aria-label={copy.readingMode}>
         {(["original", "dual", "translated"] as const).map((item) => (
           <button
             className="button button-quiet translation-mode-button"
             type="button"
+            ref={item === "dual" ? toggleRef : undefined}
+            aria-controls={item === "dual" ? panelContainer.id : undefined}
+            aria-expanded={item === "dual" ? model.open && model.reading : undefined}
             data-translation-mode={item}
             aria-pressed={mode === item}
             disabled={!model.reading || !document}
@@ -1082,16 +1095,19 @@ function TranslationExperience({ model, callbacks, controlsContainer, panelConta
           </button>
         ))}
       </div>
-      {mode === "translated" && overlayNotice && (
+      {model.reading && document && mode !== "dual" && overlayNotice && (
         <div className="translation-mode-notice" role="status">
           <span>{overlayNotice}</span>
-          <button className="translation-source-link" type="button" onClick={() => changeMode("dual")}>{copy.showDual}</button>
+          {!currentPageCompleted && <button className="translation-source-link" type="button" onClick={() => {
+            changeMode("dual");
+            requestAnimationFrame(() => panelContainer.querySelector<HTMLButtonElement>(".translation-current-button")?.focus());
+          }}>{copy.translate}</button>}
         </div>
       )}
     </>
   );
 
-  if (!model.open || mode !== "dual" || !model.reading || !document) return controls;
+  if (!model.reading || !document) return controls;
   const maxPages = Math.min(5, capabilities?.max_pages || 5);
   const formDisabled = Boolean(requestDraft) || pendingAction === "start";
   const operationMessage = operationError === "invalid_pages"
@@ -1105,9 +1121,28 @@ function TranslationExperience({ model, callbacks, controlsContainer, panelConta
         : operationError === "network"
           ? copy.network
           : copy.requestFailed;
+  const legacyHistory = (
+    <section className="translation-legacy-history" aria-label={copy.legacy}>
+      <h3 className="translation-secondary-heading">{copy.legacy}</h3>
+      <div className="translation-saved-row">
+        <label htmlFor="translation-saved-runs">{copy.legacy}</label>
+        <select
+          id="translation-saved-runs"
+          value=""
+          disabled={!jobs.length || Boolean(pendingAction)}
+          onChange={(event) => void openSaved(event.target.value)}
+        >
+          <option value="">{copy.noSavedRuns}</option>
+          {jobs.map((job) => <option value={job.id} key={job.id}>{runLabel(job, copy, model.language)}</option>)}
+        </select>
+      </div>
+      {jobsError && <p className="translation-status" data-kind="error" role="alert">{copy.listFailed}</p>}
+    </section>
+  );
   const panel = (
     <div
       className="translation-panel-content"
+      hidden={!model.open || mode !== "dual"}
       onKeyDown={(event) => {
         if (event.key === "Escape" && !event.nativeEvent.isComposing) {
           event.stopPropagation();
@@ -1129,38 +1164,26 @@ function TranslationExperience({ model, callbacks, controlsContainer, panelConta
             document={document}
             currentPage={model.currentPage}
             language={model.language}
+            targetLanguage={targetLanguage}
+            onTargetLanguageChange={setTargetLanguage}
             capabilities={capabilities}
             api={callbacks.api}
             onOpenSettings={openSettings}
             onSelectionChange={handleRunSelection}
             externalRun={externalRun}
-            renderResults={(run) => (
+            historyContent={legacyHistory}
+            renderResults={(run, pageNavigation) => (
               <TranslationResults
                 job={run}
                 copy={copy}
                 onSource={source}
                 onExcerpt={callbacks.onExcerpt ? excerpt : undefined}
                 excerptPending={Boolean(pendingExcerpt)}
+                pageNavigation={pageNavigation}
               />
             )}
           />
           {operationError && <p className="translation-status" data-kind="error" role="alert">{operationMessage}</p>}
-          <details className="translation-history">
-            <summary>{copy.savedRuns}</summary>
-            <div className="translation-saved-row">
-              <label htmlFor="translation-saved-runs">{copy.savedRuns}</label>
-              <select
-                id="translation-saved-runs"
-                value=""
-                disabled={!jobs.length || Boolean(pendingAction)}
-                onChange={(event) => void openSaved(event.target.value)}
-              >
-                <option value="">{copy.noSavedRuns}</option>
-                {jobs.map((job) => <option value={job.id} key={job.id}>{runLabel(job, copy, model.language)}</option>)}
-              </select>
-            </div>
-            {jobsError && <p className="translation-status" data-kind="error" role="alert">{copy.listFailed}</p>}
-          </details>
         </>
       ) : (
         <>
@@ -1198,29 +1221,6 @@ function TranslationExperience({ model, callbacks, controlsContainer, panelConta
             </div>
           )}
 
-          <details className="translation-options">
-            <summary>{copy.more}</summary>
-            <form className="translation-form" onSubmit={(event) => {
-              event.preventDefault();
-              startFromForm(false);
-            }}>
-              <label className="translation-field" htmlFor="translation-page-input">
-                <span>{copy.pagesLabel}</span>
-                <input
-                  id="translation-page-input"
-                  value={pageInput}
-                  placeholder={copy.pagesPlaceholder}
-                  inputMode="text"
-                  autoComplete="off"
-                  disabled={formDisabled || Boolean(legacyConfirmation)}
-                  onChange={(event) => setPageInput(event.target.value)}
-                />
-              </label>
-              <div className="translation-start-row">
-                <button className="button button-secondary" type="submit" disabled={!capabilities?.ready || formDisabled || Boolean(legacyConfirmation)}>{copy.reviewRange}</button>
-              </div>
-            </form>
-          </details>
           {legacyConfirmation && !requestDraft && (
             <div className="translation-run-confirmation" role="group" aria-label={copy.confirmRange}>
               <strong>{copy.pageRange(formatPages(legacyConfirmation.pages), legacyConfirmation.pages.length)} · {copy.sourceLanguage(legacyConfirmation.targetLanguage)}</strong>
@@ -1231,28 +1231,13 @@ function TranslationExperience({ model, callbacks, controlsContainer, panelConta
             </div>
           )}
 
-          <details className="translation-history">
-            <summary>{copy.savedRuns}</summary>
-            <div className="translation-saved-row">
-              <label htmlFor="translation-saved-runs">{copy.savedRuns}</label>
-              <select
-                id="translation-saved-runs"
-                value={visibleLegacyJob?.id || ""}
-                disabled={!jobs.length || Boolean(pendingAction)}
-                onChange={(event) => void openSaved(event.target.value)}
-              >
-                {!jobs.length && <option value="">{copy.noSavedRuns}</option>}
-                {jobs.map((job) => <option value={job.id} key={job.id}>{runLabel(job, copy, model.language)}</option>)}
-              </select>
-            </div>
-            {jobsError && <p className="translation-status" data-kind="error" role="alert">{copy.listFailed}</p>}
-          </details>
+
           {operationError && <p className="translation-status" data-kind="error" role="alert">{operationMessage}</p>}
           {pollError && <p className="translation-status" role="status">{copy.pollFailed}</p>}
 
           {visibleLegacyJob ? (
             <section className="translation-job" aria-label={copy.translation}>
-              <div className="translation-job-summary">
+              {visibleLegacyJob.status !== "completed" && <div className="translation-job-summary">
                 <div>
                   <strong>{copy[visibleLegacyJob.status]}</strong>
                   <p>{copy.pageRange(formatPages(visibleLegacyJob.pages), visibleLegacyJob.total_pages)}</p>
@@ -1276,7 +1261,7 @@ function TranslationExperience({ model, callbacks, controlsContainer, panelConta
                     {copy.retryJob}
                   </button>
                 )}
-              </div>
+              </div>}
               {isActive(visibleLegacyJob) && (
                 <div className="translation-progress" role="status" aria-live="polite">
                   <p>{copy[visibleLegacyJob.stage]} · {copy.progress(visibleLegacyJob.completed_pages, visibleLegacyJob.total_pages)}</p>
@@ -1298,6 +1283,45 @@ function TranslationExperience({ model, callbacks, controlsContainer, panelConta
           ) : (
             <p className="translation-empty">{copy.noSavedTranslation}</p>
           )}
+          <details className="translation-options">
+            <summary>{copy.more}</summary>
+            <form className="translation-form" onSubmit={(event) => {
+              event.preventDefault();
+              startFromForm(false);
+            }}>
+              <label className="translation-field" htmlFor="translation-page-input">
+                <span>{copy.pagesLabel}</span>
+                <input
+                  id="translation-page-input"
+                  value={pageInput}
+                  placeholder={copy.pagesPlaceholder}
+                  inputMode="text"
+                  autoComplete="off"
+                  disabled={formDisabled || Boolean(legacyConfirmation)}
+                  onChange={(event) => setPageInput(event.target.value)}
+                />
+              </label>
+              <div className="translation-start-row">
+                <button className="button button-secondary" type="submit" disabled={!capabilities?.ready || formDisabled || Boolean(legacyConfirmation)}>{copy.reviewRange}</button>
+              </div>
+            </form>
+          </details>
+          <details className="translation-history">
+            <summary>{copy.savedRuns}</summary>
+            <div className="translation-saved-row">
+              <label htmlFor="translation-saved-runs">{copy.savedRuns}</label>
+              <select
+                id="translation-saved-runs"
+                value={visibleLegacyJob?.id || ""}
+                disabled={!jobs.length || Boolean(pendingAction)}
+                onChange={(event) => void openSaved(event.target.value)}
+              >
+                {!jobs.length && <option value="">{copy.noSavedRuns}</option>}
+                {jobs.map((job) => <option value={job.id} key={job.id}>{runLabel(job, copy, model.language)}</option>)}
+              </select>
+            </div>
+            {jobsError && <p className="translation-status" data-kind="error" role="alert">{copy.listFailed}</p>}
+          </details>
         </>
       )}
     </div>

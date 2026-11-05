@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { build } from "vite";
@@ -14,17 +14,10 @@ const sourceFiles = [
   "tsconfig.json",
   "vite.config.ts",
   "scripts/build.mjs",
-  "src/index.tsx",
-  "src/header-settings.tsx",
-  "src/guest-access.tsx",
-  "src/note-controls.tsx",
-  "src/translation.tsx",
-  "src/translation-presentation.ts",
-  "src/translation-runs.tsx",
-  "src/translation-library.tsx",
-  "src/flow-reading.tsx",
-  "src/flow-sentences.ts",
-  "src/source-preparation.tsx"
+  ...(await readdir(resolve(webRoot, "src"), { recursive: true, withFileTypes: true }))
+    .filter((entry) => entry.isFile() && /\.tsx?$/.test(entry.name))
+    .map((entry) => relative(webRoot, resolve(entry.parentPath, entry.name)).replaceAll("\\", "/"))
+    .sort()
 ];
 const runtimePackages = ["react", "react-dom", "scheduler"];
 

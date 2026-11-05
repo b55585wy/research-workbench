@@ -8,6 +8,12 @@ export type {
   MountHeaderSettingsOptions
 } from "./header-settings";
 export { mountNoteControls, mountNoteFilters } from "./note-controls";
+export { mountNotesWorkspace } from "./features/notes-workspace";
+export { mountResearchShell } from "./features/research-shell";
+export type {
+  MountNotesWorkspaceOptions, NotesWorkspaceHandle, NotesWorkspaceModel,
+  NotesWorkspaceHosts, NotesWorkspaceSection
+} from "./features/notes-workspace";
 export type {
   MountNoteControlsOptions,
   MountNoteFiltersOptions,

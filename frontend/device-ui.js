@@ -4,7 +4,10 @@ import { serverPdfCache } from "/server-pdf-cache.js";
 
 const copy = {
   zh: {
-    storage: "存储",
+    storage: "当前资料位置",
+    chooseWorkspace: "比较资料位置与功能",
+    switchDeviceAction: "切换到本机资料",
+    switchServerAction: "切换到服务器资料",
     offlineReady: "离线阅读已就绪",
     offlinePreparing: "正在准备离线阅读",
     offlineFailed: "离线准备未完成",
@@ -37,7 +40,10 @@ const copy = {
     cacheFailed: "阅读缓存操作未完成，请重试。"
   },
   en: {
-    storage: "Storage",
+    storage: "Current workspace",
+    chooseWorkspace: "Compare workspace capabilities",
+    switchDeviceAction: "Switch to device storage",
+    switchServerAction: "Switch to server storage",
     offlineReady: "Offline reading is ready",
     offlinePreparing: "Preparing offline reading",
     offlineFailed: "Offline preparation did not finish",
@@ -97,11 +103,27 @@ function formatCacheBytes(value, language) {
   return `${new Intl.NumberFormat(language === "zh" ? "zh-CN" : "en", { maximumFractionDigits: unit ? 1 : 0 }).format(amount)} ${units[unit]}`;
 }
 
+function storageIcon(className, path) {
+  const icon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  icon.setAttribute("class", className);
+  icon.setAttribute("viewBox", "0 0 24 24");
+  icon.setAttribute("fill", "none");
+  icon.setAttribute("stroke", "currentColor");
+  icon.setAttribute("stroke-width", "1.7");
+  icon.setAttribute("stroke-linecap", "round");
+  icon.setAttribute("stroke-linejoin", "round");
+  icon.setAttribute("aria-hidden", "true");
+  icon.setAttribute("focusable", "false");
+  const shape = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  shape.setAttribute("d", path);
+  icon.append(shape);
+  return icon;
+}
+
 export function createDeviceUI(adapter) {
   const root = document.getElementById("device-storage-ui");
   const input = document.getElementById("device-backup-input");
-  const controls = document.querySelector(".header-controls");
-  if (controls && root.parentElement !== controls) controls.prepend(root);
+  // This native host stays in the header; React only moves the appearance controls.
   let pending = false;
   let status = null;
   let cacheStats = null;
@@ -180,8 +202,9 @@ export function createDeviceUI(adapter) {
     const offlineLabel = offlineText(device);
     const summary = root.querySelector(".device-storage-summary");
     if (summary) {
-      summary.setAttribute("aria-label", device ? `${text("storage")}: ${offlineLabel}` : text("storage"));
-      summary.title = device ? offlineLabel : text("storage");
+      const workspaceLabel = `${text("storage")}: ${text(device ? "device" : "server")}`;
+      summary.setAttribute("aria-label", `${workspaceLabel}. ${offlineLabel}`);
+      summary.title = `${workspaceLabel}\n${offlineLabel}`;
       const icon = summary.querySelector(".offline-status-icon");
       if (icon) icon.dataset.state = offlineState.status;
     }
@@ -230,21 +253,27 @@ export function createDeviceUI(adapter) {
     menu.open = wasOpen;
     const summary = window.document.createElement("summary");
     summary.className = "device-storage-summary";
+    const mode = window.document.createElement("span");
+    mode.className = "device-storage-mode";
+    mode.append(storageIcon("device-storage-mode-icon", device
+      ? "M5 4h14v12H5zM2 20h20l-3-4H5z"
+      : "M4 3h16v7H4zM4 14h16v7H4zM7 6.5h.01M7 17.5h.01M11 6.5h6M11 17.5h6"));
     if (device) {
       const icon = window.document.createElement("span");
       icon.className = "offline-status-icon";
       icon.setAttribute("aria-hidden", "true");
-      summary.append(icon);
+      mode.append(icon);
     }
     const label = window.document.createElement("span");
-    label.textContent = text("storage");
-    summary.append(label);
+    label.className = "device-storage-name";
+    label.textContent = text(device ? "device" : "server");
+    summary.append(mode, label, storageIcon("device-storage-chevron", "m8 10 4 4 4-4"));
     const panel = window.document.createElement("div");
     panel.className = "device-storage-panel";
     const switchLink = window.document.createElement("a");
     switchLink.className = "button button-quiet device-storage-switch";
     switchLink.href = device ? "/?storage=server" : "/device/";
-    switchLink.textContent = device ? text("server") : text("device");
+    switchLink.textContent = device ? text("switchServerAction") : text("switchDeviceAction");
     switchLink.title = device ? text("switchServer") : text("switchDevice");
     switchLink.setAttribute("aria-label", switchLink.title);
     panel.append(switchLink);
@@ -273,6 +302,11 @@ export function createDeviceUI(adapter) {
     const offline = window.document.createElement("div");
     offline.className = "offline-status";
     panel.append(offline);
+    const chooseLink = window.document.createElement("a");
+    chooseLink.className = "device-storage-help";
+    chooseLink.href = "/storage";
+    chooseLink.textContent = text("chooseWorkspace");
+    panel.append(chooseLink);
     if (status) {
       const message = window.document.createElement("p");
       message.className = "device-storage-status";
@@ -289,6 +323,21 @@ export function createDeviceUI(adapter) {
   offlineSupport.subscribe((next) => {
     offlineState = next;
     renderOffline();
+  });
+
+  root.addEventListener("keydown", (event) => {
+    const menu = root.querySelector("details");
+    if (event.key !== "Escape" || !menu?.open) return;
+    event.preventDefault();
+    event.stopPropagation();
+    menu.open = false;
+    root.querySelector("summary")?.focus({ preventScroll: true });
+  });
+
+  root.addEventListener("focusout", (event) => {
+    if (!event.relatedTarget || root.contains(event.relatedTarget)) return;
+    const menu = root.querySelector("details");
+    if (menu) menu.open = false;
   });
 
   function setStatus(kind, key) {

@@ -33,8 +33,11 @@ import { offlineSupport } from "/offline-client.js";
 import { serverPdfCache } from "/server-pdf-cache.js";
 import { collectPdfTextSelection, formatSelectionQuote, sourceSegmentsFor } from "/cross-page-selection.js";
 import { createSelectionTranslation } from "/selection-translation.js";
-import { createNoteDraftControls, createNoteDraftHistory } from "/note-draft-controls.js";
+import { createNoteDraftControls, createNoteDraftHistory, noteDraftHasContent } from "/note-draft-controls.js";
 import { createReaderCaptureActions } from "/reader-capture-actions.js";
+import { createAssistantPdfNavigator } from "/assistant-pdf-navigation.js";
+import { createNotesWorkspace } from "/notes-workspace.js";
+import { createResearchShell } from "/research-shell.js";
 
 window.workbenchStartup?.stage("workspace");
 pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf-worker-compat.js?v=0.52.0";
@@ -52,7 +55,7 @@ const MAX_DEVICE_PIXEL_RATIO = 2;
 const MAX_FILE_BYTES = 20 * 1024 * 1024;
 const ZOOM_MIN = 0.4;
 const ZOOM_MAX = 3;
-const APP_VERSION = "0.62.1";
+const APP_VERSION = "0.63.0";
 const PDF_RANGE_CHUNK_SIZE = 64 * 1024;
 const PDF_LOADING_HINT_DELAY = 12_000;
 
@@ -1295,6 +1298,9 @@ let dataImports = null;
 let charts = null;
 let presentations = null;
 let workspace = null;
+let notesWorkspace = null;
+let researchShell = null;
+let pendingNotesSection = null;
 let dataNavigation = null;
 let readerWorkspaceVisible = false;
 let assistant = null;
@@ -1850,6 +1856,21 @@ function renderNoteDraftCancel() {
   const context = currentNoteDraftContext();
   elements.noteCancel.hidden = !context || context.mode === "edit";
   elements.noteCancel.disabled = noteDraftControls.getState().disabled;
+}
+
+function notesWorkspaceModel() {
+  const owner = state.document;
+  const context = currentNoteDraftContext();
+  const projectDraft = owner && isStudy() ? study?.getNoteDraftState(owner.id) : null;
+  return {
+    language: state.language,
+    ownerId: owner ? `${deviceMode ? "device" : "server"}:${owner.kind || "paper"}:${owner.id}` : null,
+    noteCount: state.notes.filter((note) => !note.deleted_at && !note.purged).length,
+    hasDraft: projectDraft?.hasDraft ?? Boolean(context && (noteDraftHasContent(context.draft) ||
+      context.imageIds.length || context.richError || context.retryRequired)),
+    editing: projectDraft?.editing ?? context?.mode === "edit",
+    busy: Boolean(projectDraft?.busy || context?.pending || state.pendingSaves || state.pendingMutations.size)
+  };
 }
 
 function discardCurrentNoteDraft(context, { navigation }) {
@@ -3500,6 +3521,7 @@ function renderRegionCapture() {
 
 function renderDraft() {
   renderNoteDraftCancel();
+  notesWorkspace?.update();
   if (isStudy()) {
     captureActions.hide();
     elements.regionDraft.hidden = true;
@@ -3700,6 +3722,7 @@ function renderNoteTools(document, visibleNotes) {
 }
 
 function renderNotes() {
+  notesWorkspace?.update();
   noteControls.destroyNotes();
   if (isStudy()) {
     elements.notesFilterPanel.hidden = true;
@@ -3962,7 +3985,7 @@ async function loadDocuments() {
         chartId: requestedMode === "data" ? requestedChart : null,
         imageLink: requestedMode === "reading" ? imageLink || null : null,
         workspace: requestedMode,
-        tool: requestedChart ? "charts" : params.get("tool"),
+        tool: params.get("tool") === "presentations" ? "presentations" : requestedChart ? "charts" : params.get("tool"),
         replaceUrl: true
       });
     } else if (state.documents.length) {
@@ -4299,13 +4322,14 @@ async function ensurePersonalOwner() {
   return owner;
 }
 
-async function openPersonalWithIntent(intent) {
+async function openPersonalWithIntent(intent, requestedTool = "analysis") {
   try {
     const owner = await ensurePersonalOwner();
     if (intent !== workspaceModeIntent) return;
     await openDocument(owner.id, {
       ownerKind: "study",
       workspace: "data",
+      tool: requestedTool,
       explicitIntent: true,
       modeIntent: intent
     });
@@ -4324,22 +4348,26 @@ async function openPersonalData() {
   await openPersonalWithIntent(intent);
 }
 
-async function openDataWorkspace() {
+async function openDataWorkspace(requestedTool = null) {
   const intent = beginWorkspaceModeIntent();
   if (intent === null) return;
   rememberCurrentWorkspaceOwner();
-  workspace?.reveal("data", { tool: lastDataSelection.chartId ? "charts" : "analysis" });
-  const targetId = lastDataDocumentId || (isStudy() ? state.document?.id : null);
+  const tool = ["analysis", "charts", "presentations"].includes(requestedTool)
+    ? requestedTool : lastDataSelection.chartId ? "charts" : "analysis";
+  workspace?.reveal("data", { tool });
+  const targetId = requestedTool === "presentations" && state.document
+    ? state.document.id : lastDataDocumentId || (isStudy() ? state.document?.id : null);
   if (!targetId) {
-    await openPersonalWithIntent(intent);
+    await openPersonalWithIntent(intent, tool);
     return;
   }
   try {
-    const selection = targetId === lastDataDocumentId ? lastDataSelection : { datasetId: null, analysisId: null, chartId: null };
+    const selection = targetId === lastDataDocumentId ? { ...lastDataSelection } : { datasetId: null, analysisId: null, chartId: null };
+    if (requestedTool === "analysis") selection.chartId = null;
     await openDocument(targetId, {
       workspace: "data",
       ...selection,
-      tool: selection.chartId ? "charts" : "analysis",
+      tool,
       explicitIntent: true,
       passiveRestore: true,
       modeIntent: intent
@@ -4363,6 +4391,21 @@ async function openReadingWorkspace() {
   }
 }
 
+async function navigateResearchArea(area) {
+  if (!["reading", "analysis", "charts", "presentations"].includes(area)) return;
+  if (deviceMode && area !== "reading") return;
+  const before = workspaceModeIntent;
+  if (area === "reading") await openReadingWorkspace();
+  else await openDataWorkspace(area);
+  const expectedMode = area === "reading" ? "reading" : "data";
+  if (before === workspaceModeIntent || workspace.getMode() !== expectedMode ||
+      area !== "reading" && workspace.getTool() !== area) return;
+  if (area === "charts" && state.document) void charts?.reload(state.document.id);
+  if (!window.matchMedia("(max-width: 820px)").matches) return;
+  if (!$("assistant-panel").hidden) $("assistant-close").click();
+  $("documents-panel").querySelector(".mobile-pane-back")?.click();
+}
+
 function openCatalogItem(item) {
   if (!item?.document_id || !item.id) return;
   const selection = item.kind === "dataset" ? { datasetId: item.id } : item.kind === "analysis" ? { analysisId: item.id } : { chartId: item.id };
@@ -4375,6 +4418,7 @@ function openCatalogItem(item) {
 }
 
 function restorePassiveDataSelection(documentId, options) {
+  if (options.tool === "presentations") return false;
   if (!options.passiveRestore) return false;
   const datasetId = options.datasetId || null;
   const analysisId = options.analysisId || null;
@@ -4466,7 +4510,7 @@ async function openDocument(documentId, options = {}) {
   const explicitPage = !studyOwner && Number.isInteger(options.page) && options.page >= 1 && options.page <= document.page_count ? options.page : null;
   const explicitNavigation = Boolean(options.explicitIntent || options.noteId || options.imageLink || explicitPage || options.analysisId || options.datasetId || options.chartId);
   const mode = options.workspace || (options.noteId || options.imageLink ? "reading" : options.analysisId || options.datasetId || options.chartId ? "data" : studyOwner ? "data" : workspace?.getMode() || "reading");
-  const tool = options.chartId || options.tool === "charts" ? "charts" : "analysis";
+  const tool = options.tool === "presentations" ? "presentations" : options.chartId || options.tool === "charts" ? "charts" : "analysis";
   if (mode === "reading" && !studyOwner) lastReadingDocumentId = documentId;
   if (mode === "data") {
     lastDataDocumentId = documentId;
@@ -8346,7 +8390,7 @@ window.addEventListener("popstate", () => {
   const contextChanging = (state.document?.id || null) !== documentId || mode !== workspace?.getMode();
   if (!noteDraftHistory.traverse(() => !contextChanging || prepareContextNavigation(draftNavigation))) return;
   invalidateWorkspaceModeIntent();
-  const tool = chartId || params.get("tool") === "charts" ? "charts" : "analysis";
+  const tool = params.get("tool") === "presentations" ? "presentations" : chartId || params.get("tool") === "charts" ? "charts" : "analysis";
   const imageLink = studyId ? null : readImageLink(params);
   const validPage = mode === "reading" && page && state.document?.id === documentId && page <= state.document.page_count;
   if (noteId || imageLink || analysisId || datasetId || chartId || validPage) cancelReaderProgressRestore();
@@ -8435,6 +8479,26 @@ function assistantContext() {
   const draft = ensureDraft(state.document.id);
   if (draft.page === state.page) context.rect = draft.rect ? [...draft.rect] : null;
   return context;
+}
+
+async function navigateAssistantPdfReference(document, source, isLatest) {
+  const draftNavigation = {};
+  if (!isLatest() || !prepareContextNavigation(draftNavigation)) return false;
+  const opening = openDocument(document.id, {
+    page: source.page, workspace: "reading", explicitIntent: true, draftNavigation
+  });
+  const intent = workspaceModeIntent;
+  const opened = await opening;
+  const matches = () => Boolean(isLatest() && intent === workspaceModeIntent && state.pdf &&
+    state.document?.id === document.id && state.document.sha256 === document.sha256 && state.page === source.page);
+  if (opened === false || !matches()) return false;
+  const highlightId = `assistant-source-${crypto.randomUUID()}`;
+  state.highlight = source.rect ? {
+    id: highlightId, document_id: document.id, page: source.page, rect: [...source.rect]
+  } : null;
+  state.highlightRevealId = source.rect ? highlightId : null;
+  await goToPage(source.page, { preserveHighlight: true });
+  return matches() && state.page === source.page && workspace.getMode() === "reading";
 }
 
 async function navigateAssistantSource(source) {
@@ -8791,7 +8855,12 @@ if (!deviceMode) dataNavigation = createDataNavigation({
 });
 
 workspace = createWorkspace({
+  initialNotesVisible: false,
   getDocument: () => state.document,
+  notesSectionRequested: (section) => {
+    pendingNotesSection = section;
+    notesWorkspace?.show(section);
+  },
   getLanguage: () => state.language,
   modeSelected: (mode) => mode === "data" ? openDataWorkspace() : openReadingWorkspace(),
   modeRendered: (mode) => {
@@ -8818,6 +8887,42 @@ workspace = createWorkspace({
   chartsSelected: (documentId) => charts?.reload(documentId),
   navigationChanged: () => researchRecord?.navigationChanged()
 });
+
+const notesWorkspaceHost = document.createElement("div");
+notesWorkspaceHost.id = "notes-workspace-host";
+$("notes-heading").parentElement.after(notesWorkspaceHost);
+notesWorkspace = createNotesWorkspace({
+  container: notesWorkspaceHost,
+  hosts: { editor: $("note-editor-group"), saved: $("saved-notes-group"), images: $("image-library") },
+  getModel: notesWorkspaceModel,
+  onOpenEditor: () => { workspace.showNotes("editor"); richText?.focus(); }
+});
+if (pendingNotesSection) notesWorkspace.show(pendingNotesSection);
+window.addEventListener("pagehide", (event) => { if (!event.persisted) notesWorkspace?.destroy(); });
+
+const researchLayout = document.createElement("div");
+researchLayout.className = "research-shell-layout";
+const researchNavigation = document.createElement("div");
+researchNavigation.id = "research-shell";
+researchNavigation.hidden = true;
+const nativeWorkspace = document.querySelector("main.workspace");
+nativeWorkspace.before(researchLayout);
+researchLayout.append(researchNavigation, nativeWorkspace);
+researchShell = createResearchShell({
+  container: researchNavigation,
+  getModel: () => {
+    const snapshot = workspace.getSnapshot();
+    return { ...snapshot, area: snapshot.mode === "reading" ? "reading" : snapshot.tool,
+      availableAreas: deviceMode ? ["reading"] : undefined };
+  },
+  subscribe: (listener) => workspace.subscribe(listener),
+  onNavigate: navigateResearchArea,
+  onLibrary: () => $("workspace-library-toggle").click(),
+  onNotes: () => $("workspace-notes-toggle").click(),
+  onAssistant: () => $("assistant-toggle").click()
+});
+void researchShell.load();
+window.addEventListener("pagehide", (event) => { if (!event.persisted) researchShell?.destroy(); });
 
 selectionTranslation = createSelectionTranslation({
   api,
@@ -8988,6 +9093,7 @@ researchRecord = createResearchRecord({
 });
 
 study = createStudy({
+  noteDraftChanged: () => notesWorkspace?.update(),
   api,
   getDocument: () => state.document,
   getDocuments: () => state.documents,
@@ -9039,8 +9145,21 @@ $("charts-panel").addEventListener("toggle", (event) => {
   if (event.currentTarget.open && documentId) charts.reload(documentId);
 });
 
+const pdfSourceNavigator = createAssistantPdfNavigator({
+  getSnapshot: () => ({
+    documentId: state.document?.id || null, page: state.page,
+    loadSequence: state.loadSequence, modeIntent: workspaceModeIntent,
+    navigationGeneration: workspace.getNavigationGeneration()
+  }),
+  readDocument: (documentId) => api(`/api/v1/documents/${encodeURIComponent(documentId)}`),
+  navigate: navigateAssistantPdfReference,
+  report: (code) => setStatus(code, "error")
+});
+window.addEventListener("pagehide", (event) => { if (!event.persisted) pdfSourceNavigator.destroy(); });
+
 assistant = createAssistant({
   api,
+  onOpenPdfSource: pdfSourceNavigator.open,
   getDocument: () => state.document,
   getLanguage: () => state.language,
   getNavigationGeneration: () => workspace.getNavigationGeneration(),

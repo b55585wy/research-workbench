@@ -47,13 +47,23 @@
 }
 
 #header-settings {
-  grid-column: 2;
+  grid-column: 3;
   grid-row: 1;
   min-width: 0;
 }
 
 html[data-ui-settings="ready"] .app-header {
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+}
+
+html[data-ui-settings="ready"] .app-header > #device-storage-ui .device-storage-panel {
+  right: -52px;
+}
+
+.app-header #workspace-identity > .brand-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 html[data-ui-settings="ready"] .app-header #workspace-identity > .local-guest {
@@ -137,13 +147,6 @@ html[data-ui-settings="ready"] .app-header #workspace-identity > .local-guest {
   padding: 12px 0 8px;
 }
 
-.header-settings-identity {
-  margin-top: 4px;
-  color: var(--ui-text-muted);
-  font-size: var(--ui-font-metadata);
-  line-height: 1.5;
-}
-
 .header-settings-space-action {
   margin-top: 8px;
 }
@@ -151,37 +154,6 @@ html[data-ui-settings="ready"] .app-header #workspace-identity > .local-guest {
 .header-settings-native,
 .header-settings-native .header-controls {
   display: contents;
-}
-
-.header-settings-native #device-storage-ui {
-  order: 1;
-  width: 100%;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--ui-border);
-}
-
-.header-settings-native .device-storage-menu,
-.header-settings-native .device-storage-summary {
-  width: 100%;
-}
-
-.header-settings-native .device-storage-summary {
-  min-height: 40px;
-  height: 40px;
-  padding: 0;
-  justify-content: space-between;
-  border: 0;
-  font-size: 14px;
-}
-
-.header-settings-native .device-storage-panel {
-  position: static;
-  width: 100%;
-  max-height: none;
-  margin-top: 8px;
-  padding: 12px;
-  overflow: visible;
-  box-shadow: none;
 }
 
 .header-settings-appearance-label {
@@ -370,7 +342,7 @@ html[data-ui-settings="ready"] .app-header #workspace-identity > .local-guest {
     max-height: calc(var(--mobile-viewport-height, 100dvh) - 76px - env(safe-area-inset-bottom, 0px));
   }
 
-  .mobile-layout-active .header-settings-native :is(.device-storage-summary, .theme-control, #theme-select, .language-toggle) {
+  .mobile-layout-active .header-settings-native :is(.theme-control, #theme-select, .language-toggle) {
     min-height: 44px;
   }
 
