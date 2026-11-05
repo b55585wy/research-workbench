@@ -2366,6 +2366,24 @@ h3 {
   font-size: 12px;
 }
 
+.reader-shape-editor > label[hidden] {
+  display: none;
+}
+
+.reader-shape-editor[data-kind]:not([data-kind="textbox"]) {
+  width: min(280px, calc(100vw - 16px));
+  padding: 12px;
+}
+
+.reader-shape-editor:not([data-kind="textbox"]) .reader-shape-width-picker {
+  top: calc(100% + 8px);
+  bottom: auto;
+}
+
+.reader-shape-editor[data-width-menu-open="true"]:not([data-kind="textbox"]) .reader-shape-style-row {
+  padding-bottom: 64px;
+}
+
 .reader-shape-editor textarea {
   width: 100%;
   min-height: 54px;

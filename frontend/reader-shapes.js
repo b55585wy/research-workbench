@@ -239,16 +239,20 @@ export function createReaderShapes(adapter) {
   function closeWidthMenu(returnFocus = false) {
     const restoreFocus = returnFocus && widthMenuOpen && !widthToggle.disabled;
     widthMenuOpen = false;
+    editor.dataset.widthMenuOpen = "false";
     widthPicker.hidden = true;
     widthToggle.setAttribute("aria-expanded", "false");
     document.removeEventListener("pointerdown", handleWidthMenuPointerDown, true);
     if (restoreFocus) widthToggle.focus({ preventScroll: true });
+    positionEditor();
   }
 
   function openWidthMenu() {
     if (width.disabled || widthToggle.disabled || widthField.hidden || !interaction || interaction.shape.kind === "textbox") return;
     widthMenuOpen = true;
+    editor.dataset.widthMenuOpen = "true";
     widthPicker.hidden = false;
+    positionEditor();
     widthToggle.setAttribute("aria-expanded", "true");
     document.addEventListener("pointerdown", handleWidthMenuPointerDown, true);
     const checked = [...widthPicker.querySelectorAll(".reader-shape-width-option")].find((button) => button.dataset.value === width.value);
@@ -304,6 +308,12 @@ export function createReaderShapes(adapter) {
     return Number.isInteger(fontSize.valueAsNumber) && fontSize.valueAsNumber >= 8 && fontSize.valueAsNumber <= 48;
   }
 
+  function focusEditor() {
+    const target = interaction?.shape.kind === "textbox" ? description
+      : colorPalette.querySelector('button[aria-checked="true"]:not(:disabled)') || cancelButton;
+    if (!target.disabled) target.focus({ preventScroll: true });
+  }
+
   function renderEditor(sync = false) {
     const focusedColor = colorPalette.contains(document.activeElement) ? document.activeElement.dataset.value : null;
     editor.hidden = !interaction || Boolean(interaction.drawing);
@@ -315,6 +325,8 @@ export function createReaderShapes(adapter) {
     const busy = saving || adapter.isBusy();
     const frozen = Boolean(interaction.operation);
     const textbox = interaction.shape.kind === "textbox";
+    editor.dataset.kind = interaction.shape.kind;
+    description.closest("label").hidden = !textbox;
     if (sync) {
       updateColorOptions(interaction.shape.kind);
       description.value = interaction.text;
@@ -525,7 +537,7 @@ export function createReaderShapes(adapter) {
     closeWidthMenu();
     if (interaction?.noteId === note.id && interaction.record === record && generationCurrent(interaction)) {
       drawKind = null;
-      if (options.focus) description.focus({ preventScroll: true });
+      if (options.focus) focusEditor();
       return true;
     }
     if (hasUnsavedChanges()) {
@@ -549,7 +561,7 @@ export function createReaderShapes(adapter) {
     };
     render();
     renderEditor(true);
-    if (options.focus) description.focus({ preventScroll: true });
+    if (options.focus) focusEditor();
     return true;
   }
 
@@ -711,7 +723,7 @@ export function createReaderShapes(adapter) {
     }
     render();
     renderEditor(true);
-    description.focus({ preventScroll: true });
+    focusEditor();
     if (atLimit) adapter.status("shapeInkLimit");
   }
 

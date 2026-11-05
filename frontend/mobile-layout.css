@@ -463,6 +463,12 @@
     gap: 3px;
   }
 
+  .mobile-layout-active #reader-shape-editor[data-kind]:not([data-kind="textbox"]) {
+    width: min(320px, calc(var(--mobile-viewport-width, 100vw) - 16px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)));
+    gap: 8px;
+    padding: 12px;
+  }
+
   .mobile-layout-active #reader-shape-description {
     height: 64px;
     min-height: 52px;

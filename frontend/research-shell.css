@@ -3,6 +3,9 @@
 }
 
 .research-shell-layout {
+  display: flex;
+  flex: 1;
+  min-height: 0;
   min-width: 0;
 }
 
@@ -120,7 +123,8 @@ html[data-research-shell="ready"] .research-shell-host:not([hidden]) {
   html[data-research-shell="ready"] .research-shell-layout {
     display: grid;
     grid-template-columns: 68px minmax(0, 1fr);
-    align-items: start;
+    grid-template-rows: minmax(0, 1fr);
+    align-items: stretch;
   }
 
   html[data-research-shell="ready"] .research-shell-host {
@@ -136,7 +140,15 @@ html[data-research-shell="ready"] .research-shell-host:not([hidden]) {
     --research-library-width: clamp(180px, 18vw, 240px);
     --research-notes-width: clamp(240px, 24vw, 320px);
     min-width: 0;
+    grid-template-rows: minmax(0, 1fr);
+    overflow: hidden;
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  html[data-research-shell="ready"] .research-shell-layout > .workspace > .data-workspace {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
   }
 
   html[data-research-shell="ready"] .research-shell-layout > .workspace[data-library-visible="true"] {
