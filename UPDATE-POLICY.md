@@ -1,5 +1,19 @@
 # 更新与访问连续性
 
+## 2026-11-05：v0.59.1 前端体验更新
+
+源码 `26b14b1`；前端 `ui-0.59.1-5917abb5c372a494`，后端继续运行 v0.59.0。
+本轮通过兼容指纹校验后原子切换前端指针，没有重启后端、代理或原 owner，也没有迁移用户资料。
+功能与有界合成验收见 [本轮记录](UI-READING-0.59.1.md)。
+
+| 入口 | 切换前后服务 PID | 回退指针备份 |
+|---|---|---|
+| https://itsyiyi.com/ | guest 25070 / Caddy 13133 / 原 owner 13400，全部保持 | `downloads/ui-foundation-v1/pointer-before-1793841576.json` |
+| https://5ai.life/ | guest 35012 / Caddy 2710，全部保持 | `downloads/ui-foundation-v1/pointer-before-1793841591.json` |
+
+两站发布记录均为 `/opt/research-workspace/downloads/ui-foundation-v1/DEPLOYMENT-STATUS.json`。
+保留 v0.59.0 资源供已打开页面继续使用；新页面采用新前端。不会强制刷新现有用户页面。
+
 ## 2026-11-05：v0.59.0 分析、绘图与PPT发布
 
 源码 `01e319893c2be1d418355c4e7a481495955af8c6`，前端 `ui-0.59.0-1af99627ca9f986a`；
