@@ -107,6 +107,8 @@ export function createWorkspace(adapter) {
   const libraryToggle = byId("workspace-library-toggle");
   const notesToggle = byId("workspace-notes-toggle");
   const dataWorkspace = byId("data-workspace");
+  reader.tabIndex = -1;
+  dataWorkspace.tabIndex = -1;
   const readerHeading = byId("reader-heading").closest(".reader-heading-row");
   const notesHeading = byId("notes-heading").parentElement;
   const dataWorkspaceHeading = dataWorkspace.querySelector(".data-workspace-header");
@@ -283,7 +285,7 @@ export function createWorkspace(adapter) {
   }
 
   function isVisible(node) {
-    return Boolean(node?.isConnected && node.getClientRects().length && !node.closest("[hidden]"));
+    return Boolean(node?.isConnected && !node.disabled && node.getClientRects().length && !node.closest("[hidden]"));
   }
 
   function confirmationNeedsReveal() {
@@ -394,9 +396,14 @@ export function createWorkspace(adapter) {
     const previous = focusByMode.get(mode);
     if (isVisible(previous)) previous.focus({ preventScroll: true });
     else {
-      const shellCurrent = document.querySelector('.research-shell [aria-current="page"]');
-      const fallback = isVisible(shellCurrent) ? shellCurrent : mode === "reading" ? modeReading : modeData;
-      fallback.focus({ preventScroll: true });
+      const fallback = [
+        document.querySelector('.research-shell [aria-current="page"]'),
+        document.querySelector(".research-shell select"),
+        mode === "reading" ? modeReading : modeData,
+        document.querySelector('[data-mobile-pane="reader"]'),
+        mode === "reading" ? reader : dataWorkspace
+      ].find(isVisible);
+      fallback?.focus({ preventScroll: true });
     }
   }
 

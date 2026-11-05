@@ -10,7 +10,6 @@ if (main && documents && notes && assistant) {
   const notesHeading = byId("notes-heading");
   const dataHeading = byId("data-workspace-title");
   const notesToggle = byId("workspace-notes-toggle");
-  const readingToggle = byId("workspace-mode-reading");
   const assistantToggle = byId("assistant-toggle");
   const assistantClose = byId("assistant-close");
   const appStatus = byId("app-status");
@@ -21,22 +20,24 @@ if (main && documents && notes && assistant) {
     zh: {
       navigation: "主要工作区",
       library: "资料",
-      reader: "阅读",
+      reader: "正文",
+      workspace: "工作区",
       notes: "笔记",
       assistant: "助手",
       backReading: "返回阅读",
-      backData: "返回数据分析",
+      backData: "返回工作区",
       emptyNotes: "请先在资料中选择一篇文献，再编辑或查看笔记。已有草稿和来源会保留。",
       chooseDocument: "选择文献"
     },
     en: {
       navigation: "Primary workspace",
       library: "Library",
-      reader: "Read",
+      reader: "Content",
+      workspace: "Workspace",
       notes: "Notes",
       assistant: "Assistant",
       backReading: "Back to reading",
-      backData: "Back to data analysis",
+      backData: "Back to workspace",
       emptyNotes: "Choose a paper in Library to edit or view notes. Existing drafts and sources are preserved.",
       chooseDocument: "Choose a paper"
     }
@@ -44,6 +45,7 @@ if (main && documents && notes && assistant) {
   const iconPaths = {
     library: '<path d="M3 6h7l2 2h9v11H3z"/><path d="M3 6V4h7l2 2"/>',
     reader: '<path d="M3 5c4-1 7 0 9 2 2-2 5-3 9-2v14c-4-1-7 0-9 2-2-2-5-3-9-2z"/><path d="M12 7v14"/>',
+    workspace: '<path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z"/>',
     notes: '<path d="M5 3h14v18H5z"/><path d="M9 8h6M9 12h6M9 16h4"/>',
     assistant: '<path d="M4 4h16v12H9l-5 4z"/><path d="M8 9h8M8 12h5"/>',
     back: '<path d="m15 18-6-6 6-6"/>'
@@ -66,11 +68,11 @@ if (main && documents && notes && assistant) {
   let phoneActive = false;
   let currentPane = "library";
   let pendingDocument = null;
-  let pendingMode = null;
   let assistantOpen = !assistant.hidden;
   let suppressAssistantFocus = false;
   let userNavigated = false;
   let lastMode = main.dataset.workspaceMode === "data" ? "data" : "reading";
+  let viewportInitialized = false;
 
   const libraryBar = document.createElement("div");
   libraryBar.className = "mobile-pane-bar";
@@ -119,8 +121,13 @@ if (main && documents && notes && assistant) {
     navigation.setAttribute("aria-label", copy.navigation);
     for (const button of navigationButtons) {
       const key = button.dataset.mobilePane;
-      button.querySelector(".mobile-primary-label").textContent = copy[key];
-      button.setAttribute("aria-label", copy[key]);
+      const label = key === "reader" && nativeMode() === "data" ? "workspace" : key;
+      button.querySelector(".mobile-primary-label").textContent = copy[label];
+      button.setAttribute("aria-label", copy[label]);
+      if (key === "reader") {
+        button.querySelector("svg")?.replaceWith(makeIcon(label));
+        button.setAttribute("aria-controls", nativeMode() === "data" ? "data-workspace" : "reader-panel");
+      }
     }
     libraryTitle.textContent = copy.library;
     libraryBack.setAttribute("aria-label", backLabel);
@@ -161,7 +168,7 @@ if (main && documents && notes && assistant) {
       const pane = button.dataset.mobilePane;
       const selected = assistantOpen
         ? pane === "assistant"
-        : pane === currentPane && (pane !== "reader" || nativeMode() === "reading");
+        : pane === (currentPane === "data" ? "reader" : currentPane);
       button.setAttribute("aria-pressed", String(selected));
       if (selected) button.setAttribute("aria-current", "page");
       else button.removeAttribute("aria-current");
@@ -221,11 +228,6 @@ if (main && documents && notes && assistant) {
 
   function handleNativeStatus() {
     if (!["error", "info"].includes(appStatus.dataset.kind)) return;
-    const rejectedMode = pendingMode !== null;
-    pendingMode = null;
-    if (rejectedMode && appStatus.dataset.kind === "error" && hasDocument() && !notes.hidden && currentPane === "library") {
-      showPane("notes", { focus: "heading" });
-    }
     if (!pendingDocument) return;
     const pending = pendingDocument;
     if (matchesPendingDocument(pending)) return;
@@ -240,9 +242,7 @@ if (main && documents && notes && assistant) {
     main.dataset.mobileHasDocument = String(hasDocument());
     if (mode !== lastMode) {
       lastMode = mode;
-      const revealMode = pendingMode === mode || currentPane !== "library";
-      pendingMode = null;
-      if (revealMode) showBasePane();
+      if (currentPane !== "library") showBasePane();
     }
     applyLanguage();
     resolvePendingDocument();
@@ -266,11 +266,7 @@ if (main && documents && notes && assistant) {
       if (pane === "library") showPane("library");
       else if (pane === "notes") showPane("notes");
       else if (pane === "reader") {
-        if (nativeMode() === "reading") showPane("reader");
-        else {
-          pendingMode = "reading";
-          readingToggle.click();
-        }
+        showBasePane();
       } else if (pane === "assistant" && assistant.hidden) assistantToggle.click();
     });
   }
@@ -413,6 +409,21 @@ if (main && documents && notes && assistant) {
     if (Math.abs((window.visualViewport?.scale || 1) - 1) > 0.01) cancelPendingAutoFit();
   });
 
+  function repairResponsiveFocus() {
+    requestAnimationFrame(() => {
+      const active = document.activeElement;
+      if (active && active !== document.body && active.getClientRects().length) return;
+      if (!assistant.hidden) { assistantClose.focus({ preventScroll: true }); return; }
+      const current = navigationButtons.find((button) => button.dataset.mobilePane === (currentPane === "data" ? "reader" : currentPane));
+      const candidates = phoneActive
+        ? [document.querySelector(".research-shell select"), current]
+        : [document.querySelector('.research-shell [aria-current="page"]'), byId(nativeMode() === "reading" ? "workspace-mode-reading" : "workspace-mode-data")];
+      const target = candidates.find((node) => node?.isConnected && !node.disabled && node.getClientRects().length && !node.closest("[hidden]"));
+      if (target) target.focus({ preventScroll: true });
+      else focusPane(currentPane, "heading");
+    });
+  }
+
   function updateViewport() {
     const viewport = window.visualViewport;
     const rootStyle = document.documentElement.style;
@@ -421,7 +432,7 @@ if (main && documents && notes && assistant) {
     rootStyle.setProperty("--mobile-viewport-left", `${viewport?.offsetLeft || 0}px`);
     rootStyle.setProperty("--mobile-viewport-top", `${viewport?.offsetTop || 0}px`);
     const nextPhoneActive = phoneQuery.matches;
-    if (nextPhoneActive === phoneActive) return;
+    if (nextPhoneActive === phoneActive) { viewportInitialized = true; return; }
     phoneActive = nextPhoneActive;
     document.documentElement.classList.toggle("mobile-layout-active", phoneActive);
     document.body.classList.toggle("mobile-layout-active", phoneActive);
@@ -431,6 +442,8 @@ if (main && documents && notes && assistant) {
       else showPane(currentPane);
       repairVisiblePane();
     }
+    if (viewportInitialized) repairResponsiveFocus();
+    viewportInitialized = true;
   }
 
   applyLanguage();

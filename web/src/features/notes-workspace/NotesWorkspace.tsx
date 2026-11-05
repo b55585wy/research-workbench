@@ -51,8 +51,12 @@ export function NotesWorkspace({ hosts, model, section, revealVersion, onSelect,
             </button>
           ))}
         </div>
-        <button type="button" className="notes-workspace-open" hidden={section === "editor"} disabled={model.busy} onClick={onOpenEditor}>
-          {draft ? copy.resume : copy.open}
+        <button type="button" className="notes-workspace-open" hidden={section === "editor"} disabled={model.busy}
+          title={draft ? copy.resume : copy.open} aria-label={draft ? copy.resume : copy.open} onClick={onOpenEditor}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+            <path d="m4 20 4.5-1 10-10a2.1 2.1 0 0 0-3-3l-10 10L4 20ZM13.5 8l3 3" />
+          </svg>
+          <span className="sr-only">{draft ? copy.resume : copy.open}</span>
         </button>
       </div>
       <span className="notes-workspace-status sr-only" role="status">{model.busy ? copy.busy : ""}</span>
