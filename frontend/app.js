@@ -34,6 +34,7 @@ import { serverPdfCache } from "/server-pdf-cache.js";
 import { collectPdfTextSelection, formatSelectionQuote, sourceSegmentsFor } from "/cross-page-selection.js";
 import { createSelectionTranslation } from "/selection-translation.js";
 import { createNoteDraftControls, createNoteDraftHistory } from "/note-draft-controls.js";
+import { createReaderCaptureActions } from "/reader-capture-actions.js";
 
 window.workbenchStartup?.stage("workspace");
 pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf-worker-compat.js?v=0.52.0";
@@ -51,7 +52,7 @@ const MAX_DEVICE_PIXEL_RATIO = 2;
 const MAX_FILE_BYTES = 20 * 1024 * 1024;
 const ZOOM_MIN = 0.4;
 const ZOOM_MAX = 3;
-const APP_VERSION = "0.62.0";
+const APP_VERSION = "0.62.1";
 const PDF_RANGE_CHUNK_SIZE = 64 * 1024;
 const PDF_LOADING_HINT_DELAY = 12_000;
 
@@ -320,6 +321,7 @@ const messages = {
     replaceDraftConfirm: "当前有未保存或正在编辑的笔记。用新的原文选择替换当前草稿吗？此操作不会自动保存。",
     draftPending: "当前笔记操作尚未完成，请完成后再选择新的原文。",
     regionDraftUnsaved: "已截取所选区域的 PDF 画面，尚未加入笔记或助手。",
+    regionSelected: "已选区域",
     regionDraftCancel: "取消截图",
     regionDraftCancelConfirm: "取消此截图和预览？笔记文字会保留。",
     regionCaption: "第 {page} 页区域截图",
@@ -802,6 +804,7 @@ const messages = {
     replaceDraftConfirm: "There is an unsaved or edited note. Replace the current draft with the new source selection? Nothing will be saved automatically.",
     draftPending: "A note operation is still in progress. Finish it before choosing another source.",
     regionDraftUnsaved: "Captured pixels from the selected PDF region. Not added to a note or the assistant yet.",
+    regionSelected: "Selected region",
     regionDraftCancel: "Cancel capture",
     regionDraftCancelConfirm: "Clear this capture and preview? Your note text will be kept.",
     regionCaption: "Page {page} region capture",
@@ -1318,6 +1321,20 @@ const noteDraftControls = createNoteDraftControls({
     setStatus(key, "info");
   },
   discard: discardCurrentNoteDraft
+});
+
+const captureActions = createReaderCaptureActions({
+  host: elements.readerStage.closest(".reader-panel"),
+  stage: elements.readerStage,
+  getSnapshot: captureActionsModel,
+  getSurface: (model) => {
+    const record = state.readerPages.get(model.page);
+    return readerRecordIsCurrent(record, model.documentId, model.sourceSha, state.renderSequence) ? record.surface : null;
+  },
+  onNote: addCaptureToNote,
+  onAsk: addCaptureToAgent,
+  onCancel: cancelRegionCapture,
+  onVisibilityChange: (visible) => { elements.regionDraft.dataset.nearActions = String(visible); }
 });
 
 const workspaceShell = createWorkspaceShellBridge({
@@ -3455,13 +3472,26 @@ function renderDocumentDetails() {
   deviceUI?.render();
 }
 
+function captureActionsModel() {
+  const capture = state.regionCapture;
+  if (!capture || isStudy() || !captureIsCurrent(capture)) return null;
+  return {
+    identity: capture, requestId: capture.requestId,
+    documentId: capture.documentId, sourceSha: capture.sourceSha, page: capture.page, rect: capture.rect,
+    language: state.language, pending: capture.pending, error: capture.error, imageId: capture.image?.id,
+    disabled: Boolean(capture.pending || state.pendingSaves > 0 || state.pendingMutations.size > 0)
+  };
+}
+
 function renderRegionCapture() {
-  const capture = state.regionCapture?.documentId === state.document?.id ? state.regionCapture : null;
+  const model = captureActionsModel();
+  const capture = model?.identity;
+  captureActions.update(model);
   elements.regionDraft.hidden = !capture;
   if (!capture) return;
   if (elements.regionPreview.firstChild !== capture.previewCanvas) elements.regionPreview.replaceChildren(capture.previewCanvas);
   elements.regionDraftStatus.dataset.kind = capture.error ? "error" : "info";
-  elements.regionDraftStatus.textContent = t(capture.pending ? "captureUploading" : capture.error || (capture.shape ? "shapeRegionDraftUnsaved" : "regionDraftUnsaved"));
+  elements.regionDraftStatus.textContent = t(capture.pending ? "captureUploading" : capture.error || "regionSelected");
   const disabled = capture.pending || state.pendingSaves > 0 || state.pendingMutations.size > 0;
   elements.regionAddNote.disabled = disabled;
   elements.regionAddAgent.disabled = disabled;
@@ -3471,6 +3501,7 @@ function renderRegionCapture() {
 function renderDraft() {
   renderNoteDraftCancel();
   if (isStudy()) {
+    captureActions.hide();
     elements.regionDraft.hidden = true;
     elements.readerRegionMode.disabled = true;
     richText?.close({ restoreFocus: false });
@@ -3478,6 +3509,7 @@ function renderDraft() {
     return;
   }
   if (!state.document) {
+    captureActions.hide();
     elements.noteForm.dataset.mode = "create";
     elements.editModeLabel.hidden = true;
     elements.editCancel.hidden = true;
@@ -5189,6 +5221,7 @@ function ensureReaderPages() {
 }
 
 function destroyReaderPages() {
+  captureActions.hide();
   for (const record of state.readerPages.values()) {
     try {
       record.renderTask?.cancel();
@@ -6422,6 +6455,7 @@ function clearHighlights() {
 }
 
 function drawHighlight() {
+  captureActions.update(captureActionsModel());
   clearHighlights();
   const note = state.highlight;
   if (!note || !state.document || note.document_id !== state.document.id) return null;
@@ -6891,7 +6925,6 @@ function finishSelection(event) {
   setRegionMode(false);
   highlightDraft(documentId, page, rect);
   state.highlight.id = `reader-capture-${documentId}`;
-  workspace?.showNotes();
   clearStatus();
   renderDraft();
   assistant?.contextChanged();

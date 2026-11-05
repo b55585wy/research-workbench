@@ -2,8 +2,9 @@ Server deployment and current status: [SERVER-DEPLOYMENT.md](SERVER-DEPLOYMENT.m
 
 # research workspace
 
-当前版本：v0.62.0，入口为 https://itsyiyi.com/ 与 https://5ai.life/，两边用户资料独立。
-当前代码 v0.62.0 增加[取消笔记与离开确认、桌面常显工具、透明文本框](NOTE-DRAFT-CANCEL.md)；阅读缓存、星级、翻译与试读资料沿用。实际上线状态见[发布记录](UPDATE-POLICY.md)。
+当前代码：v0.62.1，入口为 https://itsyiyi.com/ 与 https://5ai.life/，两边用户资料独立。
+v0.62.1 增加[选区旁的截图操作与统一数据侧栏](SIDEBAR-CAPTURE-ACTIONS.md)，以前端补丁发布，运行中的后端沿用 v0.62.0。
+[取消笔记与离开确认、桌面常显工具、透明文本框](NOTE-DRAFT-CANCEL.md)，以及阅读缓存、星级、翻译与试读资料沿用。实际上线状态见[发布记录](UPDATE-POLICY.md)。
 多 Agent 分工、模块接口与 app.js 渐进拆分见 [PARALLEL-AGENTS.md](PARALLEL-AGENTS.md)，完整控制器迁移尚未完成。
 可选择浏览器本机资料或服务器游客空间。本机资料保存在 IndexedDB；选区翻译和明确文字问答须预览确认，数据导入/分析尚未接入本机模式。
 加载提示、版本化前端发布和[完全离线启动](OFFLINE-START.md)均已上线。联网打开入口页或服务器工作区，

@@ -1,4 +1,9 @@
 const KINDS = ["dataset", "analysis", "chart"];
+const NAVIGATION_ICON_PATHS = {
+  dataset: "M3 4h18v16H3ZM3 9h18M8 9v11m8-11v11M3 14h18",
+  analysis: "M4 7h7m4 0h5M4 17h3m4 0h9M11 4v6M7 14v6",
+  chart: "M4 3v17h17M8 15l4-5 4 3 4-7"
+};
 
 const messages = {
   zh: {
@@ -64,6 +69,21 @@ function make(tag, className, text) {
   return node;
 }
 
+function navigationIcon(className, pathData) {
+  const icon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  icon.setAttribute("class", className);
+  icon.setAttribute("viewBox", "0 0 24 24");
+  icon.setAttribute("fill", "none");
+  icon.setAttribute("stroke", "currentColor");
+  icon.setAttribute("stroke-width", className === "sidebar-chevron" ? "1.8" : "1.6");
+  icon.setAttribute("aria-hidden", "true");
+  icon.setAttribute("focusable", "false");
+  const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  path.setAttribute("d", pathData);
+  icon.append(path);
+  return icon;
+}
+
 export function createDataNavigation(adapter) {
   const root = document.getElementById("data-navigation");
   const headingRow = make("div", "panel-heading data-navigation-heading");
@@ -93,9 +113,13 @@ export function createDataNavigation(adapter) {
   for (const kind of KINDS) {
     const section = make("details", "data-catalog-group");
     section.open = kind === "dataset";
-    const summary = make("summary", "data-catalog-group-summary");
+    const summary = make("summary", "data-catalog-group-summary sidebar-group-summary");
     const groupHeading = make("h3", "data-catalog-group-heading");
-    summary.append(groupHeading);
+    summary.append(
+      navigationIcon("sidebar-chevron", "m9 6 6 6-6 6"),
+      navigationIcon("sidebar-nav-icon", NAVIGATION_ICON_PATHS[kind]),
+      groupHeading
+    );
     const list = make("ul", "documents-list data-catalog-list");
     const status = make("div", "data-catalog-status");
     status.setAttribute("role", "status");

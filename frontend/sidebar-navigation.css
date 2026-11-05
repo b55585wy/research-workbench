@@ -33,6 +33,35 @@
   font: inherit;
 }
 
+#documents-panel #data-navigation {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border-bottom: 0;
+}
+
+#documents-panel #data-navigation .data-catalog-group {
+  margin: 0;
+  padding: 0;
+}
+
+#documents-panel #data-navigation .data-catalog-group-heading,
+#documents-panel #project-library > .sidebar-group-summary > [role="heading"] {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  color: inherit;
+  font: inherit;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#documents-panel #data-navigation:not([hidden]) + #project-library {
+  margin-top: 0;
+}
+
 .sidebar-nav-icon,
 .sidebar-chevron {
   display: block;
