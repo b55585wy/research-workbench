@@ -2,7 +2,8 @@ Server deployment and current status: [SERVER-DEPLOYMENT.md](SERVER-DEPLOYMENT.m
 
 # research workspace
 
-当前前端 v0.72.0、核心后端 v0.64.0，另有独立论文PPT服务 v0.72.0；两站用户资料仍独立。入口为 https://itsyiyi.com/ 与 https://5ai.life/。
+当前前端 v0.74.1、核心后端 v0.64.0，另有独立论文PPT服务 v0.72.0；两站用户资料仍独立。入口为 https://itsyiyi.com/ 与 https://5ai.life/。
+[首次功能引导](FIRST-USE-GUIDE.md)已上线：高亮与箭头定位真实入口，支持跳过、完成记忆和「设置→功能引导」重看；手机适配底栏。本轮仅切换前端，没有重启服务或强制刷新旧页面。
 [PDF生成论文PPT](PAPER-PRESENTATIONS.md)与[助手窗口/快捷键](ASSISTANT-WINDOW.md)已上线：选全文或页码、带来源的可编辑PPTX；助手可上下移动/调整高度/收起保留，Enter发送、Ctrl/Shift+Enter换行。[助手内生成PPT](AGENT-PRESENTATIONS.md)的v0.73候选已实现并完成私有验收，尚未上线，需要核心后端升级。
 [手机阅读全屏](MOBILE-READING-FULLSCREEN.md)已上线：PDF工具栏和流式阅读标题栏有图标入口；支持原生全屏与页内沉浸回退，保留阅读位置和草稿。
 [离线程序更新复用](OFFLINE-CACHE-REUSE.md)已上线：按新清单校验并复用完整旧包中的相同文件，缺失或损坏才下载；升级失败保留旧版，首次访问仍需准备程序。
