@@ -225,9 +225,11 @@ export function createFirstUseGuide({ getLanguage, isDevice = () => false,
   function auto() {
     if (!autoAllowed || autoAttempted || destroyed || session.state.open) return;
     if (session.hasSeen()) { autoAttempted = true; return; }
-    window.clearTimeout(timer);
+    if (timer !== null) return;
     timer = window.setTimeout(() => { timer = null; start(); }, 1000);
   }
+
+  function activity() { window.clearTimeout(timer); timer = null; auto(); }
 
   function changed() { if (session.state.open) schedule(); else auto(); }
   function request() {
@@ -235,7 +237,7 @@ export function createFirstUseGuide({ getLanguage, isDevice = () => false,
     manualFrame = requestAnimationFrame(() => { manualFrame = null; if (!destroyed) start(true); });
   }
   function keys(event) {
-    if (!session.state.open) { auto(); return; }
+    if (!session.state.open) { activity(); return; }
     if (event.key !== "Escape" || !session.state.open) return;
     event.preventDefault(); event.stopImmediatePropagation(); session.dismiss();
   }
@@ -248,7 +250,7 @@ export function createFirstUseGuide({ getLanguage, isDevice = () => false,
   const languageObserver = new MutationObserver(changed);
   languageObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["lang"] });
   const events = [[window, "resize", changed], [window, "scroll", changed], [window, "workbench:guide-request", request],
-    [document, "keydown", keys], [document, "pointerdown", auto], [document, "focusin", focus],
+    [document, "keydown", keys], [document, "pointerdown", activity], [document, "focusin", focus],
     [document, "focusout", auto], [document, "visibilitychange", changed], [document, "fullscreenchange", fullscreen]];
   if (window.visualViewport) events.push([window.visualViewport, "resize", changed], [window.visualViewport, "scroll", changed]);
   for (const [node, name, handler] of events) node.addEventListener(name, handler, true);
