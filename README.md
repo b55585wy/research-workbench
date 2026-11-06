@@ -2,7 +2,7 @@ Server deployment and current status: [SERVER-DEPLOYMENT.md](SERVER-DEPLOYMENT.m
 
 # research workspace
 
-当前代码/前端：v0.71.0，公开后端保持 v0.64.0；入口为 https://itsyiyi.com/ 与 https://5ai.life/，两边用户资料独立。
+当前代码/前端：v0.71.1，公开后端保持 v0.64.0；入口为 https://itsyiyi.com/ 与 https://5ai.life/，两边用户资料独立。
 [手机阅读全屏](MOBILE-READING-FULLSCREEN.md)已上线：PDF工具栏和流式阅读标题栏有图标入口；支持原生全屏与页内沉浸回退，保留阅读位置和草稿。
 [离线程序更新复用](OFFLINE-CACHE-REUSE.md)已上线：按新清单校验并复用完整旧包中的相同文件，缺失或损坏才下载；升级失败保留旧版，首次访问仍需准备程序。
 [连续滚动与批注弹窗](READER-CONTINUOUS-LAYOUT.md)已修复：阅读区恢复内部滚动、翻页与位置恢复；普通图形仅保留颜色、线宽和保存/取消，文本框仍可输入文字。
