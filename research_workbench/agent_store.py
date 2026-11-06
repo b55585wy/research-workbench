@@ -62,6 +62,10 @@ class AgentStore:
         result={key:value for key,value in dict(row).items() if key not in ('request_hash','context_json','sources_json','error_json')}
         result.update(context=json.loads(row['context_json']),sources=json.loads(row['sources_json']),error=json.loads(row['error_json']) if row['error_json'] else None)
         result['events']=[dict(r) for r in connection.execute('SELECT id,kind,title,status,summary,created_at FROM agent_events WHERE turn_id=? ORDER BY rowid',(identifier,))]
+        from .agent_presentation_tools import plan_record
+        plans=[record for event in result['events']
+               if (record:=plan_record(document_id,event)) is not None]
+        if plans:result['presentation_plans']=plans
         result['proposals']=[self.proposal_record(r) for r in connection.execute('SELECT * FROM agent_proposals WHERE turn_id=? ORDER BY rowid',(identifier,))]
         return result
 
@@ -133,6 +137,47 @@ class AgentStore:
         with self.store.connection() as connection:
             connection.execute('INSERT INTO agent_events VALUES (?,?,?,?,?,?,?)',(
                 str(uuid4()),identifier,kind,title,status,summary[:2000],now()))
+
+    def publish_presentation_plan(self,document_id,identifier,title,summary,expected_sha):
+        """Publish one plan event only while this exact turn may still act.
+
+        PDF extraction already happened outside this method.  Every fence is
+        re-read in the same BEGIN IMMEDIATE transaction as the dedupe/insert,
+        so a cancel, conversation clear, lost grant or changed source during
+        extraction cannot leave an actionable plan.  No model call and no PDF
+        text extraction happens here.
+        """
+        from .agent_presentation_tools import (MAX_SUMMARY,MAX_TITLE,PLAN_KIND,
+            presentation_context_granted)
+        from .library import read_metadata
+        if not isinstance(title,str) or not 1 <= len(title) <= MAX_TITLE:
+            return None
+        if not isinstance(summary,str) or not 1 <= len(summary) <= MAX_SUMMARY:
+            return None
+        with self.store.connection() as connection:
+            connection.execute('BEGIN IMMEDIATE')
+            row=connection.execute('SELECT * FROM agent_turns WHERE id=? AND document_id=?',
+                (identifier,document_id)).fetchone()
+            if row is None or row['status']!='running':
+                return None
+            reject_cleared(connection,row['conversation_id'])
+            try:context=json.loads(row['context_json'])
+            except (TypeError,ValueError):return None
+            if not presentation_context_granted(context):
+                return None
+            document=read_metadata(connection,document_id)
+            if document.get('kind')=='study' or document.get('page_count') is None:
+                return None
+            if document.get('sha256')!=expected_sha:
+                raise WorkspaceError('source_changed','原论文已变化，请核对资料后重试。',409)
+            duplicate=connection.execute(
+                "SELECT id FROM agent_events WHERE turn_id=? AND kind=? AND status='completed' "
+                "AND summary=? ORDER BY rowid LIMIT 1",(identifier,PLAN_KIND,summary)).fetchone()
+            if duplicate is not None:return duplicate['id']
+            event_id=str(uuid4())
+            connection.execute('INSERT INTO agent_events VALUES (?,?,?,?,?,?,?)',(
+                event_id,identifier,PLAN_KIND,title,'completed',summary,now()))
+            return event_id
 
     def cancel(self,document_id,identifier):
         with self.store.connection() as connection:

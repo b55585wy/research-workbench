@@ -230,6 +230,7 @@ def create_app(data_root=None, validator=None, renderer=None, *, agent_provider=
     store.study_notes=StudyNotes(store,datasets,analysis,charts)
     agent.workspace.records=records
     agent.workspace.references=reference_catalog
+    agent.workspace.presentations=presentations
 
     @asynccontextmanager
     async def lifespan(app):

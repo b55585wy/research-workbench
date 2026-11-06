@@ -8,7 +8,7 @@ from .agent_proposals import Proposals
 from .agent_store import AgentStore,canonical,digest,TERMINAL,submission_hash
 from .agent_tools import ReadingTools,bounded
 from .agent_tasks import AgentTasks
-from .conversation_lifecycle import ConversationClears
+from .conversation_lifecycle import CLEARED_CODE,ConversationClears
 from .models import WorkspaceError
 from .agent_reading_budget import ReadingBudget, MAX_PAGE_READS, READING_SECONDS, read_page
 
@@ -195,7 +195,13 @@ class ReadingAgent:
     def status(self):
         # Explicit capability flag: an older server omits it, so the UI hides or
         # disables Clear instead of guessing.  It never requires a model key.
-        return {**self.provider.status(),'conversation_clear':True,'tools':ReadingTools.manifest()}
+        tools=ReadingTools.manifest()
+        installed=getattr(self.workspace,'presentations',None) is not None
+        if not installed:
+            tools=[item for item in tools if item['name']!='prepare_presentation']
+        value={**self.provider.status(),'conversation_clear':True,'tools':tools}
+        if installed:value['agent_presentations']=True
+        return value
 
     def clear_conversation(self,document_id,conversation_id,payload):
         return self.conversation_clears.clear(document_id,conversation_id,payload)
@@ -241,19 +247,48 @@ class ReadingAgent:
             if turn is None:
                 self.wake.wait(.5);self.wake.clear();continue
             try:self.execute(turn)
-            except WorkspaceError as error:self.fail(turn,error)
+            except WorkspaceError as error:
+                # A cleared conversation is closed, finished work, not a live
+                # failure: its tombstone already ended the turn and blocks every
+                # later write, so trying to record an error there would raise the
+                # same guard and kill this loop.
+                if error.code==CLEARED_CODE:continue
+                self.fail(turn,error)
             except Exception:self.fail(turn,WorkspaceError('agent_execution_error','助手执行遇到错误，请检查已有记录后重试。',503))
 
     def fail(self,turn,error):
-        self.store.update(turn['document_id'],turn['id'],expected_turn=turn,status='failed',error={'code':error.code,'message':error.message})
+        if error.code==CLEARED_CODE:return
+        try:
+            self.store.update(turn['document_id'],turn['id'],expected_turn=turn,status='failed',error={'code':error.code,'message':error.message})
+        except WorkspaceError as failure:
+            # The conversation was cleared while this error was being written.
+            # The turn is already closed; never reopen it and never let the
+            # closed-conversation guard terminate the worker loop.
+            if failure.code!=CLEARED_CODE:raise
 
     def active(self,turn):
-        return not self.stop.is_set() and self.store.get(turn['document_id'],turn['id'])['status'] not in TERMINAL and self.tasks.active(turn)
+        if self.stop.is_set():return False
+        try:
+            current=self.store.get(turn['document_id'],turn['id'])
+            return current['status'] not in TERMINAL and self.tasks.active(turn)
+        except WorkspaceError as error:
+            # Only an explicitly cleared conversation counts as inactive/finished.
+            # Any other storage or task error still propagates unchanged.
+            if error.code==CLEARED_CODE:return False
+            raise
 
     def initial_messages(self,turn,sources):
         messages=[{'role':'system','content':SYSTEM}]
         task_instructions=self.tasks.instructions(turn)
         if task_instructions:messages.append({'role':'system','content':task_instructions})
+        from .agent_presentation_tools import presentation_granted
+        if presentation_granted(self.workspace,turn['context']):
+            messages.append({'role':'system','content':
+                'prepare_presentation only prepares a small read-only plan for the '
+                'current bound paper. A plan is NOT a generated outline, slide deck, '
+                'file or download, and it does not mean the paper body was read. Call '
+                'it only when the user asks for a presentation; generation requires the '
+                "user's explicit click in the presentation card."})
         history=self.store.history(turn['document_id'],turn['conversation_id'])['turns'][-8:]
         context=turn['context']
         from .agent_online_data_tools import historical_online_answer

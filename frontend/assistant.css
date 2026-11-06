@@ -742,13 +742,12 @@
   color: var(--ui-success);
 }
 
-.assistant-panel > .assistant-reference-add-row {
-  flex: 0 1 auto;
-  min-height: 0;
-  max-height: 20%;
-  overflow: auto;
-  padding: 8px 12px 0;
-  background: var(--ui-surface);
+.assistant-send-row .assistant-reference-add-row {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  margin-right: auto;
+  padding: 0;
 }
 
 .assistant-form {

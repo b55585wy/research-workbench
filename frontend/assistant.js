@@ -5,6 +5,7 @@ import { bindAssistantComposerKeys } from "/assistant-composer-keys.js";
 import { bindPdfSourceLink, isPdfPageSource, isPdfSourceKind, onlineDatasetSourceUrl, renderAssistantAnswer } from "/assistant-answer.js";
 import { createReferencePicker, normalizeResourceReference, resourceReferenceKey, resourceReferencesFromTurn, resourceReferenceWire } from "/assistant-references.js";
 import { createSourcePreparationBridge } from "/source-preparation-bridge.js";
+import { createAssistantPresentationsBridge, negotiatePresentationActions } from "/assistant-presentations.js";
 
 const ACTIVE_STATES = new Set(["queued", "running"]);
 const TERMINAL_STATES = new Set(["waiting_confirmation", "completed", "failed", "cancelled", "interrupted"]);
@@ -890,7 +891,7 @@ export function createAssistant(adapter) {
   const management = byId("assistant-management");
   const managementBody = management.querySelector(".assistant-management-body");
   const referenceAddRow = elements.referenceAdd.closest(".assistant-reference-add-row");
-  elements.form.before(referenceAddRow);
+  elements.form.querySelector(".assistant-send-row").prepend(referenceAddRow);
   const continueTaskLabel = managementBody.querySelector('label[for="assistant-continue-task"]');
   const continueTaskHelp = byId("assistant-continue-task-help");
   elements.panel.insertBefore(elements.context, management);
@@ -933,6 +934,32 @@ export function createAssistant(adapter) {
   let sharedPending = false;
   let settingsStatus = null;
   let clearDialogOperation = null;
+  let assistantDestroyed = false;
+
+  const presentations = createAssistantPresentationsBridge({
+    api: adapter.api,
+    getOwner: () => {
+      if (assistantDestroyed || deviceMode || document.documentElement.dataset.storageMode === "device") return null;
+      const { paper, entry } = current();
+      return paper && entry && !entry.clearing?.pending ? { document: paper, conversationId: entry.conversationId, navigationGeneration: adapter.getNavigationGeneration?.() } : null;
+    }
+  });
+  const assistantStorageMode = document.documentElement.dataset.storageMode;
+  const presentationModeObserver = new MutationObserver(() => {
+    if (document.documentElement.dataset.storageMode !== assistantStorageMode) destroyAssistant();
+  });
+  presentationModeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["data-storage-mode"] });
+  function destroyAssistant() {
+    if (assistantDestroyed) return;
+    assistantDestroyed = true;
+    presentationModeObserver.disconnect();
+    presentations.destroy();
+    sourcePreparation.destroy();
+    for (const entry of papers.values()) { stopPolling(entry); entry.loadSequence += 1; entry.loadController?.abort(); }
+    window.removeEventListener("pagehide", onAssistantPageHide);
+  }
+  function onAssistantPageHide(event) { if (!event.persisted) destroyAssistant(); }
+  window.addEventListener("pagehide", onAssistantPageHide);
 
   function t(key, values = {}) {
     let text = messages[language][key] || messages.en[key] || key;
@@ -1594,6 +1621,8 @@ export function createAssistant(adapter) {
 
   function renderMessages(entry) {
     const expandedTools = new Set([...elements.messages.querySelectorAll("details.assistant-tools[data-turn-id][open]")].map((details) => details.dataset.turnId));
+    presentations.contextChanged();
+    presentations.unmountViews();
     elements.messages.replaceChildren();
     if (deviceMode) return;
     if (!entry?.turns.length) {
@@ -1645,7 +1674,8 @@ export function createAssistant(adapter) {
         error.textContent = errorText(turn.error, "turnFailed");
         article.append(error);
       }
-      const events = (Array.isArray(turn.events) ? turn.events : []).filter((event) => event && (String(event.title || "").trim() || String(event.summary || "").trim()));
+      presentations.mountTurn(article, turn, language);
+      const events = (Array.isArray(turn.events) ? turn.events : []).filter((event) => event && event.kind !== "presentation_plan" && (String(event.title || "").trim() || String(event.summary || "").trim()));
       if (events.length) {
         const details = document.createElement("details");
         details.className = "assistant-tools";
@@ -2434,6 +2464,7 @@ export function createAssistant(adapter) {
   }
 
   function render() {
+    if (assistantDestroyed) return;
     const { paper, entry } = current();
     management.hidden = deviceMode;
     referenceAddRow.hidden = deviceMode;
@@ -2486,6 +2517,7 @@ export function createAssistant(adapter) {
   }
 
   function resetClearedConversation(paperId, entry, conversationId, statusKey) {
+    presentations.clearConversation(paperId, conversationId);
     entry.conversations = entry.conversations.filter((conversation) => conversation.id !== conversationId);
     entry.conversationsLoadSequence += 1;
     entry.conversationsLoading = false;
@@ -2716,7 +2748,7 @@ export function createAssistant(adapter) {
   }
 
   async function send(paperId, entry) {
-    if (deviceMode || entry.loading || entry.conversationsLoading || entry.clearing || entry.pendingSend?.pending || activeTurn(entry)) return;
+    if (assistantDestroyed || deviceMode || entry.loading || entry.conversationsLoading || entry.clearing || entry.pendingSend?.pending || activeTurn(entry)) return;
     if (!entry.pendingSend && tasks.isBusy(paperId, entry.conversationId)) {
       entry.status = { key: "agent_task_busy", kind: "error" };
       render();
@@ -2774,6 +2806,7 @@ export function createAssistant(adapter) {
         }
       };
       if (tasks.continueTaskRequested(paperId)) payload.continue_task = true;
+      negotiatePresentationActions(payload, provider, adapter.getDocument(), presentations.installed);
       Object.freeze(payload.context);
       Object.freeze(payload);
       entry.pendingSend = {
@@ -3087,6 +3120,7 @@ export function createAssistant(adapter) {
     entry.fresh = true;
     entry.pendingSend = null;
     entry.resourceRefs = [];
+    presentations.contextChanged();
     entry.status = null;
     sourcePreparationGeneration += 1;
     tasks.conversationChanged(paper.id, null);
@@ -3100,6 +3134,7 @@ export function createAssistant(adapter) {
     entry.turns = [];
     entry.pendingSend = null;
     entry.resourceRefs = [];
+    presentations.contextChanged();
     sourcePreparationGeneration += 1;
     tasks.conversationChanged(paper.id, entry.conversationId);
     loadConversation(paper.id, entry, entry.conversationId);
@@ -3134,6 +3169,7 @@ export function createAssistant(adapter) {
   elements.sharedUse.addEventListener("click", useSharedConnection);
 
   if (!deviceMode) void sourcePreparation.load();
+  if (!deviceMode) void presentations.load().then(() => render());
   loadProvider();
 
   return {
@@ -3195,6 +3231,7 @@ export function createAssistant(adapter) {
       return Boolean(papers.get(documentId)?.clearing?.pending);
     },
     documentChanged() {
+      presentations.contextChanged();
       referencePicker.close();
       sourcePreparationGeneration += 1;
       const { paper, entry } = current();
@@ -3216,6 +3253,7 @@ export function createAssistant(adapter) {
       const entry = entryFor(documentId);
       return loadConversations(documentId, entry, false);
     },
-    render
+    render,
+    destroy: destroyAssistant
   };
 }

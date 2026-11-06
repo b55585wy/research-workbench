@@ -12,7 +12,7 @@
 - 后端 `presentation_paper.py` / `presentation_paper_probe.py` 单独提取文字；原 `presentation_service.py` 负责来源验证、大纲及导出；`presentation_export.py` 生成原生文本、图表和引用页。
 - 新增 `/api/v1/paper-presentations/capabilities` 和 `/api/v1/documents/{id}/paper-presentations/{context,outline,export}`。旧版入口保持原语义；新能力不可用时保留原来的工作流，不自动重试另一生成入口。
 - 公共站以 loopback `presentation_companion.py` 接入，既有核心后端保持v0.64.0。`presentation_passive.py` 只读已有 registry2 / SQLite29，不创建、迁移、恢复或清理正式工作区。只在明确导出时创建自身临时文件。
-- 浏览器本机资料没有被自动上传；这一步面向服务器已有论文。Agent聊天直接生成PPT尚未接入，不能把工作区导出能力当作已上线的聊天工具。
+- 浏览器本机资料没有被自动上传；这一步面向服务器已有论文。[Agent聊天PPT](AGENT-PRESENTATIONS.md)已另行实现并完成v0.73候选私有验收，尚未上线；工作区导出能力不代表聊天工具已发布。
 
 ## 本次验收
 

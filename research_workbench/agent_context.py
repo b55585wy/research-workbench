@@ -146,6 +146,7 @@ class ReadingWorkspace:
                 'active_analysis_id':str(context.active_analysis_id) if context.active_analysis_id else None,'active_analysis':active_analysis,
                 'initiator':{'identity_source':'local_compat','authenticated':False}}
         if active_image is not None:result['active_image']=active_image
+        if context.presentation_actions:result['presentation_actions']=True
         if active_chart is not None:result.update(active_chart_id=active_chart['id'],active_chart=active_chart)
         if pinned_notes:
             result['pinned_notes']=pinned_notes

@@ -13,6 +13,7 @@ export { mountResearchShell } from "./features/research-shell";
 export { mountChartSkills } from "./features/chart-skills";
 export { mountTeachingData } from "./features/teaching-data";
 export { mountPresentationPaper } from "./features/presentation-paper";
+export { mountAssistantPresentation } from "./features/assistant-presentations";
 export type {
   MountNotesWorkspaceOptions, NotesWorkspaceHandle, NotesWorkspaceModel,
   NotesWorkspaceHosts, NotesWorkspaceSection

@@ -137,8 +137,9 @@ from .agent_online_data_tools import OnlineDataTools,ONLINE_DEFINITIONS
 from .agent_reference_tools import ReferenceTools,REFERENCE_DEFINITIONS
 from .agent_reference_analysis import ReferenceAnalysisTools,REFERENCE_ANALYSIS_DEFINITIONS
 from .agent_evidence_tools import EvidenceTools,EVIDENCE_DEFINITIONS
+from .agent_presentation_tools import PresentationTools,PRESENTATION_DEFINITIONS,presentation_granted
 
-DEFINITIONS+=CHART_DEFINITIONS+STATISTICS_DEFINITIONS+SELECTION_DEFINITIONS+RECORD_DEFINITIONS+PAPER_DEFINITIONS+CORRELATION_DEFINITIONS+ONLINE_DEFINITIONS+REFERENCE_DEFINITIONS+REFERENCE_ANALYSIS_DEFINITIONS+EVIDENCE_DEFINITIONS
+DEFINITIONS+=CHART_DEFINITIONS+STATISTICS_DEFINITIONS+SELECTION_DEFINITIONS+RECORD_DEFINITIONS+PAPER_DEFINITIONS+CORRELATION_DEFINITIONS+ONLINE_DEFINITIONS+REFERENCE_DEFINITIONS+REFERENCE_ANALYSIS_DEFINITIONS+EVIDENCE_DEFINITIONS+PRESENTATION_DEFINITIONS
 
 
 def bounded(value,depth=0):
@@ -149,7 +150,7 @@ def bounded(value,depth=0):
     return value
 
 
-class ReadingTools(OnlineDataTools,CorrelationTools,PaperTools,RecordTools,SelectionTools,StatisticsTools,ChartTools,ReferenceTools,ReferenceAnalysisTools,EvidenceTools):
+class ReadingTools(OnlineDataTools,CorrelationTools,PaperTools,RecordTools,SelectionTools,StatisticsTools,ChartTools,ReferenceTools,ReferenceAnalysisTools,EvidenceTools,PresentationTools):
     def __init__(self,workspace,agent_store,proposals,turn,sources):
         self.workspace,self.store,self.proposals=workspace,agent_store,proposals
         self.turn,self.sources=turn,sources
@@ -159,10 +160,12 @@ class ReadingTools(OnlineDataTools,CorrelationTools,PaperTools,RecordTools,Selec
     def manifest():
         return [{'name':n,'title':t,'risk':risk} for n,t,_,_,risk in DEFINITIONS]
 
-    @staticmethod
-    def functions():
-        return [{'type':'function','function':{'name':n,'description':description,'parameters':model.model_json_schema()}}
-                for n,_,description,model,_ in DEFINITIONS]
+    def functions(self):
+        rows=[{'type':'function','function':{'name':n,'description':description,'parameters':model.model_json_schema()}}
+              for n,_,description,model,_ in DEFINITIONS]
+        if not presentation_granted(self.workspace,self.turn['context']):
+            rows=[row for row in rows if row['function']['name']!='prepare_presentation']
+        return rows
 
     def execute(self,name,arguments,call_id):
         definition=next((r for r in DEFINITIONS if r[0]==name),None)

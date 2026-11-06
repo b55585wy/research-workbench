@@ -68,6 +68,7 @@ class ReadingContext(BaseModel):
     active_image: ImageSelection | None=None
     active_chart_id: UUID | None=None
     language: Literal['zh','en']='zh'
+    presentation_actions: bool=Field(default=False,strict=True)
     note_refs: list[NoteReference]=Field(default_factory=list,max_length=8)
     resource_refs: list[ResourceReference]=Field(default_factory=list,max_length=8)
 
@@ -88,6 +89,10 @@ class ReadingContext(BaseModel):
     @model_serializer(mode='wrap')
     def compatible_serialization(self, handler):
         value=handler(self)
+        # Absent/false negotiation must serialize exactly as before: old
+        # submission hashes and stored captures stay byte-identical.
+        if value.get('presentation_actions') is False:
+            value.pop('presentation_actions',None)
         if not value.get('note_refs'):
             value.pop('note_refs',None)
         if not value.get('resource_refs'):

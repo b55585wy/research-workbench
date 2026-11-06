@@ -1,0 +1,92 @@
+.assistant-presentation-host {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.assistant-presentation {
+  min-width: 0;
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--ui-border);
+  border-radius: 4px;
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  font: inherit;
+  overflow-wrap: anywhere;
+}
+
+.assistant-presentation h3,
+.assistant-presentation h4 {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.assistant-presentation-pages,
+.assistant-presentation-status,
+.assistant-presentation-error {
+  margin: 4px 0 8px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.assistant-presentation-pages,
+.assistant-presentation-status {
+  color: var(--ui-text-muted);
+}
+
+.assistant-presentation-error {
+  color: var(--ui-danger, var(--ui-text));
+}
+
+.assistant-presentation .button,
+.assistant-presentation-preview > summary {
+  min-height: 44px;
+  max-width: 100%;
+  padding: 12px;
+  white-space: normal;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.assistant-presentation-preview {
+  min-width: 0;
+  margin: 8px 0;
+  border-top: 1px solid var(--ui-border);
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.assistant-presentation-preview > summary {
+  box-sizing: border-box;
+  color: var(--ui-text-soft);
+}
+
+.assistant-presentation-preview > ol {
+  max-height: 240px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  margin: 0 0 12px;
+  padding-left: 24px;
+}
+
+.assistant-presentation-preview li {
+  margin-bottom: 8px;
+  padding-right: 8px;
+  line-height: 1.5;
+  font-size: 12px;
+}
+
+.assistant-presentation-preview ul {
+  padding-left: 16px;
+  margin-top: 4px;
+}
+
+.assistant-presentation :is(button, summary):focus-visible {
+  outline: 2px solid var(--ui-focus);
+  outline-offset: 2px;
+}
+
+@media (max-width: 480px) {
+  .assistant-presentation .button { width: 100%; }
+}
