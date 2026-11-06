@@ -1,8 +1,12 @@
 const phoneQuery = window.matchMedia("(max-width: 820px)");
+const shortTouchQuery = window.matchMedia("(pointer: coarse) and (max-height: 600px)");
 const readerPanel = document.getElementById("reader-panel");
 const toolbar = readerPanel?.querySelector(".reader-toolbar");
 
 if (readerPanel && toolbar) {
+  const compactControls = () => phoneQuery.matches || (
+    shortTouchQuery.matches && readerPanel.classList.contains("reader-fullscreen-panel")
+  );
   const byId = (id) => document.getElementById(id);
   const workspace = document.querySelector(".workspace");
   const readerStage = byId("reader-stage");
@@ -140,6 +144,8 @@ if (readerPanel && toolbar) {
 
   let openPanel = null;
   let returnFocus = null;
+  let lastFocused = null;
+  readerPanel.addEventListener("focusin", (event) => { lastFocused = event.target; });
 
   function makePanel(id) {
     const panel = document.createElement("section");
@@ -324,7 +330,7 @@ if (readerPanel && toolbar) {
         setAttribute(native, "aria-label", label);
         setAttribute(native, "title", label);
       }
-      if (phoneQuery.matches) ensureNativeIcon(native, iconName);
+      if (compactControls()) ensureNativeIcon(native, iconName);
     }
     if (findToggle) {
       const label = nativeLabel(findToggle);
@@ -420,13 +426,13 @@ if (readerPanel && toolbar) {
     openPanel = null;
     annotationTrigger.setAttribute("aria-expanded", "false");
     moreTrigger.setAttribute("aria-expanded", "false");
-    if (options.restoreFocus !== false && returnFocus?.isConnected && phoneQuery.matches) returnFocus.focus({ preventScroll: true });
+    if (options.restoreFocus !== false && returnFocus?.isConnected && compactControls()) returnFocus.focus({ preventScroll: true });
     returnFocus = null;
     if (closing.contains(document.activeElement)) document.activeElement.blur();
   }
 
   function openTools(panel, trigger) {
-    if (!phoneQuery.matches || trigger.disabled) return;
+    if (!compactControls() || trigger.disabled) return;
     if (openPanel === panel) {
       closeTools();
       return;
@@ -444,6 +450,7 @@ if (readerPanel && toolbar) {
   moreTrigger.addEventListener("click", () => openTools(more.panel, moreTrigger));
 
   document.addEventListener("pointerdown", (event) => {
+    lastFocused = null;
     if (!openPanel || openPanel.contains(event.target) || annotationTrigger.contains(event.target) || moreTrigger.contains(event.target)) return;
     closeTools({ restoreFocus: false });
   });
@@ -479,14 +486,20 @@ if (readerPanel && toolbar) {
 
   let active = false;
   function updateViewport() {
-    const nextActive = phoneQuery.matches;
+    const nextActive = compactControls();
     if (nextActive === active) return;
+    const focused = document.activeElement === document.body ? lastFocused : document.activeElement;
+    const restoreFocus = primaryActions.contains(focused) || openPanel?.contains(focused);
     active = nextActive;
     closeTools({ restoreFocus: false });
     document.documentElement.classList.toggle("reader-mobile-tools-active", active);
     if (active) viewModeSection.append(viewLabel);
     else readingControls.insertBefore(viewLabel, findToggle);
     syncState();
+    if (!active && restoreFocus) {
+      const target = viewLabel.contains(focused) ? focused : byId("reader-fullscreen");
+      if (target?.getClientRects().length && !target.disabled) target.focus({ preventScroll: true });
+    }
   }
 
   let previousPane = workspace?.dataset.mobilePane;
@@ -494,6 +507,7 @@ if (readerPanel && toolbar) {
   let previousDocument = readerStage?.dataset.documentId;
   let previousFlow = readerPanel?.dataset.flowActive;
   const observer = new MutationObserver((records) => {
+    updateViewport();
     let navigationChanged = false;
     for (const record of records) {
       if (record.target === workspace || record.target === readerStage || record.target === readerPanel) {
@@ -521,7 +535,7 @@ if (readerPanel && toolbar) {
     attributeFilter: ["disabled", "hidden", "aria-label", "aria-pressed", "data-contextual"]
   });
   observer.observe(document.documentElement, { attributes: true, attributeFilter: ["lang"] });
-  observer.observe(readerPanel, { attributes: true, attributeFilter: ["data-flow-active"] });
+  observer.observe(readerPanel, { attributes: true, attributeFilter: ["data-flow-active", "class"] });
   if (workspace) observer.observe(workspace, { attributes: true, attributeFilter: ["data-mobile-pane", "data-owner-kind"] });
   if (readerStage) observer.observe(readerStage, { attributes: true, attributeFilter: ["data-document-id"] });
 
@@ -537,6 +551,7 @@ if (readerPanel && toolbar) {
   });
 
   phoneQuery.addEventListener("change", updateViewport);
+  shortTouchQuery.addEventListener("change", updateViewport);
   syncState();
   updateViewport();
 }

@@ -146,6 +146,7 @@ const visualKinds = new Set(["image", "table", "formula"]);
 const strings = {
   zh: {
     heading: "段落阅读",
+    tools: "阅读工具",
     fullscreen: "阅读全屏",
     exitFullscreen: "退出全屏",
     original: "原文",
@@ -210,6 +211,7 @@ const strings = {
   },
   en: {
     heading: "Paragraph reading",
+    tools: "Reading tools",
     fullscreen: "Reading fullscreen",
     exitFullscreen: "Exit fullscreen",
     original: "Original",
@@ -559,7 +561,7 @@ function findInPages(pages: SourcePage[], query: string, mode: TextMode, transla
   return matches;
 }
 
-type FlowIconName = "return" | "previous" | "next" | "settings" | "search" | "up" | "down" | "expand" | "collapse";
+type FlowIconName = "return" | "previous" | "next" | "settings" | "search" | "up" | "down" | "expand" | "collapse" | "more";
 
 function FlowIcon({ name }: { name: FlowIconName }) {
   return (
@@ -573,6 +575,7 @@ function FlowIcon({ name }: { name: FlowIconName }) {
       {name === "search" && <><circle cx="8.5" cy="8.5" r="5" /><path d="m12 12 4.5 4.5" /></>}
       {name === "expand" && <path d="M7 3H3v4M13 3h4v4M17 13v4h-4M7 17H3v-4" />}
       {name === "collapse" && <path d="M3 7h4V3M13 3v4h4M17 13h-4v4M7 17v-4H3" />}
+      {name === "more" && <><circle cx="4" cy="10" r="1" /><circle cx="10" cy="10" r="1" /><circle cx="16" cy="10" r="1" /></>}
     </svg>
   );
 }
@@ -672,6 +675,9 @@ function FlowReader({ model, callbacks }: { model: FlowReaderModel; callbacks: F
   const [preferences, setPreferences] = useState<FlowReadingPreferences>(readFlowReadingPreferences);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [toolsOpen, setToolsOpen] = useState(false);
+  const toolsPanelRef = useRef<HTMLDivElement | null>(null);
+  const toolsToggleRef = useRef<HTMLButtonElement | null>(null);
   const [jumpValue, setJumpValue] = useState(String(initialPage));
   const [jumpError, setJumpError] = useState(false);
   const [query, setQuery] = useState("");
@@ -685,6 +691,37 @@ function FlowReader({ model, callbacks }: { model: FlowReaderModel; callbacks: F
   const previousPreferencesRef = useRef(preferences);
   const modelRef = useRef(model);
   modelRef.current = model;
+  useEffect(() => {
+    if (!model.fullscreen) setToolsOpen(false);
+  }, [model.fullscreen]);
+  useEffect(() => {
+    const ownerDocument = toolsPanelRef.current?.ownerDocument;
+    if (!model.fullscreen || !ownerDocument) return;
+    let focused: EventTarget | null = ownerDocument.activeElement;
+    const rememberFocus = (event: FocusEvent) => { focused = event.target; };
+    const outside = (event: PointerEvent) => {
+      const target = event.target as Node;
+      focused = target;
+      if (toolsOpen && !toolsPanelRef.current?.contains(target) && !toolsToggleRef.current?.contains(target)) setToolsOpen(false);
+    };
+    const media = ownerDocument.defaultView?.matchMedia("(max-width: 820px), (pointer: coarse) and (max-height: 600px)");
+    const changed = () => {
+      if (media?.matches) return;
+      setToolsOpen(false);
+      if (ownerDocument.activeElement === toolsToggleRef.current
+        || ownerDocument.activeElement === ownerDocument.body && focused === toolsToggleRef.current) {
+        toolsToggleRef.current?.parentElement?.querySelector<HTMLButtonElement>(".flow-fullscreen-toggle")?.focus({ preventScroll: true });
+      }
+    };
+    ownerDocument.addEventListener("pointerdown", outside);
+    ownerDocument.addEventListener("focusin", rememberFocus);
+    media?.addEventListener("change", changed);
+    return () => {
+      ownerDocument.removeEventListener("pointerdown", outside);
+      ownerDocument.removeEventListener("focusin", rememberFocus);
+      media?.removeEventListener("change", changed);
+    };
+  }, [toolsOpen, model.fullscreen]);
   const scope = `${document.id}:${document.sha256}`;
   const batchPages = useMemo(
     () => Array.from({ length: Math.min(3, document.pageCount - batchStart + 1) }, (_, index) => batchStart + index),
@@ -1041,13 +1078,24 @@ function FlowReader({ model, callbacks }: { model: FlowReaderModel; callbacks: F
             : null;
 
   return (
-    <section className="flow-reader" aria-label={copy.heading}>
+    <section className="flow-reader" aria-label={copy.heading} data-tools-open={toolsOpen} onKeyDown={(event) => {
+      if (event.key !== "Escape" || event.defaultPrevented || !toolsOpen || !toolsToggleRef.current?.getClientRects().length) return;
+      event.preventDefault();
+      event.stopPropagation();
+      setToolsOpen(false);
+      toolsToggleRef.current.focus({ preventScroll: true });
+    }}>
       <header className="flow-header">
         <div className="flow-heading-wrap">
           <h2>{copy.heading}</h2>
           <p title={document.title || copy.untitled}>{document.title || copy.untitled}</p>
+          <span className="flow-compact-page" aria-label={copy.currentPage(viewedPage)}>{viewedPage}/{document.pageCount}</span>
         </div>
         <div className="flow-header-actions">
+          <button className="button button-quiet flow-icon-button flow-tools-toggle" type="button"
+            ref={toolsToggleRef} aria-label={copy.tools} title={copy.tools}
+            aria-controls="flow-reading-tools" aria-expanded={toolsOpen}
+            onClick={() => setToolsOpen((value) => !value)}><FlowIcon name="more" /></button>
           <button
             className="button button-secondary flow-icon-button"
             type="button"
@@ -1067,6 +1115,7 @@ function FlowReader({ model, callbacks }: { model: FlowReaderModel; callbacks: F
           ><FlowIcon name={model.fullscreen ? "collapse" : "expand"} /></button>}
         </div>
       </header>
+      <div className="flow-tools-panel" id="flow-reading-tools" ref={toolsPanelRef} role="group" aria-label={copy.tools}>
       <div className="flow-controls">
         <div className="flow-text-modes" role="group" aria-label={copy.textModeLabel}>
           <button className="button button-quiet" type="button" aria-pressed={mode === "original"} onClick={() => setMode("original")}>{copy.original}</button>
@@ -1278,6 +1327,7 @@ function FlowReader({ model, callbacks }: { model: FlowReaderModel; callbacks: F
           {missingTranslation && <p>{copy.translationScope}</p>}
         </div>
       )}
+      </div>
       {statusMessage && (
         <div className={`flow-status flow-status-${phase}`} role={phase === "error" ? "alert" : "status"}>
           {busy && <span className="flow-status-spinner" aria-hidden="true" />}

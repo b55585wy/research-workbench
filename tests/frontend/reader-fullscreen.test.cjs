@@ -195,6 +195,29 @@ test('flow paragraph anchoring preserves the visible offset through a layout cha
   assert.equal(context.captureFlowPosition(null), null);
 });
 
+test('reflow keeps the same fraction of a partially read paragraph through narrow and wide layouts', () => {
+  let height = 120, top = 40;
+  const block = { isConnected: true, getBoundingClientRect: () => ({ top, bottom: top + height, height }) };
+  const scroller = { isConnected: true, scrollTop: 600, contains: () => true,
+    getBoundingClientRect: () => ({ top: 100 }), querySelectorAll: () => [block] };
+  const position = context.captureFlowPosition(scroller);
+  for (const nextHeight of [40, 240, 120]) {
+    height = nextHeight; top = 80; scroller.scrollTop = 600;
+    context.restoreFlowPosition(position);
+    assert.equal(scroller.scrollTop, 580 + nextHeight / 2);
+  }
+});
+
+test('zero-height reflow and a paragraph below the top preserve their pixel offset', () => {
+  for (const offset of [-20, 20]) {
+    const block = { isConnected: true, getBoundingClientRect: () => ({ top: 130, height: 0 }) };
+    const scroller = { isConnected: true, scrollTop: 100, contains: () => true,
+      getBoundingClientRect: () => ({ top: 100 }) };
+    context.restoreFlowPosition({ scroller, block, offset, blockHeight: 50 });
+    assert.equal(scroller.scrollTop, 130 - offset);
+  }
+});
+
 test('native promotion before the first frame preserves the original flow anchor', async () => {
   const owner = {}, frames = [];
   let blockTop = 80, rootTop = 100;

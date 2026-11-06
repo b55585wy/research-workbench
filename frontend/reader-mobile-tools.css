@@ -4,7 +4,7 @@
   display: none;
 }
 
-@media (max-width: 820px) {
+@media (max-width: 820px), (pointer: coarse) and (max-height: 600px) {
   html.reader-mobile-tools-active .reader-toolbar {
     flex: 0 0 56px;
     flex-flow: row nowrap;
@@ -55,6 +55,15 @@
   html.reader-mobile-tools-active .reader-toolbar .reader-reading-controls,
   html.reader-mobile-tools-active .reader-toolbar .reader-source-controls {
     display: contents;
+  }
+
+  html.reader-mobile-tools-active .reader-toolbar :is(.reader-secondary-tools, .reader-secondary-tools-panel, .reader-draw-menu) {
+    display: contents;
+  }
+
+  html.reader-mobile-tools-active .reader-toolbar :is(.reader-secondary-tools, .reader-draw-menu) > summary,
+  html.reader-mobile-tools-active .reader-toolbar .reader-shape-tool-menu {
+    display: none;
   }
 
   html.reader-mobile-tools-active .reader-toolbar .reader-reading-controls > :not(#reader-find-toggle),

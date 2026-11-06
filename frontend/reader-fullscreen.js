@@ -3,14 +3,18 @@ export function captureFlowPosition(scroller) {
   const top = scroller.getBoundingClientRect().top;
   const block = [...scroller.querySelectorAll("[data-flow-block-id]")]
     .find((element) => element.getBoundingClientRect().bottom > top + 1);
-  return { scroller, block, offset: block ? block.getBoundingClientRect().top - top : 0, scrollTop: scroller.scrollTop };
+  const rect = block?.getBoundingClientRect();
+  return { scroller, block, offset: rect ? rect.top - top : 0, blockHeight: rect?.height, scrollTop: scroller.scrollTop };
 }
 
 export function restoreFlowPosition(position) {
   if (!position?.scroller.isConnected) return;
   const { scroller, block } = position;
   if (block?.isConnected && scroller.contains(block)) {
-    scroller.scrollTop += block.getBoundingClientRect().top - scroller.getBoundingClientRect().top - position.offset;
+    const rect = block.getBoundingClientRect();
+    const offset = position.offset < 0 && position.blockHeight > 0 && rect.height > 0
+      ? position.offset * rect.height / position.blockHeight : position.offset;
+    scroller.scrollTop += rect.top - scroller.getBoundingClientRect().top - offset;
   } else scroller.scrollTop = position.scrollTop;
 }
 
