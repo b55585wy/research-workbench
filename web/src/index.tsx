@@ -14,6 +14,7 @@ export { mountChartSkills } from "./features/chart-skills";
 export { mountTeachingData } from "./features/teaching-data";
 export { mountPresentationPaper } from "./features/presentation-paper";
 export { mountAssistantPresentation } from "./features/assistant-presentations";
+export { mountFirstUseGuide } from "./features/first-use-guide";
 export type {
   MountNotesWorkspaceOptions, NotesWorkspaceHandle, NotesWorkspaceModel,
   NotesWorkspaceHosts, NotesWorkspaceSection

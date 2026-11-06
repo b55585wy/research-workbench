@@ -1,0 +1,38 @@
+#first-use-guide { position: fixed; inset: 0; z-index: 16000; pointer-events: none; }
+.header-settings-guide { order: 6; margin-top: 12px; }
+.first-use-overlay { position: absolute; inset: 0; }
+.first-use-spotlight {
+  position: fixed;
+  border: 2px solid var(--ui-focus);
+  border-radius: 4px;
+  box-shadow: 0 0 0 9999px rgb(0 0 0 / 28%);
+  box-sizing: border-box;
+}
+.first-use-arrow { position: fixed; inset: 0; width: 100%; height: 100%; overflow: visible; color: var(--ui-focus); }
+.first-use-card {
+  position: fixed;
+  pointer-events: auto;
+  box-sizing: border-box;
+  padding: 12px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  border: 1px solid var(--ui-border-strong);
+  border-radius: 4px;
+  box-shadow: 0 4px 16px rgb(0 0 0 / 14%);
+  font: inherit;
+}
+.first-use-card header, .first-use-card footer { display: flex; align-items: center; gap: 4px; }
+.first-use-counter { flex: 1; color: var(--ui-text-muted); font-size: 12px; }
+.first-use-card h2 { margin: 0 0 8px; font-size: 14px; line-height: 1.5; }
+.first-use-card p { margin: 0 0 12px; font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+.first-use-card footer { justify-content: flex-end; }
+.first-use-card footer > :first-child { margin-right: auto; }
+.first-use-card .button { min-height: 44px; padding: 8px; font: inherit; font-size: 13px; white-space: nowrap; }
+.first-use-card .first-use-close { width: 44px; display: inline-flex; align-items: center; justify-content: center; }
+.first-use-card :is(button, [tabindex]):focus-visible, .first-use-card:focus-visible { outline: 2px solid var(--ui-focus); outline-offset: 2px; }
+@media (prefers-reduced-motion: no-preference) {
+  .first-use-card { animation: first-use-in 120ms ease-out; }
+}
+@keyframes first-use-in { from { opacity: 0; } to { opacity: 1; } }

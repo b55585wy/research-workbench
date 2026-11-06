@@ -27,7 +27,8 @@ const strings = {
     space: "空间恢复",
     appearance: "外观与主题",
     language: "语言",
-    spaceRecovery: "空间保存与恢复"
+    spaceRecovery: "空间保存与恢复",
+    guide: "功能引导"
   },
   en: {
     settings: "Workspace settings",
@@ -35,7 +36,8 @@ const strings = {
     space: "Space recovery",
     appearance: "Appearance and theme",
     language: "Language",
-    spaceRecovery: "Space saving and recovery"
+    spaceRecovery: "Space saving and recovery",
+    guide: "Feature guide"
   }
 } as const;
 
@@ -176,6 +178,10 @@ function HeaderSettings({ container, controls, identity }: Omit<MountHeaderSetti
           <h3 className="header-settings-appearance-label">{copy.appearance}</h3>
           <NativeControlsSlot controls={controls} />
           <h3 className="header-settings-language-label">{copy.language}</h3>
+          <button className="button button-secondary header-settings-guide" type="button" data-action="first-use-guide" onClick={() => {
+            closePanel(false);
+            window.dispatchEvent(new Event("workbench:guide-request"));
+          }}>{copy.guide}</button>
         </div>
       </section>
     </div>

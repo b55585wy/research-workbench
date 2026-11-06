@@ -42,6 +42,7 @@ import { createAssistantPdfNavigator } from "/assistant-pdf-navigation.js";
 import { createNotesWorkspace } from "/notes-workspace.js";
 import { createResearchShell } from "/research-shell.js";
 import { createReaderFullscreen, captureFlowPosition, createFlowPositionRestorer } from "/reader-fullscreen.js";
+import { createFirstUseGuide } from "/first-use-guide.js";
 
 window.workbenchStartup?.stage("workspace");
 pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf-worker-compat.js?v=0.52.0";
@@ -9368,6 +9369,8 @@ applyDeviceCapabilities();
 applyTheme();
 applyLanguage();
 if (deviceMode) void offlineSupport.start();
+const firstUseGuide = createFirstUseGuide({ getLanguage: () => state.language, isDevice: () => deviceMode });
+window.addEventListener("pagehide", (event) => { if (!event.persisted) firstUseGuide.destroy(); });
 
 async function startApplication() {
   if (deviceMode) {
@@ -9393,6 +9396,7 @@ async function startApplication() {
   window.workbenchStartup?.stage("library");
   await loadDocuments();
   window.workbenchStartup?.ready();
+  firstUseGuide.startAutomatically();
 }
 void startApplication()
   .catch(() => window.workbenchStartup?.fail())
