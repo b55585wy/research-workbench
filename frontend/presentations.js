@@ -1,13 +1,33 @@
+import { createPresentationPaperView, missingPaperCitation, parsePaperPages } from "/presentation-paper.js";
+
 const STYLE_IDS = ["default", "nature", "cell"];
 const LIMITS = { notes: 5, charts: 4, analyses: 4, slides: 8 };
 const UUID = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 const SHA256 = /^[0-9a-f]{64}$/;
 const PPTX_MIME = "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+const SOURCE_CHANGED_CODES = ["source_changed", "presentation_changed", "presentation_source_changed"];
 
 const messages = {
   zh: {
     panel: "AI 大纲与可编辑 PPT",
-    help: "选择当前工作区的笔记、分析结果和图表，整理成可编辑的汇报。可直接编辑资料大纲，也可使用 AI。",
+    help: "从论文 PDF 生成汇报，也可使用笔记、分析和图表。",
+    supplemental: "补充资料",
+    paperSource: "论文 PDF",
+    paperPages: "读取第 {pages} 页",
+    paperEmptyPages: "其中无文字页面：{pages}",
+    paperCitationRequired: "论文汇报的正文页需要保留论文来源，请勾选该页的引用来源。",
+    invalidPaperPages: "请填写有效且不重复的页码，每次最多 60 页。",
+    presentation_paper_invalid: "请先打开一篇已导入的论文 PDF。",
+    presentation_paper_pages: "请选择论文中的有效页码，每次最多 60 页。",
+    presentation_paper_chars: "所选论文文字过多，请在页面范围中减少页码。",
+    presentation_paper_context_too_large: "论文与补充资料过多，请减少页码或资料。",
+    presentation_paper_empty: "所选页面没有可提取文字，可能是扫描件。请选择含文字的页面。",
+    presentation_paper_unreadable: "无法读取这份 PDF，请检查文件或选择其他页面。",
+    presentation_paper_encrypted: "PDF 有密码保护，请解除密码后重新导入。",
+    presentation_paper_busy: "正在读取另一篇论文，请稍后重试。",
+    presentation_paper_timeout: "读取论文超时，请减少页码后重试。",
+    presentation_paper_unavailable: "论文读取组件暂不可用，请稍后重试。",
+    presentation_source_changed: "论文或资料已变化。大纲已保留，请重新预览来源。",
     title: "演示标题",
     titlePlaceholder: "输入 1–120 个字符",
     style: "视觉风格",
@@ -56,7 +76,7 @@ const messages = {
     download: "下载可编辑 PPTX",
     downloading: "正在生成 PPTX…",
     downloadNote: "下载到你的设备，可继续编辑；来源保留在附录中。",
-    emptySelection: "请至少选择一条笔记、一个图表或一项已完成分析。",
+    emptySelection: "请选择论文 PDF、笔记、图表或已完成分析。",
     selectionLimit: "所选来源超过上限，请减少选择。",
     titleRequired: "请输入 1–120 个字符的演示标题。",
     contextRequired: "来源或设置已变化。草稿已保留，请重新预览来源。",
@@ -87,7 +107,24 @@ const messages = {
   },
   en: {
     panel: "AI outline & editable PPT",
-    help: "Choose notes, analysis results, and charts from this workspace. Edit the source outline directly or use AI to draft your presentation.",
+    help: "Create a presentation from a paper PDF, or use notes, analysis, and charts.",
+    supplemental: "Additional sources",
+    paperSource: "Paper PDF",
+    paperPages: "Read pages {pages}",
+    paperEmptyPages: "Pages without text: {pages}",
+    paperCitationRequired: "Keep the paper selected under sources on every body slide.",
+    invalidPaperPages: "Enter up to 60 valid, distinct page numbers.",
+    presentation_paper_invalid: "Open an imported paper PDF first.",
+    presentation_paper_pages: "Select up to 60 valid pages from this paper.",
+    presentation_paper_chars: "The paper selection has too much text. Select fewer pages.",
+    presentation_paper_context_too_large: "Too much paper text and additional context. Reduce the selection.",
+    presentation_paper_empty: "No text could be extracted. These may be scanned pages; choose pages with native text.",
+    presentation_paper_unreadable: "This PDF could not be read. Check the file or choose other pages.",
+    presentation_paper_encrypted: "This PDF is password protected. Remove the password and import it again.",
+    presentation_paper_busy: "Another paper is being read. Try again shortly.",
+    presentation_paper_timeout: "Reading the paper timed out. Select fewer pages and retry.",
+    presentation_paper_unavailable: "The paper reader is temporarily unavailable. Try again later.",
+    presentation_source_changed: "The paper or sources changed. Your outline is retained; preview the sources again.",
     title: "Presentation title",
     titlePlaceholder: "Enter 1–120 characters",
     style: "Visual style",
@@ -136,7 +173,7 @@ const messages = {
     download: "Download editable PPTX",
     downloading: "Generating PPTX…",
     downloadNote: "Download to your device and keep editing. Sources are retained in the appendix.",
-    emptySelection: "Select at least one note, chart, or completed analysis.",
+    emptySelection: "Select a paper PDF, note, chart, or completed analysis.",
     selectionLimit: "Too many sources are selected. Reduce the selection.",
     titleRequired: "Enter a presentation title of 1–120 characters.",
     contextRequired: "Sources or settings changed. Your draft is retained; preview the sources again.",
@@ -177,25 +214,38 @@ function validText(value, maximum, nonempty = false) {
 
 function validOutline(outline, sources = []) {
   if (!outline || !validText(outline.title, 120, true) || !Array.isArray(outline.slides) || outline.slides.length < 1 || outline.slides.length > LIMITS.slides) return false;
+  if (missingPaperCitation(outline, sources)) return false;
   const refs = new Set(sources.map((source) => source.ref));
   const chartIds = new Set(sources.filter((source) => source.kind === "chart").map((source) => source.id));
   return outline.slides.every((slide) => slide && validText(slide.title, 100, true) && Array.isArray(slide.body) && slide.body.length <= 5 &&
-    slide.body.every((body) => validText(body, 400)) && Array.isArray(slide.source_refs) && slide.source_refs.length <= 13 &&
+    slide.body.every((body) => validText(body, 400)) && Array.isArray(slide.source_refs) && slide.source_refs.length <= (sources.some((source) => source.kind === "paper") ? 14 : 13) &&
     new Set(slide.source_refs).size === slide.source_refs.length && slide.source_refs.every((ref) => typeof ref === "string" && refs.has(ref)) &&
     (slide.chart_id === null || typeof slide.chart_id === "string" && chartIds.has(slide.chart_id)));
 }
 
-function validSources(sources, selectors) {
-  if (!Array.isArray(sources) || sources.length < 1 || sources.length > 13) return false;
+function validSources(sources, selectors, paper = null) {
+  if (!Array.isArray(sources) || sources.length < 1 || sources.length > (selectors.include_paper ? 14 : 13)) return false;
   const expected = new Map([
     ...selectors.note_ids.map((id) => [`note:${id}`, id]),
     ...selectors.chart_ids.map((id) => [`chart:${id}`, id]),
     ...selectors.analysis_ids.map((id) => [`analysis:${id}`, id])
   ]);
+  if (selectors.include_paper) {
+    if (!paper || !UUID.test(paper.id)) return false;
+    expected.set(`paper:${paper.id}`, paper.id);
+  }
   if (sources.length !== expected.size || new Set(sources.map((source) => source?.ref)).size !== sources.length) return false;
-  return sources.every((source) => source && ["note", "chart", "analysis"].includes(source.kind) && UUID.test(source.id) &&
+  return sources.every((source) => source && ["note", "chart", "analysis", "paper"].includes(source.kind) && UUID.test(source.id) &&
     expected.has(`${source.kind}:${source.id}`) && typeof source.ref === "string" && Boolean(source.ref) &&
-    typeof source.title === "string" && Boolean(source.title.trim()));
+    typeof source.title === "string" && Boolean(source.title.trim()) && (source.kind !== "paper" || validPaperSource(source, selectors, paper)));
+}
+
+function validPaperSource(source, selectors, paper) {
+  const expected = selectors.paper_pages || Array.from({ length: paper.page_count }, (_, index) => index + 1);
+  return source.ref === `paper:${paper.id}` && source.file_sha256 === paper.sha256 && Array.isArray(source.pages) && expected.length <= 60 &&
+    JSON.stringify(source.pages) === JSON.stringify(expected) && Array.isArray(source.empty_pages) &&
+    new Set(source.empty_pages).size === source.empty_pages.length && source.empty_pages.every((page) => expected.includes(page)) &&
+    Number.isInteger(source.text_chars) && source.text_chars > 0 && source.text_chars <= 120000;
 }
 
 function retargetOutlineRefs(outline, previousSources, nextSources) {
@@ -242,6 +292,50 @@ export function createPresentations(adapter) {
   let currentId = null;
   let language = adapter.getLanguage();
   let capabilitiesPromise = null;
+  const paperView = createPresentationPaperView(byId("presentation-paper-source"), paperModel, {
+    onSelect(selected, scope) {
+      const entry = currentEntry();
+      if (!entry || entry.pending || !paperAvailable(entry) || scope !== paperModel().scope) return;
+      entry.includePaper = selected;
+      entry.selectionExplicit = true;
+      invalidateContext(entry);
+      renderSources(entry);
+      renderControls(entry);
+    },
+    onPages(value, scope) {
+      const entry = currentEntry();
+      if (!entry || entry.pending || scope !== paperModel().scope) return;
+      entry.paperRange = value;
+      invalidateContext(entry);
+      renderControls(entry);
+    }
+  });
+
+  function paperAvailable(entry) {
+    return entry?.capabilities?.paper_available === true && entry.document?.kind !== "study" &&
+      SHA256.test(entry.document?.sha256 || "") && Number.isInteger(entry.document?.page_count) && entry.document.page_count > 0;
+  }
+
+  function serviceAvailable(entry) {
+    return entry?.includePaper ? paperAvailable(entry) : entry?.capabilities?.available === true;
+  }
+
+  function aiAvailable(entry) {
+    return entry?.includePaper ? entry.capabilities?.paper_ai_available === true : entry?.capabilities?.ai_available === true;
+  }
+
+  function presentationApi(documentId, action, entry) {
+    const family = entry.includePaper ? "paper-presentations" : "presentations";
+    return `/api/v1/documents/${encodeURIComponent(documentId)}/${family}/${action}`;
+  }
+
+  function paperModel() {
+    const entry = currentEntry();
+    return { language, scope: `${currentId}:${entry?.document?.sha256}`, visible: paperAvailable(entry), selected: entry?.includePaper || false,
+      disabled: !entry || Boolean(entry.pending), title: entry?.document?.title || entry?.document?.original_filename || "",
+      pageCount: entry?.document?.page_count || 0, pageRange: entry?.paperRange || "",
+      invalidPages: Boolean(entry?.includePaper && !parsePaperPages(entry.paperRange, entry.document?.page_count).valid) };
+  }
 
   function t(key, values = {}) {
     let text = messages[language][key] || messages.en[key] || key;
@@ -269,6 +363,9 @@ export function createPresentations(adapter) {
       const documentTitle = document?.id === documentId ? document.title || document.original_filename : "";
       papers.set(documentId, {
         sources: { note: [], chart: [], analysis: [] },
+        document: document?.id === documentId ? clone(document) : null,
+        includePaper: false,
+        paperRange: "",
         sourceSignature: null,
         sourcesReady: false,
         selected: { note: new Set(), chart: new Set(), analysis: new Set() },
@@ -314,7 +411,8 @@ export function createPresentations(adapter) {
       style: entry.style,
       note_ids: [...entry.selected.note],
       chart_ids: [...entry.selected.chart],
-      analysis_ids: [...entry.selected.analysis]
+      analysis_ids: [...entry.selected.analysis],
+      ...(entry.includePaper ? { include_paper: true, paper_pages: parsePaperPages(entry.paperRange, entry.document?.page_count).pages } : {})
     };
   }
 
@@ -322,7 +420,8 @@ export function createPresentations(adapter) {
     const selected = selectors(entry);
     const count = selected.note_ids.length + selected.chart_ids.length + selected.analysis_ids.length;
     if (!validText(selected.title, 120, true) || !STYLE_IDS.includes(selected.style)) return "titleRequired";
-    if (!count) return "emptySelection";
+    if (entry.includePaper && (!paperAvailable(entry) || !parsePaperPages(entry.paperRange, entry.document?.page_count).valid)) return "invalidPaperPages";
+    if (!count && !entry.includePaper) return "emptySelection";
     if (selected.note_ids.length > LIMITS.notes || selected.chart_ids.length > LIMITS.charts || selected.analysis_ids.length > LIMITS.analyses) return "selectionLimit";
     return null;
   }
@@ -340,18 +439,26 @@ export function createPresentations(adapter) {
   }
 
   function markSourceChanged(entry, error) {
-    if (!["source_changed", "presentation_changed"].includes(error?.code || error?.message)) return;
+    if (!SOURCE_CHANGED_CODES.includes(error?.code || error?.message)) return;
     entry.contextStale = true;
     entry.aiRequestId = null;
   }
 
   function getCapabilities(force = false) {
     if (!capabilitiesPromise || force) {
-      capabilitiesPromise = adapter.api("/api/v1/presentations/capabilities").then((body) => {
+      capabilitiesPromise = adapter.api("/api/v1/presentations/capabilities").then(async (body) => {
         if (!body || typeof body.available !== "boolean" || typeof body.ai_available !== "boolean" ||
           !Array.isArray(body.styles) || !STYLE_IDS.every((id) => body.styles.includes(id)) ||
           !Object.entries(LIMITS).every(([key, value]) => body.limits?.[key] === value)) throw new Error("invalidResponse");
-        return body;
+        try {
+          const paper = await adapter.api("/api/v1/paper-presentations/capabilities");
+          if (paper?.api_family === "paper-presentations/v1" && paper.paper_available === true && paper.available === true &&
+            typeof paper.ai_available === "boolean" && paper.limits?.paper_pages === 60 && paper.limits?.paper_chars === 120000 &&
+            paper.limits?.paper_context_chars === 140000) return { ...body, paper_available: true, paper_ai_available: paper.ai_available };
+        } catch {
+          // An older core remains usable when the optional paper API is absent.
+        }
+        return { ...body, paper_available: false };
       }).catch((error) => {
         capabilitiesPromise = null;
         throw error;
@@ -378,6 +485,13 @@ export function createPresentations(adapter) {
   function renderSources(entry) {
     elements.sources.replaceChildren();
     if (!entry) return;
+    let parent = elements.sources;
+    if (entry.includePaper) {
+      parent = make("details", "presentations-additional-sources");
+      parent.open = Object.values(entry.selected).some((selected) => selected.size > 0);
+      parent.append(make("summary", "", t("supplemental")));
+      elements.sources.append(parent);
+    }
     for (const kind of ["note", "chart", "analysis"]) {
       const fieldset = make("fieldset", "presentations-source-group");
       const labelKey = kind === "note" ? "notes" : kind === "chart" ? "charts" : "analyses";
@@ -393,7 +507,7 @@ export function createPresentations(adapter) {
         const checkbox = document.createElement("input");
         checkbox.type = "checkbox";
         checkbox.checked = entry.selected[kind].has(source.id);
-        checkbox.disabled = Boolean(entry.pending) || entry.capabilities?.available !== true;
+        checkbox.disabled = Boolean(entry.pending) || !serviceAvailable(entry);
         checkbox.dataset.kind = kind;
         checkbox.dataset.sourceId = source.id;
         checkbox.setAttribute("aria-label", `${sourceTitle(kind, source)} · ${sourceMeta(kind, source)}`);
@@ -411,16 +525,16 @@ export function createPresentations(adapter) {
         label.append(checkbox, text);
         fieldset.append(label);
       }
-      elements.sources.append(fieldset);
+      parent.append(fieldset);
     }
   }
 
   function renderStatus(entry) {
     elements.status.replaceChildren();
     let status = entry?.status;
-    if (!status && entry?.capabilities?.available === false) status = { key: "unavailable", kind: "error" };
+    if (!status && entry?.capabilities && !serviceAvailable(entry)) status = { key: "unavailable", kind: "error" };
     if (!status && entry?.contextStale) status = { key: "contextRequired", kind: "error" };
-    const problem = entry && !entry.pending && entry.capabilities?.available === true ? selectionProblem(entry) : null;
+    const problem = entry && !entry.pending && serviceAvailable(entry) ? selectionProblem(entry) : null;
     if (!status && problem) status = { key: problem, kind: problem === "emptySelection" ? "info" : "error" };
     if (!status) {
       delete elements.status.dataset.kind;
@@ -438,8 +552,10 @@ export function createPresentations(adapter) {
     elements.contextText.textContent = context?.text || "";
     elements.contextHash.textContent = context ? t("contextHash", { hash: context.source_sha256 }) : "";
     for (const source of context?.sources || []) {
-      const item = make("li", "", `${source.ref} · ${source.title}`);
-      item.append(make("span", "presentations-source-meta", `${source.kind} · ${source.id}`));
+      const item = make("li", "", source.title);
+      const details = source.kind === "paper" ? t("paperPages", { pages: source.pages.join(", ") }) : t(`${source.kind}Source`);
+      item.append(make("span", "presentations-source-meta", details));
+      if (source.kind === "paper" && source.empty_pages.length) item.append(make("span", "presentations-source-meta", t("paperEmptyPages", { pages: source.empty_pages.join(", ") })));
       elements.contextSources.append(item);
     }
   }
@@ -453,8 +569,8 @@ export function createPresentations(adapter) {
     entry.outlineEdited = true;
     elements.outlineKind.textContent = outlineBadge(entry);
     const valid = validOutline(entry.outline, entry.context?.sources);
-    if (!valid) setStatus(entry, "invalidOutline", "error");
-    else if (entry.status?.key === "invalidOutline") entry.status = null;
+    if (!valid) setStatus(entry, missingPaperCitation(entry.outline, entry.context?.sources) ? "paperCitationRequired" : "invalidOutline", "error");
+    else if (["invalidOutline", "paperCitationRequired"].includes(entry.status?.key)) entry.status = null;
     elements.export.disabled = Boolean(entry.pending) || !contextCurrent(entry) || !valid;
     renderStatus(entry);
   }
@@ -556,7 +672,7 @@ export function createPresentations(adapter) {
           slide.source_refs = [...selected];
           markOutlineEdited(entry);
         });
-        label.append(checkbox, make("span", "", `${source.ref} · ${source.title}`));
+        label.append(checkbox, make("span", "", source.title));
         refs.append(label);
       }
       sourceBox.append(refs);
@@ -566,19 +682,20 @@ export function createPresentations(adapter) {
   }
 
   function renderControls(entry) {
+    paperView.update();
     const pending = Boolean(entry?.pending);
     const problem = entry ? selectionProblem(entry) : "emptySelection";
     elements.title.disabled = !entry || pending;
     elements.style.disabled = !entry || pending;
-    elements.preview.disabled = !entry || pending || entry.capabilities?.available !== true || Boolean(problem);
+    elements.preview.disabled = !entry || pending || !serviceAvailable(entry) || Boolean(problem);
     elements.preview.textContent = t(entry?.pending === "context" ? "previewingContext" : "previewContext");
-    elements.ai.disabled = !entry || pending || !contextCurrent(entry) || entry.capabilities?.ai_available !== true;
+    elements.ai.disabled = !entry || pending || !contextCurrent(entry) || !aiAvailable(entry);
     elements.ai.textContent = t(entry?.pending === "outline" ? "generating" : "ai");
-    elements.aiWarning.textContent = t(entry?.capabilities && !entry.capabilities.ai_available ? "aiUnavailable" : "aiWarning");
+    elements.aiWarning.textContent = t(entry?.capabilities && !aiAvailable(entry) ? "aiUnavailable" : "aiWarning");
     elements.outline.hidden = !entry?.outline;
     elements.outlineKind.textContent = entry?.outline ? outlineBadge(entry) : "";
     elements.addSlide.disabled = !entry?.outline || pending || entry.outline.slides.length >= LIMITS.slides;
-    elements.export.disabled = !entry?.outline || pending || entry.capabilities?.available !== true || !contextCurrent(entry) || !validOutline(entry.outline, entry.context?.sources);
+    elements.export.disabled = !entry?.outline || pending || !serviceAvailable(entry) || !contextCurrent(entry) || !validOutline(entry.outline, entry.context?.sources);
     elements.export.textContent = t(entry?.pending === "export" ? "downloading" : "download");
     renderStatus(entry);
   }
@@ -594,7 +711,7 @@ export function createPresentations(adapter) {
   }
 
   function applyDefaultSelection(entry, documentId) {
-    if (entry.selectionExplicit) return;
+    if (entry.selectionExplicit || entry.outline) return;
     for (const kind of ["note", "chart", "analysis"]) entry.selected[kind].clear();
     const current = adapter.getDataSelection?.() || {};
     if (current.datasetId) return;
@@ -602,6 +719,7 @@ export function createPresentations(adapter) {
     const chartId = current.chartId || (!current.analysisId ? adapter.getCurrentChart?.(documentId)?.id : null);
     if (chartId && entry.sources.chart.some((item) => item.id === chartId)) entry.selected.chart.add(chartId);
     else if (analysisId && entry.sources.analysis.some((item) => item.id === analysisId && item.status === "succeeded")) entry.selected.analysis.add(analysisId);
+    entry.includePaper = paperAvailable(entry) && !entry.selected.chart.size && !entry.selected.analysis.size;
   }
 
   async function reload(documentId) {
@@ -610,6 +728,11 @@ export function createPresentations(adapter) {
     if (!entry) {
       render();
       return;
+    }
+    const document = adapter.getDocument?.();
+    if (document?.id === documentId) {
+      if (JSON.stringify(document) !== JSON.stringify(entry.document)) invalidateContext(entry);
+      entry.document = clone(document);
     }
     const sequence = ++entry.loadSequence;
     entry.sourcesReady = false;
@@ -642,13 +765,13 @@ export function createPresentations(adapter) {
     render();
   }
 
-  function validateContextResponse(body, selected) {
-    if (!body || !SHA256.test(body.source_sha256 || "") || typeof body.text !== "string" || body.text.length > 18000 ||
-      !validSources(body.sources, selected) || !validOutline(body.suggested_outline, body.sources)) throw new Error("invalidResponse");
+  function validateContextResponse(body, selected, paper) {
+    if (!body || !SHA256.test(body.source_sha256 || "") || typeof body.text !== "string" || body.text.length > (selected.include_paper ? 140000 : 18000) ||
+      !validSources(body.sources, selected, paper) || !validOutline(body.suggested_outline, body.sources)) throw new Error("invalidResponse");
   }
 
   async function previewContext(entry, { preserveOutline = false } = {}) {
-    if (!entry || entry.pending || selectionProblem(entry) || entry.capabilities?.available !== true) return;
+    if (!entry || entry.pending || selectionProblem(entry) || !serviceAvailable(entry)) return;
     const documentId = currentId;
     const selected = selectors(entry);
     const selectionKey = JSON.stringify(selected);
@@ -660,12 +783,12 @@ export function createPresentations(adapter) {
     setStatus(entry, "previewingContext");
     render();
     try {
-      const body = await adapter.api(`/api/v1/documents/${encodeURIComponent(documentId)}/presentations/context`, {
+      const body = await adapter.api(presentationApi(documentId, "context", entry), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(selected)
       });
-      validateContextResponse(body, selected);
+      validateContextResponse(body, selected, entry.document);
       if (entry.operation !== operation || version !== entry.contextVersion || navigationGeneration !== adapter.getNavigationGeneration?.()) return;
       const previousHash = entry.context?.source_sha256;
       const previousSources = entry.context?.sources || [];
@@ -696,7 +819,7 @@ export function createPresentations(adapter) {
   }
 
   async function generateOutline(entry) {
-    if (!entry || entry.pending || !contextCurrent(entry) || entry.capabilities?.ai_available !== true) return;
+    if (!entry || entry.pending || !contextCurrent(entry) || !aiAvailable(entry)) return;
     const documentId = currentId;
     const version = entry.contextVersion;
     const sourceHash = entry.context.source_sha256;
@@ -708,12 +831,12 @@ export function createPresentations(adapter) {
     setStatus(entry, "generating");
     render();
     try {
-      const body = await adapter.api(`/api/v1/documents/${encodeURIComponent(documentId)}/presentations/outline`, {
+      const body = await adapter.api(presentationApi(documentId, "outline", entry), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...selectors(entry), source_sha256: sourceHash, request_id: entry.aiRequestId, confirmed: true })
       });
-      if (!body || body.ai_generated !== true || body.source_sha256 !== sourceHash || !validSources(body.sources, selectors(entry)) || !validOutline(body.outline, body.sources)) throw new Error("invalidResponse");
+      if (!body || body.ai_generated !== true || body.source_sha256 !== sourceHash || !validSources(body.sources, selectors(entry), entry.document) || !validOutline(body.outline, body.sources)) throw new Error("invalidResponse");
       if (entry.operation !== operation || version !== entry.contextVersion || entry.context?.source_sha256 !== sourceHash || navigationGeneration !== adapter.getNavigationGeneration?.()) return;
       entry.outline = clone(body.outline);
       entry.outline.title = entry.title.trim();
@@ -722,7 +845,7 @@ export function createPresentations(adapter) {
       setStatus(entry, "outlineReady", "success");
     } catch (error) {
       markSourceChanged(entry, error);
-      const stale = ["source_changed", "presentation_changed"].includes(error?.code || error?.message);
+      const stale = SOURCE_CHANGED_CODES.includes(error?.code || error?.message);
       if (entry.operation === operation && version === entry.contextVersion) setStatus(entry, errorKey(error, "outlineFailed"), "error", stale ? () => previewContext(entry) : () => generateOutline(entry));
     } finally {
       if (entry.operation === operation) {
@@ -739,7 +862,7 @@ export function createPresentations(adapter) {
   }
 
   async function exportPresentation(entry) {
-    if (!entry || entry.pending || !contextCurrent(entry) || entry.capabilities?.available !== true || !validOutline(entry.outline, entry.context.sources)) return;
+    if (!entry || entry.pending || !contextCurrent(entry) || !serviceAvailable(entry) || !validOutline(entry.outline, entry.context.sources)) return;
     const documentId = currentId;
     const version = entry.contextVersion;
     const sourceHash = entry.context.source_sha256;
@@ -750,7 +873,7 @@ export function createPresentations(adapter) {
     setStatus(entry, "downloading");
     render();
     try {
-      const response = await adapter.checkedFetch(`/api/v1/documents/${encodeURIComponent(documentId)}/presentations/export`, {
+      const response = await adapter.checkedFetch(presentationApi(documentId, "export", entry), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...selectors(entry), source_sha256: sourceHash, outline: clone(entry.outline) })
@@ -771,7 +894,7 @@ export function createPresentations(adapter) {
       setStatus(entry, "downloaded", "success");
     } catch (error) {
       markSourceChanged(entry, error);
-      const stale = ["source_changed", "presentation_changed"].includes(error?.code || error?.message);
+      const stale = SOURCE_CHANGED_CODES.includes(error?.code || error?.message);
       if (entry.operation === operation && version === entry.contextVersion) setStatus(entry, errorKey(error, "exportFailed"), "error", stale ? () => previewContext(entry) : () => exportPresentation(entry));
     } finally {
       if (entry.operation === operation) {
@@ -829,6 +952,7 @@ export function createPresentations(adapter) {
   }, true);
 
   return {
+    destroy() { paperView.destroy(); },
     async prepareTeachingSources(documentId, dataset, analysis, chart, title) {
       if (currentId !== documentId || currentEntry()?.pending) return false;
       const before = currentEntry();
@@ -841,7 +965,7 @@ export function createPresentations(adapter) {
       const belongs = (item, source) => item.id === source.id && item.document_id === documentId &&
         item.dataset_id === dataset.id && item.dataset_sha256 === dataset.sha256;
       if (!entry.sources.analysis.some((item) => belongs(item, analysis)) || !entry.sources.chart.some((item) => belongs(item, chart))) return false;
-      const same = entry.title === title && !entry.selected.note.size && entry.selected.analysis.size === 1 &&
+      const same = !entry.includePaper && entry.title === title && !entry.selected.note.size && entry.selected.analysis.size === 1 &&
         entry.selected.analysis.has(analysis.id) && entry.selected.chart.size === 1 && entry.selected.chart.has(chart.id);
       if (same && entry.outline) {
         if (!contextCurrent(entry)) await previewContext(entry, { preserveOutline: true });
@@ -852,6 +976,7 @@ export function createPresentations(adapter) {
       invalidateContext(entry);
       entry.title = title;
       entry.selectionExplicit = true;
+      entry.includePaper = false;
       entry.selected = { note: new Set(), analysis: new Set([analysis.id]), chart: new Set([chart.id]) };
       entry.outline = null;
       entry.outlineEdited = false;

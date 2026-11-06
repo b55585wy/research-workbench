@@ -75,6 +75,68 @@ html[data-storage-mode="device"] .presentations-panel {
   border-radius: 3px;
 }
 
+.presentation-paper-source {
+  margin-top: 12px;
+  border-block: 1px solid var(--ui-border);
+  padding: 8px 0;
+}
+
+.presentation-paper-choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-height: 44px;
+  padding: 8px 0;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.presentation-paper-choice > span {
+  min-width: 0;
+}
+
+.presentation-paper-choice .presentations-source-meta {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.presentation-paper-choice svg {
+  flex: none;
+}
+
+.presentation-paper-range {
+  padding: 4px 0 8px 32px;
+  font-size: 12px;
+}
+
+.presentation-paper-range summary {
+  min-height: 32px;
+  cursor: pointer;
+}
+
+.presentation-paper-range input {
+  width: 100%;
+  min-height: 44px;
+  padding: 8px;
+  border: 1px solid var(--ui-input-border);
+  border-radius: 4px;
+  color: var(--ui-text);
+  background: var(--ui-input-bg);
+  font: inherit;
+}
+
+.presentation-paper-range [role="alert"] {
+  color: var(--ui-danger);
+}
+
+.presentations-additional-sources > summary {
+  min-height: 44px;
+  padding-block: 12px;
+  color: var(--ui-text-soft);
+  font-size: 13px;
+  cursor: pointer;
+}
+
 .presentations-source-group legend {
   padding: 0 4px;
   color: var(--ui-text-soft);

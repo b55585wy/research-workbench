@@ -924,7 +924,7 @@
       <details id="presentations-panel" class="presentations-panel">
         <summary>AI 大纲与可编辑 PPT</summary>
         <div class="presentations-body">
-          <p id="presentations-help" class="presentations-help">仅使用当前文献中明确选择的已保存笔记、已完成分析和图表。先预览来源，再决定是否使用 AI。</p>
+          <p id="presentations-help" class="presentations-help">从论文 PDF 生成汇报，也可使用笔记、分析和图表。</p>
           <label class="presentations-field" for="presentation-title">演示标题
             <input id="presentation-title" type="text" maxlength="120" required autocomplete="off">
           </label>
@@ -936,6 +936,7 @@
             </select>
           </label>
           <p id="presentations-style-note" class="presentations-style-note">Nature / Cell 为视觉预设，不表示符合期刊投稿规范。</p>
+          <div id="presentation-paper-source"></div>
           <div id="presentation-sources"></div>
           <div class="presentations-actions">
             <button id="presentation-context-preview" class="button button-secondary" type="button" disabled>预览所选来源</button>
@@ -1072,10 +1073,10 @@
         <button id="assistant-new" class="button button-quiet" type="button">新对话</button>
         <button id="assistant-clear" class="button button-quiet" type="button" aria-haspopup="dialog" aria-controls="assistant-clear-dialog" hidden>清空对话</button>
         <button id="assistant-full-page" class="button button-quiet" type="button" aria-label="全屏" aria-pressed="false" title="全屏">全屏</button>
-        <button id="assistant-close" class="button button-quiet" type="button" aria-label="关闭研究助手">×</button>
+        <button id="assistant-close" class="button button-quiet assistant-icon-button" type="button" aria-label="收起助手" title="收起助手"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 17h14"></path></svg></button>
       </div>
     </div>
-    <p id="assistant-window-help" class="sr-only">拖动标题栏空白区域移动窗口。聚焦标题栏后使用方向键移动，按住 Shift 加速。聚焦右下角调整大小手柄后，使用方向键调整宽度和高度。全屏或窄屏时不能手动移动或调整大小。</p>
+    <p id="assistant-window-help" class="sr-only">拖动标题栏或聚焦后使用方向键移动，按住 Shift 加速。左右边缘调整宽度，上下边缘调整高度，右下角调整宽高。Escape 结束拖动或缩放。全页面板不能移动或缩放。收起后任务保持运行。</p>
     <details id="assistant-management" class="assistant-management">
       <summary id="assistant-management-summary">上下文与设置</summary>
       <div class="assistant-management-body">
@@ -1133,7 +1134,7 @@
     <div id="assistant-status" class="assistant-status" role="status" aria-live="polite"></div>
     <form id="assistant-form" class="assistant-form">
       <label class="sr-only" for="assistant-message">给研究助手的消息</label>
-      <textarea id="assistant-message" rows="4" maxlength="8000" placeholder="询问当前页面或已选图片…"></textarea>
+      <textarea id="assistant-message" rows="4" maxlength="8000" placeholder="询问当前页面或已选图片…" aria-keyshortcuts="Enter Control+Enter Shift+Enter" title="Enter 发送；Ctrl+Enter 或 Shift+Enter 换行。"></textarea>
       <div class="assistant-send-row">
         <button id="assistant-cancel" class="button button-quiet" type="button" hidden>停止</button>
         <button id="assistant-send" class="button button-primary" type="submit">发送</button>
@@ -1141,6 +1142,8 @@
     </form>
     <button id="assistant-resize-left" class="assistant-resize-edge assistant-resize-left" type="button" aria-label="从左侧调整助手窗口宽度" aria-describedby="assistant-window-help" aria-keyshortcuts="ArrowLeft ArrowRight" title="拖动或使用左右方向键调整宽度；保持右边缘不动"><span aria-hidden="true"></span></button>
     <button id="assistant-resize-right" class="assistant-resize-edge assistant-resize-right" type="button" aria-label="从右侧调整助手窗口宽度" aria-describedby="assistant-window-help" aria-keyshortcuts="ArrowLeft ArrowRight" title="拖动或使用左右方向键调整宽度；保持左边缘不动"><span aria-hidden="true"></span></button>
+    <button id="assistant-resize-top" class="assistant-resize-edge assistant-resize-top" type="button" aria-label="从顶部调整助手窗口高度" aria-describedby="assistant-window-help" aria-keyshortcuts="ArrowUp ArrowDown" title="拖动或使用上下方向键调整高度；保持底边不动"><span aria-hidden="true"></span></button>
+    <button id="assistant-resize-bottom" class="assistant-resize-edge assistant-resize-bottom" type="button" aria-label="从底部调整助手窗口高度" aria-describedby="assistant-window-help" aria-keyshortcuts="ArrowUp ArrowDown" title="拖动或使用上下方向键调整高度；保持顶边不动"><span aria-hidden="true"></span></button>
     <button id="assistant-resize" class="assistant-resize" type="button" aria-label="调整助手窗口大小" aria-describedby="assistant-window-help" aria-keyshortcuts="ArrowLeft ArrowRight ArrowUp ArrowDown" title="拖动或使用方向键调整窗口大小"><span aria-hidden="true">◢</span></button>
   </aside>
 

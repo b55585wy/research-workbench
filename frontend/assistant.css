@@ -10,6 +10,17 @@
   visibility: hidden;
 }
 
+.assistant-toggle[data-running="true"]::after {
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-left: 8px;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  background: currentColor;
+}
+
 .assistant-panel {
   position: fixed;
   right: 16px;
@@ -19,8 +30,8 @@
   flex-direction: column;
   min-width: 0;
   width: min(420px, calc(100vw - 32px));
-  height: calc(100vh - 32px);
-  max-height: min(760px, calc(100vh - 32px));
+  height: min(560px, max(300px, 68vh), calc(100vh - 16px));
+  max-height: calc(100vh - 16px);
   overflow: hidden;
   border: 1px solid var(--ui-border-strong);
   border-radius: 6px;
@@ -128,6 +139,7 @@
 
 .assistant-management[open] {
   flex: 0 1 auto;
+  min-height: 0;
   max-height: 45%;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -138,6 +150,10 @@
 }
 
 .assistant-context {
+  flex: 0 1 auto;
+  min-height: 0;
+  max-height: 20%;
+  overflow: auto;
   display: flex;
   flex-wrap: wrap;
   gap: 5px;
@@ -702,7 +718,10 @@
 }
 
 .assistant-status {
-  flex: none;
+  flex: 0 1 auto;
+  min-height: 0;
+  max-height: 25%;
+  overflow: auto;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -724,13 +743,22 @@
 }
 
 .assistant-panel > .assistant-reference-add-row {
-  flex: none;
+  flex: 0 1 auto;
+  min-height: 0;
+  max-height: 20%;
+  overflow: auto;
   padding: 8px 12px 0;
   background: var(--ui-surface);
 }
 
 .assistant-form {
-  flex: none;
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 auto;
+  min-height: 0;
+  max-height: 50%;
+  overflow: hidden;
+  overscroll-behavior: contain;
   padding: 10px 12px;
   background: var(--ui-surface);
 }
@@ -818,6 +846,7 @@
 
 #assistant-message {
   display: block;
+  flex: 1 1 auto;
   width: 100%;
   min-height: 84px;
   padding: 9px 10px;
@@ -831,6 +860,7 @@
 
 .assistant-send-row {
   display: flex;
+  flex: none;
   justify-content: flex-end;
   gap: 6px;
   margin-top: 7px;
@@ -999,6 +1029,30 @@
 .assistant-resize-edge:hover > span,
 .assistant-resize-edge:focus-visible > span {
   background: var(--ui-primary);
+}
+
+.assistant-resize-top,
+.assistant-resize-bottom {
+  left: 50%;
+  top: auto;
+  width: 72px;
+  height: 16px;
+  transform: translateX(-50%);
+  cursor: ns-resize;
+}
+
+.assistant-resize-top {
+  top: 0;
+}
+
+.assistant-resize-bottom {
+  bottom: 0;
+}
+
+.assistant-resize-top > span,
+.assistant-resize-bottom > span {
+  width: 32px;
+  height: 2px;
 }
 
 :root .assistant-panel[data-compact="true"] .assistant-management[open] {

@@ -207,6 +207,7 @@ def create_app(data_root=None, validator=None, renderer=None, *, agent_provider=
     charts=Charts(store,datasets,analysis)
     from .presentation_service import Presentations
     from .presentation_api import router as presentation_router
+    from .paper_presentation_api import router as paper_presentation_router
     presentations=Presentations(store,datasets,analysis,charts,provider)
     from .research_records import ResearchRecords
     from .record_api import router as record_router
@@ -283,6 +284,7 @@ def create_app(data_root=None, validator=None, renderer=None, *, agent_provider=
     app.include_router(record_router)
     app.include_router(chart_router)
     app.include_router(presentation_router)
+    app.include_router(paper_presentation_router)
     app.include_router(data_import_router)
     app.add_middleware(LocalBoundary)
     install_image_annotation_routes(app,image_annotations)

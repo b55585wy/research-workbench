@@ -714,7 +714,7 @@
   }
 
   .mobile-layout-active #assistant-full-page,
-  .mobile-layout-active :is(#assistant-resize, #assistant-resize-left, #assistant-resize-right) {
+  .mobile-layout-active :is(#assistant-resize, #assistant-resize-left, #assistant-resize-right, #assistant-resize-top, #assistant-resize-bottom) {
     display: none !important;
   }
 

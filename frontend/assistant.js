@@ -1,6 +1,7 @@
 import { renderRichHtml } from "/rich-text.js";
 import { createTaskClient } from "/task-client.js";
 import { createAssistantWindow } from "/assistant-window.js";
+import { bindAssistantComposerKeys } from "/assistant-composer-keys.js";
 import { bindPdfSourceLink, isPdfPageSource, isPdfSourceKind, onlineDatasetSourceUrl, renderAssistantAnswer } from "/assistant-answer.js";
 import { createReferencePicker, normalizeResourceReference, resourceReferenceKey, resourceReferencesFromTurn, resourceReferenceWire } from "/assistant-references.js";
 import { createSourcePreparationBridge } from "/source-preparation-bridge.js";
@@ -11,21 +12,27 @@ const TERMINAL_STATES = new Set(["waiting_confirmation", "completed", "failed", 
 const messages = {
   zh: {
     assistant: "研究助手",
-    close: "关闭研究助手",
+    close: "收起助手",
+    assistantRunning: "研究助手 · 任务进行中",
     window: "移动助手窗口",
     fullPage: "全屏",
     exitFullPage: "退出全屏",
     resize: "调整助手窗口大小",
     resizeLeft: "从左侧调整助手窗口宽度",
     resizeRight: "从右侧调整助手窗口宽度",
+    resizeTop: "从顶部调整助手窗口高度",
+    resizeBottom: "从底部调整助手窗口高度",
+    fixedHelp: "全页面板；收起后可继续阅读，任务保持运行。",
     moveHelp: "拖动标题栏移动；聚焦后使用方向键移动。",
     resizeHelp: "拖动或使用方向键调整窗口大小；按住 Shift 加速。",
     resizeEdgeHelp: "拖动或使用左右方向键调整宽度；按住 Shift 加速，另一侧边缘保持不动。",
-    windowHelp: "拖动标题栏空白区域移动窗口。聚焦标题栏后使用方向键移动，按住 Shift 加速。左右边缘手柄用于调整宽度，右下角手柄用于调整宽度和高度；也可聚焦手柄使用方向键。全屏或窄屏时不能手动移动或调整大小。",
+    resizeHeightHelp: "拖动或使用上下方向键调整高度；按住 Shift 加速，另一侧边缘保持不动。",
+    windowHelp: "拖动标题栏空白区域或聚焦后使用方向键移动，按住 Shift 加速。左右边缘调整宽度，上下边缘调整高度，右下角调整宽高；手柄也支持方向键。Escape 结束拖动或缩放。全页面板不能移动或缩放。收起后任务保持运行。",
     history: "对话记录",
     new: "新对话",
     emptyHistory: "暂无对话",
     messageLabel: "给研究助手的消息",
+    composerKeys: "Enter 发送；Ctrl+Enter 或 Shift+Enter 换行。",
     placeholder: "询问当前页面或已选图片…",
     analysisPlanPrompt: "请检查当前已共享的数据和研究设计，并提出合适的分析方案。只提供建议，不要自动运行分析。",
     send: "发送",
@@ -406,21 +413,27 @@ const messages = {
   },
   en: {
     assistant: "Research assistant",
-    close: "Close research assistant",
+    close: "Minimize assistant",
+    assistantRunning: "Research assistant · Task running",
     window: "Move assistant window",
     fullPage: "Full screen",
     exitFullPage: "Exit full screen",
     resize: "Resize assistant window",
     resizeLeft: "Resize assistant width from the left",
     resizeRight: "Resize assistant width from the right",
+    resizeTop: "Resize assistant height from the top",
+    resizeBottom: "Resize assistant height from the bottom",
+    fixedHelp: "Full-page panel; minimize to continue reading while tasks keep running.",
     moveHelp: "Drag the header to move; focus it and use the arrow keys.",
     resizeHelp: "Drag or use the arrow keys to resize; hold Shift for larger steps.",
     resizeEdgeHelp: "Drag or use Left/Right Arrow to resize width; hold Shift for larger steps. The opposite edge stays fixed.",
-    windowHelp: "Drag a free area of the header to move the window. Focus the header and use the arrow keys to move; hold Shift for larger steps. Drag the left or right edge to adjust width, or the bottom-right corner to adjust width and height. Focus a handle to use arrow keys. Manual moving and resizing are unavailable in full-screen or narrow-screen mode.",
+    resizeHeightHelp: "Drag or use Up/Down Arrow to resize height; hold Shift for larger steps. The opposite edge stays fixed.",
+    windowHelp: "Drag a free area of the header or focus it and use arrow keys to move; hold Shift for larger steps. Left/right edges resize width, top/bottom edges resize height, and the corner resizes both. Handles also support arrow keys. Escape ends a drag or resize. Full-page panels cannot move or resize. Tasks keep running when minimized.",
     history: "Conversations",
     new: "New conversation",
     emptyHistory: "No conversations",
     messageLabel: "Message for the research assistant",
+    composerKeys: "Enter to send; Ctrl+Enter or Shift+Enter for a new line.",
     placeholder: "Ask about the current page or selected images…",
     analysisPlanPrompt: "Inspect the currently shared data and research design, then propose an appropriate analysis. Provide recommendations only; do not run an analysis automatically.",
     send: "Send",
@@ -812,6 +825,8 @@ export function createAssistant(adapter) {
     resize: byId("assistant-resize"),
     resizeLeft: byId("assistant-resize-left"),
     resizeRight: byId("assistant-resize-right"),
+    resizeTop: byId("assistant-resize-top"),
+    resizeBottom: byId("assistant-resize-bottom"),
     windowHelp: byId("assistant-window-help"),
     heading: byId("assistant-heading"),
     history: byId("assistant-history"),
@@ -893,7 +908,7 @@ export function createAssistant(adapter) {
       svg.setAttribute("viewBox", "0 0 24 24");
       svg.setAttribute("aria-hidden", "true");
       svg.setAttribute("focusable", "false");
-      const paths = icon === "new"
+      const paths = icon === "minimize" ? ["M5 17h14"] : icon === "new"
         ? ["M12 5v14", "M5 12h14"]
         : ["M4 7h16", "M10 11v6", "M14 11v6", "M6 7l1 13h10l1-13", "M9 7V4h6v3"];
       for (const data of paths) {
@@ -932,14 +947,10 @@ export function createAssistant(adapter) {
     resizeHandle: elements.resize,
     leftResizeHandle: elements.resizeLeft,
     rightResizeHandle: elements.resizeRight,
+    topResizeHandle: elements.resizeTop,
+    bottomResizeHandle: elements.resizeBottom,
     help: elements.windowHelp
   });
-
-  function focusAssistant() {
-    const touchLayout = window.matchMedia("(max-width: 820px), (pointer: coarse)").matches;
-    const target = touchLayout ? elements.close : elements.message;
-    target.focus({ preventScroll: true });
-  }
 
   const tasks = createTaskClient({
     api: adapter.api,
@@ -1355,7 +1366,6 @@ export function createAssistant(adapter) {
       elements.toggle.setAttribute("aria-expanded", "true");
       windowControls.show();
       render();
-      focusAssistant();
     }
     return "added";
   }
@@ -1531,7 +1541,6 @@ export function createAssistant(adapter) {
     elements.toggle.setAttribute("aria-expanded", "true");
     windowControls.show();
     render();
-    focusAssistant();
     return "added";
   }
 
@@ -2450,6 +2459,10 @@ export function createAssistant(adapter) {
     const active = entry ? activeTurn(entry) : null;
     const sending = Boolean(entry?.pendingSend?.pending);
     const taskBusy = Boolean(paper && entry && tasks.isBusy(paper.id, entry.conversationId));
+    const running = sending || Boolean(active) || taskBusy;
+    elements.toggle.dataset.running = String(running);
+    elements.toggle.setAttribute("aria-label", t(running ? "assistantRunning" : "assistant"));
+    elements.toggle.title = t(running ? "assistantRunning" : "assistant");
     const continuationReferenceConflict = Boolean(paper && entry && hasContinuationReferenceConflict(paper.id, entry));
     elements.send.disabled = deviceMode || !paper || Boolean(entry?.loading) || Boolean(entry?.conversationsLoading) || sending || Boolean(entry?.clearing) || Boolean(active) || taskBusy || continuationReferenceConflict || Boolean(entry?.pendingDecision) || (!entry?.draft.trim() && !adapter.getChatImages(paper?.id).length && !entry?.noteRefs.length && !entry?.pendingSend);
     elements.send.textContent = t(entry?.pendingSend ? "retry" : "send");
@@ -2458,6 +2471,7 @@ export function createAssistant(adapter) {
     elements.cancel.textContent = t(entry?.cancelling ? "stopping" : "cancel");
     elements.new.disabled = deviceMode || !paper || sending || Boolean(entry?.pendingDecision) || Boolean(entry?.clearing);
     setIconButton(elements.new, "new", t("new"));
+    setIconButton(elements.close, "minimize", t("close"));
     renderClearDialog(paper, entry);
     renderSettings();
     sourcePreparation.update(sourcePreparationModel());
@@ -3012,40 +3026,35 @@ export function createAssistant(adapter) {
     }
   }
 
+  function minimizeAssistant() {
+    windowControls.cancelInteraction();
+    referencePicker.close();
+    elements.panel.hidden = true;
+    elements.toggle.setAttribute("aria-expanded", "false");
+    sourcePreparation.reset();
+    sourcePreparation.update(sourcePreparationModel());
+  }
+
   elements.toggle.addEventListener("click", () => {
     const open = elements.panel.hidden;
     elements.panel.hidden = !open;
     elements.toggle.setAttribute("aria-expanded", String(open));
     if (open) {
       windowControls.show();
-      focusAssistant();
     } else {
-      referencePicker.close();
-      sourcePreparation.reset();
+      minimizeAssistant();
     }
     sourcePreparation.update(sourcePreparationModel());
   });
-  elements.close.addEventListener("click", () => {
-    referencePicker.close();
-    elements.panel.hidden = true;
-    elements.toggle.setAttribute("aria-expanded", "false");
-    sourcePreparation.reset();
-    sourcePreparation.update(sourcePreparationModel());
-    elements.toggle.focus();
-  });
+  elements.close.addEventListener("click", minimizeAssistant);
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && !elements.panel.hidden) {
       if (elements.clearDialog.open || referencePicker.isOpen()) return;
-      if (windowControls.exitFullPage()) {
+      if (windowControls.cancelInteraction() || windowControls.exitFullPage()) {
         event.preventDefault();
         return;
       }
-      referencePicker.close();
-      elements.panel.hidden = true;
-      elements.toggle.setAttribute("aria-expanded", "false");
-      sourcePreparation.reset();
-      sourcePreparation.update(sourcePreparationModel());
-      elements.toggle.focus();
+      minimizeAssistant();
     }
   });
   elements.clear.addEventListener("click", () => {
@@ -3082,7 +3091,6 @@ export function createAssistant(adapter) {
     sourcePreparationGeneration += 1;
     tasks.conversationChanged(paper.id, null);
     render();
-    focusAssistant();
   });
   elements.history.addEventListener("change", () => {
     const { paper, entry } = current();
@@ -3110,7 +3118,13 @@ export function createAssistant(adapter) {
   elements.form.addEventListener("submit", (event) => {
     event.preventDefault();
     const { paper, entry } = current();
-    if (paper) send(paper.id, entry);
+    if (paper && !elements.send.disabled) send(paper.id, entry);
+  });
+  bindAssistantComposerKeys({
+    message: elements.message,
+    form: elements.form,
+    sendButton: elements.send,
+    isHidden: () => elements.panel.hidden
   });
   elements.cancel.addEventListener("click", () => {
     const { paper, entry } = current();
@@ -3127,17 +3141,22 @@ export function createAssistant(adapter) {
       language = nextLanguage;
       elements.toggle.textContent = t("assistant");
       elements.heading.textContent = t("assistant");
-      elements.close.setAttribute("aria-label", t("close"));
+      setIconButton(elements.close, "minimize", t("close"));
       windowControls.applyLanguage({
+        panel: t("assistant"),
         window: t("window"),
         fullPage: t("fullPage"),
         exitFullPage: t("exitFullPage"),
         resize: t("resize"),
         resizeLeft: t("resizeLeft"),
         resizeRight: t("resizeRight"),
+        resizeTop: t("resizeTop"),
+        resizeBottom: t("resizeBottom"),
+        fixedHelp: t("fixedHelp"),
         moveHelp: t("moveHelp"),
         resizeHelp: t("resizeHelp"),
         resizeEdgeHelp: t("resizeEdgeHelp"),
+        resizeHeightHelp: t("resizeHeightHelp"),
         help: t("windowHelp")
       });
       setIconButton(elements.new, "new", t("new"));
@@ -3145,6 +3164,8 @@ export function createAssistant(adapter) {
       elements.clearHelp.textContent = t("clearConversationHelp");
       elements.clearCancel.textContent = t("clearDialogCancel");
       elements.message.setAttribute("aria-label", t("messageLabel"));
+      elements.message.title = t("composerKeys");
+      elements.message.setAttribute("aria-keyshortcuts", "Enter Control+Enter Shift+Enter");
       elements.message.placeholder = t("placeholder");
       elements.settingsToggle.textContent = `${t("personalConnection")} · ${t("settings")}`;
       elements.settingsHelp.textContent = t("settingsHelp");
@@ -3168,7 +3189,6 @@ export function createAssistant(adapter) {
       elements.toggle.setAttribute("aria-expanded", "true");
       windowControls.show();
       render();
-      focusAssistant();
       return true;
     },
     isClearPending(documentId) {

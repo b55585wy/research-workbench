@@ -82,9 +82,12 @@ def test_capabilities_hide_keys_and_report_frozen_limits(tmp_path):
         response = c.get('/api/v1/presentations/capabilities')
         assert response.status_code == 200
         value = response.json()
-        assert set(value) == {'available', 'ai_available', 'styles', 'limits'}
+        assert set(value) == {'available', 'ai_available', 'paper_available', 'styles', 'limits'}
         assert value['styles'] == ['default', 'nature', 'cell']
-        assert value['limits'] == {'notes': 5, 'charts': 4, 'analyses': 4, 'slides': 8}
+        assert value['limits'] == {'notes': 5, 'charts': 4, 'analyses': 4, 'slides': 8,
+                                   'paper_pages': 60, 'paper_chars': 120000,
+                                   'paper_context_chars': 140000}
+        assert value['paper_available'] is True
         assert value['ai_available'] is True
         assert 'api_key' not in response.text and 'base_url' not in response.text
 

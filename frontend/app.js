@@ -9121,6 +9121,7 @@ presentations = createPresentations({
   getSelectedAnalysis: (documentId) => analysis.getSelectedAnalysis(documentId),
   getCurrentChart: (documentId) => charts.getCurrentChart(documentId)
 });
+window.addEventListener("pagehide", (event) => { if (!event.persisted) presentations?.destroy(); });
 
 if (!deviceMode) {
   const teachingWorkflow = createTeachingWorkflow({

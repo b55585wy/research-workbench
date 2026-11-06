@@ -1,6 +1,6 @@
 const VIEWPORT_MARGIN = 8;
 const MIN_WIDTH = 320;
-const MIN_HEIGHT = 420;
+const MIN_HEIGHT = 300;
 const KEY_STEP = 8;
 const LARGE_KEY_STEP = 32;
 const ARROW_KEYS = new Set(["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"]);
@@ -9,13 +9,15 @@ function clamp(value, minimum, maximum) {
   return Math.min(Math.max(value, minimum), maximum);
 }
 
-export function createAssistantWindow({ panel, header, fullPageToggle, resizeHandle, leftResizeHandle, rightResizeHandle, help }) {
+export function createAssistantWindow({ panel, header, fullPageToggle, resizeHandle, leftResizeHandle, rightResizeHandle, topResizeHandle, bottomResizeHandle, help }) {
   let floatingRect = null;
   let fullPage = false;
   let interaction = null;
   let labels = {};
   const visualViewport = window.visualViewport;
   const edgeHandles = [leftResizeHandle, rightResizeHandle].filter(Boolean);
+  const heightHandles = [topResizeHandle, bottomResizeHandle].filter(Boolean);
+  const resizeHandles = [resizeHandle, ...edgeHandles, ...heightHandles];
 
   function viewport() {
     return {
@@ -28,13 +30,21 @@ export function createAssistantWindow({ panel, header, fullPageToggle, resizeHan
 
   function defaultRect(view) {
     const width = Math.min(420, Math.max(0, view.width - VIEWPORT_MARGIN * 2));
-    const height = Math.min(760, Math.max(0, view.height - VIEWPORT_MARGIN * 2));
+    const height = Math.min(560, Math.max(MIN_HEIGHT, view.height * 0.68), Math.max(0, view.height - VIEWPORT_MARGIN * 2));
     return {
       x: view.x + view.width - VIEWPORT_MARGIN - width,
       y: view.y + view.height - VIEWPORT_MARGIN - height,
       width,
       height
     };
+  }
+
+  function isCompact(view) {
+    return view.width <= 480 || Boolean(document.body?.classList.contains("mobile-layout-active") && window.matchMedia("(max-width: 820px)").matches);
+  }
+
+  function canManipulate() {
+    return !panel.hidden && !fullPage && !isCompact(viewport());
   }
 
   function clampFloating(rect, view) {
@@ -62,8 +72,11 @@ export function createAssistantWindow({ panel, header, fullPageToggle, resizeHan
 
   function updateLabels() {
     const toggleLabel = fullPage ? labels.exitFullPage : labels.fullPage;
-    header.setAttribute("aria-label", labels.window || "");
-    header.title = labels.moveHelp || "";
+    const fixed = fullPage || isCompact(viewport());
+    header.setAttribute("aria-label", (fixed ? labels.panel : labels.window) || "");
+    header.title = (fixed ? labels.fixedHelp : labels.moveHelp) || "";
+    if (fixed) header.removeAttribute("aria-keyshortcuts");
+    else header.setAttribute("aria-keyshortcuts", "ArrowLeft ArrowRight ArrowUp ArrowDown");
     help.textContent = labels.help || "";
     const icon = fullPage ? "restore" : "expand";
     fullPageToggle.classList.add("assistant-icon-button");
@@ -90,15 +103,20 @@ export function createAssistantWindow({ panel, header, fullPageToggle, resizeHan
       handle.setAttribute("aria-label", label || "");
       handle.title = labels.resizeEdgeHelp || label || "";
     }
+    for (const handle of heightHandles) {
+      const label = handle === topResizeHandle ? labels.resizeTop : labels.resizeBottom;
+      handle.setAttribute("aria-label", label || "");
+      handle.title = labels.resizeHeightHelp || label || "";
+    }
   }
 
   function applyGeometry() {
     if (panel.hidden) return;
     const view = viewport();
-    const compact = view.width <= 480;
+    const compact = isCompact(view);
     panel.dataset.fullPage = String(fullPage);
     panel.dataset.compact = String(compact);
-    for (const handle of [resizeHandle, ...edgeHandles]) {
+    for (const handle of resizeHandles) {
       handle.hidden = fullPage || compact;
       handle.disabled = fullPage || compact;
     }
@@ -112,15 +130,16 @@ export function createAssistantWindow({ panel, header, fullPageToggle, resizeHan
   }
 
   function cancelInteraction() {
-    if (!interaction) return;
+    if (!interaction) return false;
     const current = interaction;
     interaction = null;
     delete panel.dataset.windowInteraction;
     if (current.target.hasPointerCapture(current.pointerId)) current.target.releasePointerCapture(current.pointerId);
+    return true;
   }
 
   function startInteraction(type, event) {
-    if (!event.isPrimary || event.button !== 0 || interaction || fullPage || viewport().width <= 480) return;
+    if (!event.isPrimary || event.button !== 0 || interaction || !canManipulate()) return;
     if (type === "move" && event.target.closest?.("button, input, textarea, select, a, summary, [contenteditable='true']")) return;
     applyGeometry();
     const target = event.currentTarget;
@@ -151,17 +170,29 @@ export function createAssistantWindow({ panel, header, fullPageToggle, resizeHan
     return { ...start, width: clamp(start.width + dx, minimum, maximum) };
   }
 
+  function resizeHeight(start, type, dy, view) {
+    const minimum = Math.min(MIN_HEIGHT, Math.max(0, view.height - VIEWPORT_MARGIN * 2));
+    const bottom = start.y + start.height;
+    const fromTop = type === "resize-top";
+    const maximum = fromTop ? bottom - view.y - VIEWPORT_MARGIN : view.y + view.height - VIEWPORT_MARGIN - start.y;
+    const height = clamp(start.height + (fromTop ? -dy : dy), minimum, Math.max(minimum, maximum));
+    return { ...start, y: fromTop ? bottom - height : start.y, height };
+  }
+
   function moveInteraction(event) {
     if (!interaction || event.pointerId !== interaction.pointerId) return;
+    if (!canManipulate()) {
+      cancelInteraction();
+      return;
+    }
     const dx = event.clientX - interaction.startX;
     const dy = event.clientY - interaction.startY;
     const start = interaction.rect;
     const view = viewport();
-    const candidate = interaction.type === "move"
-      ? { ...start, x: start.x + dx, y: start.y + dy }
-      : interaction.type === "resize-left" || interaction.type === "resize-right"
-        ? resizeEdge(start, interaction.type, dx, view)
-        : { ...start, width: start.width + dx, height: start.height + dy };
+    let candidate = { ...start, width: start.width + dx, height: start.height + dy };
+    if (interaction.type === "move") candidate = { ...start, x: start.x + dx, y: start.y + dy };
+    if (interaction.type === "resize-left" || interaction.type === "resize-right") candidate = resizeEdge(start, interaction.type, dx, view);
+    if (interaction.type === "resize-top" || interaction.type === "resize-bottom") candidate = resizeHeight(start, interaction.type, dy, view);
     floatingRect = clampFloating(candidate, view);
     writeRect(floatingRect);
     event.preventDefault();
@@ -186,8 +217,9 @@ export function createAssistantWindow({ panel, header, fullPageToggle, resizeHan
 
   function handleMoveKey(event) {
     if (event.target !== header || !ARROW_KEYS.has(event.key) || event.altKey || event.ctrlKey || event.metaKey) return;
+    if (!canManipulate() || interaction) return;
     event.preventDefault();
-    if (fullPage || viewport().width <= 480) return;
+    applyGeometry();
     const delta = arrowDeltas(event.key, keyStep(event));
     floatingRect = clampFloating({ ...floatingRect, x: floatingRect.x + delta.x, y: floatingRect.y + delta.y }, viewport());
     writeRect(floatingRect);
@@ -195,8 +227,9 @@ export function createAssistantWindow({ panel, header, fullPageToggle, resizeHan
 
   function handleResizeKey(event) {
     if (!ARROW_KEYS.has(event.key) || event.altKey || event.ctrlKey || event.metaKey) return;
+    if (!canManipulate() || interaction) return;
     event.preventDefault();
-    if (fullPage || viewport().width <= 480) return;
+    applyGeometry();
     const delta = arrowDeltas(event.key, keyStep(event));
     floatingRect = clampFloating({ ...floatingRect, width: floatingRect.width + delta.x, height: floatingRect.height + delta.y }, viewport());
     writeRect(floatingRect);
@@ -204,12 +237,24 @@ export function createAssistantWindow({ panel, header, fullPageToggle, resizeHan
 
   function handleEdgeResizeKey(event) {
     if (!["ArrowLeft", "ArrowRight"].includes(event.key) || event.altKey || event.ctrlKey || event.metaKey) return;
+    if (!canManipulate() || interaction) return;
     event.preventDefault();
+    applyGeometry();
     const view = viewport();
-    if (fullPage || view.width <= 480) return;
     const type = event.currentTarget === leftResizeHandle ? "resize-left" : "resize-right";
     const delta = arrowDeltas(event.key, keyStep(event));
     floatingRect = clampFloating(resizeEdge(floatingRect, type, delta.x, view), view);
+    writeRect(floatingRect);
+  }
+
+  function handleHeightResizeKey(event) {
+    if (!["ArrowUp", "ArrowDown"].includes(event.key) || event.altKey || event.ctrlKey || event.metaKey) return;
+    if (!canManipulate() || interaction) return;
+    event.preventDefault();
+    applyGeometry();
+    const type = event.currentTarget === topResizeHandle ? "resize-top" : "resize-bottom";
+    const delta = arrowDeltas(event.key, keyStep(event));
+    floatingRect = clampFloating(resizeHeight(floatingRect, type, delta.y, viewport()), viewport());
     writeRect(floatingRect);
   }
 
@@ -222,7 +267,9 @@ export function createAssistantWindow({ panel, header, fullPageToggle, resizeHan
   resizeHandle.addEventListener("pointerdown", (event) => startInteraction("resize", event));
   leftResizeHandle?.addEventListener("pointerdown", (event) => startInteraction("resize-left", event));
   rightResizeHandle?.addEventListener("pointerdown", (event) => startInteraction("resize-right", event));
-  for (const target of [header, resizeHandle, ...edgeHandles]) {
+  topResizeHandle?.addEventListener("pointerdown", (event) => startInteraction("resize-top", event));
+  bottomResizeHandle?.addEventListener("pointerdown", (event) => startInteraction("resize-bottom", event));
+  for (const target of [header, ...resizeHandles]) {
     target.addEventListener("pointermove", moveInteraction);
     target.addEventListener("pointerup", endInteraction);
     target.addEventListener("pointercancel", endInteraction);
@@ -231,7 +278,9 @@ export function createAssistantWindow({ panel, header, fullPageToggle, resizeHan
   header.addEventListener("keydown", handleMoveKey);
   resizeHandle.addEventListener("keydown", handleResizeKey);
   for (const handle of edgeHandles) handle.addEventListener("keydown", handleEdgeResizeKey);
+  for (const handle of heightHandles) handle.addEventListener("keydown", handleHeightResizeKey);
   fullPageToggle.addEventListener("click", () => {
+    if (panel.hidden) return;
     cancelInteraction();
     fullPage = !fullPage;
     applyGeometry();
@@ -246,6 +295,7 @@ export function createAssistantWindow({ panel, header, fullPageToggle, resizeHan
       updateLabels();
     },
     show: applyGeometry,
+    cancelInteraction,
     isFullPage() {
       return fullPage;
     },

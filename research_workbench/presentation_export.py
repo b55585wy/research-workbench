@@ -4,6 +4,7 @@ Text, tables, charts and worksheets are native OOXML objects.  Nothing is
 captured as a whole-slide raster image and no dataset or PDF bytes are embedded.
 """
 import math
+import re
 import tempfile
 import threading
 import xml.etree.ElementTree as ET
@@ -12,6 +13,7 @@ from pathlib import Path
 
 from .chart_export import STYLE_PALETTES
 from .models import WorkspaceError
+from .presentation_paper import page_scope
 
 try:
     from pptx import Presentation
@@ -31,6 +33,7 @@ _EXPORT_SLOTS = threading.BoundedSemaphore(MAX_EXPORTS)
 INK = (32, 37, 48)
 MUTED = (92, 99, 112)
 PANEL = (249, 250, 251)
+DOI_PATTERN = re.compile(r'^10\.\d{4,9}/[-._;()/:A-Za-z0-9]+$')
 
 
 def _rgb(value):
@@ -101,6 +104,12 @@ def _base_slide(prs, palette):
 
 
 def _source_notes(source):
+    if source['kind'] == 'paper':
+        return f"{source['ref']} | paper | {source['title']} | id={source['id']} | " \
+               f"file_sha256={source['file_sha256']} | source_sha256={source['sha']} | " \
+               f"pages={page_scope(source['pages'])} | page_count={source['page_count']} | " \
+               f"text_chars={source['text_chars']} | " \
+               f"empty_pages={page_scope(source['empty_pages']) or 'none'}"
     if source['kind'] == 'note':
         page = source['page'] if source['page'] is not None else 'study'
         return f"{source['ref']} | note | {source['title']} | id={source['id']} | " \
@@ -112,6 +121,12 @@ def _source_notes(source):
                f"used={summary['used_rows']} | excluded={summary['excluded_rows']}"
     return f"{source['ref']} | analysis | {source['title']} | id={source['id']} | " \
            f"sha256={source['sha']} | method={source['method']} | engine={source['engine']}"
+
+
+def _paper_footer(slide, paper):
+    text = f"来源：{_label(paper['title'], 70)} · 第 {page_scope(paper['pages'])} 页"
+    _textbox(slide, Inches(0.55), Inches(7.0), Inches(12.2), Inches(0.3),
+             text, 8, color=MUTED)
 
 
 def _content_slide(prs, item, palette, sources):
@@ -129,6 +144,10 @@ def _content_slide(prs, item, palette, sources):
                Inches(6.45), Inches(5.35))
     notes = [_source_notes(sources[ref]) for ref in item.source_refs if ref in sources]
     slide.notes_slide.notes_text_frame.text = '\n'.join(notes)
+    paper = next((sources[ref] for ref in item.source_refs
+                  if ref in sources and sources[ref]['kind'] == 'paper'), None)
+    if paper is not None:
+        _paper_footer(slide, paper)
     return slide
 
 
@@ -363,6 +382,53 @@ def _chart(slide, source, palette, left, top, width, height):
     return _scatter_chart(slide, source, palette, plot_left, plot_top, plot_width, plot_height)
 
 
+def _paper_reference(prs, papers, palette):
+    if not papers:
+        return None
+    for paper in papers:
+        slide = _base_slide(prs, palette)
+        _textbox(slide, Inches(0.5), Inches(0.35), Inches(12.3), Inches(0.8),
+                 '论文来源 / Paper reference', 22, bold=True)
+        top = Inches(1.35)
+        title_size = 20 if len(paper['title']) <= 90 else 16 if len(paper['title']) <= 140 else 13
+        _textbox(slide, Inches(0.6), top, Inches(12.1), Inches(1.2),
+                 _label(paper['title'], 180), title_size, bold=True)
+        top += Inches(1.25)
+        if paper.get('authors'):
+            long_authors = len(paper['authors']) > 120
+            author_height = Inches(1.1 if long_authors else 0.6)
+            _textbox(slide, Inches(0.6), top, Inches(12.1), author_height,
+                     '作者 / Authors：' + _label(paper['authors'], 300, ''),
+                     11 if long_authors else 14)
+            top += author_height + Inches(0.05)
+        if paper.get('year') is not None:
+            _textbox(slide, Inches(0.6), top, Inches(12.1), Inches(0.45),
+                     f"年份 / Year：{paper['year']}", 14)
+            top += Inches(0.45)
+        if paper.get('doi'):
+            long_doi = len(paper['doi']) > 100
+            doi_height = Inches(1.0 if long_doi else 0.45)
+            frame = _textbox(slide, Inches(0.6), top, Inches(12.1), doi_height,
+                             'DOI：' + _label(paper['doi'], 255, ''),
+                             10 if long_doi else 14)
+            doi = paper['doi'].strip()
+            if DOI_PATTERN.fullmatch(doi):
+                run = frame.paragraphs[0].runs[0]
+                run.hyperlink.address = 'https://doi.org/' + doi
+            top += doi_height + Inches(0.05)
+        scope = page_scope(paper['pages'])
+        _textbox(slide, Inches(0.6), top + Inches(0.2), Inches(12.1), Inches(0.7),
+                 f'阅读范围 / Reading scope：第 {scope} 页'
+                 f'（PDF 共 {paper["page_count"]} 页；实际读取 {len(paper["pages"])} 页；'
+                 f'可提取文字 {paper["text_chars"]} 字符）', 13)
+        if paper['empty_pages']:
+            _textbox(slide, Inches(0.6), top + Inches(0.95), Inches(12.1), Inches(0.5),
+                     '无可提取文字的页码 / No native text：'
+                     + page_scope(paper['empty_pages']), 12, color=MUTED)
+        slide.notes_slide.notes_text_frame.text = _source_notes(paper)
+    return slide
+
+
 def _appendix(prs, sources, palette):
     chunks = [sources[index:index + 7] for index in range(0, len(sources), 7)]
     for number, chunk in enumerate(chunks, 1):
@@ -438,7 +504,11 @@ def build_presentation(store, context, outline, style):
         sources = {source['ref']: source for source in context['sources']}
         for item in outline.slides:
             _content_slide(prs, item, palette, sources)
-        _appendix(prs, context['sources'], palette)
+        papers = [source for source in context['sources'] if source['kind'] == 'paper']
+        if papers:
+            _paper_reference(prs, papers, palette)
+        _appendix(prs, [source for source in context['sources'] if source['kind'] != 'paper'],
+                  palette)
         with tempfile.NamedTemporaryFile(dir=store.exports, suffix='.pptx', delete=False) as stream:
             path = Path(stream.name)
         prs.save(str(path))
