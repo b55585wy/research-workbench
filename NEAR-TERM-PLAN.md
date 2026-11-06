@@ -1,7 +1,8 @@
 # research workspace：近期任务计划
 
-更新：2026-11-06。用户本轮明确优先手机阅读全屏；医工功能先于后续新增阅读主线的排序保留。
-最新双站前端 v0.71.2、后端 v0.64.0：[手机全屏](MOBILE-READING-FULLSCREEN.md)已接通PDF和流式阅读图标入口、原生/沉浸回退与位置保持，并补齐横屏PDF退出入口；[更新复用](OFFLINE-CACHE-REUSE.md)、[连续滚动与批注弹窗](READER-CONTINUOUS-LAYOUT.md)、[绘图加载](CHART-RENDERER-LOADING.md)、[按钮布局](BUTTON-LAYOUT.md)、[笔记/批注弹层](NOTES-ACTION-LAYOUT.md)、手机助手焦点及[医学生示例数据引导](MEDICAL-TEACHING-DATA.md)、常驻试读、自定义绘图 skill 保留。前端由 Codex 实现，后端默认由 DeepSeek 官方 API 实现；本轮没有后端改动。实际核对见 [发布记录](UPDATE-POLICY.md)。
+更新：2026-11-06。当前前端 v0.72.0、核心后端 v0.64.0，另有独立论文PPT服务 v0.72.0；两站用户资料仍独立。
+[PDF生成论文PPT](PAPER-PRESENTATIONS.md)与[助手窗口/快捷键](ASSISTANT-WINDOW.md)已上线：选全文或页码、带来源的可编辑PPTX；助手可上下移动/调整高度/收起保留，Enter发送、Ctrl/Shift+Enter换行。Agent聊天直接生成PPT尚未接入。
+近期后续：Agent聊天调用PPT工具、真实资料的生成质量核对、笔记控制器C的有界抽取；这些尚未完成。医工功能先于新增阅读主线的顺序保留。
 **今日状态以 [2026-11-06 计划](TODAY-PLAN-2026-11-06.md) 为准：此前 A、B 及本轮布局已完成；笔记控制器 C 仍待有界抽取。以下已交付项目不再重复排期。**
 最新反馈的翻译简化、工作区入口/区别说明和助手原页引用修正已随 v0.63.0 完成；自定义 skill 首版也已随 v0.64.0 完成。
 上一轮 v0.61.0：已读 PDF 缓存、独立掌握星级、笔记图标/颜色圆点、折叠筛选、简洁译文展示。缓存仍先核对当前工作区和来源，不替代本机正式存储。见 [功能与有界核对](CACHE-NOTES.md) 和 [发布记录](UPDATE-POLICY.md)。
